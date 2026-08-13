@@ -295,6 +295,20 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
+function Remove-UpdateArtifact {
+  param([string] $Path)
+  if (-not $Path) { return }
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    try {
+      Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+      return
+    } catch {
+      if ($attempt -lt 19) { Start-Sleep -Milliseconds 100 }
+    }
+  }
+}
+
 function New-VerifiedStage {
   param([string] $Source, [string] $Target)
   if (-not $Source -or -not $Target -or -not (Test-Path -LiteralPath $Source -PathType Leaf)) { return $null }
@@ -305,7 +319,7 @@ function New-VerifiedStage {
   $sourceHash = (Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash
   $stagedHash = (Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash
   if ($sourceHash -ne $stagedHash) {
-    Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+    Remove-UpdateArtifact -Path $temporary
     throw "Staged update verification failed for $Target"
   }
   return [pscustomobject]@{ Target = $Target; Temporary = $temporary; Backup = ""; HadOriginal = (Test-Path -LiteralPath $Target) }
@@ -329,7 +343,7 @@ function Restore-CommittedStage {
     if (Test-Path -LiteralPath $Stage.Target) {
       $discard = $Stage.Target + "." + [Guid]::NewGuid().ToString("N") + ".rollback"
       [System.IO.File]::Replace($Stage.Backup, $Stage.Target, $discard, $true)
-      if (Test-Path -LiteralPath $discard) { Remove-Item -LiteralPath $discard -Force }
+      Remove-UpdateArtifact -Path $discard
     } else {
       [System.IO.File]::Move($Stage.Backup, $Stage.Target)
     }
@@ -359,8 +373,8 @@ try {
   throw
 } finally {
   foreach ($stage in $stages) {
-    if ($stage.Temporary -and (Test-Path -LiteralPath $stage.Temporary)) { Remove-Item -LiteralPath $stage.Temporary -Force -ErrorAction SilentlyContinue }
-    if ($stage.Backup -and (Test-Path -LiteralPath $stage.Backup)) { Remove-Item -LiteralPath $stage.Backup -Force -ErrorAction SilentlyContinue }
+    Remove-UpdateArtifact -Path $stage.Temporary
+    Remove-UpdateArtifact -Path $stage.Backup
   }
 }
 if ($ObsoleteExe -and
