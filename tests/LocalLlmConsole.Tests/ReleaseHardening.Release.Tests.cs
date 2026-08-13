@@ -587,8 +587,14 @@ public sealed partial class ReleaseHardeningTests
             string.Equals("old-app", await File.ReadAllTextAsync(targetExe, TestContext.Current.CancellationToken), StringComparison.Ordinal),
             diagnostics);
         Assert.True(Directory.Exists(targetCli), diagnostics);
-        Assert.Empty(Directory.EnumerateFiles(root, ".*.new"));
-        Assert.True(!Directory.EnumerateFiles(root, ".*.bak").Any(), diagnostics);
+        var temporaryFiles = Directory.EnumerateFiles(root, ".*.new").ToArray();
+        var backupFiles = Directory.EnumerateFiles(root, ".*.bak").ToArray();
+        Assert.True(
+            temporaryFiles.Length == 0,
+            $"{diagnostics}{Environment.NewLine}Temporary files: {string.Join(", ", temporaryFiles)}");
+        Assert.True(
+            backupFiles.Length == 0,
+            $"{diagnostics}{Environment.NewLine}Backup files: {string.Join(", ", backupFiles)}");
     }
 
     [Fact]

@@ -298,14 +298,18 @@ $ErrorActionPreference = "Stop"
 function Remove-UpdateArtifact {
   param([string] $Path)
   if (-not $Path) { return }
-  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+  for ($attempt = 0; $attempt -lt 50; $attempt++) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
     try {
-      Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
-      return
+      [System.IO.File]::SetAttributes($Path, [System.IO.FileAttributes]::Normal)
+      [System.IO.File]::Delete($Path)
+      if (-not (Test-Path -LiteralPath $Path)) { return }
     } catch {
-      if ($attempt -lt 19) { Start-Sleep -Milliseconds 100 }
+      if ($attempt -eq 49) {
+        Write-Warning ("Could not remove update artifact '{0}': {1}" -f $Path, $_.Exception.Message)
+      }
     }
+    if ($attempt -lt 49) { Start-Sleep -Milliseconds 100 }
   }
 }
 
