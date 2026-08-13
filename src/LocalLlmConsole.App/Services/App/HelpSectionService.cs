@@ -17,7 +17,6 @@ public sealed class HelpSectionService
         new("models", "Models", "Models", "Find GGUF files, manage local models, and tune launch settings."),
         new("runtimes", "Runtimes", "Runtimes", "Install official llama.cpp packages or use advanced Windows and WSL tooling."),
         new("settings", "Settings", "Settings", "Configure app behavior, network access, the gateway, logs, and secrets."),
-        new("opencode", "OpenCode", "OpenCode", "Add local models and agents to OpenCode with gateway or direct endpoints."),
         new("maintenance", "Logs & Updates", "Logs & Updates", "Inspect logs, lifetime counters, runtime jobs, and app updates.")
     ];
 

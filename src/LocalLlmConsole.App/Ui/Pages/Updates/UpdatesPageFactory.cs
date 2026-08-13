@@ -30,7 +30,7 @@ public static class UpdatesPageFactory
         var root = new StackPanel { Margin = new Thickness(16) };
 
         var actions = Bar();
-        actions.Children.Add(Button(request.ViewModel.ActionText, request.Actions.PrimaryActionAsync));
+        actions.Children.Add(Button(request.ViewModel.ActionText, request.Actions.PrimaryActionAsync, VisualRole.Primary));
         actions.Children.Add(Button(Loc.T("Updates.OpenGitHubButton"), () =>
         {
             request.Actions.OpenRepository();
@@ -60,9 +60,10 @@ public static class UpdatesPageFactory
             TextWrapping = TextWrapping.Wrap
         };
 
-    private static WpfButton Button(string text, Func<Task> click)
+    private static WpfButton Button(string text, Func<Task> click, string visualRole = "")
     {
         var button = new WpfButton { Content = text };
+        VisualRole.SetButtonRole(button, visualRole);
         button.Click += async (_, _) => await click();
         return button;
     }

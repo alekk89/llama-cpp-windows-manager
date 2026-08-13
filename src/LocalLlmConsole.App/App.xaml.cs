@@ -11,6 +11,18 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        var sidecars = new AgentSidecarBootstrapService().InstallEmbedded(typeof(App).Assembly, AppContext.BaseDirectory);
+        if (sidecars.Status == AgentSidecarBootstrapStatus.Failed)
+        {
+            Trace.TraceWarning($"Agent control sidecar bootstrap failed: {sidecars.Error}");
+        }
+
+        if (e.Args.Contains("--bootstrap-agent-sidecars-only", StringComparer.OrdinalIgnoreCase))
+        {
+            Shutdown(AgentSidecarBootstrapService.VerificationExitCode(sidecars.Status));
+            return;
+        }
+
         if (!_singleInstance.TryAcquire(SingleInstanceMutexName))
         {
             _dialogs.Notify(null, "llama.cpp Windows Manager is already running.", "llama.cpp Windows Manager", MessageBoxImage.Information);

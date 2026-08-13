@@ -21,7 +21,6 @@ public partial class MainWindow
         await RefreshRuntimesAsync();
         await RefreshJobsAsync();
         await RefreshOverviewAsync();
-        if (_viewModel.CurrentPage == "OpenCode") await RefreshOpenCodeAsync();
         if (_viewModel.CurrentPage == "Lifetime") await RefreshLifetimeMetricsAsync();
         if (_viewModel.CurrentPage == "Windows") await RefreshWindowsAsync();
         if (_viewModel.CurrentPage == "WSL Linux") await RefreshWslLinuxAsync();
@@ -35,7 +34,6 @@ public partial class MainWindow
     private void ShowWindows_Click(object sender, RoutedEventArgs e) => ShowWindows();
     private void ShowWslLinux_Click(object sender, RoutedEventArgs e) => ShowWslLinux();
     private void ShowSettings_Click(object sender, RoutedEventArgs e) => ShowSettings();
-    private void ShowOpenCode_Click(object sender, RoutedEventArgs e) => ShowOpenCode();
     private void ShowLifetime_Click(object sender, RoutedEventArgs e) => ShowLifetime();
     private void ShowLogs_Click(object sender, RoutedEventArgs e) => ShowLogs();
     private void ShowUpdates_Click(object sender, RoutedEventArgs e) => ShowUpdates();

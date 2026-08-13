@@ -2,49 +2,6 @@ namespace LocalLlmConsole.Services;
 
 public sealed partial class AppServiceFactory
 {
-    public OpenCodeConfigService CreateOpenCodeConfigService()
-        => new(_workspaceRoot);
-
-    public OpenCodeModelSyncService CreateOpenCodeModelSyncService(OpenCodeConfigService openCode)
-        => new(openCode);
-
-    public OpenCodeModelWorkflowService CreateOpenCodeModelWorkflowService(OpenCodeConfigService openCode)
-        => new(openCode);
-
-    public OpenCodeModelApplicationService CreateOpenCodeModelApplicationService(OpenCodeModelWorkflowService workflow)
-        => new(workflow);
-
-    public OpenCodePageApplicationService CreateOpenCodePageApplicationService()
-        => new();
-
-    public OpenCodeLocalModelWorkflowService CreateOpenCodeLocalModelWorkflowService(OpenCodeModelSyncService sync)
-        => new(sync);
-
-    public OpenCodeLocalModelApplicationService CreateOpenCodeLocalModelApplicationService(OpenCodeLocalModelWorkflowService workflow)
-        => new(workflow);
-
-    public OpenCodeAgentWorkflowService CreateOpenCodeAgentWorkflowService(OpenCodeConfigService openCode)
-        => new(openCode);
-
-    public OpenCodeAgentApplicationService CreateOpenCodeAgentApplicationService(OpenCodeAgentWorkflowService workflow)
-        => new(workflow);
-
-    public OpenCodePageWorkflowService CreateOpenCodePageWorkflowService(OpenCodeConfigService openCode, OpenCodeModelSyncService sync)
-        => new(openCode, sync);
-
-    public OpenCodeRefreshApplicationService CreateOpenCodeRefreshApplicationService(
-        OpenCodePageWorkflowService workflow,
-        OpenCodePageApplicationService pageApplication)
-        => new(workflow, pageApplication);
-
-    public OpenCodeFileSetApplicationService CreateOpenCodeFileSetApplicationService(
-        OpenCodePageWorkflowService workflow,
-        OpenCodePageApplicationService pageApplication)
-        => new(workflow, pageApplication);
-
-    public OpenCodeSettingsSyncService CreateOpenCodeSettingsSyncService(OpenCodePageWorkflowService workflow, OpenCodeModelSyncService sync)
-        => new(workflow, sync);
-
     public JobEngine CreateJobEngine(StateStore stateStore)
         => new(stateStore, LogRoot);
 
@@ -197,6 +154,11 @@ public sealed partial class AppServiceFactory
     public DownloadHistoryApplicationService CreateDownloadHistoryApplicationService(DownloadHistoryWorkflowService workflow)
         => new(workflow);
 
-    public LocalAppService CreateLocalAppService(StateStore stateStore, JobEngine jobs, int port)
-        => new(stateStore, jobs, port);
+    public LocalAppService CreateLocalAppService(
+        StateStore stateStore,
+        JobEngine jobs,
+        int port,
+        LocalControlApi? controlApi = null,
+        LocalControlDiscoveryService? discovery = null)
+        => new(stateStore, jobs, port, controlApi, discovery);
 }

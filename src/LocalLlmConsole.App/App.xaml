@@ -3,51 +3,58 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:LocalLlmConsole">
   <Application.Resources>
-    <SolidColorBrush x:Key="AppBack" Color="#090E16"/>
-    <SolidColorBrush x:Key="SidebarBack" Color="#101927"/>
-    <SolidColorBrush x:Key="PanelBack" Color="#121C2A"/>
-    <SolidColorBrush x:Key="PanelBackAlt" Color="#192638"/>
-    <SolidColorBrush x:Key="SurfaceRaised" Color="#1C2B3E"/>
-    <SolidColorBrush x:Key="SectionHeaderBack" Color="#172436"/>
-    <SolidColorBrush x:Key="PanelBorder" Color="#293A4F"/>
-    <SolidColorBrush x:Key="PanelBorderStrong" Color="#3B516B"/>
-    <SolidColorBrush x:Key="ControlBack" Color="#1D2C3F"/>
-    <SolidColorBrush x:Key="ControlHover" Color="#273B53"/>
-    <SolidColorBrush x:Key="ControlPressed" Color="#142235"/>
-    <SolidColorBrush x:Key="InputBack" Color="#0D1623"/>
-    <SolidColorBrush x:Key="ReadOnlyBack" Color="#111C2A"/>
-    <SolidColorBrush x:Key="GridRowBack" Color="#111B29"/>
-    <SolidColorBrush x:Key="GridRowAlt" Color="#152234"/>
-    <SolidColorBrush x:Key="TextMain" Color="#F3F7FB"/>
-    <SolidColorBrush x:Key="TextMuted" Color="#96A9BC"/>
-    <SolidColorBrush x:Key="TextSoft" Color="#CBD7E3"/>
-    <SolidColorBrush x:Key="Accent" Color="#4DE0BE"/>
-    <SolidColorBrush x:Key="AccentStrong" Color="#27C99D"/>
-    <SolidColorBrush x:Key="AccentHover" Color="#62E8C8"/>
-    <SolidColorBrush x:Key="AccentForeground" Color="#061812"/>
-    <SolidColorBrush x:Key="AccentSoft" Color="#163B38"/>
-    <SolidColorBrush x:Key="AccentBlue" Color="#6CB6FF"/>
-    <SolidColorBrush x:Key="InfoSoft" Color="#183451"/>
-    <SolidColorBrush x:Key="SelectionBack" Color="#185047"/>
-    <SolidColorBrush x:Key="FocusRing" Color="#77E8CF"/>
-    <SolidColorBrush x:Key="Success" Color="#55D98C"/>
-    <SolidColorBrush x:Key="SuccessSoft" Color="#173D2B"/>
-    <SolidColorBrush x:Key="Warning" Color="#F6C45B"/>
-    <SolidColorBrush x:Key="WarningSoft" Color="#483719"/>
-    <SolidColorBrush x:Key="Danger" Color="#FF7A84"/>
-    <SolidColorBrush x:Key="DangerHover" Color="#FF97A0"/>
-    <SolidColorBrush x:Key="DangerSoft" Color="#47242C"/>
-    <SolidColorBrush x:Key="StatusBack" Color="#0F2130"/>
-    <SolidColorBrush x:Key="ShadowColor" Color="#02050A"/>
-    <SolidColorBrush x:Key="StatusQueued" Color="#29334A"/>
-    <SolidColorBrush x:Key="StatusRunning" Color="#174737"/>
-    <SolidColorBrush x:Key="StatusFailed" Color="#512832"/>
-    <SolidColorBrush x:Key="StatusCancelled" Color="#3C2B36"/>
+    <SolidColorBrush x:Key="AppBack" Color="#191918"/>
+    <SolidColorBrush x:Key="SidebarBack" Color="#151514"/>
+    <SolidColorBrush x:Key="PanelBack" Color="#1F1F1D"/>
+    <SolidColorBrush x:Key="PanelBackAlt" Color="#252523"/>
+    <SolidColorBrush x:Key="SurfaceRaised" Color="#222220"/>
+    <SolidColorBrush x:Key="SectionHeaderBack" Color="#272725"/>
+    <SolidColorBrush x:Key="PanelBorder" Color="#30302E"/>
+    <SolidColorBrush x:Key="PanelBorderStrong" Color="#42423F"/>
+    <SolidColorBrush x:Key="ControlBack" Color="#2A2A28"/>
+    <SolidColorBrush x:Key="ControlHover" Color="#343431"/>
+    <SolidColorBrush x:Key="ControlPressed" Color="#1D1D1B"/>
+    <SolidColorBrush x:Key="InputBack" Color="#181817"/>
+    <SolidColorBrush x:Key="ReadOnlyBack" Color="#20201E"/>
+    <SolidColorBrush x:Key="GridRowBack" Color="#1F1F1D"/>
+    <SolidColorBrush x:Key="GridRowAlt" Color="#232321"/>
+    <SolidColorBrush x:Key="TextMain" Color="#F3F3EF"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#92928E"/>
+    <SolidColorBrush x:Key="TextSoft" Color="#C9C9C4"/>
+    <SolidColorBrush x:Key="Accent" Color="#E8E8E3"/>
+    <SolidColorBrush x:Key="AccentStrong" Color="#D6D6D0"/>
+    <SolidColorBrush x:Key="AccentHover" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="AccentForeground" Color="#171716"/>
+    <SolidColorBrush x:Key="AccentSoft" Color="#30302D"/>
+    <SolidColorBrush x:Key="DisabledPrimaryBack" Color="#343431"/>
+    <SolidColorBrush x:Key="DisabledPrimaryBorder" Color="#555550"/>
+    <SolidColorBrush x:Key="DisabledPrimaryForeground" Color="#C7C7C1"/>
+    <SolidColorBrush x:Key="DisabledControlBack" Color="#242422"/>
+    <SolidColorBrush x:Key="DisabledControlBorder" Color="#3B3B38"/>
+    <SolidColorBrush x:Key="DisabledControlForeground" Color="#9B9B95"/>
+    <SolidColorBrush x:Key="AccentPressed" Color="#BDBDB7"/>
+    <SolidColorBrush x:Key="AccentBlue" Color="#AEB8FF"/>
+    <SolidColorBrush x:Key="InfoSoft" Color="#2A2A28"/>
+    <SolidColorBrush x:Key="SelectionBack" Color="#383835"/>
+    <SolidColorBrush x:Key="FocusRing" Color="#A8A8A3"/>
+    <SolidColorBrush x:Key="Success" Color="#61C991"/>
+    <SolidColorBrush x:Key="SuccessSoft" Color="#20372A"/>
+    <SolidColorBrush x:Key="Warning" Color="#E8B95A"/>
+    <SolidColorBrush x:Key="WarningSoft" Color="#3B3120"/>
+    <SolidColorBrush x:Key="Danger" Color="#F07A82"/>
+    <SolidColorBrush x:Key="DangerHover" Color="#FF969C"/>
+    <SolidColorBrush x:Key="DangerSoft" Color="#3D2528"/>
+    <SolidColorBrush x:Key="StatusBack" Color="#202422"/>
+    <SolidColorBrush x:Key="ShadowColor" Color="#000000"/>
+    <SolidColorBrush x:Key="StatusQueued" Color="#30302E"/>
+    <SolidColorBrush x:Key="StatusRunning" Color="#20372A"/>
+    <SolidColorBrush x:Key="StatusFailed" Color="#42282D"/>
+    <SolidColorBrush x:Key="StatusCancelled" Color="#342B31"/>
     <Style TargetType="Window">
       <Setter Property="Background" Value="{DynamicResource AppBack}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
-      <Setter Property="FontSize" Value="13.5"/>
+      <Setter Property="FontSize" Value="13"/>
       <Setter Property="UseLayoutRounding" Value="True"/>
       <Setter Property="SnapsToDevicePixels" Value="True"/>
       <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
@@ -71,7 +78,7 @@
             <Border Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="7"
+                    CornerRadius="6"
                     Padding="{TemplateBinding Padding}"
                     SnapsToDevicePixels="True">
               <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
@@ -85,9 +92,14 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <DataTemplate x:Key="ButtonTextTemplate">
+      <TextBlock Text="{Binding}"
+                 Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+                 VerticalAlignment="Center"/>
+    </DataTemplate>
     <Style TargetType="Button">
-      <Setter Property="MinHeight" Value="32"/>
-      <Setter Property="Padding" Value="13,6"/>
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="Padding" Value="14,6"/>
       <Setter Property="Margin" Value="0,0,8,7"/>
       <Setter Property="Background" Value="{DynamicResource ControlBack}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
@@ -97,6 +109,7 @@
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="ContentTemplate" Value="{StaticResource ButtonTextTemplate}"/>
       <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -105,37 +118,44 @@
                     Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="7"
+                    CornerRadius="6"
                     SnapsToDevicePixels="True">
-              <ContentPresenter Margin="{TemplateBinding Padding}"
+              <ContentPresenter x:Name="ButtonContent"
+                                Margin="{TemplateBinding Padding}"
                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                TextElement.Foreground="{TemplateBinding Foreground}"
                                 RecognizesAccessKey="True"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="Tag" Value="Active">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSoft}"/>
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource TextMain}"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
               </Trigger>
               <Trigger Property="local:VisualRole.ButtonRole" Value="Primary">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentStrong}"/>
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource AccentForeground}"/>
                 <Setter Property="Foreground" Value="{DynamicResource AccentForeground}"/>
               </Trigger>
               <Trigger Property="local:VisualRole.ButtonRole" Value="Danger">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DangerSoft}"/>
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Danger}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource Danger}"/>
                 <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
               </Trigger>
               <Trigger Property="local:VisualRole.ButtonRole" Value="Quiet">
                 <Setter TargetName="Chrome" Property="Background" Value="Transparent"/>
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource PanelBorder}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource TextSoft}"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextSoft}"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlHover}"/>
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Accent}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlPressed}"/>
@@ -148,6 +168,7 @@
                 </MultiTrigger.Conditions>
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentHover}"/>
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentHover}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource AccentForeground}"/>
                 <Setter Property="Foreground" Value="{DynamicResource AccentForeground}"/>
               </MultiTrigger>
               <MultiTrigger>
@@ -157,12 +178,38 @@
                 </MultiTrigger.Conditions>
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Danger}"/>
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DangerHover}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="White"/>
                 <Setter Property="Foreground" Value="White"/>
               </MultiTrigger>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Opacity" Value="0.48"/>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DisabledControlBack}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DisabledControlBorder}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter Property="Opacity" Value="1"/>
                 <Setter Property="Cursor" Value="Arrow"/>
               </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="local:VisualRole.ButtonRole" Value="Primary"/>
+                  <Condition Property="IsEnabled" Value="False"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DisabledPrimaryBack}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DisabledPrimaryBorder}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource DisabledPrimaryForeground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DisabledPrimaryForeground}"/>
+                <Setter Property="Opacity" Value="1"/>
+              </MultiTrigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="local:VisualRole.ButtonRole" Value="Primary"/>
+                  <Condition Property="IsPressed" Value="True"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentPressed}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentPressed}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource AccentForeground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AccentForeground}"/>
+              </MultiTrigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -172,8 +219,8 @@
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="HorizontalContentAlignment" Value="Left"/>
       <Setter Property="MinHeight" Value="40"/>
-      <Setter Property="Margin" Value="0,0,0,5"/>
-      <Setter Property="Padding" Value="13,8"/>
+      <Setter Property="Margin" Value="0,0,0,4"/>
+      <Setter Property="Padding" Value="14,7"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextSoft}"/>
@@ -185,22 +232,34 @@
                     Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="1"
-                    CornerRadius="7">
+                    CornerRadius="6">
               <Grid>
-                <ContentPresenter Margin="{TemplateBinding Padding}"
-                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                  VerticalAlignment="Center"/>
+                <Grid Margin="{TemplateBinding Padding}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{TemplateBinding local:VisualRole.NavGlyph}"
+                             FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                             FontSize="14"
+                             Foreground="{TemplateBinding Foreground}"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"/>
+                  <ContentPresenter Grid.Column="1"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="Center"/>
+                </Grid>
               </Grid>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlHover}"/>
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
               </Trigger>
               <Trigger Property="Tag" Value="Active">
-                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentSoft}"/>
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentStrong}"/>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlHover}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="Transparent"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
@@ -212,15 +271,46 @@
       </Setter>
     </Style>
     <Style x:Key="TitleBarButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="Width" Value="42"/>
-      <Setter Property="Height" Value="30"/>
-      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="ContentTemplate" Value="{x:Null}"/>
+      <Setter Property="Width" Value="44"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="MinHeight" Value="34"/>
       <Setter Property="Margin" Value="0"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextSoft}"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Chrome"
+                    Margin="2"
+                    Background="Transparent"
+                    CornerRadius="5">
+              <ContentPresenter HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlHover}"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ControlPressed}"/>
+              </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="Tag" Value="Close"/>
+                  <Condition Property="IsMouseOver" Value="True"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Danger}"/>
+                <Setter Property="Foreground" Value="White"/>
+              </MultiTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="DropDownPickerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="MinHeight" Value="29"/>
@@ -239,9 +329,11 @@
                     CornerRadius="5"
                     SnapsToDevicePixels="True">
               <Grid>
-                <ContentPresenter Margin="8,4,24,4"
+                <ContentPresenter x:Name="PickerContent"
+                                  Margin="8,4,24,4"
                                   HorizontalAlignment="Left"
                                   VerticalAlignment="Center"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
                                   RecognizesAccessKey="True"/>
                 <Path Data="M 0 0 L 4 4 L 8 0 Z"
                       Fill="{DynamicResource TextSoft}"
@@ -262,7 +354,11 @@
                 <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentStrong}"/>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Opacity" Value="0.52"/>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DisabledControlBack}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DisabledControlBorder}"/>
+                <Setter TargetName="PickerContent" Property="TextElement.Foreground" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter Property="Opacity" Value="1"/>
                 <Setter Property="Cursor" Value="Arrow"/>
               </Trigger>
             </ControlTemplate.Triggers>
@@ -288,7 +384,7 @@
                     Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="7">
+                    CornerRadius="6">
               <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -335,7 +431,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="7">
+                            CornerRadius="6">
                       <ContentPresenter/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -376,7 +472,7 @@
                 <Border Background="{DynamicResource PanelBackAlt}"
                         BorderBrush="{DynamicResource PanelBorderStrong}"
                         BorderThickness="1"
-                        CornerRadius="7"
+                        CornerRadius="6"
                         Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                         MaxHeight="{TemplateBinding MaxDropDownHeight}">
                   <ScrollViewer CanContentScroll="True">
@@ -658,8 +754,8 @@
       <Setter Property="RowBackground" Value="{DynamicResource GridRowBack}"/>
       <Setter Property="AlternatingRowBackground" Value="{DynamicResource GridRowAlt}"/>
       <Setter Property="HeadersVisibility" Value="Column"/>
-      <Setter Property="ColumnHeaderHeight" Value="34"/>
-      <Setter Property="RowHeight" Value="31"/>
+      <Setter Property="ColumnHeaderHeight" Value="36"/>
+      <Setter Property="RowHeight" Value="33"/>
       <Setter Property="Margin" Value="0"/>
       <Setter Property="SelectionMode" Value="Single"/>
       <Setter Property="SelectionUnit" Value="FullRow"/>
@@ -669,12 +765,12 @@
     </Style>
     <Style TargetType="DataGridColumnHeader">
       <Setter Property="Background" Value="{DynamicResource SectionHeaderBack}"/>
-      <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextSoft}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
-      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="FontSize" Value="11.5"/>
       <Setter Property="Padding" Value="12,0"/>
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
-      <Setter Property="BorderThickness" Value="0,0,1,1"/>
+      <Setter Property="BorderThickness" Value="0,0,0,1"/>
       <Setter Property="HorizontalContentAlignment" Value="Left"/>
     </Style>
     <Style TargetType="DataGridRow">
@@ -715,25 +811,38 @@
       <Setter Property="Background" Value="{DynamicResource PanelBack}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="11"/>
-      <Setter Property="Padding" Value="20"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Padding" Value="18"/>
       <Setter Property="Effect">
         <Setter.Value>
           <DropShadowEffect Color="#02050A"
-                            BlurRadius="22"
-                            ShadowDepth="3"
+                            BlurRadius="16"
+                            ShadowDepth="2"
                             Direction="270"
-                            Opacity="0.22"
+                            Opacity="0.16"
                             RenderingBias="Quality"/>
         </Setter.Value>
       </Setter>
     </Style>
     <Style TargetType="Border" x:Key="MetricCard">
       <Setter Property="Background" Value="{DynamicResource PanelBackAlt}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="5"/>
-      <Setter Property="Padding" Value="9,7"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="Padding" Value="12,9"/>
+    </Style>
+    <Style TargetType="Border" x:Key="SidebarShell">
+      <Setter Property="Background" Value="{DynamicResource SidebarBack}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource PanelBorder}"/>
+      <Setter Property="BorderThickness" Value="0,0,1,0"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Padding" Value="12"/>
+    </Style>
+    <Style TargetType="Border" x:Key="WorkspaceShell">
+      <Setter Property="Background" Value="{DynamicResource PanelBack}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
     </Style>
   </Application.Resources>
 </Application>

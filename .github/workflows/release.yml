@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -49,23 +49,41 @@ jobs:
             if (Test-Path -LiteralPath $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force }
           }
 
+      - name: Install Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) { $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw "Inno Setup compiler was not found." }
+          "path=$compiler" >> $env:GITHUB_OUTPUT
+
       - name: Run signed release gate
         shell: pwsh
         run: >-
           .\test-release-gate.ps1 -Configuration Release -Runtime win-x64
-          -IncludePublish -CertificateThumbprint "${{ steps.signing.outputs.thumbprint }}"
+          -IncludePublish -IncludeInstaller -InnoSetupPath "${{ steps.inno.outputs.path }}"
+          -CertificateThumbprint "${{ steps.signing.outputs.thumbprint }}"
           -RequireSigned
 
-      - name: Upload signed portable
-        uses: actions/upload-artifact@v4
+      - name: Upload signed release artifacts
+        uses: actions/upload-artifact@v7
         with:
-          name: LlamaCppWindowsManager-win-x64-signed
+          name: LlamaCppWindowsManager-win-x64-signed-release
           if-no-files-found: error
           path: |
             dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe
             dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe.sha256
+            dist/LlamaCppWindowsManager-win-x64/llwmctl.exe
+            dist/LlamaCppWindowsManager-win-x64/llwmctl.exe.sha256
+            dist/LlamaCppWindowsManager-win-x64/AGENTS.md
+            dist/LlamaCppWindowsManager-win-x64/agent.md
+            dist/LlamaCppWindowsManager-win-x64/docs/CONTROL_API.md
             dist/LlamaCppWindowsManager-win-x64.zip
             dist/LlamaCppWindowsManager-win-x64.zip.sha256
+            dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe
+            dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe.sha256
 
       - name: Remove imported certificate
         if: always() && steps.signing.outputs.thumbprint != ''

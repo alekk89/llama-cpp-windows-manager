@@ -44,12 +44,12 @@ public static class PageSectionFactory
         var frame = new Border
         {
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(7),
             Margin = new Thickness(0, 7, 0, 8),
             Child = grid
         };
         frame.SetResourceReference(Border.BackgroundProperty, "SurfaceRaised");
-        frame.SetResourceReference(Border.BorderBrushProperty, "PanelBorderStrong");
+        frame.SetResourceReference(Border.BorderBrushProperty, "PanelBorder");
         return frame;
     }
 
@@ -69,18 +69,7 @@ public static class PageSectionFactory
 
     private static Grid SectionHeader(string title, string description = "")
     {
-        var header = new Grid { Margin = new Thickness(1, 1, 0, 3) };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition());
-        var marker = new Border
-        {
-            Width = 4,
-            MinHeight = 26,
-            CornerRadius = new CornerRadius(2),
-            Margin = new Thickness(0, 1, 9, 1)
-        };
-        marker.SetResourceReference(Border.BackgroundProperty, "AccentStrong");
-        header.Children.Add(marker);
+        var header = new Grid { Margin = new Thickness(1, 2, 0, 4) };
         var copy = new StackPanel();
         var titleBlock = new TextBlock
         {
@@ -102,7 +91,6 @@ public static class PageSectionFactory
             descriptionBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             copy.Children.Add(descriptionBlock);
         }
-        Grid.SetColumn(copy, 1);
         header.Children.Add(copy);
         return header;
     }
@@ -116,13 +104,13 @@ public static class PageSectionFactory
         var frame = new Border
         {
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(7),
             Padding = new Thickness(2),
             Margin = new Thickness(0, 7, 0, 8),
             Child = child
         };
         frame.SetResourceReference(Border.BackgroundProperty, "SurfaceRaised");
-        frame.SetResourceReference(Border.BorderBrushProperty, "PanelBorderStrong");
+        frame.SetResourceReference(Border.BorderBrushProperty, "PanelBorder");
         Grid.SetRow(frame, 1);
         section.Children.Add(frame);
         return section;
@@ -252,6 +240,13 @@ public static class PageSectionFactory
         factory.SetValue(WpfControl.PaddingProperty, new Thickness(7, 1, 7, 2));
         factory.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
         factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
+        var labelFactory = new FrameworkElementFactory(typeof(TextBlock));
+        labelFactory.SetBinding(TextBlock.TextProperty, new WpfBinding("."));
+        labelFactory.SetBinding(TextBlock.ForegroundProperty, new WpfBinding(nameof(WpfControl.Foreground))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(WpfButton), 1)
+        });
+        factory.SetValue(ContentControl.ContentTemplateProperty, new DataTemplate { VisualTree = labelFactory });
         var style = new Style(typeof(WpfButton), (Style)WpfApplication.Current.Resources[typeof(WpfButton)]);
         var emptyTrigger = new Trigger { Property = ContentControl.ContentProperty, Value = "" };
         emptyTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));

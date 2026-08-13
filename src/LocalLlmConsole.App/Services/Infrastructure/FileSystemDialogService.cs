@@ -14,21 +14,7 @@ public sealed record OpenFilePickerRequest(
     string DefaultExt,
     string FileName,
     string InitialDirectory)
-{
-    public static OpenFilePickerRequest From(OpenCodeConfigFilePickerPlan plan)
-    {
-        ArgumentNullException.ThrowIfNull(plan);
-
-        return new OpenFilePickerRequest(
-            plan.Title,
-            plan.Filter,
-            plan.CheckFileExists,
-            plan.AddExtension,
-            plan.DefaultExt,
-            plan.FileName,
-            plan.InitialDirectory);
-    }
-}
+;
 
 public sealed class FileSystemDialogService
 {
@@ -51,9 +37,6 @@ public sealed class FileSystemDialogService
         ArgumentNullException.ThrowIfNull(request);
         return _pickOpenFile(request, owner);
     }
-
-    public string? PickOpenCodeConfigFile(OpenCodeConfigFilePickerPlan plan, Window? owner = null)
-        => PickOpenFile(OpenFilePickerRequest.From(plan), owner);
 
     public static string ExistingDirectoryOrEmpty(string path)
         => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path) ? path : "";

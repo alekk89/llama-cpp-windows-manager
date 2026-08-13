@@ -16,8 +16,6 @@ public sealed partial class AppServiceFactory
         var settingsWorkflow = CreateAppSettingsWorkflowService(stateStore, core.App.SettingsUpdates);
         var settingsApplication = CreateAppSettingsApplicationService(
             settingsWorkflow,
-            core.OpenCodeServices.OpenCodeSettingsSync,
-            stateStore,
             CreateWindowsStartupRegistrationService());
         var cacheClearWorkflow = CreateCacheClearWorkflowService(stateStore);
         var logPageWorkflow = CreateLogPageWorkflowService(stateStore);

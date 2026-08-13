@@ -169,6 +169,7 @@ public static class WindowsPageFactory
         Grid.SetColumn(descriptionText, 1);
         row.Children.Add(descriptionText);
         actionButton = Button(actionText, actionClick, _ => Loc.T("Tooltip.InstallRepairOnWindows", label));
+        VisualRole.SetButtonRole(actionButton, VisualRole.Primary);
         Grid.SetColumn(actionButton, 2);
         row.Children.Add(actionButton);
         return row;

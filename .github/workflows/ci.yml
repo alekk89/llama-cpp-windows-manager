@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -38,7 +38,7 @@ jobs:
         shell: pwsh
         run: git diff --check
 
-      - name: Package vulnerability audit
+      - name: Package security and currency audit
         shell: pwsh
         run: .\test-vulnerabilities.ps1
 
@@ -50,9 +50,14 @@ jobs:
         shell: pwsh
         run: |
           $exe = Join-Path $PWD "dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe"
+          $publishDir = Split-Path -Parent $exe
           $zip = Join-Path $PWD "dist\LlamaCppWindowsManager-win-x64.zip"
           if (-not (Test-Path -LiteralPath $exe)) { throw "Published executable was not produced: $exe" }
           if (-not (Test-Path -LiteralPath "$exe.sha256")) { throw "Published executable checksum was not produced: $exe.sha256" }
+          foreach ($sidecar in @("llwmctl.exe", "llwmctl.exe.sha256", "AGENTS.md", "agent.md", "docs\CONTROL_API.md")) {
+            $sidecarPath = Join-Path $publishDir $sidecar
+            if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) { throw "Required control sidecar was not produced: $sidecarPath" }
+          }
           if (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $exe) "LlamaCppConsole.exe")) { throw "Removed legacy executable alias was published." }
           if (-not (Test-Path -LiteralPath $zip)) { throw "Portable release archive was not produced: $zip" }
           if (-not (Test-Path -LiteralPath "$zip.sha256")) { throw "Portable release archive checksum was not produced: $zip.sha256" }

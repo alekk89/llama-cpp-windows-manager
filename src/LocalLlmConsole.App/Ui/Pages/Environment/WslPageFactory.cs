@@ -250,12 +250,14 @@ public static class WslPageFactory
     {
         var row = BaseRow(columnCount: 5, label, description);
         installButton = Button(installText, installClick, buttonToolTip);
+        VisualRole.SetButtonRole(installButton, VisualRole.Primary);
         Grid.SetColumn(installButton, 2);
         row.Children.Add(installButton);
         updateButton = Button(updateText, updateClick, buttonToolTip);
         Grid.SetColumn(updateButton, 3);
         row.Children.Add(updateButton);
         deleteButton = Button(deleteText, deleteClick, buttonToolTip);
+        VisualRole.SetButtonRole(deleteButton, VisualRole.Danger);
         Grid.SetColumn(deleteButton, 4);
         row.Children.Add(deleteButton);
         return row;
@@ -273,9 +275,11 @@ public static class WslPageFactory
     {
         var row = BaseRow(columnCount: 4, label, description);
         actionButton = Button(actionText, actionClick, _ => Loc.T("Tooltip.InstallRepairInUbuntu", label));
+        VisualRole.SetButtonRole(actionButton, VisualRole.Primary);
         Grid.SetColumn(actionButton, 2);
         row.Children.Add(actionButton);
         deleteButton = Button(deleteText, deleteClick, _ => Loc.T("Tooltip.RemoveFromUbuntu", label));
+        VisualRole.SetButtonRole(deleteButton, VisualRole.Danger);
         Grid.SetColumn(deleteButton, 3);
         row.Children.Add(deleteButton);
         return row;

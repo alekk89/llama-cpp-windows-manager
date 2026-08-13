@@ -51,8 +51,8 @@ public sealed class AppSettingsWorkflowService
         AppSettings targetSettings,
         CancellationToken cancellationToken = default)
     {
-        // When auth is disabled, clear any previously stored key to prevent
-        // it from lingering in OpenCode config or being reused if re-enabled.
+        // When auth is disabled, clear any previously stored key so it cannot
+        // be reused if authentication is re-enabled later.
         if (!targetSettings.RequireApiKeyAuth)
         {
             if (!string.IsNullOrWhiteSpace(targetSettings.ModelApiKey))

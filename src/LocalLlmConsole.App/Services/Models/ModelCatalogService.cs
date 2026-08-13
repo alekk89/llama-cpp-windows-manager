@@ -27,7 +27,7 @@ public sealed partial class ModelCatalogService
     public async Task<ModelRecord> RegisterDownloadedAsync(string modelsRoot, string modelName, string modelPath, string metadataJson)
     {
         EnsurePathInsideRoot(modelPath, modelsRoot);
-        var id = SafeId(Path.GetFileNameWithoutExtension(modelPath));
+        var id = ModelIdForPath(modelsRoot, modelPath);
         var enrichedMetadata = await Task.Run(() => MergeGgufManifest(modelPath, metadataJson));
         var record = new ModelRecord(
             id,

@@ -568,6 +568,31 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(8099, (await store.GetModelLaunchSettingsAsync(appOwned.Id))?.Port);
     }
 
+    [Fact]
+    public async Task DownloadRegistrationKeepsIdenticallyNamedFilesInDifferentManagedFoldersDistinct()
+    {
+        var root = CreateTempRoot();
+        var modelsRoot = Path.Combine(root, "models");
+        var firstPath = Path.Combine(modelsRoot, "repo-one", "model-q4.gguf");
+        var secondPath = Path.Combine(modelsRoot, "repo-two", "model-q4.gguf");
+        Directory.CreateDirectory(Path.GetDirectoryName(firstPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(secondPath)!);
+        WriteMinimalGguf(firstPath);
+        WriteMinimalGguf(secondPath);
+        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
+        await store.InitializeAsync();
+        var catalog = new ModelCatalogService(store);
+
+        var first = await catalog.RegisterDownloadedAsync(modelsRoot, "model-q4.gguf", firstPath, "{}");
+        var second = await catalog.RegisterDownloadedAsync(modelsRoot, "model-q4.gguf", secondPath, "{}");
+        var models = await store.ListModelsAsync();
+
+        Assert.NotEqual(first.Id, second.Id, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(2, models.Count(model => model.Ownership == OwnershipKind.AppOwned));
+        Assert.Contains(models, model => Path.GetFullPath(model.ModelPath) == Path.GetFullPath(firstPath));
+        Assert.Contains(models, model => Path.GetFullPath(model.ModelPath) == Path.GetFullPath(secondPath));
+    }
+
 
     [Fact]
     public async Task ModelCatalogScanCollapsesExistingAppOwnedDuplicateForSameModelPath()

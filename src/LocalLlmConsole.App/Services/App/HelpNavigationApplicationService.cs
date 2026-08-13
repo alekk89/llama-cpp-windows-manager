@@ -9,7 +9,6 @@ public enum HelpNavigationDestination
     Windows,
     WslLinux,
     Settings,
-    OpenCode,
     Logs,
     Lifetime,
     Updates
@@ -23,8 +22,6 @@ public enum HelpNavigationFocusTarget
     RuntimeJobsGrid,
     HuggingFaceQueryBox,
     ModelCombo,
-    OpenCodeModelCombo,
-    OpenCodeLocalModelCombo,
     LogsGrid
 }
 
@@ -73,12 +70,6 @@ public sealed class HelpNavigationApplicationService
                 "Help: Settings stores app preferences, network behavior, secrets, gateway options, and log limits."),
             "gateway-settings" => Settings(
                 "Help: Network settings include Auto-load gateway, Gateway port, and Gateway policy."),
-            "opencode" => OpenCode(
-                HelpNavigationFocusTarget.OpenCodeModelCombo,
-                "Help: choose Add New in OpenCode models, select a local model, then click Add."),
-            "opencode-gateway" => OpenCode(
-                HelpNavigationFocusTarget.OpenCodeLocalModelCombo,
-                "Help: add local models through the shared gateway provider or as direct per-model endpoints."),
             "logs" => Logs(
                 "Help: open logs to inspect app, model runtime, and runtime job output."),
             "lifetime" => Lifetime(
@@ -111,9 +102,6 @@ public sealed class HelpNavigationApplicationService
 
     private static HelpNavigationPlan Settings(string status)
         => new(HelpNavigationDestination.Settings, HelpNavigationFocusTarget.None, status);
-
-    private static HelpNavigationPlan OpenCode(HelpNavigationFocusTarget focus, string status)
-        => new(HelpNavigationDestination.OpenCode, focus, status);
 
     private static HelpNavigationPlan Logs(string status)
         => new(HelpNavigationDestination.Logs, HelpNavigationFocusTarget.LogsGrid, status);

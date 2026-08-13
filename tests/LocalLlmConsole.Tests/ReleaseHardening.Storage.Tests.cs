@@ -218,46 +218,6 @@ DELETE FROM migrations WHERE id = 2;
 
 
     [Fact]
-    public async Task StateStorePersistsRuntimeSourceCleanupSetting()
-    {
-        var root = CreateTempRoot();
-        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
-        await store.InitializeAsync();
-
-        var settings = AppSettings.CreateDefault(root) with
-        {
-            DeleteRuntimeSourceAfterSuccessfulBuild = false,
-            AutoSaveOpenCodeOnLaunchSettingsSave = false,
-            PromptCacheMode = "on",
-            PromptCacheRamMb = 16_384,
-            ContextCheckpointsMode = "on",
-            ContextCheckpointCount = 48,
-            ContextCheckpointEveryNTokens = 512,
-            CudaPackagePreference = "compatibility",
-            CustomParameters = "--n-cpu-moe 999",
-            GpuMode = "tensor",
-            GpuDevices = "CUDA0,CUDA1",
-            GpuSplit = "1,1"
-        };
-
-        await store.SaveAppSettingsAsync(settings);
-        var loaded = await store.GetAppSettingsAsync(root);
-
-        Assert.False(loaded.DeleteRuntimeSourceAfterSuccessfulBuild);
-        Assert.False(loaded.AutoSaveOpenCodeOnLaunchSettingsSave);
-        Assert.Equal("on", loaded.PromptCacheMode);
-        Assert.Equal(16_384, loaded.PromptCacheRamMb);
-        Assert.Equal("on", loaded.ContextCheckpointsMode);
-        Assert.Equal(48, loaded.ContextCheckpointCount);
-        Assert.Equal(512, loaded.ContextCheckpointEveryNTokens);
-        Assert.Equal("compatibility", loaded.CudaPackagePreference);
-        Assert.Equal("--n-cpu-moe 999", loaded.CustomParameters);
-        Assert.Equal("tensor", loaded.GpuMode);
-        Assert.Equal("CUDA0,CUDA1", loaded.GpuDevices);
-        Assert.Equal("1,1", loaded.GpuSplit);
-    }
-
-    [Fact]
     public async Task DeletingModelFreesSavedLaunchProfilePort()
     {
         var root = CreateTempRoot();

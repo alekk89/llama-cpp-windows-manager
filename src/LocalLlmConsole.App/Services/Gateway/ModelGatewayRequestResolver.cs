@@ -40,6 +40,24 @@ public static class ModelGatewayRequestResolver
         }
     }
 
+    public static ModelGatewayModelRoute? ResolveModel(IReadOnlyList<ModelGatewayModelRoute> models, string requestedModel)
+    {
+        var requested = (requestedModel ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(requested)) return null;
+
+        var exact = models.FirstOrDefault(route => string.Equals(route.Id, requested, StringComparison.OrdinalIgnoreCase))
+            ?? models.FirstOrDefault(route => string.Equals(route.Name, requested, StringComparison.OrdinalIgnoreCase))
+            ?? models.FirstOrDefault(route => string.Equals(route.Profile.Id, requested, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null) return exact;
+
+        return models.FirstOrDefault(route => route.Profile.IsDefault
+            && string.Equals(route.Model.Name, requested, StringComparison.OrdinalIgnoreCase))
+            ?? models.FirstOrDefault(route => route.Profile.IsDefault
+                && string.Equals(Path.GetFileName(route.Model.ModelPath), requested, StringComparison.OrdinalIgnoreCase))
+            ?? models.FirstOrDefault(route => route.Profile.IsDefault
+                && string.Equals(Path.GetFileNameWithoutExtension(route.Model.ModelPath), requested, StringComparison.OrdinalIgnoreCase));
+    }
+
     public static ModelRecord? ResolveModel(IReadOnlyList<ModelRecord> models, string requestedModel)
     {
         var requested = (requestedModel ?? "").Trim();
@@ -47,7 +65,6 @@ public static class ModelGatewayRequestResolver
 
         return models.FirstOrDefault(model => string.Equals(model.Id, requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(model => string.Equals(model.Name, requested, StringComparison.OrdinalIgnoreCase))
-            ?? models.FirstOrDefault(model => string.Equals(OpenCodeConfigService.LocalModelIdFor(model), requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(model => string.Equals(Path.GetFileName(model.ModelPath), requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(model => string.Equals(Path.GetFileNameWithoutExtension(model.ModelPath), requested, StringComparison.OrdinalIgnoreCase));
     }

@@ -8,7 +8,6 @@ public sealed record MainWindowPageControllers(
     RuntimesPageRowActionController RuntimeRows,
     WindowsPageActionController Windows,
     WslPageActionController Wsl,
-    OpenCodePageActionController OpenCode,
     OverviewPageActionController Overview,
     LogsPageActionController Logs,
     LifetimePageActionController Lifetime,
@@ -29,7 +28,6 @@ public partial class MainWindow
             runtimeRows,
             CreateWindowsPageActionController(),
             CreateWslPageActionController(),
-            CreateOpenCodePageActionController(),
             CreateOverviewPageActionController(),
             CreateLogsPageActionController(),
             CreateLifetimePageActionController(),
@@ -137,27 +135,6 @@ public partial class MainWindow
                 SetRuntimeGridColumnSizing,
                 SetRuntimeBuildGridColumnSizing,
                 SetRuntimeJobsGridColumnSizing));
-
-    private OpenCodePageActionController CreateOpenCodePageActionController()
-        => new(
-            new OpenCodePageActionControllerActions(
-                DetectOpenCodeFilesAsync,
-                ChooseOpenCodeConfigFileAsync,
-                ChooseOpenCodeAgentsFolderAsync,
-                async () => await RunAsync("Refreshing OpenCode config...", async () => await RefreshOpenCodeAsync()),
-                LoadSelectedOpenCodeModelAsync,
-                LoadOpenCodeLocalModelDraftAsync,
-                SaveOpenCodeModelSnippetAsync,
-                DeleteOpenCodeModelAsync,
-                async () => await SaveOpenCodeLocalModelSnippetAsync(addAsNew: false),
-                async () => await SaveOpenCodeLocalModelSnippetAsync(addAsNew: false),
-                async () => await SaveOpenCodeLocalModelSnippetAsync(addAsNew: true),
-                () => _openCodeModelEditor.IsProgrammaticUpdate,
-                UpdateOpenCodeModelEditorState,
-                LoadSelectedOpenCodeAgentAsync,
-                SaveOpenCodeAgentSnippetAsync,
-                DeleteOpenCodeAgentAsync,
-                CreateOpenCodeAgentAsync));
 
     private OverviewPageActionController CreateOverviewPageActionController()
         => new(

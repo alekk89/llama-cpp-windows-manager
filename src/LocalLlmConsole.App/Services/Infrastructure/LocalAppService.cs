@@ -10,16 +10,26 @@ public sealed class LocalAppService : ILocalAppServiceHost
     private readonly HashSet<Task> _requestHandlers = [];
     private readonly StateStore _stateStore;
     private readonly JobEngine _jobs;
+    private readonly LocalControlApi? _controlApi;
+    private readonly LocalControlDiscoveryService? _discovery;
     private Task? _loop;
     private int _listenerErrorCount;
 
     public Uri BaseUri { get; }
+    public string SessionToken => _security.SessionToken;
     public string LastListenerError { get; private set; } = "";
 
-    public LocalAppService(StateStore stateStore, JobEngine jobs, int port)
+    public LocalAppService(
+        StateStore stateStore,
+        JobEngine jobs,
+        int port,
+        LocalControlApi? controlApi = null,
+        LocalControlDiscoveryService? discovery = null)
     {
         _stateStore = stateStore;
         _jobs = jobs;
+        _controlApi = controlApi;
+        _discovery = discovery;
         BaseUri = new Uri($"http://127.0.0.1:{port}/");
         _listener.Prefixes.Add(BaseUri.ToString());
     }
@@ -28,6 +38,7 @@ public sealed class LocalAppService : ILocalAppServiceHost
     {
         await _jobs.RecoverAfterRestartAsync();
         _listener.Start();
+        _discovery?.Publish(BaseUri, _security.SessionToken);
         _loop = Task.Run(() => ListenAsync(_stop.Token));
     }
 
@@ -59,7 +70,7 @@ public sealed class LocalAppService : ILocalAppServiceHost
 
     private void QueueRequest(HttpListenerContext context, CancellationToken cancellationToken)
     {
-        var task = Task.Run(() => HandleAsync(context), cancellationToken);
+        var task = Task.Run(() => HandleAsync(context, cancellationToken), cancellationToken);
         lock (_requestHandlersLock)
         {
             _requestHandlers.Add(task);
@@ -79,7 +90,7 @@ public sealed class LocalAppService : ILocalAppServiceHost
             TaskScheduler.Default);
     }
 
-    private async Task HandleAsync(HttpListenerContext context)
+    private async Task HandleAsync(HttpListenerContext context, CancellationToken cancellationToken)
     {
         try
         {
@@ -121,8 +132,23 @@ public sealed class LocalAppService : ILocalAppServiceHost
                 await WriteJsonAsync(context, 200, new { ok = true, jobs = RedactedJobs(await _stateStore.ListJobsAsync()) });
                 return;
             }
+            if (path.StartsWith("/api/v1/", StringComparison.OrdinalIgnoreCase) && _controlApi is not null)
+            {
+                var request = await BuildControlRequestAsync(context.Request, path, cancellationToken);
+                var response = await _controlApi.HandleAsync(request, cancellationToken);
+                await WriteJsonAsync(context, response.StatusCode, response.Body);
+                return;
+            }
 
             await WriteJsonAsync(context, 404, new { ok = false, error = "Not found." });
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JsonException)
+        {
+            try { await WriteJsonAsync(context, 400, new { ok = false, error = ex.Message }); }
+            catch (Exception writeEx)
+            {
+                Trace.TraceWarning($"Local app service failed to write validation response: {writeEx}");
+            }
         }
         catch (Exception ex)
         {
@@ -151,7 +177,7 @@ public sealed class LocalAppService : ILocalAppServiceHost
         var origin = context.Request.Headers["Origin"];
         if (!string.IsNullOrWhiteSpace(origin) && _security.IsLocalOriginAllowed(origin))
             context.Response.Headers["Access-Control-Allow-Origin"] = origin;
-        context.Response.Headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS";
+        context.Response.Headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
         context.Response.Headers["Access-Control-Allow-Headers"] = "content-type,authorization";
         context.Response.Headers["Vary"] = "Origin";
         context.Response.Headers["Cache-Control"] = "no-store";
@@ -169,8 +195,46 @@ public sealed class LocalAppService : ILocalAppServiceHost
         context.Response.Close();
     }
 
+    private static async Task<LocalControlRequest> BuildControlRequestAsync(
+        HttpListenerRequest request,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        const int maxBodyBytes = 1024 * 1024;
+        if (request.ContentLength64 > maxBodyBytes)
+            throw new InvalidOperationException("Control API request bodies are limited to 1 MiB.");
+
+        JsonObject? body = null;
+        if (request.HasEntityBody)
+        {
+            using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+            var buffer = new char[8192];
+            var text = new StringBuilder();
+            while (true)
+            {
+                var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
+                if (count == 0) break;
+                text.Append(buffer, 0, count);
+                if (Encoding.UTF8.GetByteCount(text.ToString()) > maxBodyBytes)
+                    throw new InvalidOperationException("Control API request bodies are limited to 1 MiB.");
+            }
+            if (!string.IsNullOrWhiteSpace(text.ToString()))
+                body = JsonNode.Parse(text.ToString()) as JsonObject
+                    ?? throw new InvalidOperationException("Control API request body must be a JSON object.");
+        }
+
+        var query = request.QueryString.AllKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .ToDictionary(key => key!, key => request.QueryString[key!] ?? "", StringComparer.OrdinalIgnoreCase);
+        var headers = request.Headers.AllKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .ToDictionary(key => key!, key => request.Headers[key!] ?? "", StringComparer.OrdinalIgnoreCase);
+        return new LocalControlRequest(request.HttpMethod, path, query, body, headers);
+    }
+
     public async ValueTask DisposeAsync()
     {
+        _discovery?.Remove();
         _stop.Cancel();
         if (_listener.IsListening) _listener.Stop();
         _listener.Close();

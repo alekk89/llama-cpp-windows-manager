@@ -1,17 +1,18 @@
 # Release Hardening Audit
 
-Audit date: 2026-05-31
+Audit date: 2026-08-13
 
 ## Executive Summary
 
-Overall release posture: **v1.1.4 is ready as an unsigned community release
-candidate with explicit SmartScreen and SHA-256 verification notes. Trusted
-code-signing and broader clean-machine/hardware validation remain follow-up
-hardening work, not hidden blockers for the current public release candidate.**
+Overall release posture: **v2.1.0 passes the repository's automated build,
+test, coverage, vulnerability, portable-publish, sidecar-bootstrap, and
+installer gates. Public artifacts must still come from the protected signed
+release workflow, and clean-machine plus hardware-matrix validation remains a
+manual release requirement.**
 
 The core release blockers from the full audit have been addressed in code:
 
-- Release build and self-contained publish now verify on .NET SDK 8.0.421 / runtime 8.0.27.
+- Release build and self-contained publish verify on .NET SDK 10.0.400 with the current .NET 10 servicing runtime.
 - Automated release-hardening tests now cover concurrent SQLite access, corrupt settings recovery, deletion boundaries, and runtime host validation.
 - SQLite access is serialized and settings saves are transactional.
 - Corrupt settings are backed up before defaults are restored; corrupt DB files are quarantined and recreated.
@@ -26,7 +27,9 @@ The core release blockers from the full audit have been addressed in code:
   verifies whether the targeted runtime stopped and logs failures for diagnosis.
 - The WSL Linux page now detects WSL, installed non-Docker distros, the default distro, and shows focused WSL/Ubuntu install or update actions.
 - Release publish omits PDB files and supports certificate signing with `-CertificateThumbprint` and `-RequireSigned`.
-- App update checks are staged through the workspace cache and replace the portable exe only after the running process closes.
+- App update checks are staged through the workspace cache; the app and control
+  CLI are copied to verified sibling files and atomically replaced after the
+  running process closes, with rollback if either replacement fails.
 - App update staging verifies a matching SHA-256 companion asset when present and requires same-certificate signature continuity when the installed app is already signed.
 - Runtime onboarding is prebuilt-first: official llama.cpp release packages can
   be installed directly before using source builds.
@@ -44,12 +47,9 @@ The core release blockers from the full audit have been addressed in code:
   direct model endpoints, both, or neither.
 - Per-model launch profiles now support saved variants, auto-detected,
   embedded/model-bundled, or explicit vision head/projector choices, vision
-  image token allowances, separate MTP head choices for compatible runtimes,
-  and OpenCode vision metadata when synced.
-- OpenCode sync can be automatic on Settings, launch-setting, or variant save
-  or manually controlled from the OpenCode page, with Settings and docs calling out that
-  OpenCode provider config stores the synced API key in plain text. Synced
-  OpenCode model output limits come from Settings > OpenCode > Limit output.
+  image token allowances and separate MTP head choices for compatible runtimes.
+- The shared gateway publishes one client-neutral route per saved launch profile
+  and never edits third-party harness configuration.
 - Fresh installer setups offer Start with Windows by default, with a matching
   current-user startup preference in Settings.
 - Settings are grouped by category, and Overview preserves completed model load
@@ -78,8 +78,13 @@ The core release blockers from the full audit have been addressed in code:
 
 - Severity: Medium
 - Area: Distribution
-- Status: Update UI, staged installer, checksum verification, and signed-app signature continuity are implemented; the public repository and v1.1.4 asset naming are confirmed.
-- Required result: Latest GitHub release contains `LlamaCppWindowsManager-win-x64.zip`, matching SHA-256 companion assets, and release notes suitable for the completion popup.
+- Status: Update UI, staged installer, checksum verification, signed-app
+  signature continuity, and rollback-safe app/CLI replacement are implemented;
+  the public repository and v2.1.0 asset naming are confirmed.
+- Required result: Latest GitHub release contains
+  `LlamaCppWindowsManager-win-x64.zip`, the standalone
+  `LlamaCppWindowsManager.exe` required by v1.x/v2.0 updaters, matching SHA-256
+  companion assets, and release notes suitable for the completion popup.
 
 ### WSL and hardware matrix
 
@@ -115,13 +120,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -SkipPublish
 ```
 
-The latest local architecture/release pass ran
+The latest local architecture/release pass on 2026-08-13 ran
 `test-release-gate.ps1 -IncludePublish -IncludeInstaller`, which wraps the
 release build, release-hardening suite, formatting verification,
-`git diff --check`, vulnerable-package audit, publish smoke, and installer
-artifact checks. The v2 portable zip contains only
-`LlamaCppWindowsManager.exe`; the updater and installer remove the obsolete
-pre-rename executable during migration.
+`git diff --check`, vulnerability/deprecation/direct-package currency audit,
+publish smoke, and installer artifact checks. Service/unit tests passed
+(`458/458`) and the WPF smoke test
+passed (`1/1`) with no skips. The v2 portable zip contains the Manager, control
+CLI, agent guides, control API reference, and
+checksum companions; the updater and installer remove the obsolete pre-rename
+executable during migration. The local verification artifacts were unsigned.
 
 ## Post-v1.1.2 Hardening
 
@@ -155,9 +163,7 @@ low-risk items that were safe to take immediately:
   summaries for AMD/Intel/Vulkan systems.
 - Overview Model Status now separates Loading/Loaded Model from Loading Time and
   keeps the completed load duration visible after startup.
-- Settings now renders preferences in category sections for easier navigation,
-  and OpenCode sync documents/writes `limit.output` from the OpenCode Limit
-  output setting.
+- Settings now renders preferences in category sections for easier navigation.
 
 Verification for this hardening pass:
 
@@ -183,10 +189,11 @@ checks passed locally.
 - Missing or deleted llama-server executable after registration.
 - Manually edited or corrupt SQLite/settings state.
 - Unicode, spaces, long paths, and non-default drive letters.
-- OpenCode missing, outdated, or misconfigured.
+- Third-party OpenAI-compatible clients with stale model ids or credentials.
 
 ## Release Decision
 
-v1.1.4 is acceptable as a clearly unsigned public community release candidate.
-A future trusted/stable Windows distribution should add Authenticode signing,
-broader clean-machine smoke testing, and wider hardware matrix validation.
+v2.1.0 is acceptable for release after the protected workflow produces signed
+portable and installer artifacts and the manual clean-machine checklist is
+completed. Local unsigned artifacts are suitable only for testing and must
+remain labelled unsigned.

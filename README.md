@@ -16,8 +16,8 @@ endpoints, and monitor loaded sessions without living in PowerShell.
 ![llama.cpp Windows Manager overview](docs/images/overview.png)
 
 Use it when you want the flexibility of `llama-server` on Windows or WSL, but
-with a UI for runtimes, ports, launch settings, logs, metrics, updates, and
-optional OpenCode config sync. It is not a hosted service or a chat-first model
+with a UI for runtimes, ports, launch settings, logs, metrics, updates, and a
+client-neutral model gateway. It is not a hosted service or a chat-first model
 library replacement.
 
 ## What It Does
@@ -33,9 +33,9 @@ library replacement.
 - Keeps advanced source builds available for native Windows or Ubuntu/WSL when a
   custom fork, branch, patch, or backend build is needed.
 - Provides an optional auto-load gateway: one shared OpenAI-compatible `/v1`
-  endpoint that starts requested models on their saved direct ports, proxies
-  requests, and can either keep existing sessions or switch to a single active
-  model.
+  endpoint that exposes each saved launch profile as a model, starts the exact
+  requested profile on its direct port, proxies requests, and can either keep
+  existing sessions or switch to a single active model.
 - Scopes LAN exposure independently for gateway and direct model ports.
 - Supports saved launch variants, reasoning/template options, vision
   head/projector selection, dynamic-resolution image token settings, MTP head
@@ -44,10 +44,6 @@ library replacement.
   activity, preserved model load duration, and two-row token monitors with
   live, average, and total values for normal and MTP token streams on the
   Overview page.
-- Optionally writes and syncs OpenCode local model/provider entries through the
-  shared gateway or direct per-model endpoints; automatic OpenCode entry sync can
-  be disabled. OpenCode `limit.output` is controlled by **Settings > OpenCode >
-  Limit output** and is written when OpenCode settings are saved or synced.
 - Offers a Start with Windows installer task, enabled by default for fresh
   installs, plus the same setting inside the app.
 - Supports 21 languages: English, Bulgarian, Spanish, Russian, German, French,
@@ -55,6 +51,10 @@ library replacement.
   Dutch, Vietnamese, Korean, Arabic, Indonesian, Hindi, Czech, and Swedish.
   The language is selectable from the sidebar and persisted across restarts.
 - Stores settings, jobs, models, runtimes, migrations, and history in SQLite.
+- Exposes its complete authenticated loopback control API through `llwmctl` and
+  classifies bounded, redacted API activity in the Logs page as **Control API**.
+  Request bodies, query values, credentials, and model-serving API keys are not
+  written to that audit log.
 
 ## Comparison
 
@@ -66,7 +66,7 @@ Windows or inside Ubuntu/WSL without living in a terminal.
 | --- | --- | --- |
 | Ollama | Simple local model runner with CLI, app, model library, and local API. | Keeps you closer to raw `llama.cpp`/GGUF workflows: install prebuilt CPU/CUDA/Vulkan/SYCL runtimes for Windows or WSL, keep custom source builds available, choose a runtime per model, and inspect logs/metrics directly. |
 | LM Studio | Polished desktop model browser, chat UI, and local OpenAI-compatible server. | Focuses less on chat UX and more on toolchain setup, source builds, runtime selection, launch profiles, and operational monitoring. |
-| Jan | Open-source local AI platform with desktop, server/API, CLI, and assistant workflows. | Stays centered on Windows-managed `llama.cpp` runtimes, plus optional OpenCode config helpers, instead of being a general assistant platform. |
+| Jan | Open-source local AI platform with desktop, server/API, CLI, and assistant workflows. | Stays centered on Windows-managed `llama.cpp` runtimes and client-neutral OpenAI-compatible serving instead of being a general assistant platform. |
 | `llama-server` | Upstream `llama.cpp` OpenAI-compatible HTTP server. | Wraps `llama-server` with Windows UI for prebuilt runtime downloads, optional Windows/WSL toolchain setup, source checkout/builds, model registration, per-model launch settings, logs, metrics, and update/install flow. |
 
 ## Safety Defaults
@@ -115,18 +115,37 @@ The normal path is prebuilt-first:
    can be loaded on their own saved ports when hardware capacity allows it. The
    Model Status card keeps Loading/Loaded Model and Loading Time on separate
    rows, preserving the final load duration after startup completes.
-5. Optional: keep **Settings > Auto-load gateway** enabled so OpenCode can use
-   one shared local provider and the app can load requested models on demand.
+5. Optional: keep **Settings > Auto-load gateway** enabled so any
+   OpenAI-compatible client can use one shared endpoint and the app can load
+   requested model profiles on demand. Query `GET /v1/models` and use the
+   returned model id; every saved launch profile is listed separately.
    Use **Gateway policy** to choose whether the router keeps existing models
    loaded or switches to a single active model.
-6. Open **OpenCode** and add each local model. The app can write gateway-backed
-   entries or direct per-model entries, and can auto-sync those entries when
-   Settings, saved launch settings, or saved variants change. The app's saved API key is
-   protected in llama.cpp Windows Manager settings, but OpenCode provider config
-   stores the synced key in plain text so OpenCode can call the local endpoint.
-   To control OpenCode's output cap, edit **Settings > OpenCode > Limit output**
-   and save Settings with **Auto-sync entries** enabled, or update the entry from
-   the OpenCode page.
+
+## Agent and CLI Control
+
+The release also includes `llwmctl.exe`, an authenticated local control client
+for coding agents, scripts, and terminal users. It controls the running
+Manager rather than launching unmanaged `llama-server` processes.
+
+```powershell
+llwmctl status
+llwmctl self
+llwmctl models list
+llwmctl load qwen3-30b-q4-k-m --profile CUDA --set contextSize=65536 --wait
+llwmctl sessions metrics qwen3-30b-q4-k-m
+llwmctl sessions logs qwen3-30b-q4-k-m
+```
+
+The control surface covers model and runtime discovery, full launch-profile
+settings, one-shot launch overrides, load/restart/unload, self-identification,
+vision/draft/MTP companions, live metrics and slots, logs, application settings,
+Hugging Face search/download, and download job control. The API binds only to
+loopback and uses a separate per-process token protected for the current Windows
+user. Agents should start with [AGENTS.md](AGENTS.md), which includes cold-start,
+self-restart recovery, troubleshooting, GitHub installation, source-build, and
+safe repository-contribution workflows. See also
+[Local control API and `llwmctl`](docs/CONTROL_API.md).
 
 Use **Show advanced** in Runtimes only when you need to download source and build
 a custom fork, branch, patch, or runtime target without a prebuilt package. The
@@ -198,7 +217,7 @@ End users should receive a release artifact, not the source tree.
 Preferred artifact:
 
 ```text
-dist\installer\LlamaCppWindowsManager-Setup-2.0.0-win-x64.exe
+dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe
 ```
 
 Portable artifacts:
@@ -208,7 +227,8 @@ dist\LlamaCppWindowsManager-win-x64.zip
 dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe
 ```
 
-The portable zip contains only the canonical `LlamaCppWindowsManager.exe` executable.
+The portable zip contains the canonical `LlamaCppWindowsManager.exe` application
+and `llwmctl.exe` control client.
 When updating an older renamed portable copy, the updater migrates to the canonical
 filename and removes the obsolete executable after the running process exits.
 
@@ -241,7 +261,7 @@ and `LOCAL_LLM_CONSOLE_WORKSPACE` variables are still accepted.
 
 - Windows 10/11 x64.
 - PowerShell 5+.
-- .NET 8 SDK.
+- .NET 10 SDK.
 - For prebuilt runtimes: no build toolchain is required. Windows or WSL
   GPU drivers/toolkits may still be needed for the chosen runtime to see the
   hardware.
@@ -278,7 +298,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1
 
 That wrapper builds the app, runs the release-hardening tests, rejects skipped
 tests, enforces targeted service/model coverage, verifies formatting, checks
-diff whitespace, and audits vulnerable packages. Include
+diff whitespace, and rejects vulnerable, deprecated, or outdated direct packages. Include
 packaging smoke checks on a release machine with:
 
 ```powershell
@@ -332,6 +352,13 @@ Remove `dist` too:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\clean-repo.ps1 -AllDist
+```
+
+For a pre-release scrub, remove all ignored build, test, diagnostics, publish,
+distribution, and isolated development-workspace output:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\clean-repo.ps1 -AllGenerated
 ```
 
 ## Project Layout

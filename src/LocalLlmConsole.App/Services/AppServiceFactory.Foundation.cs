@@ -57,7 +57,6 @@ public sealed partial class AppServiceFactory
     public MainWindowUiState CreateMainWindowUiState()
         => new(
             new MainWindowViewModel(),
-            new OpenCodeFileSetState(),
             new RuntimeCatalogSessionState(),
             new LaunchSettingsPanelState(),
             new ModelsPageState(),
@@ -66,8 +65,6 @@ public sealed partial class AppServiceFactory
             new LogsPageState(),
             new LifetimePageState(),
             new SettingsPageState(),
-            new OpenCodePageState(),
-            new OpenCodeModelEditorSession(),
             new DownloadHistoryPageState(),
             new RuntimeDashboardPageState(),
             new WindowsPageState(),
@@ -168,10 +165,8 @@ public sealed partial class AppServiceFactory
 
     public AppSettingsApplicationService CreateAppSettingsApplicationService(
         AppSettingsWorkflowService settingsWorkflow,
-        OpenCodeSettingsSyncService openCodeSettingsSync,
-        StateStore stateStore,
         WindowsStartupRegistrationService startupRegistration)
-        => new(settingsWorkflow, openCodeSettingsSync, stateStore, startupRegistration);
+        => new(settingsWorkflow, startupRegistration);
 
     public SettingsPageDefinitionService CreateSettingsPageDefinitionService()
         => new();

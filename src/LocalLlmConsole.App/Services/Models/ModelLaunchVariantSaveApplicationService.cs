@@ -1,8 +1,7 @@
 namespace LocalLlmConsole.Services;
 
 public sealed record ModelLaunchVariantSaveApplicationRequest(
-    ModelLaunchVariantWorkflowResult Result,
-    AppSettings Settings);
+    ModelLaunchVariantWorkflowResult Result);
 
 public enum ModelLaunchVariantSaveApplicationOutcome
 {
@@ -16,7 +15,6 @@ public sealed record ModelLaunchVariantSaveActions(
     Action<string> SelectLaunchProfileAfterRefresh,
     Func<Task> RenderSelectedModelLaunchSettingsAsync,
     Func<Task> RefreshOverviewModelSelectorAsync,
-    Func<AppSettings, Task> SyncOpenCodeLocalProviderAsync,
     Action<string> SetStatus);
 
 public sealed record ModelLaunchVariantSaveSelectedActions(
@@ -58,7 +56,7 @@ public sealed class ModelLaunchVariantSaveApplicationService
                 actions.SelectedRuntimeId(),
                 settings));
             saved = await ApplyAsync(
-                new ModelLaunchVariantSaveApplicationRequest(result, settings),
+                new ModelLaunchVariantSaveApplicationRequest(result),
                 actions.ResultActions);
         });
 
@@ -85,8 +83,6 @@ public sealed class ModelLaunchVariantSaveApplicationService
         actions.SelectLaunchProfileAfterRefresh(result.Profile.Id);
         await actions.RenderSelectedModelLaunchSettingsAsync();
         await actions.RefreshOverviewModelSelectorAsync();
-        if (request.Settings.AutoSaveOpenCodeOnLaunchSettingsSave)
-            await actions.SyncOpenCodeLocalProviderAsync(request.Settings);
         actions.SetStatus(result.StatusMessage);
         return true;
     }
@@ -110,7 +106,6 @@ public sealed class ModelLaunchVariantSaveApplicationService
         ArgumentNullException.ThrowIfNull(actions.SelectLaunchProfileAfterRefresh);
         ArgumentNullException.ThrowIfNull(actions.RenderSelectedModelLaunchSettingsAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshOverviewModelSelectorAsync);
-        ArgumentNullException.ThrowIfNull(actions.SyncOpenCodeLocalProviderAsync);
         ArgumentNullException.ThrowIfNull(actions.SetStatus);
     }
 }

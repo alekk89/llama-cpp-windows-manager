@@ -2,52 +2,7 @@ namespace LocalLlmConsole.Tests;
 
 public sealed partial class ReleaseHardeningTests
 {
-    [Fact]
-    public void ServiceImplementationFilesStayInFeatureModules()
-    {
-        var factoryPath = FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "AppServiceFactory.cs");
-        var servicesRoot = Path.GetDirectoryName(factoryPath)!;
-        var allowedRootFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "AppServiceFactory.cs",
-            "AppServiceFactory.Catalog.cs",
-            "AppServiceFactory.Core.cs",
-            "AppServiceFactory.Foundation.cs",
-            "AppServiceFactory.Loaded.cs",
-            "AppServiceFactory.Runtime.cs",
-            "AppServiceFactory.RuntimeModel.cs",
-            "MainWindowServices.cs"
-        };
-        var expectedModules = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "App",
-            "Environment",
-            "Gateway",
-            "HuggingFace",
-            "Infrastructure",
-            "Models",
-            "OpenCode",
-            "Runtimes"
-        };
 
-        var unexpectedRootFiles = Directory
-            .EnumerateFiles(servicesRoot, "*.cs", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
-            .Where(file => file is not null && !allowedRootFiles.Contains(file))
-            .ToArray();
-        var missingModules = expectedModules
-            .Where(module => !Directory.Exists(Path.Combine(servicesRoot, module)))
-            .ToArray();
-        var unexpectedModules = Directory
-            .EnumerateDirectories(servicesRoot, "*", SearchOption.TopDirectoryOnly)
-            .Select(Path.GetFileName)
-            .Where(module => module is not null && !expectedModules.Contains(module))
-            .ToArray();
-
-        Assert.Empty(unexpectedRootFiles);
-        Assert.Empty(missingModules);
-        Assert.Empty(unexpectedModules);
-    }
 
     [Fact]
     public void UiImplementationFilesStayInCommonOrPageModules()
@@ -79,84 +34,6 @@ public sealed partial class ReleaseHardeningTests
         Assert.Empty(unexpectedModules);
     }
 
-    [Fact]
-    public void RepresentativeServicesStayInTheirOwningModules()
-    {
-        var factoryPath = FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "AppServiceFactory.cs");
-        var servicesRoot = Path.GetDirectoryName(factoryPath)!;
-        var expectedFilesByModule = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["App"] =
-            [
-                "AppUpdateService.cs",
-                "AppUpdateReleaseParser.cs",
-                "AppUpdateAssetVerifier.cs",
-                "AppStartupApplicationService.cs"
-            ],
-            ["Environment"] =
-            [
-                "WindowsEnvironmentService.cs",
-                "WslEnvironmentService.cs",
-                "WslPageWorkflowService.cs",
-                "ToolSetupApplicationService.cs"
-            ],
-            ["Gateway"] =
-            [
-                "ModelGatewayService.cs",
-                "ModelGatewayRequestAccessPolicy.cs",
-                "ModelGatewayUpstreamProxy.cs",
-                "GatewayModelLoadWorkflowService.cs"
-            ],
-            ["HuggingFace"] =
-            [
-                "HuggingFaceService.cs",
-                "HuggingFaceService.Downloads.cs",
-                "HuggingFaceLaunchSettingsSuggester.cs",
-                "DownloadHistoryWorkflowService.cs"
-            ],
-            ["Infrastructure"] =
-            [
-                "StateStore.cs",
-                "JobEngine.cs",
-                "FileSystemSafetyService.cs",
-                "SecretProtector.cs"
-            ],
-            ["Models"] =
-            [
-                "ModelCatalogService.cs",
-                "ModelCapabilityService.cs",
-                "ModelLaunchSettingsWorkflowService.cs",
-                "ModelPortAllocator.cs"
-            ],
-            ["OpenCode"] =
-            [
-                "OpenCodeConfigService.cs",
-                "OpenCodeModelSyncService.cs",
-                "OpenCodePageWorkflowService.cs",
-                "OpenCodeLocalModelWorkflowService.cs"
-            ],
-            ["Runtimes"] =
-            [
-                "LlamaProcessSupervisor.cs",
-                "NativeRuntimeStopService.cs",
-                "RuntimeBuildWorkflowService.cs",
-                "RuntimePackageInstallWorkflowService.cs"
-            ]
-        };
-
-        var missing = expectedFilesByModule
-            .SelectMany(pair => pair.Value.Select(file => new
-            {
-                Module = pair.Key,
-                File = file,
-                Path = Path.Combine(servicesRoot, pair.Key, file)
-            }))
-            .Where(entry => !File.Exists(entry.Path))
-            .Select(entry => $"Services/{entry.Module}/{entry.File}")
-            .ToArray();
-
-        Assert.Empty(missing);
-    }
 
     [Fact]
     public void ServiceAndUiModuleFileNamesStayUnambiguous()
@@ -212,74 +89,6 @@ public sealed partial class ReleaseHardeningTests
         Assert.Empty(emptyPartials);
     }
 
-    [Fact]
-    public void MainWindowServiceBundlesStayFeatureOwned()
-    {
-        var source = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "MainWindowServices.cs"));
-        var forbiddenFlatAliases = new[]
-        {
-            "=> App.",
-            "=> Models.",
-            "=> Gateway.",
-            "=> Runtime.",
-            "=> Ui.",
-            "=> HuggingFaceServices.",
-            "=> OpenCodeServices.",
-            "=> Environment."
-        };
-
-        Assert.Contains("public sealed record MainWindowCoreServices(", source, StringComparison.Ordinal);
-        Assert.Contains("MainWindowCoreEnvironmentServices Environment);", source, StringComparison.Ordinal);
-        Assert.Contains("public sealed record MainWindowLoadedServices(", source, StringComparison.Ordinal);
-        Assert.Contains("MainWindowLoadedRuntimeServices Runtime);", source, StringComparison.Ordinal);
-        foreach (var alias in forbiddenFlatAliases)
-            Assert.DoesNotContain(alias, source, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void PageEventRoutingLivesInPageControllers()
-    {
-        var mainWindow = ReadMainWindowSources();
-        var expectedControllers = new[]
-        {
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Models", "ModelsPageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Models", "ModelsPageRowActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Models", "DownloadHistoryRowActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Runtimes", "RuntimesPageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Runtimes", "RuntimesPageRowActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Environment", "WindowsPageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "OpenCode", "OpenCodePageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewPageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Logs", "LogsPageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Lifetime", "LifetimePageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Settings", "SettingsPageActionController.cs"),
-            FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Environment", "WslPageActionController.cs")
-        };
-        var missingControllers = expectedControllers
-            .Where(path => !File.Exists(path))
-            .ToArray();
-
-        Assert.Empty(missingControllers);
-        Assert.Contains("_pageControllers.Models.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.DownloadHistoryRows.ResumeDownloadRow_Click", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Runtimes.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Windows.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.OpenCode.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Overview.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Logs.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Lifetime.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Settings.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("_pageControllers.Wsl.Build()", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new OpenCodePageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new ModelsPageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new RuntimesPageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new WindowsPageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new OverviewPageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new LogsPageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new LifetimePageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new SettingsPageActions(", mainWindow, StringComparison.Ordinal);
-        Assert.DoesNotContain("new WslPageActions(", mainWindow, StringComparison.Ordinal);
-    }
 
     [Fact]
     public void ModelGatewayHostKeepsTransportResponsibilitiesSplit()

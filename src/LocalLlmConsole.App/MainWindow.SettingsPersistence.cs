@@ -32,7 +32,6 @@ public partial class MainWindow
             ApplyTheme,
             () => ApplyLaunchSettingsToControls(),
             RestartModelGatewayAsync,
-            SyncOpenCodeLocalProviderAsync,
             () => _viewModel.CurrentPage == "Settings",
             ShowSettings,
             SetStatus);
@@ -43,29 +42,7 @@ public partial class MainWindow
         Require(settingsApplication);
         var result = await settingsApplication!.EnsureModelApiKeyAsync(_settings, settings);
         if (result.GeneratedApiKey)
-        {
             _settings = result.PersistedSettings;
-            if (result.Settings.AutoSaveOpenCodeOnLaunchSettingsSave)
-                await SyncOpenCodeLocalProviderAsync(result.Settings);
-        }
         return result.Settings;
-    }
-
-    private async Task SyncOpenCodeLocalProviderAsync(AppSettings settings)
-    {
-        var settingsApplication = AppServices.SettingsApplication;
-        Require(settingsApplication);
-        await settingsApplication!.SyncOpenCodeLocalProviderAndApplyAsync(
-            new AppSettingsOpenCodeSyncApplicationRequest(
-                settings,
-                async (model, _) => await ReadModelLaunchProfileAsync(model),
-                async (model, launchSettings, cancellationToken) =>
-                    await ResolveOpenCodeModelLimitsAsync(model, launchSettings, cancellationToken)),
-            new AppSettingsOpenCodeSyncApplicationActions(
-                fileSet => _openCodeFileSet.Set(fileSet),
-                () => _viewModel.CurrentPage == "OpenCode",
-                () => RefreshOpenCodeAsync(),
-                UpdateOpenCodeHealthAsync,
-                WriteAppLogAsync));
     }
 }

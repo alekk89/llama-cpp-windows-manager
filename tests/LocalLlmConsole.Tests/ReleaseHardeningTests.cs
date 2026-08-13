@@ -62,12 +62,6 @@ public sealed partial class ReleaseHardeningTests
         return path;
     }
 
-    private static OpenCodeLocalModelWorkflowService CreateOpenCodeLocalModelWorkflowService(string root)
-        => new(new OpenCodeModelSyncService(new OpenCodeConfigService(root)));
-
-    private static OpenCodeLocalModelApplicationService CreateOpenCodeLocalModelApplicationService(string root)
-        => new(CreateOpenCodeLocalModelWorkflowService(root));
-
     private static string FindRepositoryFile(params string[] segments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

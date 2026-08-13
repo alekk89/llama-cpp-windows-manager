@@ -4,7 +4,7 @@
 
 The release target is Windows-first and self-contained for the UI, with llama.cpp running either as a native Windows `llama-server.exe` or inside Ubuntu/WSL. The repo owns code and process control:
 
-- .NET 8 WPF desktop shell
+- .NET 10 WPF desktop shell
 - single app instance per Windows user session
 - Local app service with per-session auth token
 - serialized SQLite state store
@@ -20,15 +20,14 @@ The repo does not own large data by default:
 
 - GGUF models
 - downloaded/extracted llama.cpp builds
-- OpenCode config
 
-The startup workspace is fixed for the process and defaults to `data` beside `LlamaCppWindowsManager.exe` when that location is writable. If not, it falls back to `%LocalAppData%\llama.cpp Windows Manager`, while reusing `%LocalAppData%\llama.cpp Console` or `%LocalAppData%\LocalLlmConsole` only when those legacy folders already exist. It can be overridden with `LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE` before launch; `LLAMA_CPP_CONSOLE_WORKSPACE` and `LOCAL_LLM_CONSOLE_WORKSPACE` remain accepted as legacy aliases. Models and runtimes are configured in App Settings and stored in SQLite. Cache data is kept inside the fixed workspace and is not exposed as a separate Settings folder. The source tree now contains only the WPF app, tests, docs, and the helper script that is embedded in the exe and extracted on demand to `data\tools` for llama.cpp builds.
+The startup workspace is fixed for the process and defaults to `data` beside `LlamaCppWindowsManager.exe` when that location is writable. If not, it falls back to `%LocalAppData%\llama.cpp Windows Manager`, while reusing `%LocalAppData%\llama.cpp Console` or `%LocalAppData%\LocalLlmConsole` only when those legacy folders already exist. It can be overridden with `LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE` before launch; `LLAMA_CPP_CONSOLE_WORKSPACE` and `LOCAL_LLM_CONSOLE_WORKSPACE` remain accepted as legacy aliases. Models and runtimes are configured in App Settings and stored in SQLite. Cache data is kept inside the fixed workspace and is not exposed as a separate Settings folder. The source tree contains the WPF app, the `llwmctl` control CLI, tests, docs, and the helper script used for llama.cpp builds. Release builds embed the CLI and agent-control sidecars in the app executable and restore verified copies beside it at startup.
 
 ## Runtime Shape
 
 ```mermaid
 flowchart LR
-  UI[".NET 8 WPF Shell"] --> API["Local App Service :8090"]
+  UI[".NET 10 WPF Shell"] --> API["Local App Service :8090"]
   API --> DB["SQLite State Store"]
   UI --> Jobs["Hidden Job Engine"]
   UI --> Gateway["Auto-load Gateway :gateway port"]
@@ -131,7 +130,7 @@ state, and page controllers. Startup/shutdown wiring stays in
 controllers where a page has meaningful action wiring.
 
 `MainWindow` dependencies are grouped by ownership. Core services are read
-through named bundles (`App`, `Ui`, `Models`, `Runtime`, `OpenCodeServices`,
+through named bundles (`App`, `Ui`, `Models`, `Runtime`,
 `HuggingFaceServices`, and `Environment`), and loaded services are read through
 their post-startup bundles (`App`, `Models`, `Gateway`, and `Runtime`). These
 bundle records intentionally do not expose flat pass-through aliases; the
@@ -142,24 +141,23 @@ top-level `Services` folder is reserved for composition/root wiring
 (`AppServiceFactory*` and `MainWindowServices`), while implementation code lives
 under `Services/App`, `Services/Environment`, `Services/Gateway`,
 `Services/HuggingFace`, `Services/Infrastructure`, `Services/Models`,
-`Services/OpenCode`, and `Services/Runtimes`. UI factories and page state are
+and `Services/Runtimes`. UI factories and page state are
 similarly grouped under `Ui/Common` and `Ui/Pages/*`; larger UI factories such
 as `LaunchSettingsPanelFactory` are split into shell, section composition,
 control factories, picker menus, and layout helpers. The current code keeps
 file-scoped namespaces stable; namespace tightening can happen module-by-module
 if it provides clear value.
 
-- `MainWindowViewModel` and page view models (`OverviewPageViewModel`, `ModelsPageViewModel`, `RuntimesPageViewModel`, `RuntimePackagesPageViewModel`, `RuntimeBuildsPageViewModel`, `RuntimeMetricsViewModel`, `WindowsPageViewModel`, `WslLinuxPageViewModel`, `HuggingFacePageViewModel`, `JobsViewModel`, `LogsViewModel`, `SettingsPageViewModel`, `OpenCodePageViewModel`, `LaunchSettingsViewModel`, `UpdatesPageViewModel`, and `LifetimeMetricsViewModel`) own row collections, selection lists, status/busy state, and deterministic row projection for migrated pages.
+- `MainWindowViewModel` and page view models (`OverviewPageViewModel`, `ModelsPageViewModel`, `RuntimesPageViewModel`, `RuntimePackagesPageViewModel`, `RuntimeBuildsPageViewModel`, `RuntimeMetricsViewModel`, `WindowsPageViewModel`, `WslLinuxPageViewModel`, `HuggingFacePageViewModel`, `JobsViewModel`, `LogsViewModel`, `SettingsPageViewModel`, `LaunchSettingsViewModel`, `UpdatesPageViewModel`, and `LifetimeMetricsViewModel`) own row collections, selection lists, status/busy state, and deterministic row projection for migrated pages.
+- `LocalControlApi`, `LocalControlDiscoveryService`, and `llwmctl` own the versioned loopback automation surface, current-user endpoint/token discovery, safe model self-identification, full typed setting patches, and structured command output. `ControlRequestAdmissionService` applies self-preservation rules, while `ControlOperationCatalog` exposes machine and application operations. `ControlApiAuditLogService` writes a bounded request audit containing only method, path, result status, and duration; `LogFileService` exposes it in the Logs page as Type **Control API**. Control actions reuse the same model/runtime services and dispatch UI synchronization through the shell bridge.
 - `StateStore`, `JobEngine`, and `SecretProtector` own durable state, jobs, protected settings, and persisted job-transition validation.
 - `ModelCatalogService`, `HuggingFaceService`, `HuggingFaceInstallStateService`, `HuggingFaceLaunchSettingsSuggester`, and `ModelCapabilityService` own model discovery, download lifecycle, matching mmproj/projector companion downloads, installed/download button state, README launch hints, and local model capability inference. Hugging Face launch suggestion parsing is split across config JSON parsing, README command extraction, shell tokenization, and option mapping.
 - `RuntimeRegistryService`, `RuntimeAdapter`, `RuntimeDeletionPlanner`, `RuntimeDeletionExecutorService`, `RuntimePackageSourceCatalog`, `RuntimePackageReleaseClient`, `RuntimePackageAssetSelector`, `RuntimePackageInstallFileService`, `RuntimePackageInventoryPresenter`, `RuntimeBuildCatalogService`, `RuntimeBuildJobService`, `RuntimeBuildToolService`, `RuntimeMetadataService`, `RuntimeEquivalenceService`, `RuntimeFileService`, `RuntimePortAllocator`, `ModelPortAllocator`, and `RuntimeEndpointService` own runtime discovery, launch validation, deletion planning, deletion execution, prebuilt package source/feed selection, release parsing, asset matching, extraction/metadata stamping, package inventory projection, source/build catalog metadata and remote-ref parsing, build job payload/log metadata, build-tool command construction, source/prebuilt equivalence, safe delete boundaries, model-server URLs, stable per-model ports, and served-model matching.
 - `LlamaProcessSupervisor`, `NativeRuntimeStopService`, `LlamaRuntimeOutputObserver`, `TrackedProcessRunner`, `WindowsEnvironmentService`, `WindowsSetupCommands`, `WslEnvironmentService`, `WslSetupCommands`, and `CommandLineService` own process supervision, native process stop verification, runtime stdout/stderr observation, tracked process execution, Windows and WSL detection/status/tool-probe parsing, setup/probe commands, and visible shell command quoting/launching.
-- `RuntimeMetrics`, `RuntimeDashboardService`, `GpuStatusService`, `LogFileService`, `FileSystemSafetyService`, `ConfigFileSafetyService`, `VramAdmissionService`, and `CacheMaintenanceService` own metrics parsing, live runtime dashboard math, CUDA/NVIDIA GPU summaries, Intel SYCL identification, vendor-neutral Windows GPU fallback summaries, log previews/classification/redaction/deletion planning, shared filesystem guardrails, backup-before-write config safety, conservative multi-model VRAM admission, and cache clearing safety.
+- `RuntimeMetrics`, `RuntimeDashboardService`, `GpuStatusService`, `LogFileService`, `FileSystemSafetyService`, `VramAdmissionService`, and `CacheMaintenanceService` own metrics parsing, live runtime dashboard math, CUDA/NVIDIA GPU summaries, Intel SYCL identification, vendor-neutral Windows GPU fallback summaries, log previews/classification/redaction/deletion planning, shared filesystem guardrails, conservative multi-model VRAM admission, and cache clearing safety.
 - `AppPreferenceService`, `DisplayFormatService`, `LaunchSettingMetadataService`, `LoadedModelSessionManager`, `ActiveRuntimeSessionStore`, `ModelRuntimeStatusTracker`, `ModelRuntimeStatusController`, `ModelRuntimeStatusRenderService`, `AppUpdateService`, `AppUpdateReleaseParser`, and `AppUpdateAssetVerifier` own settings option normalization, shared UI value formatting, launch-setting option/help/suggestion text, in-memory loaded-session state, running-runtime recovery state, transient model loading/loaded status timing, persisted completed load-duration display, GitHub release updates, release asset selection/version parsing, and update checksum verification.
 - `ModelGatewayService`, `ModelGatewayRequestAccessPolicy`, `ModelGatewayRequestResolver`, `ModelGatewayUpstreamProxy`, `ModelGatewayResponseWriter`, `GatewayModelLoadWorkflowService`, `GatewayRuntimeApplicationService`, `GatewayActivityStatusTracker`, and `GatewayActivityStatusController` own the shared auto-load router, access/CORS checks, model-id resolution, upstream proxying, client-facing response payloads, policy-aware load workflow, client-facing load failures, and Overview routing status.
-- `OpenCodeConfigService`, `OpenCodeSettingsSyncService`, `OpenCodeModelSyncService`, `OpenCodeLocalModelWorkflowService`, and related OpenCode application services own config discovery, provider/model/agent edits, gateway-backed versus direct local model entries, credential sync, saved launch-setting sync, OpenCode output-limit preference mapping, and vision-capability metadata.
-
-The largest service classes are also split by concern: `StateStore` separates catalog, settings, job persistence, and legacy launch-default migration; `HuggingFaceService` separates search, download lifecycle, safety verification, projector companion handling, and launch-profile suggestions; `OpenCodeConfigService` separates model/provider edits, agents, core JSON file handling, model envelopes, provider enablement, and path discovery; `LlamaProcessSupervisor` separates runtime lifecycle, launch helpers, and WSL cleanup helpers; `RuntimeBuildCatalogService` separates default presets, custom repository persistence, downloaded source metadata, preset row presentation, and backend/mode identity helpers; `RuntimeMetadataService` separates package metadata reads, preset inference, commit helpers, and runtime folder/package path helpers; `ModelGatewayService` delegates access policy, request/model resolution, upstream proxying, and response payloads to gateway helpers; `RuntimeDeletionPlanner` separates direct runtime, package, source-cache, and build-preset planning while `RuntimeDeletionExecutorService` performs state/filesystem mutation; `AppUpdateService` delegates release parsing and checksum verification to update helpers; and `ModelCatalogService` keeps legacy metadata parsing separate from normal scan/import/delete flows.
+The largest service classes are also split by concern: `StateStore` separates catalog, settings, job persistence, and legacy launch-default migration; `HuggingFaceService` separates search, download lifecycle, safety verification, projector companion handling, and launch-profile suggestions; `LlamaProcessSupervisor` separates runtime lifecycle, launch helpers, and WSL cleanup helpers; `RuntimeBuildCatalogService` separates default presets, custom repository persistence, downloaded source metadata, preset row presentation, and backend/mode identity helpers; `RuntimeMetadataService` separates package metadata reads, preset inference, commit helpers, and runtime folder/package path helpers; `ModelGatewayService` delegates access policy, request/model resolution, upstream proxying, and response payloads to gateway helpers; `RuntimeDeletionPlanner` separates direct runtime, package, source-cache, and build-preset planning while `RuntimeDeletionExecutorService` performs state/filesystem mutation; `AppUpdateService` delegates release parsing and checksum verification to update helpers; and `ModelCatalogService` keeps legacy metadata parsing separate from normal scan/import/delete flows.
 
 Domain models are grouped by use instead of living in one catch-all file: core records/enums, app defaults, per-model launch settings, and runtime/download launch payloads each have dedicated model files. MainWindow background refreshes and monitors go through a shared `RunBackground` wrapper so failures are logged and surfaced in the status line instead of becoming unobserved tasks.
 
@@ -170,7 +168,7 @@ Current:
 1. The Updates navigation item sits below Logs and defaults to **Check For Updates**.
 2. Startup checks the configured GitHub release feed in the background. When a newer release is found, the nav item changes to **Install Update**.
 3. Manual checks show either a no-updates popup or an install confirmation.
-4. Install downloads the release asset into `cache\app-updates`, extracts the portable exe when the asset is a zip, starts a hidden PowerShell handoff script, closes the app, replaces `LlamaCppWindowsManager.exe`, and restarts it.
+4. Install downloads the release asset into `cache\app-updates`, extracts the portable files when the asset is a zip, starts a hidden PowerShell handoff script, closes the app, stages and verifies sibling app/CLI files, atomically replaces both with rollback backups, and restarts only after the complete replacement succeeds.
 5. A matching SHA-256 companion asset is required and verified before extraction.
 6. If the installed app is signed, the staged update executable must be signed by the same certificate before replacement.
 7. The relaunched app shows the GitHub release name and notes from the installed update.
@@ -195,14 +193,15 @@ Current:
 9. Validate local vision/projector pairing by surfacing missing mmproj files in capability summaries, invalidating cached capabilities when a projector is added or removed, carrying auto-detected, embedded/model-bundled, or explicit per-model Vision head choices, carrying a separate MTP head path for compatible `--mtp-head` runtimes, and carrying per-model dynamic-resolution image token allowances through to `llama-server`.
 10. Save named launch variants per model so users can keep multiple runtime/port/context/vision profiles without duplicating model registration.
 11. Keep model serving local-only unless Settings explicitly enables LAN exposure. LAN exposure can be scoped to the auto-load gateway, direct model ports, or both. All launches require an API key; LAN exposure opens only model-serving endpoints, not the app-local control API.
-12. Optionally keep OpenCode local model entries synced after Settings saves, saved model launch settings, or variants change, including gateway/direct endpoint selection, `limit.output` from Settings > OpenCode > Limit output, and vision support metadata.
-13. Show model loading progress in Overview with separate model-name and loading-time rows, and retain the completed load duration after readiness is reached so users can see how long startup took.
+12. Show model loading progress in Overview with separate model-name and loading-time rows, and retain the completed load duration after readiness is reached so users can see how long startup took.
 
 Gateway routing:
 
 - The auto-load gateway listens on one OpenAI-compatible `/v1` port and never serves a model process itself.
-- Each requested model still launches on its saved direct runtime port. The gateway resolves the requested model id, ensures that direct session is loaded, then proxies the request to that direct port.
+- `GET /v1/models` exposes one route for every saved launch profile. The default profile retains the registered model id and existing model aliases; non-default profiles receive deterministic route ids derived from the model and saved profile id. Normalization collisions receive a stable hash suffix so no profile disappears from discovery.
+- Each requested profile still launches on its saved direct runtime port. The gateway resolves the requested route to a model/profile pair, ensures that exact profile is loaded, then proxies the request to that direct port. Requesting another profile for an already-running model stops that session and restarts it with the requested profile. Concurrent requests for the active profile remain concurrent until another profile queues; queued profile groups then receive FIFO priority so continuous active-profile traffic cannot starve a switch. Requests for different models remain concurrent.
 - `Prefer keeping loaded models` leaves existing sessions running and uses conservative VRAM admission before adding another GPU-backed model. `Single active model` unloads other direct sessions before loading the requested model.
+- Third-party clients discover current profile routes from `GET /v1/models`; the Manager does not discover or edit client configuration.
 - Overview reports the gateway as a router row in Loaded Model Sessions so users can see the shared endpoint, route policy, LAN exposure, and current direct-session count in the same place as loaded models.
 
 Still needed:

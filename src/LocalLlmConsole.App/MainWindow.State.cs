@@ -10,7 +10,7 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private const string AppDisplayName = "llama.cpp Windows Manager";
-    private const string AppVersionLabel = "v2.0.0";
+    private const string AppVersionLabel = "v2.1.0";
 
     private readonly string _workspaceRoot;
     private readonly AppServiceFactory _serviceFactory;
@@ -20,6 +20,7 @@ public partial class MainWindow
     private CancellationTokenSource? _runtimeLaunchOptionDiscoveryCancellation;
     private StateStore? _stateStore;
     private ILocalAppServiceHost? _service;
+    private LocalControlApi? _controlApi;
     private IModelGatewayHost? _gateway;
     private MainWindowLoadedAppServices? _appServices;
     private MainWindowLoadedModelServices? _modelServices;
@@ -30,8 +31,6 @@ public partial class MainWindow
     private AppSettings _settings;
     private AppSettings? _activeRuntimeSettings;
     private LlamaProcessSupervisor _llama => _sessions.ActiveSupervisor;
-    private readonly OpenCodeFileSetState _openCodeFileSet;
-
     private readonly RuntimeCatalogSessionState _runtimeCatalogState;
     private readonly LaunchSettingsPanelState _launchSettingsPanel;
     private readonly ModelsPageState _modelsPage;
@@ -40,8 +39,6 @@ public partial class MainWindow
     private readonly LogsPageState _logsPage;
     private readonly LifetimePageState _lifetimePage;
     private readonly SettingsPageState _settingsPage;
-    private readonly OpenCodePageState _openCodePage;
-    private readonly OpenCodeModelEditorSession _openCodeModelEditor;
     private readonly DownloadHistoryPageState _downloadHistoryPageState;
     private readonly RuntimeDashboardPageState _runtimeDashboardPage;
     private readonly WindowsPageState _windowsPage;
@@ -49,6 +46,7 @@ public partial class MainWindow
     private readonly MainWindowPageControllers _pageControllers;
     private readonly EnvironmentPageSnapshotCache _environmentPageSnapshots;
     private Forms.NotifyIcon? _trayIcon;
+    private int _controlShutdownConfirmed;
 
     private MainWindowLoadedAppServices AppServices
         => _appServices ?? throw new InvalidOperationException("Loaded app services are not initialized.");

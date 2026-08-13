@@ -56,7 +56,6 @@ public partial class MainWindow
         ModelsNavButton.Content = Localization.Loc.T("Nav.Models");
         RuntimesNavButton.Content = Localization.Loc.T("Nav.Runtimes");
         SettingsNavButton.Content = Localization.Loc.T("Nav.Settings");
-        OpenCodeNavButton.Content = Localization.Loc.T("Nav.OpenCode");
         LifetimeNavButton.Content = Localization.Loc.T("Nav.Lifetime");
         LogsNavButton.Content = Localization.Loc.T("Nav.Logs");
         ToolsNavLabel.Text = Localization.Loc.T("Nav.Tools");

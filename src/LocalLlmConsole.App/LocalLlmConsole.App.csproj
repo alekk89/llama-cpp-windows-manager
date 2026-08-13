@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,23 +11,19 @@
     <AssemblyTitle>llama.cpp Windows Manager</AssemblyTitle>
     <Product>llama.cpp Windows Manager</Product>
     <RepositoryUrl>https://github.com/alekk89/llama-cpp-windows-manager</RepositoryUrl>
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
-    <InformationalVersion>v2.0.0</InformationalVersion>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <FileVersion>2.1.0.0</FileVersion>
+    <InformationalVersion>v2.1.0</InformationalVersion>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>true</SelfContained>
-    <PublishSingleFile>true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.27" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.11" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,5 +49,6 @@
     <EmbeddedResource Include="Localization\Strings.hi.json" WithCulture="false" />
     <EmbeddedResource Include="Localization\Strings.cs.json" WithCulture="false" />
     <EmbeddedResource Include="Localization\Strings.sv.json" WithCulture="false" />
+    <EmbeddedResource Include="$(AgentBootstrapBundlePath)" LogicalName="LocalLlmConsole.AgentBootstrap.zip" Condition="'$(AgentBootstrapBundlePath)' != '' and Exists('$(AgentBootstrapBundlePath)')" />
   </ItemGroup>
 </Project>

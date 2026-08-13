@@ -2,6 +2,7 @@ namespace LocalLlmConsole.Services;
 
 public sealed record GatewayRuntimeLoadApplicationRequest(
     ModelRecord Model,
+    NamedModelLaunchProfile Profile,
     ModelGatewaySwapPolicy Policy,
     AppSettings Settings,
     LoadedModelSessionSnapshot? ExistingSession);
@@ -38,7 +39,8 @@ public sealed class GatewayRuntimeApplicationService
         ArgumentNullException.ThrowIfNull(actions);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (request.ExistingSession is { IsRunning: true } loaded)
+        if (request.ExistingSession is { IsRunning: true } loaded
+            && string.Equals(loaded.LaunchProfileId, request.Profile.Id, StringComparison.OrdinalIgnoreCase))
             return loaded;
 
         actions.StartActivity(request.Model, "switching to");
@@ -46,10 +48,11 @@ public sealed class GatewayRuntimeApplicationService
         {
             var result = await _workflow.EnsureLoadedAsync(new GatewayModelLoadWorkflowRequest(
                 request.Model,
+                request.Profile,
                 request.Policy,
                 request.Settings,
                 actions.StopModelAsync,
-                (runtime, model, launchSettings, token) => StartModelWithStatusAsync(runtime, model, launchSettings, token, actions),
+                (runtime, model, profile, launchSettings, token) => StartModelWithStatusAsync(runtime, model, profile, launchSettings, token, actions),
                 actions.EndpointAliveAsync,
                 (model, launchSettings, token) => MarkReadyWithStatusAsync(model, launchSettings, token, actions),
                 actions.SetActivityPhase),
@@ -77,12 +80,13 @@ public sealed class GatewayRuntimeApplicationService
     private static async Task StartModelWithStatusAsync(
         RuntimeRecord runtime,
         ModelRecord model,
+        NamedModelLaunchProfile profile,
         AppSettings launchSettings,
         CancellationToken cancellationToken,
         GatewayRuntimeLoadApplicationActions actions)
     {
-        actions.SetStatus($"Gateway auto-loading {model.Name}...");
-        await actions.StartModelAsync(runtime, model, launchSettings, cancellationToken);
+        actions.SetStatus($"Gateway auto-loading {model.Name} with profile {profile.Name}...");
+        await actions.StartModelAsync(runtime, model, profile, launchSettings, cancellationToken);
     }
 
     private static async Task<LoadedModelSessionSnapshot?> MarkReadyWithStatusAsync(

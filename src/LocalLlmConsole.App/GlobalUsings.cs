@@ -18,3 +18,6 @@ global using LocalLlmConsole.Models;
 global using LocalLlmConsole.Services;
 global using LocalLlmConsole.ViewModels;
 global using LocalLlmConsole.Localization;
+global using ContextMenu = System.Windows.Controls.ContextMenu;
+global using DataGrid = System.Windows.Controls.DataGrid;
+global using MenuItem = System.Windows.Controls.MenuItem;

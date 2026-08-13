@@ -23,6 +23,9 @@ public static class LogFileService
         if (name.StartsWith("app-", StringComparison.OrdinalIgnoreCase))
             return ("App", "Application events and caught errors");
 
+        if (name.StartsWith("control-api", StringComparison.OrdinalIgnoreCase))
+            return ("Control API", "Authenticated local API requests");
+
         if (name.StartsWith("runtime-build-", StringComparison.OrdinalIgnoreCase))
             return ("Runtime build", "llama.cpp build job");
 
@@ -144,6 +147,7 @@ public static class LogFileService
             redacted = redacted.Replace(trimmedApiKey, "[redacted]", StringComparison.Ordinal);
         redacted = Regex.Replace(redacted, @"(?i)(--api-key(?:=|\s+))\S+", "$1[redacted]");
         redacted = Regex.Replace(redacted, @"(?i)(Authorization\s*:\s*Bearer\s+)\S+", "$1[redacted]");
+        redacted = Regex.Replace(redacted, @"(?i)(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}", "$1[redacted]");
         return redacted;
     }
 

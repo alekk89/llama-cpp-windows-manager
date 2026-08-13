@@ -90,21 +90,6 @@ public sealed record MainWindowCoreHuggingFaceServices(
     HuggingFaceSearchApplicationService HuggingFaceSearchApplication,
     HuggingFaceDownloadApplicationService HuggingFaceDownloadApplication);
 
-public sealed record MainWindowCoreOpenCodeServices(
-    OpenCodeConfigService OpenCode,
-    OpenCodeModelSyncService OpenCodeSync,
-    OpenCodeModelWorkflowService OpenCodeModelWorkflow,
-    OpenCodeModelApplicationService OpenCodeModelApplication,
-    OpenCodePageApplicationService OpenCodePageApplication,
-    OpenCodeLocalModelWorkflowService OpenCodeLocalModelWorkflow,
-    OpenCodeLocalModelApplicationService OpenCodeLocalModelApplication,
-    OpenCodeAgentWorkflowService OpenCodeAgentWorkflow,
-    OpenCodeAgentApplicationService OpenCodeAgentApplication,
-    OpenCodePageWorkflowService OpenCodeWorkflow,
-    OpenCodeRefreshApplicationService OpenCodeRefreshApplication,
-    OpenCodeFileSetApplicationService OpenCodeFileSetApplication,
-    OpenCodeSettingsSyncService OpenCodeSettingsSync);
-
 public sealed record MainWindowCoreRuntimeServices(
     RuntimeCatalogDataService RuntimeCatalogData,
     ActiveRuntimeSessionStore ActiveSessions,
@@ -167,7 +152,6 @@ public sealed record MainWindowCoreServices(
     MainWindowCoreUiServices Ui,
     MainWindowCoreAppServices App,
     MainWindowCoreHuggingFaceServices HuggingFaceServices,
-    MainWindowCoreOpenCodeServices OpenCodeServices,
     MainWindowCoreRuntimeServices Runtime,
     MainWindowCoreModelServices Models,
     MainWindowCoreEnvironmentServices Environment);

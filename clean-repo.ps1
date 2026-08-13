@@ -1,5 +1,6 @@
 param(
-  [switch] $AllDist
+  [switch] $AllDist,
+  [switch] $AllGenerated
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,8 +48,16 @@ foreach ($dir in ($generatedDirs | Sort-Object { $_.FullName.Length } -Descendin
   Remove-RepoPath -Path $dir.FullName -Label "generated directory"
 }
 
+Remove-RepoPath -Path (Join-Path $RepoRoot "TestResults") -Label "root test-results folder"
+
+if ($AllGenerated) {
+  foreach ($name in @("diagnostics", "publish", "publish-pr7", "workspace")) {
+    Remove-RepoPath -Path (Join-Path $RepoRoot $name) -Label "$name folder"
+  }
+}
+
 $distRoot = Join-Path $RepoRoot "dist"
-if ($AllDist) {
+if ($AllDist -or $AllGenerated) {
   Remove-RepoPath -Path $distRoot -Label "dist folder"
 } elseif (Test-Path -LiteralPath $distRoot) {
   Get-ChildItem -LiteralPath $distRoot -Directory -Force -ErrorAction SilentlyContinue |

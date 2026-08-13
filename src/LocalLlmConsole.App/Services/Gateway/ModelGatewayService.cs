@@ -9,6 +9,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
     private readonly HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private readonly ModelGatewayRequestGate _modelRequestGate = new();
     private readonly object _requestHandlersLock = new();
     private readonly HashSet<Task> _requestHandlers = [];
     private Task? _loop;
@@ -233,22 +234,26 @@ public sealed class ModelGatewayService : IModelGatewayHost
             return;
         }
 
-        var model = ModelGatewayRequestResolver.ResolveModel(await _runtime.ListModelsAsync(cancellationToken), requestedModel);
-        if (model is null)
+        var route = ModelGatewayRequestResolver.ResolveModel(await _runtime.ListModelsAsync(cancellationToken), requestedModel);
+        if (route is null)
         {
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 404, new { error = new { message = $"Unknown model '{requestedModel}'.", type = "model_not_found" } }, cancellationToken);
             return;
         }
 
+        using var modelRequestLease = await _modelRequestGate.EnterAsync(
+            route.Model.Id,
+            route.Profile.Id,
+            cancellationToken);
         LoadedModelSessionSnapshot session;
         try
         {
-            session = await EnsureLoadedAsync(model, cancellationToken);
+            session = await EnsureLoadedAsync(route, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 503, ModelGatewayResponseWriter.GatewayError(
-                ModelGatewayResponseWriter.GatewayClientLoadError(model, requestedModel, ex),
+                ModelGatewayResponseWriter.GatewayClientLoadError(route, requestedModel, ex),
                 "model_load_failed",
                 "model_load_failed"), cancellationToken);
             return;
@@ -261,24 +266,24 @@ public sealed class ModelGatewayService : IModelGatewayHost
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or IOException)
         {
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 502, ModelGatewayResponseWriter.GatewayError(
-                $"Gateway loaded {model.Name}, but the direct endpoint {RuntimeEndpointService.LocalOpenAiBaseUrl(session.LaunchSettings)} did not return a usable response. Details: {ModelGatewayResponseWriter.InnermostMessage(ex)}.",
+                $"Gateway loaded {route.Name}, but the direct endpoint {RuntimeEndpointService.LocalOpenAiBaseUrl(session.LaunchSettings)} did not return a usable response. Details: {ModelGatewayResponseWriter.InnermostMessage(ex)}.",
                 "upstream_unavailable",
                 "upstream_unavailable"), cancellationToken);
         }
     }
 
-    private async Task<LoadedModelSessionSnapshot> EnsureLoadedAsync(ModelRecord model, CancellationToken cancellationToken)
+    private async Task<LoadedModelSessionSnapshot> EnsureLoadedAsync(ModelGatewayModelRoute route, CancellationToken cancellationToken)
     {
         var running = (await _runtime.RunningSessionsAsync(cancellationToken))
-            .FirstOrDefault(session => string.Equals(session.ModelId, model.Id, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(session => route.MatchesRunningSession(session));
         if (running is not null) return running;
 
         await _loadGate.WaitAsync(cancellationToken);
         try
         {
             running = (await _runtime.RunningSessionsAsync(cancellationToken))
-                .FirstOrDefault(session => string.Equals(session.ModelId, model.Id, StringComparison.OrdinalIgnoreCase));
-            return running ?? await _runtime.EnsureModelLoadedAsync(model, _options.SwapPolicy, cancellationToken);
+                .FirstOrDefault(session => route.MatchesRunningSession(session));
+            return running ?? await _runtime.EnsureModelLoadedAsync(route, _options.SwapPolicy, cancellationToken);
         }
         finally
         {

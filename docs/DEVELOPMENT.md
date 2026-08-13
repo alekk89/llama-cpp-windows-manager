@@ -1,8 +1,40 @@
 # Development Guide
 
-This repo is a Windows-first .NET 8 WPF app. The app should stay easy to run
+This repo is a Windows-first .NET 10 WPF app. The app should stay easy to run
 from source, but end users should receive the published portable app or
 installer from `dist`.
+
+## Repository Onboarding
+
+The canonical repository is <https://github.com/alekk89/llama-cpp-windows-manager>.
+End users should install a checksum-verified artifact from GitHub Releases;
+cloning the repository is the development path and does not install the app,
+models, or llama.cpp runtimes.
+
+```powershell
+git clone https://github.com/alekk89/llama-cpp-windows-manager.git
+Set-Location llama-cpp-windows-manager
+Get-Content AGENTS.md
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./build-app.ps1 -Restore
+```
+
+Before launching a source build, check whether the single-instance production
+Manager is already running. Builds and tests are safe to run alongside it, but
+a second UI process cannot run in the same Windows user session. Use the ignored
+`workspace` folder for development state rather than a production workspace.
+
+For GitHub contributions, preserve existing worktree changes, use a feature
+branch, keep generated output and local state out of commits, and run the local
+gate below. Committing, pushing, opening a pull request, or publishing a release
+are separate actions that require the user's authorization. Public trusted
+releases must use the protected signed-release workflow; never label an
+unsigned local artifact as signed or trusted.
+
+Treat code from external branches and pull requests as untrusted until it has
+been reviewed. Do not execute an untrusted contribution on a machine containing
+production Manager data, signing certificates, or release credentials. If a
+contributor cannot push to the canonical repository, use their fork and a pull
+request only after that GitHub mutation has been requested.
 
 ## Local Gate
 
@@ -65,7 +97,6 @@ Implementation services live under feature modules:
 | `Services/HuggingFace` | Hugging Face search, metadata, download safety, download history, and launch suggestions. |
 | `Services/Infrastructure` | State store, local app service, process runner, filesystem/config safety, dialogs, jobs, formatting, and shell helpers. |
 | `Services/Models` | Model catalog, model capabilities, aliases, model launch profiles, and model deletion/import behavior. |
-| `Services/OpenCode` | OpenCode config discovery, provider/model/agent edits, gateway/direct local model sync, and vision-capability metadata. |
 | `Services/Runtimes` | Runtime registry, packages, source/build jobs, launch validation, sessions, metrics, readiness, and process supervision. |
 
 UI factories and page state live under:
@@ -103,13 +134,13 @@ Use these rules when touching `MainWindow`:
 - Raw WPF control references should stay grouped behind page state objects.
 - Core services should be reached through named bundles such as
   `_coreServices.App`, `_coreServices.Ui`, `_coreServices.Models`,
-  `_coreServices.Runtime`, `_coreServices.OpenCodeServices`,
+  `_coreServices.Runtime`,
   `_coreServices.HuggingFaceServices`, and `_coreServices.Environment`.
 - Loaded services should be reached through `AppServices`, `ModelServices`,
   `GatewayServices`, and `RuntimeServices`. Do not add flat pass-through aliases
   to `MainWindowLoadedServices`.
 - Page-specific row/event routing belongs in page controllers. Models, Hugging
-  Face download history, Runtimes, Windows, WSL, OpenCode, Overview, Logs,
+  Face download history, Runtimes, Windows, WSL, Overview, Logs,
   Lifetime, and Settings pages already follow this pattern.
 - Empty placeholder partials should be deleted.
 

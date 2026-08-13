@@ -74,12 +74,6 @@ public sealed class AppSettingsUpdateService
         if (!AppPreferenceService.TryIntValue(V("maxLogFileSizeMb", current.MaxLogFileSizeMb.ToString(CultureInfo.InvariantCulture)), out var maxLogFileSizeMb))
             return Fail(current, "Max log file MB must be a whole number.");
 
-        if (!AppPreferenceService.TryIntValue(V("openCodeOutputLimit", current.OpenCodeOutputLimit.ToString(CultureInfo.InvariantCulture)), out var openCodeOutputLimit))
-            return Fail(current, "OpenCode limit output must be a whole number.");
-
-        if (openCodeOutputLimit is < 1 || openCodeOutputLimit > AppSettings.MaxOpenCodeOutputLimit)
-            return Fail(current, $"OpenCode limit output must be between 1 and {AppSettings.MaxOpenCodeOutputLimit.ToString(CultureInfo.InvariantCulture)}.");
-
         var updated = current with
         {
             WorkspaceRoot = request.WorkspaceRoot,
@@ -88,10 +82,6 @@ public sealed class AppSettingsUpdateService
             StartWithWindows = AppPreferenceService.YesNoValue(
                 V("startWithWindows", AppPreferenceService.YesNoLabel(current.StartWithWindows)),
                 current.StartWithWindows),
-            AutoSaveOpenCodeOnLaunchSettingsSave = AppPreferenceService.YesNoValue(
-                V("autoSaveOpenCodeOnLaunchSettingsSave", AppPreferenceService.YesNoLabel(current.AutoSaveOpenCodeOnLaunchSettingsSave)),
-                current.AutoSaveOpenCodeOnLaunchSettingsSave),
-            OpenCodeOutputLimit = openCodeOutputLimit,
             AutoUnloadIdleMinutes = Math.Clamp(autoUnloadIdleMinutes, 0, 10080),
             DeleteRuntimeSourceAfterSuccessfulBuild = AppPreferenceService.YesNoValue(
                 V("deleteRuntimeSourceAfterSuccessfulBuild", AppPreferenceService.YesNoLabel(current.DeleteRuntimeSourceAfterSuccessfulBuild)),

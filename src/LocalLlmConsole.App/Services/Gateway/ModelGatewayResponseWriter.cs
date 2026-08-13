@@ -22,7 +22,7 @@ public static class ModelGatewayResponseWriter
         }
     }
 
-    public static object ModelsResponse(IReadOnlyList<ModelRecord> models)
+    public static object ModelsResponse(IReadOnlyList<ModelGatewayModelRoute> models)
         => new
         {
             @object = "list",
@@ -32,9 +32,13 @@ public static class ModelGatewayResponseWriter
                 {
                     id = model.Id,
                     @object = "model",
-                    created = model.UpdatedAt.ToUnixTimeSeconds(),
+                    created = model.Profile.UpdatedAt.ToUnixTimeSeconds(),
                     owned_by = "local-llm-console",
-                    name = model.Name
+                    name = model.Name,
+                    model_id = model.Model.Id,
+                    profile_id = model.Profile.Id,
+                    profile_name = model.Profile.Name,
+                    is_default_profile = model.Profile.IsDefault
                 })
                 .ToArray()
         };
@@ -42,7 +46,7 @@ public static class ModelGatewayResponseWriter
     public static object GatewayError(string message, string type, string code)
         => new { error = new { message, type, code } };
 
-    public static string GatewayClientLoadError(ModelRecord model, string requestedModel, Exception ex)
+    public static string GatewayClientLoadError(ModelGatewayModelRoute model, string requestedModel, Exception ex)
     {
         var requested = string.Equals(requestedModel, model.Id, StringComparison.OrdinalIgnoreCase)
             ? model.Id

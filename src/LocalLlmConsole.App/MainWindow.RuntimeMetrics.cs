@@ -24,10 +24,7 @@ public partial class MainWindow
 
     private void ApplyRuntimeMetricSummary(RuntimeMetricSummaryPresentation summary)
     {
-        if (summary.LastKnownCapturedAt is { } capturedAt)
-            SetLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown, capturedAt, DateTimeOffset.UtcNow);
-        else
-            ClearLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown);
+        ClearLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown);
 
         SetMetricText(_runtimeDashboardPage.TokensMetric, summary.Tokens);
         SetMetricText(_runtimeDashboardPage.MtpTokensMetric, summary.MtpTokens);

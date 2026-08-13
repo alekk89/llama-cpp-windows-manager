@@ -9,21 +9,6 @@ namespace LocalLlmConsole.Tests;
 public sealed partial class ReleaseHardeningTests
 {
     [Fact]
-    public void ConfigFileSafetyServiceBacksUpBeforeOverwrite()
-    {
-        var root = CreateTempRoot();
-        var path = Path.Combine(root, "config.json");
-        File.WriteAllText(path, "old");
-
-        ConfigFileSafetyService.WriteTextWithBackup(path, "new", System.Text.Encoding.UTF8, "test config");
-
-        var backup = Directory.EnumerateFiles(Path.Combine(root, ".local-llm-console-backups"), "config.json.*.bak").Single();
-        Assert.Equal("new", File.ReadAllText(path));
-        Assert.Equal("old", File.ReadAllText(backup));
-    }
-
-
-    [Fact]
     public void LogFileServiceDescribesValidatesAndPreviewsLogs()
     {
         var root = CreateTempRoot();

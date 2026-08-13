@@ -1,10 +1,10 @@
 # Release Readiness Checklist
 
-Last updated: 2026-06-03
+Last updated: 2026-08-13
 
 ## Automated Gate
 
-Run from a clean checkout with the .NET 8 SDK on `PATH`, or set `LLAMA_CPP_WINDOWS_MANAGER_DOTNET` to an explicit SDK `dotnet.exe`. The legacy `LLAMA_CPP_CONSOLE_DOTNET` and `LOCAL_LLM_CONSOLE_DOTNET` variables are still accepted.
+Run from a clean checkout with the .NET 10 SDK selected by `global.json` on `PATH`, or set `LLAMA_CPP_WINDOWS_MANAGER_DOTNET` to an explicit SDK `dotnet.exe`. The legacy `LLAMA_CPP_CONSOLE_DOTNET` and `LOCAL_LLM_CONSOLE_DOTNET` variables are still accepted.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-app.ps1 -Restore
@@ -41,7 +41,7 @@ protected `release` environment and its `WINDOWS_SIGNING_PFX_BASE64` and
 ## Release Gate
 
 - Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.0.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
@@ -106,14 +106,10 @@ protected `release` environment and its `WINDOWS_SIGNING_PFX_BASE64` and
   GPU performance counters for AMD/Intel/Vulkan-backed sessions, and does not
   show stale cached hardware data after switching runtimes.
 - Confirm the Settings API key Generate action creates a new model API key.
-- Confirm Settings > OpenCode > Auto-sync entries controls whether Settings
-  saves, saved launch settings, and saved variants automatically rewrite
-  OpenCode local model entries.
+- Confirm the gateway `/v1/models` response lists every saved launch profile and
+  requesting another profile for a running model restarts it with that profile.
 - Confirm Settings is separated into named category sections rather than one
   large flat settings grid.
-- Confirm Settings explains that OpenCode sync copies the model API key into
-  OpenCode provider config in plain text, even though the app protects its own
-  persisted key with current-user Windows data protection.
 - Confirm Settings shows cache size at the top and Clear removes cache contents only when downloads/builds are idle.
 - Confirm local-only model serving launches with an API key and client requests include that key.
 - Confirm the persisted model API key is protected at rest for the current Windows user.
@@ -139,8 +135,7 @@ protected `release` environment and its `WINDOWS_SIGNING_PFX_BASE64` and
 - Confirm vision-capable model settings persist image min/max token allowances and launch `llama-server` with `--image-min-tokens` / `--image-max-tokens` when set.
 - Confirm per-model Vision head choices persist for auto-detect,
   embedded/model-bundled, and explicit external projectors; explicit projectors
-  launch with `--mmproj`, embedded choices omit `--mmproj`, and synced OpenCode
-  entries are marked vision-capable when the launch settings prove support.
+  launch with `--mmproj`, while embedded choices omit `--mmproj`.
 - Confirm per-model MTP head choices persist separately from Vision head,
   `Spec type = mtp` launches with `--mtp-head`, and draft-* speculative modes
   continue to use the upstream `--model-draft` path.
@@ -161,12 +156,6 @@ protected `release` environment and its `WINDOWS_SIGNING_PFX_BASE64` and
   GPU model is unsafe.
 - Confirm Gateway policy > Single active model unloads other direct sessions
   before loading the requested model.
-- Confirm OpenCode local model entries can use either the shared gateway
-  provider or direct per-model providers/endpoints, remain stable across app
-  restarts, and include vision support when launch settings prove it.
-- Confirm OpenCode local model `limit.output` follows Settings > OpenCode >
-  Limit output after saving Settings with Auto-sync entries enabled or updating
-  an entry from OpenCode.
 - Confirm CPU-only Ubuntu/WSL llama.cpp source build path succeeds after Install CPU Tools, or fails early if Git/CMake/compiler tools are still missing inside Ubuntu.
 - Confirm CUDA Ubuntu/WSL llama.cpp source build path succeeds after Install CUDA on supported NVIDIA hardware, or fails early with a clear driver/toolkit error.
 - Confirm Vulkan Ubuntu/WSL llama.cpp source build path succeeds after Install Vulkan on supported WSL Vulkan hardware, or fails early with a clear driver/toolkit error.
@@ -174,43 +163,38 @@ protected `release` environment and its `WINDOWS_SIGNING_PFX_BASE64` and
 - Confirm custom runtime repository row can add an HTTPS repo and then download/check/delete it from Runtime Repositories.
 - Confirm CUDA runtime builds fail before CMake with a clear message when `nvcc` or `libcudart`/CUDA Toolkit runtime libraries are missing inside the selected WSL distro.
 - Confirm Vulkan runtime builds fail before CMake with a clear message when Vulkan headers, `glslc`, `vulkaninfo`, `libvulkan.so`, SPIR-V headers, or a WSL-visible Vulkan device are unavailable.
-- Confirm OpenCode is absent or present; either way, core model management still works and the OpenCode page remains optional.
+- Confirm no harness-specific configuration page or settings appear in the app.
 - Confirm startup update checks change the left-nav Updates item to Install Update when a newer GitHub release exists.
 - Confirm manual Check For Updates shows a no-update popup when current, or an install confirmation when a newer release exists.
-- Confirm release assets include a matching SHA-256 companion file and that a bad checksum prevents staging.
+- Confirm the GitHub release includes the portable ZIP and standalone
+  `LlamaCppWindowsManager.exe`, each with its matching SHA-256 companion. The
+  standalone asset preserves in-app updates from v1.x and v2.0; a bad checksum
+  must prevent staging.
 - Confirm a signed installed app refuses an unsigned or differently signed staged update.
 - Confirm a completed staged update restarts `LlamaCppWindowsManager.exe` and shows the GitHub release notes.
 - Confirm an older renamed portable install migrates to `LlamaCppWindowsManager.exe` and removes the obsolete executable after shutdown.
 
 ## Latest Local Verification
 
-Current local check on 2026-06-01:
+Current local check on 2026-08-13:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
-Result: Release app build succeeded with zero warnings, release-hardening tests
-passed (`432/432`), formatting was clean, no vulnerable packages were found,
-the diff had no whitespace errors, and publish/installer artifact checks passed
-locally. The next release notes draft is tracked in
+Result: .NET 10 Release app and CLI builds succeeded with zero warnings;
+service/unit tests passed (`458/458`) and the WPF smoke test passed (`1/1`) with
+no skips; service coverage was 80.4% and model/view-model coverage was 96.5%;
+formatting, diff whitespace, and the vulnerability, deprecation, and
+direct-package currency audit passed; and portable,
+embedded-sidecar, and installer artifact checks passed locally. The generated
+artifacts were unsigned test builds. The next release notes draft is tracked in
 `docs/GITHUB_RELEASE_NEXT.md`.
-
-Additional local checks on 2026-06-03:
-
-```powershell
-dotnet test tests\LocalLlmConsole.Tests\LocalLlmConsole.Tests.csproj --no-restore --filter "Help|Settings|ModelRuntimeStatus|MetricCardFactory|LightTheme"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1 -Runtime win-x64 -Configuration Release
-```
-
-Result: focused Help/Settings/status/rendering tests passed (`41/41`), the
-Release publish succeeded, and an unsigned portable `win-x64` test build was
-produced in `dist`.
 
 ## Manual Clean-Machine Test
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-1.1.4-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.
@@ -218,7 +202,7 @@ produced in `dist`.
 7. Uninstall and confirm `data` is kept by default; repeat on a disposable install and choose the explicit delete-data option to confirm data removal.
 8. Copy only `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` into a writable portable test folder.
 9. Confirm launching from a non-writable location falls back to `%LocalAppData%\llama.cpp Windows Manager`, reuses `%LocalAppData%\llama.cpp Console` or `%LocalAppData%\LocalLlmConsole` only for an existing legacy folder, or reports a clear workspace error.
-10. Launch the app without Git, CMake, CUDA, or OpenCode.
+10. Launch the app without Git, CMake, or CUDA.
 11. Verify the app opens, creates state, and explains missing Ubuntu/WSL prerequisites without crashing.
 12. Use Runtime Downloads to install an official prebuilt CPU Windows runtime, then confirm it appears in model launch runtime choices.
 13. On suitable hardware, repeat Runtime Downloads for CUDA, Vulkan, or Intel Arc SYCL Windows/WSL packages.
@@ -235,7 +219,7 @@ produced in `dist`.
     inverse.
 23. Import an external model folder, delete the registration, and verify GGUF files remain.
 24. Add a downloaded app-owned model, delete it, and verify only app-owned paths are removed.
-25. Verify the OpenCode page remains optional and does not block core workflows.
+25. Verify `GET /v1/models` lists each saved profile as a separate model id.
 26. Verify app update checks can reach the GitHub release feed, and that update install works from a copied portable exe folder.
 
 ## Release Blockers

@@ -3,6 +3,7 @@ using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
 using Microsoft.Data.Sqlite;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace LocalLlmConsole.Tests;
 
@@ -10,14 +11,34 @@ namespace LocalLlmConsole.Tests;
 public sealed partial class ReleaseHardeningTests
 {
     [Fact]
-    public void ProjectDeclaresVersionTwoZeroMetadata()
+    public void ApplicationHasNoOpenCodeIntegrationSurface()
+    {
+        var appRoot = Path.GetDirectoryName(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"))!;
+        var source = string.Join(
+            "\n",
+            Directory.EnumerateFiles(appRoot, "*", SearchOption.AllDirectories)
+                .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                    || path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                    && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Select(File.ReadAllText));
+
+        var serviceDirectory = Path.Combine(appRoot, "Services", "OpenCode");
+        var pageDirectory = Path.Combine(appRoot, "Ui", "Pages", "OpenCode");
+        Assert.False(Directory.Exists(serviceDirectory) && Directory.EnumerateFiles(serviceDirectory, "*", SearchOption.AllDirectories).Any());
+        Assert.False(Directory.Exists(pageDirectory) && Directory.EnumerateFiles(pageDirectory, "*", SearchOption.AllDirectories).Any());
+        Assert.DoesNotContain("OpenCode", source, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ProjectDeclaresVersionTwoTwoMetadata()
     {
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
 
-        Assert.Contains("<Version>2.0.0</Version>", project, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>2.0.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>2.0.0.0</FileVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>v2.0.0</InformationalVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<Version>2.1.0</Version>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>2.1.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>2.1.0.0</FileVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>v2.1.0</InformationalVersion>", project, StringComparison.Ordinal);
     }
 
 
@@ -75,6 +96,8 @@ public sealed partial class ReleaseHardeningTests
         var development = File.ReadAllText(FindRepositoryFile("docs", "DEVELOPMENT.md"));
 
         Assert.Contains("windows-latest", workflow, StringComparison.Ordinal);
+        Assert.Contains("actions/checkout@v7", workflow, StringComparison.Ordinal);
+        Assert.Contains("actions/setup-dotnet@v6", workflow, StringComparison.Ordinal);
         Assert.Contains(".\\build-app.ps1 -Restore", workflow, StringComparison.Ordinal);
         Assert.Contains(".\\test-coverage.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("dotnet format LocalLlmConsole.sln --verify-no-changes --verbosity minimal", workflow, StringComparison.Ordinal);
@@ -82,8 +105,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains(".\\test-vulnerabilities.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("checksum was not produced", workflow, StringComparison.Ordinal);
         Assert.Contains("package --vulnerable --include-transitive --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
+        Assert.Contains("package --outdated --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
+        Assert.Contains("package --deprecated --include-transitive --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
         Assert.Contains(".\\publish-app.ps1", workflow, StringComparison.Ordinal);
-        Assert.Contains("\"version\": \"8.0.421\"", globalJson, StringComparison.Ordinal);
+        Assert.Contains("\"version\": \"10.0.400\"", globalJson, StringComparison.Ordinal);
         Assert.Contains("TreatWarningsAsErrors", File.ReadAllText(FindRepositoryFile("Directory.Build.props")), StringComparison.Ordinal);
         Assert.Contains("root = true", editorConfig, StringComparison.Ordinal);
         Assert.Contains("*.ps1 text eol=lf", gitAttributes, StringComparison.Ordinal);
@@ -98,6 +123,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("MinimumServiceLineCoverage = 80.0", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("MinimumModelLineCoverage = 95.0", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("Skipped or not-executed tests are not allowed", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
+        Assert.Contains("LocalLlmConsole.App/", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("dotnet format", releaseGate, StringComparison.Ordinal);
         Assert.Contains("git -C $RepoRoot diff --check", releaseGate, StringComparison.Ordinal);
         Assert.Contains("test-vulnerabilities.ps1", releaseGate, StringComparison.Ordinal);
@@ -114,7 +140,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("Assert-InstallerArtifacts", releaseGate, StringComparison.Ordinal);
         Assert.Contains("WINDOWS_SIGNING_PFX_BASE64", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("-RequireSigned", releaseWorkflow, StringComparison.Ordinal);
-        Assert.Contains("actions/upload-artifact@v4", releaseWorkflow, StringComparison.Ordinal);
+        Assert.Contains("actions/checkout@v7", releaseWorkflow, StringComparison.Ordinal);
+        Assert.Contains("actions/setup-dotnet@v6", releaseWorkflow, StringComparison.Ordinal);
+        Assert.Contains("actions/upload-artifact@v7", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains(".\\test-release-gate.ps1", development, StringComparison.Ordinal);
         Assert.Contains("-IncludePublish -IncludeInstaller", development, StringComparison.Ordinal);
     }
@@ -260,6 +288,29 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("LlamaCppWindowsManager-win-x64.zip.sha256", update.ChecksumAssetName);
         Assert.Equal("https://example.invalid/app.zip.sha256", update.ChecksumAssetUrl);
         Assert.Contains("update checks", update.ReleaseNotes, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AppUpdateServiceKeepsStandaloneExecutableAvailableForOlderUpdaters()
+    {
+        var release = System.Text.Json.Nodes.JsonNode.Parse("""
+        {
+          "tag_name": "v2.1.0",
+          "name": "v2.1.0",
+          "assets": [
+            { "name": "LlamaCppWindowsManager-win-x64.zip", "browser_download_url": "https://example.invalid/app.zip", "size": 1234 },
+            { "name": "LlamaCppWindowsManager-win-x64.zip.sha256", "browser_download_url": "https://example.invalid/app.zip.sha256", "size": 64 },
+            { "name": "LlamaCppWindowsManager.exe", "browser_download_url": "https://example.invalid/LlamaCppWindowsManager.exe", "size": 1024 },
+            { "name": "LlamaCppWindowsManager.exe.sha256", "browser_download_url": "https://example.invalid/LlamaCppWindowsManager.exe.sha256", "size": 64 }
+          ]
+        }
+        """)!.AsObject();
+
+        var update = AppUpdateReleaseParser.ParseLatestRelease(release, "v2.0.0");
+
+        Assert.True(update.IsAvailable);
+        Assert.Equal("LlamaCppWindowsManager.exe", update.AssetName);
+        Assert.Equal("LlamaCppWindowsManager.exe.sha256", update.ChecksumAssetName);
     }
 
     [Fact]
@@ -482,10 +533,66 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("-TargetExe", args);
         Assert.Contains(targetExe, args);
         Assert.Contains("-ObsoleteExe", args);
+        Assert.Contains("-SourceCli", args);
+        Assert.Contains("-TargetCli", args);
         Assert.Contains("-NoticeTarget", args);
         Assert.Contains(noticePath, args);
         Assert.DoesNotContain("new HttpClient", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Process.Start", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PortableUpdaterRollsBackAppWhenCliReplacementFails()
+    {
+        var root = CreateTempRoot();
+        var sourceExe = Path.Combine(root, "staged-app.exe");
+        var targetExe = Path.Combine(root, AppUpdateService.PortableExeName);
+        var sourceCli = Path.Combine(root, "staged-cli.exe");
+        var targetCli = Path.Combine(root, AppUpdateService.ControlCliExeName);
+        var scriptPath = Path.Combine(root, "update.ps1");
+        await File.WriteAllTextAsync(sourceExe, "new-app", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(targetExe, "old-app", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(sourceCli, "new-cli", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(targetCli, "old-cli", TestContext.Current.CancellationToken);
+        var updaterScript = typeof(AppUpdateService)
+            .GetMethod("UpdaterScript", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, null)?.ToString() ?? throw new InvalidOperationException("Updater script was unavailable.");
+        await File.WriteAllTextAsync(scriptPath, updaterScript, TestContext.Current.CancellationToken);
+
+        await using var cliLock = new FileStream(targetCli, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = HostExecutableResolver.WindowsPowerShellExe(),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            ArgumentList =
+            {
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath,
+                "-ParentPid", "999999",
+                "-SourceExe", sourceExe,
+                "-TargetExe", targetExe,
+                "-SourceCli", sourceCli,
+                "-TargetCli", targetCli,
+                "-WorkingDirectory", root
+            }
+        }) ?? throw new InvalidOperationException("Could not start updater rollback test.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+        var standardError = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+        await process.WaitForExitAsync(TestContext.Current.CancellationToken);
+        var diagnostics = (await standardOutput) + Environment.NewLine + (await standardError);
+        await cliLock.DisposeAsync();
+
+        Assert.NotEqual(0, process.ExitCode);
+        Assert.True(
+            string.Equals("old-app", await File.ReadAllTextAsync(targetExe, TestContext.Current.CancellationToken), StringComparison.Ordinal),
+            diagnostics);
+        Assert.True(
+            string.Equals("old-cli", await File.ReadAllTextAsync(targetCli, TestContext.Current.CancellationToken), StringComparison.Ordinal),
+            diagnostics);
+        Assert.Empty(Directory.EnumerateFiles(root, ".*.new"));
+        Assert.True(!Directory.EnumerateFiles(root, ".*.bak").Any(), diagnostics);
     }
 
     [Fact]

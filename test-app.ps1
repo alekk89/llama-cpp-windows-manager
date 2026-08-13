@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $AppDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $TestProject = Join-Path $AppDir "tests\LocalLlmConsole.Tests\LocalLlmConsole.Tests.csproj"
-$BundledDotnet = Join-Path (Split-Path -Parent $AppDir) ".dotnet-sdk-8\dotnet.exe"
+$BundledDotnet = Join-Path (Split-Path -Parent $AppDir) ".dotnet-sdk-10\dotnet.exe"
 $Dotnet = if ($env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET) {
   $env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET
 } elseif ($env:LLAMA_CPP_CONSOLE_DOTNET) {
@@ -20,7 +20,7 @@ $Dotnet = if ($env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET) {
   (Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue).Source
 }
 if (-not $Dotnet) {
-  throw ".NET SDK was not found. Install the .NET 8 SDK from https://dotnet.microsoft.com/download/dotnet/8.0."
+  throw ".NET SDK was not found. Install the .NET 10 SDK from https://dotnet.microsoft.com/download/dotnet/10.0."
 }
 if (-not (Test-Path -LiteralPath $Dotnet)) {
   throw "Configured dotnet path was not found: $Dotnet"
@@ -28,7 +28,7 @@ if (-not (Test-Path -LiteralPath $Dotnet)) {
 
 $Info = & $Dotnet --info
 if ($Info -match "No SDKs were found") {
-  throw ".NET runtime is installed, but no SDK was found. Install the .NET 8 SDK to test the WPF app."
+  throw ".NET runtime is installed, but no SDK was found. Install the .NET 10 SDK to test the WPF app."
 }
 if (-not (Test-Path -LiteralPath $TestProject)) {
   throw "Test project not found: $TestProject"

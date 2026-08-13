@@ -17,9 +17,12 @@ public sealed partial class ModelCatalogService
     }
 
     public static string? FindVisionProjector(string modelPath)
+        => FindVisionProjectors(modelPath).FirstOrDefault();
+
+    public static IReadOnlyList<string> FindVisionProjectors(string modelPath)
     {
         var folder = Path.GetDirectoryName(Path.GetFullPath(modelPath));
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return null;
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return [];
 
         return CandidateVisionProjectors(folder)
             .Where(file =>
@@ -30,13 +33,16 @@ public sealed partial class ModelCatalogService
             })
             .OrderBy(file => Path.GetFileName(file).Contains("f16", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
             .ThenBy(file => file, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+            .ToArray();
     }
 
     public static string? FindDraftModel(string modelPath)
+        => FindDraftModels(modelPath).FirstOrDefault();
+
+    public static IReadOnlyList<string> FindDraftModels(string modelPath)
     {
         var folder = Path.GetDirectoryName(Path.GetFullPath(modelPath));
-        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return null;
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return [];
 
         var mainPath = Path.GetFullPath(modelPath);
         return CandidateVisionProjectors(folder)
@@ -53,7 +59,7 @@ public sealed partial class ModelCatalogService
             .ThenBy(file => Path.GetFileName(file).Contains("mtp", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
             .ThenBy(file => Path.GetFileName(file).Contains("draft", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
             .ThenBy(file => file, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+            .ToArray();
     }
 
     private static IEnumerable<string> CandidateVisionProjectors(string folder)

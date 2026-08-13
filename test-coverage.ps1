@@ -11,7 +11,7 @@ $TestProjects = @(
   (Join-Path $RepoRoot "tests\LocalLlmConsole.Tests\LocalLlmConsole.Tests.csproj"),
   (Join-Path $RepoRoot "tests\LocalLlmConsole.UiTests\LocalLlmConsole.UiTests.csproj")
 )
-$BundledDotnet = Join-Path (Split-Path -Parent $RepoRoot) ".dotnet-sdk-8\dotnet.exe"
+$BundledDotnet = Join-Path (Split-Path -Parent $RepoRoot) ".dotnet-sdk-10\dotnet.exe"
 $Dotnet = if ($env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET) {
   $env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET
 } elseif ($env:LLAMA_CPP_CONSOLE_DOTNET) {
@@ -24,7 +24,7 @@ $Dotnet = if ($env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET) {
   (Get-Command dotnet -CommandType Application -ErrorAction SilentlyContinue).Source
 }
 if (-not $Dotnet -or -not (Test-Path -LiteralPath $Dotnet)) {
-  throw ".NET 8 SDK was not found."
+  throw ".NET 10 SDK was not found."
 }
 
 $ResultsRoot = Join-Path $RepoRoot ("TestResults\coverage-" + [Guid]::NewGuid().ToString("N"))
@@ -63,6 +63,19 @@ function Measure-LineCoverage {
     [xml] $Coverage = Get-Content -LiteralPath $CoverageFile.FullName
     foreach ($class in $Coverage.coverage.packages.package.classes.class) {
       $file = ([string] $class.filename).Replace('\', '/')
+      foreach ($sourceMarker in @("/src/LocalLlmConsole.App/", "/src/LocalLlmConsole.ControlCli/")) {
+        $markerIndex = $file.IndexOf($sourceMarker, [StringComparison]::OrdinalIgnoreCase)
+        if ($markerIndex -ge 0) {
+          $file = $file.Substring($markerIndex + $sourceMarker.Length)
+          break
+        }
+      }
+      foreach ($projectPrefix in @("LocalLlmConsole.App/", "LocalLlmConsole.ControlCli/")) {
+        if ($file.StartsWith($projectPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+          $file = $file.Substring($projectPrefix.Length)
+          break
+        }
+      }
       if (-not (& $Include $file)) { continue }
       foreach ($line in @($class.lines.line)) {
         $key = "$file|$($line.number)"

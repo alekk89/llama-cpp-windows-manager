@@ -111,6 +111,7 @@ public static class RuntimeCustomRepositoryDialogFactory
         };
         var addButton = new WpfButton { Content = Loc.T("Runtimes.CustomRepo.AddButton"), MinWidth = 90, IsDefault = true, Margin = new Thickness(7, 0, 0, 0) };
         var cancelButton = new WpfButton { Content = Loc.T("Runtimes.CustomRepo.CancelButton"), MinWidth = 90, IsCancel = true, Margin = new Thickness(7, 0, 0, 0) };
+        VisualRole.SetButtonRole(addButton, VisualRole.Primary);
         SetButtonToolTip(addButton, Loc.T("Runtimes.CustomRepo.AddTooltip"));
         SetButtonToolTip(cancelButton, Loc.T("Runtimes.CustomRepo.CancelTooltip"));
         addButton.Click += (_, _) =>

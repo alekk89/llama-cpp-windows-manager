@@ -93,9 +93,7 @@ public partial class MainWindow
             SelectedModelLaunchProfileId,
             () => RenderSelectedModelLaunchSettingsAsync(),
             ReadLaunchSettingsFromControls,
-            () => _settings,
             SaveModelLaunchProfileAsync,
-            SyncOpenCodeLocalProviderAsync,
             ModelLaunchProfileSaveActions());
 
     private ModelLaunchProfileSaveActions ModelLaunchProfileSaveActions()
@@ -134,7 +132,6 @@ public partial class MainWindow
             SelectLaunchProfileAfterRefresh,
             () => RenderSelectedModelLaunchSettingsAsync(),
             RefreshOverviewModelSelectorAsync,
-            SyncOpenCodeLocalProviderAsync,
             SetStatus);
 
     private async Task<ModelLaunchSettingsSaveResult> SaveModelLaunchProfileAsync(

@@ -27,9 +27,7 @@ public sealed record ModelLaunchProfileSaveSelectedActions(
     Func<string> SelectedProfileId,
     Func<Task> RenderSelectedModelLaunchSettingsAsync,
     Func<AppSettings> ReadLaunchSettings,
-    Func<AppSettings> CurrentSettings,
     Func<ModelRecord, AppSettings, string, Task<ModelLaunchSettingsSaveResult>> SaveProfileAsync,
-    Func<AppSettings, Task> SyncOpenCodeLocalProviderAsync,
     ModelLaunchProfileSaveActions ResultActions);
 
 public sealed record LaunchDefaultsSaveActions(
@@ -69,9 +67,6 @@ public sealed class ModelLaunchSettingsSaveApplicationService
             ApplyProfileSave(
                 new ModelLaunchProfileSaveApplicationRequest(model.Id, profileId, result),
                 actions.ResultActions);
-            var currentSettings = actions.CurrentSettings();
-            if (currentSettings.AutoSaveOpenCodeOnLaunchSettingsSave)
-                await actions.SyncOpenCodeLocalProviderAsync(currentSettings);
         });
 
         return ModelLaunchProfileSaveApplicationOutcome.Saved;
@@ -125,9 +120,7 @@ public sealed class ModelLaunchSettingsSaveApplicationService
         ArgumentNullException.ThrowIfNull(actions.SelectedProfileId);
         ArgumentNullException.ThrowIfNull(actions.RenderSelectedModelLaunchSettingsAsync);
         ArgumentNullException.ThrowIfNull(actions.ReadLaunchSettings);
-        ArgumentNullException.ThrowIfNull(actions.CurrentSettings);
         ArgumentNullException.ThrowIfNull(actions.SaveProfileAsync);
-        ArgumentNullException.ThrowIfNull(actions.SyncOpenCodeLocalProviderAsync);
         Validate(actions.ResultActions);
     }
 

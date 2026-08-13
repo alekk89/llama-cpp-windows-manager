@@ -125,6 +125,8 @@ public static class ThemedMessageBox
                 IsDefault = isDefault,
                 IsCancel = value is MessageBoxResult.Cancel or MessageBoxResult.No
             };
+            if (value is MessageBoxResult.OK or MessageBoxResult.Yes)
+                VisualRole.SetButtonRole(button, VisualRole.Primary);
             button.ToolTip = DialogButtonToolTip(value);
             ToolTipService.SetShowOnDisabled(button, true);
             button.Click += (_, _) =>

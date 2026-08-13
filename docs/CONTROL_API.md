@@ -1,0 +1,230 @@
+# Local control API and `llwmctl`
+
+The Manager exposes an authenticated, loopback-only control API for local agents and automation. This API controls the desktop application's managed state; it is separate from the OpenAI-compatible model-serving gateway and direct model ports.
+
+Use `llwmctl` instead of calling the HTTP API directly. The CLI discovers the active Manager instance, decrypts its current-user DPAPI session token, sends the request, and prints structured JSON.
+
+Portable releases also embed `llwmctl.exe`, `AGENTS.md`, `agent.md`, and this reference in the main executable. The Manager verifies and restores those sidecars beside itself at startup, so an executable-only update from an older release acquires the complete control surface automatically. `LlamaCppWindowsManager.exe --bootstrap-agent-sidecars-only` runs that bootstrap and exits without opening the UI.
+
+## Operator interface and API logs
+
+The Manager intentionally does not include a visual API command console. Use `llwmctl` so requests go to the running desktop application through authenticated loopback transport and receive the same validation, self-identification, self-preservation, and confirmation handling as any other control client.
+
+Each routed request creates one bounded, redacted audit entry in `<workspace>/logs/control-api.log`. The in-app **Logs** page classifies this file as Type **Control API**. Entries contain only the HTTP method, route path without its query string, result status, and elapsed time. Request bodies, query values, bearer credentials, model-serving API keys, and response bodies are never written to this log. Its size follows the app's maximum log-file-size setting.
+
+## Discovery and authentication
+
+At startup the Manager writes a discovery document to:
+
+```text
+%LocalAppData%\llama.cpp Windows Manager\control.json
+<workspace>\state\control.json
+```
+
+The document contains the current process ID, selected localhost port, workspace, and a DPAPI-protected per-process bearer token. The files are removed on normal shutdown. The control listener binds only to `127.0.0.1`, checks the `Host` and browser `Origin`, requires authentication for `/api/*` except health, limits JSON bodies to 1 MiB, and never uses the model-serving API key as its control credential.
+
+Override discovery when necessary:
+
+```powershell
+llwmctl status --workspace D:\MyManagerWorkspace
+llwmctl status --connection D:\MyManagerWorkspace\state\control.json
+```
+
+## Self-identification
+
+```powershell
+llwmctl self
+llwmctl self --endpoint http://127.0.0.1:8087/v1
+llwmctl self --model qwen3-30b-q4-k-m
+llwmctl self --session model:qwen3-30b-q4-k-m
+```
+
+The CLI automatically forwards `LLWM_SESSION_ID`, `LLWM_MODEL_ID`, `LLWM_ENDPOINT`, `OPENCODE_MODEL`, `OPENAI_MODEL`, `LLM_MODEL`, `OPENAI_BASE_URL`, or `OPENAI_API_BASE` when present. The API matches a session ID, registered model alias/ID/name/filename, endpoint port, or process ID. With exactly one running model it can make a clearly labelled single-session inference. With multiple unmatched sessions it returns all candidates instead of guessing.
+
+An agent should identify itself before unloading, restarting, or using `--unload-others`. Stopping its own model may terminate the response that initiated the command.
+
+For destructive lifecycle commands, `llwmctl` performs this identity check automatically. It refuses to stop the identified current model unless `--allow-self-stop` is supplied. Agents should add that override only after an explicit user request and warning.
+
+## Model lifecycle
+
+List registered models and runtimes:
+
+```powershell
+llwmctl models list
+llwmctl runtimes list
+```
+
+Load with a saved profile:
+
+```powershell
+llwmctl load "Qwen3 30B Q4_K_M" --profile CUDA --wait
+```
+
+Apply one-shot overrides:
+
+```powershell
+llwmctl load qwen3-30b-q4-k-m `
+  --runtime llama-cpp-cuda `
+  --set contextSize=65536 `
+  --set gpuLayers=999 `
+  --set gpuMode=row `
+  --set gpuDevices=CUDA0,CUDA1 `
+  --set gpuSplit=3,1 `
+  --wait
+```
+
+Persist the effective overrides into the selected profile:
+
+```powershell
+llwmctl restart qwen3-30b-q4-k-m --profile CUDA --set contextSize=131072 --save-profile=CUDA-128K --wait
+```
+
+Without `--save-profile`, overrides never modify the saved profile. If a model is already running, `load` returns its current session; use `restart` to apply different settings.
+
+Other lifecycle commands:
+
+```powershell
+llwmctl unload <model>
+llwmctl models scan
+llwmctl models import --folder D:\ExternalModels\ModelFolder
+llwmctl models delete <model> --confirm
+```
+
+App-owned deletion removes the Manager-owned model directory. Imported/external models are unregistered without deleting the external model folder.
+
+## Profiles and all launch settings
+
+```powershell
+llwmctl profiles list --model <model>
+llwmctl profiles create --model <model> --name "CUDA 128K" --set runtimeId=<runtime> --set contextSize=131072
+llwmctl profiles update --model <model> --id <profile-id> --set temperature=0.7 --set topP=0.9
+llwmctl profiles delete --model <model> --id <profile-id>
+```
+
+`llwmctl capabilities` returns the live schema for every `ModelLaunchSettings` and `AppSettings` property. Repeated `--set name=value` accepts booleans, integers, decimal numbers, strings, JSON arrays/objects, and `null`. For a large patch:
+
+```powershell
+llwmctl profiles update --model <model> --id <profile-id> --settings-file profile-patch.json
+```
+
+The full profile surface includes runtime and port, context, GPU layers/mode/devices/split, parallelism, batches, threads, flash attention, K/V cache types and offload, prompt cache, checkpoints, continuous batching, reasoning/template options, vision image tokens, mmap/mlock, sampling and penalties, RoPE, speculative mode and draft controls, vision/MTP/draft paths, metrics, and validated custom parameters.
+
+## Shared model-serving gateway
+
+The OpenAI-compatible gateway is separate from the control API. When enabled, query its model catalog with `GET http://127.0.0.1:<gateway-port>/v1/models`. Every saved launch profile is returned as a separate model entry:
+
+- The default profile uses the model id.
+- A named profile uses `<model-id>--<profile-id>`, with the profile segment normalized for use in a URL/model field. If two stored ids normalize to the same value, each route receives a deterministic hash suffix.
+
+Send the returned id in the `model` field of an OpenAI-compatible request. The gateway loads the selected profile automatically, proxies to its direct llama.cpp port, and restarts an already-running copy of the same GGUF when a different profile is requested. Concurrent requests for one profile remain concurrent, while a different-profile request waits for their upstream responses to complete before switching. This contract is client-neutral; the Manager does not discover or edit third-party harness configuration.
+
+## Vision, draft, and MTP heads
+
+List every eligible nearby companion rather than only the first auto-detected file:
+
+```powershell
+llwmctl models companions <model>
+```
+
+Select an external vision head:
+
+```powershell
+llwmctl profiles update --model <model> --id <profile-id> --set visionProjectorPath=D:\Models\mmproj-f16.gguf
+```
+
+Use embedded vision:
+
+```powershell
+llwmctl profiles update --model <model> --id <profile-id> --set visionProjectorPath=embedded
+```
+
+Configure upstream draft MTP or an Atomic MTP head:
+
+```powershell
+llwmctl profiles update --model <model> --id <profile-id> `
+  --set speculativeType=draft-mtp `
+  --set specDraftModelPath=D:\Models\mtp-assistant.gguf
+
+llwmctl profiles update --model <model> --id <profile-id> `
+  --set speculativeType=atomic-mtp `
+  --set mtpHeadPath=D:\Models\mtp-head.gguf
+```
+
+Use an empty string for automatic nearby-file discovery.
+
+## Metrics and logs
+
+```powershell
+llwmctl sessions list
+llwmctl sessions metrics <session-or-model>
+llwmctl sessions logs <session-or-model> --tail 32000
+llwmctl metrics
+llwmctl logs list
+llwmctl logs tail llama-server-example.log --tail 80000
+```
+
+Metrics responses include raw parsed Prometheus samples, metric type/help metadata, endpoint responsiveness, and the current `/slots` snapshot. Log responses are bounded and redact the configured model API key and common bearer/command-line secret patterns.
+
+## Hugging Face downloads and jobs
+
+```powershell
+llwmctl hf search "Qwen Q4_K_M"
+llwmctl hf download --repo owner/repository --file model-Q4_K_M.gguf --dry-run
+llwmctl hf download --repo owner/repository --file model-Q4_K_M.gguf --revision main
+llwmctl jobs list
+llwmctl jobs pause <job-id>
+llwmctl jobs resume <job-id>
+llwmctl jobs cancel <job-id>
+```
+
+The existing Manager download pipeline remains responsible for filename safety, byte-count/SHA-256 validation, resumable partials, companion projector discovery, registration, launch-profile suggestions, and UI/job updates.
+
+## Application settings
+
+```powershell
+llwmctl settings get
+llwmctl settings set --set autoUnloadIdleMinutes=30 --set autoLoadGatewayPolicy=singleActive
+llwmctl settings rotate-key
+```
+
+Settings changes are persisted through the Manager, applied to the live UI, restart the gateway, and update Start with Windows. API-key material is redacted. The running process workspace root is immutable; model API keys can only be rotated, not retrieved or injected through a general patch.
+
+## Complete application operations
+
+The operation registry exposes the Manager functions available to local automation:
+
+```powershell
+llwmctl operations list
+llwmctl operations run runtime.catalog
+llwmctl operations run runtime-package.install --set preset=official-prebuilt-windows-cuda --dry-run
+llwmctl operations run runtime-package.install --set preset=official-prebuilt-windows-cuda --confirm
+llwmctl operations run windows.status
+llwmctl operations run wsl.setup --set action=InstallUbuntuCudaToolkit --set distro=Ubuntu-24.04 --dry-run
+```
+
+The registry covers runtime packages, custom repositories, source downloads/builds, runtime job controls, Windows/WSL detection and setup, gateway lifecycle, cache/log/download-history maintenance, lifetime metrics, UI navigation, update checks/installation, refresh, and shutdown. `llwmctl capabilities` and `llwmctl operations list` are authoritative.
+
+Operations marked `requiresConfirmation` reject execution without `confirm=true`. Every operation accepts `dryRun=true`; dry-run validates the action and target and returns its planned consequence without mutation. Machine setup launches can open elevated or interactive terminals and report `Started`, not installation completion.
+
+## HTTP route summary
+
+The complete live route and settings list is returned by `GET /api/v1/capabilities`. Principal routes include:
+
+- `GET /api/v1/status`, `/capabilities`, `/self`
+- `GET /api/v1/models`, `/runtimes`, `/sessions`, `/metrics`, `/logs`, `/jobs`
+- `POST /api/v1/models/{model}/load|restart|unload`
+- `GET|POST /api/v1/models/{model}/profiles`
+- `PUT|DELETE /api/v1/models/{model}/profiles/{profile}`
+- `GET /api/v1/models/{model}/companions`
+- `GET|PATCH /api/v1/settings`
+- `GET /api/v1/huggingface/search` and `POST /api/v1/huggingface/download`
+- `GET /api/v1/operations` and `POST /api/v1/operations/{operation}`
+
+For uncommon or future routes, use the raw client while retaining discovery and authentication:
+
+```powershell
+llwmctl request GET /api/v1/capabilities
+llwmctl request POST /api/v1/models/MODEL/load --body '{"waitForReady":true}'
+```
+
+Raw requests sent through `llwmctl request` still enforce the CLI's current-session protection for model unload/restart/delete, `unloadOthers`, and operations that can stop the active runtime or Manager. `--allow-self-stop` is required for the same explicitly authorized cases as the named commands; CLI raw mode is not a safety bypass.

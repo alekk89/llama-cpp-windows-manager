@@ -20,6 +20,18 @@ public partial class MainWindow
         return launchProfiles is null ? null : await launchProfiles.ReadAsync(model);
     }
 
+    private async ValueTask<IReadOnlyList<NamedModelLaunchProfile>> ReadModelLaunchProfilesAsync(
+        ModelRecord model,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var launchProfiles = ModelServices.LaunchProfiles;
+        if (launchProfiles is null) return [];
+        var profiles = await launchProfiles.ListNamedAsync(model);
+        if (profiles.Count > 0) return profiles;
+        return [await launchProfiles.EnsureDefaultAsync(model, _settings)];
+    }
+
     private async Task<NamedModelLaunchProfile> EnsureDefaultModelLaunchProfileAsync(ModelRecord model)
     {
         var launchProfiles = ModelServices.LaunchProfiles;

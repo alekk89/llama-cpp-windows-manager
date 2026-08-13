@@ -45,7 +45,18 @@ public partial class MainWindow
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var modelLookup = AppServices.ModelLookupApplication;
-                return await modelLookup.ListAsync();
+                var models = await modelLookup.ListAsync();
+                await EnsureDefaultModelLaunchProfilesAsync(models);
+                var routes = new List<ModelGatewayModelRoute>();
+                foreach (var model in models)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var profiles = ModelServices.LaunchProfiles is null
+                        ? []
+                        : await ModelServices.LaunchProfiles.ListNamedAsync(model);
+                    routes.AddRange(profiles.Select(profile => new ModelGatewayModelRoute(model, profile)));
+                }
+                return ModelGatewayRouteId.EnsureUnique(routes);
             }),
             cancellationToken => RunOnUiThreadAsync(() =>
             {
@@ -54,7 +65,7 @@ public partial class MainWindow
                     .Where(session => session.IsRunning)
                     .ToArray());
             }),
-            (model, policy, cancellationToken) => RunOnUiThreadAsync(() => EnsureGatewayModelLoadedAsync(model, policy, cancellationToken))));
+            (route, policy, cancellationToken) => RunOnUiThreadAsync(() => EnsureGatewayModelLoadedAsync(route, policy, cancellationToken))));
 
     private Task<T> RunOnUiThreadAsync<T>(Func<Task<T>> action)
     {
@@ -64,20 +75,21 @@ public partial class MainWindow
         return Dispatcher.InvokeAsync(action).Task.Unwrap();
     }
 
-    private async Task<LoadedModelSessionSnapshot> EnsureGatewayModelLoadedAsync(ModelRecord model, ModelGatewaySwapPolicy policy, CancellationToken cancellationToken)
+    private async Task<LoadedModelSessionSnapshot> EnsureGatewayModelLoadedAsync(ModelGatewayModelRoute route, ModelGatewaySwapPolicy policy, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var model = route.Model;
         return await GatewayServices.GatewayRuntimeApplication.EnsureModelLoadedAsync(
             new GatewayRuntimeLoadApplicationRequest(
                 model,
+                route.Profile,
                 policy,
                 _settings,
                 _sessions.SessionForModel(model.Id)),
                 new GatewayRuntimeLoadApplicationActions(
                 async (loadedModel, _) => await StopModelRuntimeAsync(loadedModel),
-                async (runtime, runtimeModel, launchSettings, _) =>
+                async (runtime, runtimeModel, profile, launchSettings, _) =>
                 {
-                    var profile = await EnsureDefaultModelLaunchProfileAsync(runtimeModel);
                     await StartModelRuntimeAsync(
                         runtime,
                         runtimeModel,

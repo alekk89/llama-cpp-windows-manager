@@ -11,6 +11,116 @@ namespace LocalLlmConsole.Tests;
 public sealed partial class ReleaseHardeningTests
 {
     [Fact]
+    public void GatewayExposesSavedProfilesWithClientNeutralModelIds()
+    {
+        var root = CreateTempRoot();
+        var model = new ModelRecord(
+            "qwen-model",
+            "Qwen Model",
+            Path.Combine(root, "qwen.gguf"),
+            OwnershipKind.External,
+            "{}",
+            DateTimeOffset.UtcNow);
+        var settings = AppSettings.CreateDefault(root);
+        var defaultProfile = new NamedModelLaunchProfile(
+            "default:qwen-model",
+            model.Id,
+            "Default",
+            ModelLaunchSettings.FromAppSettings(settings, "runtime"),
+            DateTimeOffset.UtcNow,
+            true);
+        var tunedProfile = new NamedModelLaunchProfile(
+            "Profile 128K / DFlash",
+            model.Id,
+            "128K DFlash",
+            ModelLaunchSettings.FromAppSettings(settings with { ContextSize = 131072 }, "runtime"),
+            DateTimeOffset.UtcNow,
+            false);
+        var routes = new[]
+        {
+            new ModelGatewayModelRoute(model, defaultProfile),
+            new ModelGatewayModelRoute(model, tunedProfile)
+        };
+
+        Assert.Equal(model.Id, routes[0].Id);
+        Assert.Equal("qwen-model--profile-128k-dflash", routes[1].Id);
+        Assert.Same(routes[1], ModelGatewayRequestResolver.ResolveModel(routes, routes[1].Id));
+        Assert.DoesNotContain("opencode", routes[1].Id, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GatewayDisambiguatesNormalizedProfileIdCollisionsDeterministically()
+    {
+        var root = CreateTempRoot();
+        var model = new ModelRecord("qwen-model", "Qwen", Path.Combine(root, "qwen.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+        var launchSettings = ModelLaunchSettings.FromAppSettings(AppSettings.CreateDefault(root), "runtime");
+        var first = new NamedModelLaunchProfile("Profile 128K / DFlash", model.Id, "First", launchSettings, DateTimeOffset.UtcNow);
+        var second = new NamedModelLaunchProfile("profile-128k-dflash", model.Id, "Second", launchSettings, DateTimeOffset.UtcNow);
+        var source = new[] { new ModelGatewayModelRoute(model, first), new ModelGatewayModelRoute(model, second) };
+
+        var routes = ModelGatewayRouteId.EnsureUnique(source);
+        var repeated = ModelGatewayRouteId.EnsureUnique(source);
+
+        Assert.NotEqual(routes[0].Id, routes[1].Id, StringComparer.OrdinalIgnoreCase);
+        Assert.StartsWith("qwen-model--profile-128k-dflash-", routes[0].Id, StringComparison.Ordinal);
+        Assert.StartsWith("qwen-model--profile-128k-dflash-", routes[1].Id, StringComparison.Ordinal);
+        Assert.Equal(routes.Select(route => route.Id), repeated.Select(route => route.Id));
+    }
+
+    [Fact]
+    public async Task GatewayAllowsSameProfileConcurrencyAndWaitsBeforeSwitchingProfiles()
+    {
+        var gates = new ModelGatewayRequestGate();
+        using var first = await gates.EnterAsync("qwen", "profile-a", TestContext.Current.CancellationToken);
+
+        var sameProfile = await gates.EnterAsync("QWEN", "PROFILE-A", TestContext.Current.CancellationToken);
+        var blocked = gates.EnterAsync("qwen", "profile-b", TestContext.Current.CancellationToken);
+        Assert.False(blocked.IsCompleted);
+
+        using var differentModel = await gates.EnterAsync("llama", "profile-a", TestContext.Current.CancellationToken);
+
+        first.Dispose();
+        Assert.False(blocked.IsCompleted);
+        sameProfile.Dispose();
+        using var switched = await blocked.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task GatewayGivesWaitingProfilePriorityOverNewActiveProfileRequests()
+    {
+        var gates = new ModelGatewayRequestGate();
+        using var active = await gates.EnterAsync("qwen", "profile-a", TestContext.Current.CancellationToken);
+        var switchRequest = gates.EnterAsync("qwen", "profile-b", TestContext.Current.CancellationToken);
+        var lateActiveRequest = gates.EnterAsync("qwen", "profile-a", TestContext.Current.CancellationToken);
+
+        Assert.False(switchRequest.IsCompleted);
+        Assert.False(lateActiveRequest.IsCompleted);
+        active.Dispose();
+
+        using var switched = await switchRequest.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        Assert.False(lateActiveRequest.IsCompleted);
+        switched.Dispose();
+
+        using var resumed = await lateActiveRequest.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task CancelledGatewayProfileWaiterDoesNotConsumeAnActiveLease()
+    {
+        var gates = new ModelGatewayRequestGate();
+        using var active = await gates.EnterAsync("qwen", "profile-a", TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        var cancelledWaiter = gates.EnterAsync("qwen", "profile-b", cancellation.Token);
+        var next = gates.EnterAsync("qwen", "profile-c", TestContext.Current.CancellationToken);
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelledWaiter);
+        active.Dispose();
+
+        using var admitted = await next.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public void DisplayFormatServiceFormatsMetricsBytesElapsedAndLongText()
     {
         Assert.Equal("0s", DisplayFormatService.Elapsed(TimeSpan.FromSeconds(-1)));
@@ -214,7 +324,7 @@ public sealed partial class ReleaseHardeningTests
                 return expectedHost;
             });
         var actions = new ModelGatewayRuntimeControllerActions(
-            _ => Task.FromResult<IReadOnlyList<ModelRecord>>([]),
+            _ => Task.FromResult<IReadOnlyList<ModelGatewayModelRoute>>([]),
             _ => Task.FromResult<IReadOnlyList<LoadedModelSessionSnapshot>>([]),
             (_, _, _) => Task.FromException<LoadedModelSessionSnapshot>(new NotSupportedException()));
 
@@ -229,23 +339,6 @@ public sealed partial class ReleaseHardeningTests
         Assert.Throws<ArgumentNullException>(() => service.CreateGatewayHost(ModelGatewayOptions.FromSettings(settings), null!));
     }
 
-
-    [Fact]
-    public void ModelGatewayExtractsAndResolvesRequestedModels()
-    {
-        var root = CreateTempRoot();
-        var now = DateTimeOffset.UtcNow;
-        var model = new ModelRecord("qwen-id", "Friendly Qwen", Path.Combine(root, "models", "Qwen3-8B.gguf"), OwnershipKind.External, "{}", now);
-        var body = System.Text.Encoding.UTF8.GetBytes("""{"model":"Friendly Qwen","messages":[]}""");
-
-        Assert.Equal("Friendly Qwen", ModelGatewayRequestResolver.ExtractRequestedModel(body));
-        Assert.Equal(model, ModelGatewayRequestResolver.ResolveModel([model], "qwen-id"));
-        Assert.Equal(model, ModelGatewayRequestResolver.ResolveModel([model], "Friendly Qwen"));
-        Assert.Equal(model, ModelGatewayRequestResolver.ResolveModel([model], OpenCodeConfigService.LocalModelIdFor(model)));
-        Assert.Equal(model, ModelGatewayRequestResolver.ResolveModel([model], "Qwen3-8B.gguf"));
-        Assert.Equal(model, ModelGatewayRequestResolver.ResolveModel([model], "Qwen3-8B"));
-        Assert.Null(ModelGatewayRequestResolver.ResolveModel([model], "other"));
-    }
 
     [Fact]
     public void ModelGatewayRequestBodyReaderRejectsOversizedBodies()
@@ -294,6 +387,8 @@ public sealed partial class ReleaseHardeningTests
         var settings = AppSettings.CreateDefault(root) with { Port = 8093 };
         var first = new ModelRecord("z-model", "Zulu", Path.Combine(root, "zulu.gguf"), OwnershipKind.External, "{}", now);
         var second = new ModelRecord("a-model", "Alpha", Path.Combine(root, "alpha.gguf"), OwnershipKind.External, "{}", now.AddMinutes(1));
+        var firstProfile = new NamedModelLaunchProfile("default:z-model", first.Id, "Default", ModelLaunchSettings.FromAppSettings(settings), now, true);
+        var secondProfile = new NamedModelLaunchProfile("default:a-model", second.Id, "Default", ModelLaunchSettings.FromAppSettings(settings), now.AddMinutes(1), true);
         var running = new LoadedModelSessionSnapshot(
             "session-1",
             first.Id,
@@ -320,7 +415,7 @@ public sealed partial class ReleaseHardeningTests
         };
 
         using var modelsJson = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(
-            ModelGatewayResponseWriter.ModelsResponse([first, second])));
+            ModelGatewayResponseWriter.ModelsResponse([new(first, firstProfile), new(second, secondProfile)])));
         using var runningJson = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(
             ModelGatewayResponseWriter.RunningModelRows([stopped, running])));
         using var errorJson = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(
@@ -335,7 +430,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("http://127.0.0.1:8093/v1", runningRow.GetProperty("endpoint").GetString());
         Assert.Equal("upstream_unavailable", errorJson.RootElement.GetProperty("error").GetProperty("code").GetString());
         Assert.Contains("Friendly name -> model-id", ModelGatewayResponseWriter.GatewayClientLoadError(
-            first with { Id = "model-id" },
+            new ModelGatewayModelRoute(first with { Id = "model-id" }, firstProfile with { ModelId = "model-id" }),
             "Friendly name",
             new InvalidOperationException("runtime unavailable")), StringComparison.Ordinal);
         Assert.Equal("socket offline", ModelGatewayResponseWriter.InnermostMessage(
@@ -550,12 +645,14 @@ public sealed partial class ReleaseHardeningTests
         var runtimeSessions = new RuntimeSessionCoordinator(sessions, Path.Combine(root, "logs"));
         var profiles = new ModelLaunchProfileService(store, sessions);
         var workflow = new GatewayModelLoadWorkflowService(store, profiles, runtimeSessions);
+        var targetProfile = await profiles.EnsureDefaultAsync(target, settings);
         var phases = new List<string>();
         var stopped = new List<string>();
         AppSettings? startedSettings = null;
 
         var result = await workflow.EnsureLoadedAsync(new GatewayModelLoadWorkflowRequest(
             target,
+            targetProfile,
             ModelGatewaySwapPolicy.SingleActive,
             settings,
             async (model, _) =>
@@ -563,7 +660,7 @@ public sealed partial class ReleaseHardeningTests
                 stopped.Add(model.Id);
                 await runtimeSessions.StopModelAsync(model.Id);
             },
-            (startedRuntime, model, launchSettings, _) =>
+            (startedRuntime, model, _, launchSettings, _) =>
             {
                 startedSettings = launchSettings;
                 sessions.AttachExisting(startedRuntime, model, launchSettings, Path.Combine(root, "target.log"), LlamaRuntimeState.Loading, "", "target-session", DateTimeOffset.UtcNow);
@@ -592,6 +689,76 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("waiting for API from", phases);
     }
 
+    [Fact]
+    public async Task GatewayModelLoadWorkflowRestartsSameModelForRequestedProfile()
+    {
+        var root = CreateTempRoot();
+        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
+        await store.InitializeAsync();
+        var settings = AppSettings.CreateDefault(root) with
+        {
+            AutoLoadGatewayEnabled = true,
+            AutoLoadGatewayPort = 8082,
+            Port = 8084
+        };
+        var runtime = new RuntimeRecord("runtime", "CUDA", RuntimeMode.Native, RuntimeBackend.Cuda, Path.Combine(root, "llama-server.exe"), "{}", DateTimeOffset.UtcNow);
+        var model = new ModelRecord("qwen", "Qwen", Path.Combine(root, "qwen.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+        var defaultProfile = new NamedModelLaunchProfile(
+            "default:qwen", model.Id, "Default", ModelLaunchSettings.FromAppSettings(settings with { Port = 8084 }, runtime.Id), DateTimeOffset.UtcNow, true);
+        var tunedProfile = new NamedModelLaunchProfile(
+            "profile-qwen-128k", model.Id, "128K", ModelLaunchSettings.FromAppSettings(settings with { Port = 8085, ContextSize = 131072 }, runtime.Id), DateTimeOffset.UtcNow, false);
+        await store.UpsertRuntimeAsync(runtime);
+        await store.UpsertModelAsync(model);
+        await store.SaveNamedModelLaunchProfileAsync(defaultProfile);
+        await store.SaveNamedModelLaunchProfileAsync(tunedProfile);
+        using var sessions = CreateLoadedModelSessionManager();
+        sessions.AttachExisting(
+            runtime, model, defaultProfile.Settings.ApplyTo(settings), Path.Combine(root, "default.log"),
+            LlamaRuntimeState.Loaded, "", "default-session", DateTimeOffset.UtcNow,
+            launchProfileId: defaultProfile.Id, launchProfileName: defaultProfile.Name);
+        var runtimeSessions = new RuntimeSessionCoordinator(sessions, Path.Combine(root, "logs"));
+        var workflow = new GatewayModelLoadWorkflowService(store, new ModelLaunchProfileService(store, sessions), runtimeSessions);
+        var stopped = 0;
+        NamedModelLaunchProfile? startedProfile = null;
+        var phases = new List<string>();
+
+        var result = await workflow.EnsureLoadedAsync(new GatewayModelLoadWorkflowRequest(
+            model,
+            tunedProfile,
+            ModelGatewaySwapPolicy.KeepLoaded,
+            settings,
+            async (_, _) =>
+            {
+                stopped++;
+                await runtimeSessions.StopModelAsync(model.Id);
+            },
+            (startedRuntime, startedModel, profile, launchSettings, _) =>
+            {
+                startedProfile = profile;
+                sessions.AttachExisting(
+                    startedRuntime, startedModel, launchSettings, Path.Combine(root, "tuned.log"),
+                    LlamaRuntimeState.Loading, "", "tuned-session", DateTimeOffset.UtcNow,
+                    launchProfileId: profile.Id, launchProfileName: profile.Name);
+                return Task.CompletedTask;
+            },
+            (_, _) => Task.FromResult(true),
+            (readyModel, _, _) =>
+            {
+                sessions.MarkModelLoadedIfRunning(readyModel.Id);
+                return Task.FromResult(sessions.SessionForModel(readyModel.Id));
+            },
+            phases.Add,
+            ReadyTimeout: TimeSpan.FromSeconds(1),
+            PollInterval: TimeSpan.FromMilliseconds(1)),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, stopped);
+        Assert.Equal(tunedProfile.Id, startedProfile?.Id);
+        Assert.Equal(tunedProfile.Id, result.Session.LaunchProfileId);
+        Assert.Equal(8085, result.LaunchSettings.Port);
+        Assert.Contains(phases, phase => phase.Contains("switching from Default to 128K", StringComparison.Ordinal));
+    }
+
 
     [Fact]
     public async Task GatewayRuntimeApplicationServiceOwnsActivityRefreshAndErrorBoundary()
@@ -616,17 +783,19 @@ public sealed partial class ReleaseHardeningTests
             store,
             new ModelLaunchProfileService(store, sessions),
             runtimeSessions));
+        var profile = await new ModelLaunchProfileService(store, sessions).EnsureDefaultAsync(model, settings);
         var calls = new List<string>();
 
         var result = await application.EnsureModelLoadedAsync(
             new GatewayRuntimeLoadApplicationRequest(
                 model,
+                profile,
                 ModelGatewaySwapPolicy.KeepLoaded,
                 settings,
                 ExistingSession: null),
             new GatewayRuntimeLoadApplicationActions(
                 (_, _) => throw new InvalidOperationException("Keep-loaded policy should not stop models."),
-                (startedRuntime, runtimeModel, launchSettings, _) =>
+                (startedRuntime, runtimeModel, _, launchSettings, _) =>
                 {
                     calls.Add($"start:{runtimeModel.Id}:{launchSettings.Port}");
                     sessions.AttachExisting(startedRuntime, runtimeModel, launchSettings, Path.Combine(root, "target.log"), LlamaRuntimeState.Loading, "", "target-session", DateTimeOffset.UtcNow);
@@ -651,7 +820,7 @@ public sealed partial class ReleaseHardeningTests
 
         Assert.Equal(model.Id, result.ModelId);
         Assert.Contains($"activity:switching to:{model.Id}", calls);
-        Assert.Contains("status:Gateway auto-loading Target Model...", calls);
+        Assert.Contains("status:Gateway auto-loading Target Model with profile Default...", calls);
         Assert.Contains($"start:{model.Id}:8084", calls);
         Assert.Contains($"ready:{model.Id}", calls);
         Assert.Contains("status:Gateway loaded Target Model at http://127.0.0.1:8084/v1.", calls);
@@ -988,19 +1157,28 @@ public sealed partial class ReleaseHardeningTests
 
         public int EnsureLoadedCount { get; private set; }
 
-        public Task<IReadOnlyList<ModelRecord>> ListModelsAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult(models);
+        public Task<IReadOnlyList<ModelGatewayModelRoute>> ListModelsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ModelGatewayModelRoute>>(models.Select(model => new ModelGatewayModelRoute(
+                model,
+                new NamedModelLaunchProfile(
+                    $"default:{model.Id}",
+                    model.Id,
+                    "Default",
+                    ModelLaunchSettings.FromAppSettings(launchSettings),
+                    model.UpdatedAt,
+                    true))).ToArray());
 
         public Task<IReadOnlyList<LoadedModelSessionSnapshot>> RunningSessionsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<LoadedModelSessionSnapshot>>(_sessions.ToArray());
 
         public Task<LoadedModelSessionSnapshot> EnsureModelLoadedAsync(
-            ModelRecord model,
+            ModelGatewayModelRoute route,
             ModelGatewaySwapPolicy policy,
             CancellationToken cancellationToken = default)
         {
             EnsureLoadedCount++;
             if (LoadFailure is not null) throw LoadFailure;
+            var model = route.Model;
             var session = new LoadedModelSessionSnapshot(
                 "gateway-session",
                 model.Id,
@@ -1016,7 +1194,9 @@ public sealed partial class ReleaseHardeningTests
                 123,
                 LoadedModelSessionStatus.Running,
                 IsRunning: true,
-                IsSelected: true);
+                IsSelected: true,
+                LaunchProfileId: route.Profile.Id,
+                LaunchProfileName: route.Profile.Name);
             _sessions.Add(session);
             return Task.FromResult(session);
         }

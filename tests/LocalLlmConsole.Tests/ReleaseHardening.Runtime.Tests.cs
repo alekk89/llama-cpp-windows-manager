@@ -923,14 +923,14 @@ public sealed partial class ReleaseHardeningTests
 
     private sealed class FakeModelGatewayRuntimeController : IModelGatewayRuntimeController
     {
-        public Task<IReadOnlyList<ModelRecord>> ListModelsAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<ModelRecord>>([]);
+        public Task<IReadOnlyList<ModelGatewayModelRoute>> ListModelsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ModelGatewayModelRoute>>([]);
 
         public Task<IReadOnlyList<LoadedModelSessionSnapshot>> RunningSessionsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<LoadedModelSessionSnapshot>>([]);
 
         public Task<LoadedModelSessionSnapshot> EnsureModelLoadedAsync(
-            ModelRecord model,
+            ModelGatewayModelRoute route,
             ModelGatewaySwapPolicy policy,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();

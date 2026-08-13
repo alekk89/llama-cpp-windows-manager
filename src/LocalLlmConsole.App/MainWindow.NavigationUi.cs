@@ -4,7 +4,7 @@ public partial class MainWindow
 {
     private void SetActiveNavigation(string title)
     {
-        foreach (var button in new[] { OverviewNavButton, ModelsNavButton, RuntimesNavButton, WindowsNavButton, WslLinuxNavButton, SettingsNavButton, OpenCodeNavButton, LifetimeNavButton, LogsNavButton, UpdatesNavButton, HelpNavButton })
+        foreach (var button in new[] { OverviewNavButton, ModelsNavButton, RuntimesNavButton, WindowsNavButton, WslLinuxNavButton, SettingsNavButton, LifetimeNavButton, LogsNavButton, UpdatesNavButton, HelpNavButton })
             button.Tag = null;
 
         var active = title switch
@@ -15,7 +15,6 @@ public partial class MainWindow
             "Windows" => WindowsNavButton,
             "WSL Linux" => WslLinuxNavButton,
             "Settings" => SettingsNavButton,
-            "OpenCode" => OpenCodeNavButton,
             "Lifetime" => LifetimeNavButton,
             "Logs" => LogsNavButton,
             "Updates" => UpdatesNavButton,
@@ -36,7 +35,6 @@ public partial class MainWindow
         SetButtonToolTip(WindowsNavButton, "Open advanced native Windows tool setup actions.");
         SetButtonToolTip(WslLinuxNavButton, "Open advanced WSL, Ubuntu, and toolkit setup actions.");
         SetButtonToolTip(SettingsNavButton, "Open app preferences.");
-        SetButtonToolTip(OpenCodeNavButton, "Open OpenCode model and agent configuration.");
         SetButtonToolTip(LifetimeNavButton, "Open persisted lifetime token counters.");
         SetButtonToolTip(LogsNavButton, "Open app, runtime, and job logs.");
         SetButtonToolTip(UpdatesNavButton, "Check for app updates from GitHub releases.");
@@ -59,17 +57,8 @@ public partial class MainWindow
             "Open Logs Folder" => "Open the app logs folder in File Explorer.",
             "Delete Selected" => "Delete the selected log files when they are safe to remove.",
             "Delete All Logs" => "Delete all removable log files.",
-            "Detect Files" => "Find OpenCode config and agents files automatically.",
-            "Choose Config" => "Choose the OpenCode provider config file.",
-            "Choose Agents Folder" => "Choose the OpenCode agents folder.",
-            "Update Config" => "Save changes to the selected OpenCode model config.",
-            "Delete Config" => "Delete the selected OpenCode model config.",
             "Add" => "Add the selected item.",
             "Update" => "Update the selected item.",
-            "Add As New" => "Add this model as a new OpenCode config entry.",
-            "Save Agent" => "Save changes to the selected OpenCode agent.",
-            "Delete Agent" => "Delete the selected OpenCode agent.",
-            "Create Agent" => "Create a new OpenCode agent from the current draft.",
             "Search Hugging Face" => "Search Hugging Face for GGUF model files.",
             "History" => "Show model download history and controls.",
             "Save Settings" => "Save the current app preferences.",
@@ -95,13 +84,11 @@ public partial class MainWindow
             "Open Runtimes" => "Open runtime source download and build actions.",
             "Open Models" => "Open model search, download, and launch settings.",
             "Open Overview" => "Open the model loading dashboard.",
-            "Open OpenCode" => "Open OpenCode setup actions.",
             "First Steps" => "Show first-run setup help.",
             "Overview" => "Show Overview help.",
             "Models" => "Show Models help.",
             "Runtimes" => "Show Runtimes help.",
             "Settings" => "Show Settings help.",
-            "OpenCode" => "Show OpenCode help.",
             "Logs & Updates" => "Show logs and updates help.",
             "Search Models" => "Open Models and focus Hugging Face search.",
             "Edit Launch Settings" => "Open Models and focus launch settings.",
@@ -109,8 +96,6 @@ public partial class MainWindow
             "Windows Tools" => "Open advanced Windows setup actions.",
             "WSL Tools" => "Open advanced WSL setup actions.",
             "Runtime Jobs" => "Open Runtimes and focus runtime jobs.",
-            "Add OpenCode Model" => "Open OpenCode and add a local model.",
-            "Open Agents" => "Open OpenCode agent setup actions.",
             "Open Logs" => "Open log inspection.",
             "Open Lifetime" => "Open lifetime token counters.",
             "Check Updates" => "Open app update checks.",

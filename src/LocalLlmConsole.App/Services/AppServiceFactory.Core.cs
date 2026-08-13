@@ -69,19 +69,6 @@ public sealed partial class AppServiceFactory
             runtimeBuildMarkers,
             startupRegistration);
         var startupBackgroundApplication = CreateAppStartupBackgroundApplicationService();
-        var openCode = CreateOpenCodeConfigService();
-        var openCodeSync = CreateOpenCodeModelSyncService(openCode);
-        var openCodeModelWorkflow = CreateOpenCodeModelWorkflowService(openCode);
-        var openCodeModelApplication = CreateOpenCodeModelApplicationService(openCodeModelWorkflow);
-        var openCodePageApplication = CreateOpenCodePageApplicationService();
-        var openCodeLocalModelWorkflow = CreateOpenCodeLocalModelWorkflowService(openCodeSync);
-        var openCodeLocalModelApplication = CreateOpenCodeLocalModelApplicationService(openCodeLocalModelWorkflow);
-        var openCodeAgentWorkflow = CreateOpenCodeAgentWorkflowService(openCode);
-        var openCodeAgentApplication = CreateOpenCodeAgentApplicationService(openCodeAgentWorkflow);
-        var openCodeWorkflow = CreateOpenCodePageWorkflowService(openCode, openCodeSync);
-        var openCodeRefreshApplication = CreateOpenCodeRefreshApplicationService(openCodeWorkflow, openCodePageApplication);
-        var openCodeFileSetApplication = CreateOpenCodeFileSetApplicationService(openCodeWorkflow, openCodePageApplication);
-        var openCodeSettingsSync = CreateOpenCodeSettingsSyncService(openCodeWorkflow, openCodeSync);
         var runtimeSessions = CreateRuntimeSessionCoordinator(request.Sessions);
         var runtimeSessionPersistence = CreateRuntimeSessionPersistenceService(activeSessions, request.Sessions);
         var modelCapabilities = CreateModelCapabilityCacheService();
@@ -223,20 +210,6 @@ public sealed partial class AppServiceFactory
                 huggingFaceModelCards,
                 huggingFaceSearchApplication,
                 huggingFaceDownloadApplication),
-            new MainWindowCoreOpenCodeServices(
-                openCode,
-                openCodeSync,
-                openCodeModelWorkflow,
-                openCodeModelApplication,
-                openCodePageApplication,
-                openCodeLocalModelWorkflow,
-                openCodeLocalModelApplication,
-                openCodeAgentWorkflow,
-                openCodeAgentApplication,
-                openCodeWorkflow,
-                openCodeRefreshApplication,
-                openCodeFileSetApplication,
-                openCodeSettingsSync),
             new MainWindowCoreRuntimeServices(
                 runtimeCatalogData,
                 activeSessions,

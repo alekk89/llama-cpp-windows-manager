@@ -40,11 +40,13 @@ public sealed class WpfUiSmokeTests
                 var statusY = statusCard.TranslatePoint(new Point(0, 0), windowContent).Y;
                 Assert.True(statusY > helpY + helpButton.ActualHeight, $"Help bottom {helpY + helpButton.ActualHeight}, status top {statusY}.");
                 Assert.True(statusY + statusCard.ActualHeight <= 680, $"Status bottom {statusY + statusCard.ActualHeight}.");
-                Assert.Equal("v2.0.0", appVersionText.Text);
+                Assert.Equal("v2.1.0", appVersionText.Text);
                 Assert.All(
                     new[] { "OverviewNavButton", "ModelsNavButton", "RuntimesNavButton", "HelpNavButton" }
                         .Select(name => Assert.IsType<Button>(window.FindName(name))),
                     button => Assert.True(button.MinHeight >= 40));
+
+                Assert.Null(window.FindName("ControlApiNavButton"));
 
                 var settings = AppSettings.CreateDefault(Path.Combine(Path.GetTempPath(), "wpf-smoke"));
                 var panelState = new LocalLlmConsole.LaunchSettingsPanelState();

@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 function Resolve-Dotnet {
-  $bundledDotnet = Join-Path (Split-Path -Parent $RepoRoot) ".dotnet-sdk-8\dotnet.exe"
+  $bundledDotnet = Join-Path (Split-Path -Parent $RepoRoot) ".dotnet-sdk-10\dotnet.exe"
   if ($env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET) {
     return $env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET
   }
@@ -136,6 +136,10 @@ function Assert-PublishArtifacts {
 
   $publishDir = Join-Path $RepoRoot "dist\LlamaCppWindowsManager-$Runtime"
   $appExe = Join-Path $publishDir "LlamaCppWindowsManager.exe"
+  $controlCli = Join-Path $publishDir "llwmctl.exe"
+  $agentsGuide = Join-Path $publishDir "AGENTS.md"
+  $quickGuide = Join-Path $publishDir "agent.md"
+  $controlApiGuide = Join-Path $publishDir "docs\CONTROL_API.md"
   $zipPath = Join-Path $RepoRoot "dist\LlamaCppWindowsManager-$Runtime.zip"
 
   if (-not (Test-Path -LiteralPath $publishDir -PathType Container)) {
@@ -143,6 +147,10 @@ function Assert-PublishArtifacts {
   }
 
   Assert-HashCompanion -Path $appExe
+  Assert-HashCompanion -Path $controlCli
+  Assert-FileExists -Path $agentsGuide -Label "Agent instruction sidecar"
+  Assert-FileExists -Path $quickGuide -Label "Quick agent instruction sidecar"
+  Assert-FileExists -Path $controlApiGuide -Label "Control API reference sidecar"
   Assert-HashCompanion -Path $zipPath
 
   $pdbs = @(Get-ChildItem -LiteralPath $publishDir -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue)
@@ -155,6 +163,11 @@ function Assert-PublishArtifacts {
   try {
     $entries = @($zip.Entries | ForEach-Object { $_.FullName -replace "\\", "/" })
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "LlamaCppWindowsManager.exe" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "llwmctl.exe" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "llwmctl.exe.sha256" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "AGENTS.md" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "agent.md" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "docs/CONTROL_API.md" -ZipPath $zipPath
     if ($entries -contains "LlamaCppConsole.exe") {
       throw "Release archive contains the removed legacy executable alias: $zipPath"
     }
@@ -190,7 +203,7 @@ function Assert-InstallerArtifacts {
 
 $dotnet = Resolve-Dotnet
 if (-not $dotnet) {
-  throw ".NET SDK was not found. Install the .NET 8 SDK from https://dotnet.microsoft.com/download/dotnet/8.0."
+  throw ".NET SDK was not found. Install the .NET 10 SDK from https://dotnet.microsoft.com/download/dotnet/10.0."
 }
 if (-not (Test-Path -LiteralPath $dotnet)) {
   throw "Configured dotnet path was not found: $dotnet"

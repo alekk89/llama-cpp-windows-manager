@@ -5,6 +5,7 @@ public delegate Task GatewayModelStopper(ModelRecord model, CancellationToken ca
 public delegate Task GatewayModelStarter(
     RuntimeRecord runtime,
     ModelRecord model,
+    NamedModelLaunchProfile profile,
     AppSettings launchSettings,
     CancellationToken cancellationToken);
 
@@ -17,6 +18,7 @@ public delegate Task<LoadedModelSessionSnapshot?> GatewayReadyMarker(
 
 public sealed record GatewayModelLoadWorkflowRequest(
     ModelRecord Model,
+    NamedModelLaunchProfile Profile,
     ModelGatewaySwapPolicy Policy,
     AppSettings Settings,
     GatewayModelStopper StopModelAsync,
@@ -29,7 +31,7 @@ public sealed record GatewayModelLoadWorkflowRequest(
 
 public sealed record GatewayModelLoadWorkflowResult(
     LoadedModelSessionSnapshot Session,
-    ModelLaunchSettings Profile,
+    NamedModelLaunchProfile Profile,
     RuntimeRecord Runtime,
     AppSettings LaunchSettings);
 
@@ -89,16 +91,11 @@ public sealed class GatewayModelLoadWorkflowService
         ArgumentNullException.ThrowIfNull(request.MarkReadyAsync);
         cancellationToken.ThrowIfCancellationRequested();
 
+        ValidateProfile(request.Model, request.Profile);
+
         var loaded = _runtimeSessions.Sessions.SessionForModel(request.Model.Id);
-        if (loaded is { IsRunning: true })
-        {
-            return new GatewayModelLoadWorkflowResult(
-                loaded,
-                await _launchProfiles.EnsureAsync(request.Model, request.Settings) ?? ModelLaunchSettings.FromAppSettings(request.Settings),
-                ResolveRuntime(await _stateStore.ListRuntimesAsync(), loaded.RuntimeId)
-                    ?? new RuntimeRecord(loaded.RuntimeId, loaded.RuntimeName, loaded.Mode, loaded.Backend, "", "{}", DateTimeOffset.UtcNow),
-                loaded.LaunchSettings);
-        }
+        if (MatchesProfile(loaded, request.Profile))
+            return await ResultForRunningSessionAsync(loaded!, request.Profile);
 
         // Per-model serialization gate prevents concurrent requests from spawning
         // duplicate processes while the first one is still loading.
@@ -108,14 +105,13 @@ public sealed class GatewayModelLoadWorkflowService
         {
             // Re-check after acquiring the lock — another request may have loaded it.
             var alreadyLoaded = _runtimeSessions.Sessions.SessionForModel(request.Model.Id);
+            if (MatchesProfile(alreadyLoaded, request.Profile))
+                return await ResultForRunningSessionAsync(alreadyLoaded!, request.Profile);
+
             if (alreadyLoaded is { IsRunning: true })
             {
-                return new GatewayModelLoadWorkflowResult(
-                    alreadyLoaded,
-                    await _launchProfiles.EnsureAsync(request.Model, request.Settings) ?? ModelLaunchSettings.FromAppSettings(request.Settings),
-                    ResolveRuntime(await _stateStore.ListRuntimesAsync(), alreadyLoaded.RuntimeId)
-                        ?? new RuntimeRecord(alreadyLoaded.RuntimeId, alreadyLoaded.RuntimeName, alreadyLoaded.Mode, alreadyLoaded.Backend, "", "{}", DateTimeOffset.UtcNow),
-                    alreadyLoaded.LaunchSettings);
+                request.ReportPhase?.Invoke($"switching from {ProfileLabel(alreadyLoaded)} to {request.Profile.Name}");
+                await request.StopModelAsync(request.Model, cancellationToken);
             }
 
             return await ExecuteLoadAsync(request, cancellationToken);
@@ -130,7 +126,7 @@ public sealed class GatewayModelLoadWorkflowService
         GatewayModelLoadWorkflowRequest request,
         CancellationToken cancellationToken)
     {
-        ModelLaunchSettings? profile = null;
+        NamedModelLaunchProfile? profile = null;
         RuntimeRecord? runtime = null;
         AppSettings? launchSettings = null;
         try
@@ -139,15 +135,15 @@ public sealed class GatewayModelLoadWorkflowService
                 await StopOtherRunningModelsAsync(request, cancellationToken);
 
             request.ReportPhase?.Invoke("preparing");
-            profile = await EnsureLaunchProfileAsync(request.Model, request.Settings, cancellationToken);
-            launchSettings = profile.ApplyTo(request.Settings);
-            runtime = ResolveRuntime(await _stateStore.ListRuntimesAsync(), profile.RuntimeId)
-                ?? throw new InvalidOperationException(string.IsNullOrWhiteSpace(profile.RuntimeId)
+            profile = await EnsureLaunchProfileAsync(request.Model, request.Profile, request.Settings, cancellationToken);
+            launchSettings = profile.Settings.ApplyTo(request.Settings);
+            runtime = ResolveRuntime(await _stateStore.ListRuntimesAsync(), profile.Settings.RuntimeId)
+                ?? throw new InvalidOperationException(string.IsNullOrWhiteSpace(profile.Settings.RuntimeId)
                     ? "Register a llama.cpp runtime before auto-loading models."
-                    : $"Saved runtime '{profile.RuntimeId}' is missing.");
+                    : $"Saved runtime '{profile.Settings.RuntimeId}' is missing.");
 
             request.ReportPhase?.Invoke("starting");
-            await request.StartModelAsync(runtime, request.Model, launchSettings, cancellationToken);
+            await request.StartModelAsync(runtime, request.Model, profile, launchSettings, cancellationToken);
             request.ReportPhase?.Invoke("waiting for API from");
 
             var ready = await WaitForReadyAsync(request, launchSettings, cancellationToken);
@@ -158,7 +154,7 @@ public sealed class GatewayModelLoadWorkflowService
             throw new GatewayModelLoadException(
                 FailureMessage(
                     request.Model,
-                    profile,
+                    profile?.Settings,
                     runtime,
                     _runtimeSessions.Sessions.SessionForModel(request.Model.Id)?.LogPath ?? "",
                     ex,
@@ -185,23 +181,52 @@ public sealed class GatewayModelLoadWorkflowService
         }
     }
 
-    private async Task<ModelLaunchSettings> EnsureLaunchProfileAsync(
+    private async Task<NamedModelLaunchProfile> EnsureLaunchProfileAsync(
         ModelRecord model,
+        NamedModelLaunchProfile requestedProfile,
         AppSettings settings,
         CancellationToken cancellationToken)
     {
-        var profile = await _launchProfiles.EnsureAsync(model, settings)
-            ?? throw new InvalidOperationException($"Could not create a launch profile for {model.Name}.");
+        var saved = await _stateStore.GetNamedModelLaunchProfileAsync(requestedProfile.Id)
+            ?? throw new InvalidOperationException($"Saved launch profile '{requestedProfile.Name}' no longer exists.");
+        ValidateProfile(model, saved);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (settings.AutoLoadGatewayEnabled && profile.Port == settings.AutoLoadGatewayPort)
+        if (settings.AutoLoadGatewayEnabled && saved.Settings.Port == settings.AutoLoadGatewayPort)
         {
-            profile = profile with { Port = await _launchProfiles.NextAvailablePortAsync(model.Id, settings) };
-            await _launchProfiles.SaveAsync(model, profile);
+            var updatedSettings = saved.Settings with
+            {
+                Port = await _launchProfiles.NextAvailablePortAsync(model.Id, settings, saved.Id)
+            };
+            saved = saved with { Settings = updatedSettings, UpdatedAt = DateTimeOffset.UtcNow };
+            await _launchProfiles.SaveNamedAsync(saved);
         }
 
-        return profile;
+        return saved;
     }
+
+    private async Task<GatewayModelLoadWorkflowResult> ResultForRunningSessionAsync(
+        LoadedModelSessionSnapshot session,
+        NamedModelLaunchProfile profile)
+        => new(
+            session,
+            profile,
+            ResolveRuntime(await _stateStore.ListRuntimesAsync(), session.RuntimeId)
+                ?? new RuntimeRecord(session.RuntimeId, session.RuntimeName, session.Mode, session.Backend, "", "{}", DateTimeOffset.UtcNow),
+            session.LaunchSettings);
+
+    private static bool MatchesProfile(LoadedModelSessionSnapshot? session, NamedModelLaunchProfile profile)
+        => session is { IsRunning: true }
+            && string.Equals(session.LaunchProfileId, profile.Id, StringComparison.OrdinalIgnoreCase);
+
+    private static void ValidateProfile(ModelRecord model, NamedModelLaunchProfile profile)
+    {
+        if (!string.Equals(profile.ModelId, model.Id, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Launch profile '{profile.Name}' does not belong to {model.Name}.");
+    }
+
+    private static string ProfileLabel(LoadedModelSessionSnapshot session)
+        => string.IsNullOrWhiteSpace(session.LaunchProfileName) ? "the running profile" : session.LaunchProfileName;
 
     private async Task<LoadedModelSessionSnapshot> WaitForReadyAsync(
         GatewayModelLoadWorkflowRequest request,

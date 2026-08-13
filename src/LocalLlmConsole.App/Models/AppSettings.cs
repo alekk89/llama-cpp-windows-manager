@@ -8,8 +8,6 @@ public sealed record AppSettings(
     string ThemeMode,
     string MinimizeBehavior,
     bool StartWithWindows,
-    bool AutoSaveOpenCodeOnLaunchSettingsSave,
-    int OpenCodeOutputLimit,
     string ModelAccessMode,
     bool AutoLoadGatewayEnabled,
     int AutoLoadGatewayPort,
@@ -88,8 +86,6 @@ public sealed record AppSettings(
     public const string DefaultCacheType = "q8_0";
     public const double DefaultTemperature = 0.65;
     public const int DefaultMaxTokens = -1;
-    public const int DefaultOpenCodeOutputLimit = OpenCodeConfigService.DefaultOutputLimit;
-    public const int MaxOpenCodeOutputLimit = 1_048_576;
     public const int DefaultSeed = -1;
     public const int DefaultRepeatLastN = 64;
     public const double DefaultRepeatPenalty = 1.0;
@@ -124,8 +120,6 @@ public sealed record AppSettings(
         "system",
         "taskbarOnly",
         false,
-        true,
-        DefaultOpenCodeOutputLimit,
         "local",
         true,
         8082,

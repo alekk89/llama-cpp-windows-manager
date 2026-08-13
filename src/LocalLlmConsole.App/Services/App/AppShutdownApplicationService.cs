@@ -10,7 +10,8 @@ public enum AppShutdownApplicationOutcomeKind
 
 public sealed record AppShutdownApplicationRequest(
     int RunningModelSessions,
-    int ActiveDownloads);
+    int ActiveDownloads,
+    bool Confirmed = false);
 
 public sealed record AppShutdownApplicationActions(
     Func<AppShutdownConfirmationPrompt, Task<bool>> ConfirmAsync,
@@ -62,7 +63,7 @@ public sealed class AppShutdownApplicationService
         try
         {
             var decision = _decisions.Build(request.RunningModelSessions, request.ActiveDownloads);
-            foreach (var confirmation in decision.Confirmations)
+            foreach (var confirmation in request.Confirmed ? [] : decision.Confirmations)
             {
                 if (await actions.ConfirmAsync(confirmation))
                     continue;

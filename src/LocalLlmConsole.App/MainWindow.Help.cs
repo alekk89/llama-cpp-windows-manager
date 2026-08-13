@@ -61,9 +61,6 @@ public partial class MainWindow
             case HelpNavigationDestination.Settings:
                 ShowSettings();
                 break;
-            case HelpNavigationDestination.OpenCode:
-                ShowOpenCode();
-                break;
             case HelpNavigationDestination.Logs:
                 ShowLogs();
                 break;
@@ -96,12 +93,6 @@ public partial class MainWindow
                 break;
             case HelpNavigationFocusTarget.ModelCombo:
                 _overviewPage.FocusModelCombo();
-                break;
-            case HelpNavigationFocusTarget.OpenCodeModelCombo:
-                _openCodePage.ModelCombo?.Focus();
-                break;
-            case HelpNavigationFocusTarget.OpenCodeLocalModelCombo:
-                _openCodePage.LocalModelCombo?.Focus();
                 break;
             case HelpNavigationFocusTarget.LogsGrid:
                 _logsPage.FocusLogsGrid();

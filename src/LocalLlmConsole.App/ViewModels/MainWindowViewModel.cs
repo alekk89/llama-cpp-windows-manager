@@ -19,7 +19,6 @@ public sealed class MainWindowViewModel : ObservableViewModel
     public LogsViewModel Logs { get; } = new();
     public RuntimeMetricsViewModel RuntimeMetrics { get; } = new();
     public SettingsPageViewModel Settings { get; } = new();
-    public OpenCodePageViewModel OpenCode { get; } = new();
     public LaunchSettingsViewModel LaunchSettings { get; } = new();
     public UpdatesPageViewModel Updates { get; } = new();
 

@@ -112,7 +112,8 @@ public static class SettingsGridColumnFactory
         var primaryButton = ActionButton(
             nameof(EditableSettingRow.Action),
             nameof(EditableSettingRow.CanAction),
-            nameof(EditableSettingRow.ActionToolTip));
+            nameof(EditableSettingRow.ActionToolTip),
+            VisualRole.Primary);
         primaryButton.AddHandler(WpfButton.ClickEvent, primaryClick);
         root.AppendChild(primaryButton);
 
@@ -129,7 +130,8 @@ public static class SettingsGridColumnFactory
     private static FrameworkElementFactory ActionButton(
         string contentBinding,
         string enabledBinding,
-        string tooltipBinding)
+        string tooltipBinding,
+        string visualRole = "")
     {
         var button = new FrameworkElementFactory(typeof(WpfButton));
         button.SetBinding(ContentControl.ContentProperty, new WpfBinding(contentBinding));
@@ -142,6 +144,18 @@ public static class SettingsGridColumnFactory
         button.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
         button.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
         var style = new Style(typeof(WpfButton), (Style)WpfApplication.Current.Resources[typeof(WpfButton)]);
+        if (!string.IsNullOrWhiteSpace(visualRole))
+            style.Setters.Add(new Setter(VisualRole.ButtonRoleProperty, visualRole));
+        if (visualRole == VisualRole.Primary)
+        {
+            var dangerTrigger = new DataTrigger
+            {
+                Binding = new WpfBinding(nameof(EditableSettingRow.Key)),
+                Value = "cache"
+            };
+            dangerTrigger.Setters.Add(new Setter(VisualRole.ButtonRoleProperty, VisualRole.Danger));
+            style.Triggers.Add(dangerTrigger);
+        }
         var emptyTrigger = new Trigger { Property = ContentControl.ContentProperty, Value = "" };
         emptyTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
         style.Triggers.Add(emptyTrigger);

@@ -1,7 +1,7 @@
 #define AppName "llama.cpp Windows Manager"
 #define AppExeName "LlamaCppWindowsManager.exe"
 #ifndef AppVersion
-#define AppVersion "2.0.0"
+#define AppVersion "2.1.0"
 #endif
 #ifndef SourceDir
 #define SourceDir "..\dist\LlamaCppWindowsManager-win-x64"
@@ -52,6 +52,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#SourceDir}\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\llwmctl.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\AGENTS.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\agent.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\docs\CONTROL_API.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 
 [InstallDelete]
 Type: files; Name: "{app}\LlamaCppConsole.exe"

@@ -1,10 +1,10 @@
 # GitHub Release v1.1.2
 
-Historical notes for the published v1.1.2 release. Newer unreleased behavior,
-including the auto-load gateway, scoped LAN exposure, OpenCode sync/output-limit
-mapping, grouped Settings navigation, preserved Overview load-time display,
-Start with Windows setting, and explicit Vision head selection, is tracked in
-`docs/GITHUB_RELEASE_NEXT.md`.
+Historical notes for the published v1.1.2 release. The current release draft,
+including the auto-load gateway, scoped LAN exposure, grouped Settings
+navigation, preserved Overview load-time display, Start with Windows, explicit
+Vision head selection, and removal of the built-in OpenCode integration, is
+tracked in `docs/GITHUB_RELEASE_NEXT.md`.
 
 This release renames **llama.cpp Console** to **llama.cpp Windows Manager** and
 turns the app into a multi-runtime, multi-model Windows manager for

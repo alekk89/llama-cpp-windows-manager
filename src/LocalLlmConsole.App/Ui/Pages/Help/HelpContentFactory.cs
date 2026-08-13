@@ -9,7 +9,7 @@ namespace LocalLlmConsole;
 
 public static class HelpContentFactory
 {
-    public const int FirstStepsCount = 5;
+    public const int FirstStepsCount = 4;
 
     public static readonly string[] SupportedSections =
     [
@@ -18,7 +18,6 @@ public static class HelpContentFactory
         "models",
         "runtimes",
         "settings",
-        "opencode",
         "maintenance"
     ];
 
@@ -37,9 +36,6 @@ public static class HelpContentFactory
                 break;
             case "settings":
                 AddSettingsHelp(panel, navigate);
-                break;
-            case "opencode":
-                AddOpenCodeHelp(panel, navigate);
                 break;
             case "maintenance":
                 AddMaintenanceHelp(panel, navigate);
@@ -82,12 +78,6 @@ public static class HelpContentFactory
             navigate,
             ("Open Overview", "overview-load")));
 
-        panel.Children.Add(HelpCard(
-            "Step 5",
-            "Add the model to OpenCode",
-            "Open OpenCode, choose Add New in the OpenCode Models dropdown, select the local model in the second dropdown, then click Add. You can add it through the auto-load gateway or keep a direct per-model endpoint.",
-            navigate,
-            ("Open OpenCode", "opencode")));
     }
 
     private static void AddOverviewHelp(StackPanel panel, Action<string> navigate)
@@ -129,7 +119,7 @@ public static class HelpContentFactory
             "Use the Vision head button only for real mmproj/projector files or embedded/model-bundled vision. MTP assistant heads belong in MTP head, not Vision head.",
             "Embedding, reranker, FIM, MoE, and reasoning models may expose different behavior through the same OpenAI-compatible endpoint.");
 
-        AddHelpArticle(panel, "Saved launch variants", "Saved variants let one model keep several named launch profiles, such as a low-memory profile, a long-context profile, or a vision profile with an explicit projector. Selecting a variant fills the launch form so it can be saved, loaded, or synced to OpenCode.");
+        AddHelpArticle(panel, "Saved launch variants", "Saved variants let one model keep several named launch profiles, such as a low-memory profile, a long-context profile, or a vision profile with an explicit projector. Each profile is exposed as a separate model id through the shared gateway.");
 
         AddHelpArticle(panel, "Launch setting edge cases", "Most launch settings map directly to llama-server flags. Unsupported combinations fail at runtime, so save changes per model and restart the model after editing.");
         AddHelpDefinitionList(panel,
@@ -137,7 +127,7 @@ public static class HelpContentFactory
             ("GPU layers", "Higher values offload more layers to GPU. If loading fails with memory errors, reduce this first."),
             ("Batch and micro batch", "Higher batch can be faster but uses more memory. Lower micro batch when CUDA or Vulkan runs out of memory."),
             ("K cache and V cache", "Lower precision saves memory but can reduce quality or fail on some runtimes."),
-            ("Max tokens", "-1 leaves llama.cpp unlimited for direct serving. OpenCode output caps are controlled separately by Settings > OpenCode > Limit output."),
+            ("Max tokens", "-1 leaves llama.cpp unlimited for direct serving."),
             ("Reasoning", "auto is safest. Use a specific reasoning format only when a model family needs it."),
             ("RoPE scaling", "Long-context experiments can reduce quality or fail. Leave auto unless the model card recommends a setting."),
             ("Spec type", "Use none unless you have a known-compatible draft, Atomic MTP, or n-gram mode for that runtime. Spec type atomic-mtp emits --mtp-head and is intended for compatible Atomic forks."),
@@ -181,8 +171,6 @@ public static class HelpContentFactory
             ("Cache", "Read-only size display. Clear removes disposable cache files only when no download or runtime build is using them."),
             ("Minimize behavior", "Taskbar only, Tray only, or Tray + taskbar."),
             ("Start with Windows", "Yes registers the app for the current user's Windows startup apps. Fresh installer setups offer this checked by default."),
-            ("Auto-sync entries", "Yes automatically rewrites OpenCode local model entries after Settings saves, saved launch settings, or saved variants change. No leaves existing OpenCode config untouched unless you add or update entries from OpenCode."),
-            ("Limit output", "Whole number written to OpenCode local model entries as limit.output when Settings are saved or OpenCode entries are synced."),
             ("Auto unload idle min", "Whole number from 0 to 10080. 0 disables idle auto-unload."),
             ("Delete source after build", "Yes or No. Yes removes runtime source folders after successful source builds."),
             ("LAN exposure", "Local only keeps everything on 127.0.0.1. Gateway LAN only exposes just the shared router. Direct models LAN only exposes per-model ports. Gateway + direct LAN exposes both."),
@@ -193,34 +181,8 @@ public static class HelpContentFactory
             ("Max log file MB", "Whole number clamped from 1 to 4096. Larger values keep more history per log file."));
         AddHelpBullets(panel,
             "Changing gateway settings restarts the gateway after Save Settings.",
-            "Changing the API key syncs local OpenCode provider credentials when possible.",
-            "Turning Auto-sync entries off leaves existing OpenCode entries untouched unless you add or update them from OpenCode.",
             "LAN exposure opens the selected serving endpoints beyond localhost. Use it only on networks you trust.");
         AddHelpActions(panel, navigate, ("Open Settings", "settings"));
-    }
-
-    private static void AddOpenCodeHelp(StackPanel panel, Action<string> navigate)
-    {
-        AddHelpArticle(panel, "Before using OpenCode integration", "Make sure OpenCode is installed and has been run at least once. This app edits OpenCode config and agent files; it does not install OpenCode itself.");
-        AddHelpArticle(panel, "Files to choose if auto-detect misses", "Detect Files checks project-local and global OpenCode locations. If it picks the wrong place, use Choose Config and Choose Agents Folder.");
-        AddHelpDefinitionList(panel,
-            ("Project config", ".opencode\\opencode.jsonc, .opencode\\opencode.json, opencode.jsonc, or opencode.json in the project root."),
-            ("Global config", "%USERPROFILE%\\.config\\opencode\\opencode.jsonc, %APPDATA%\\opencode\\opencode.jsonc, or %LOCALAPPDATA%\\opencode\\opencode.jsonc. JSON variants are also accepted."),
-            ("Project agents", ".opencode\\agent or .opencode\\agents."),
-            ("Global agents", "agent or agents under the same global OpenCode directory as the config."),
-            ("Detection roots", "The app walks upward from the current directory, workspace, and app folder until a .git folder, then checks global OpenCode directories."));
-
-        AddHelpArticle(panel, "Gateway vs direct OpenCode models", "Gateway-backed OpenCode entries share the local-llm-console provider and the auto-load gateway endpoint. Direct OpenCode entries get their own per-model provider and point at the saved model port.");
-        AddHelpBullets(panel,
-            "Gateway mode is best when you want OpenCode to request any configured model through one address and let the app load it on demand.",
-            "Direct mode is best when you manually keep one or more models loaded and want OpenCode entries to point at their saved per-model ports.",
-            "OpenCode output limits come from Settings > OpenCode > Limit output, so they are independent of llama.cpp Max tokens.",
-            "Vision-capable OpenCode entries are marked as image-capable when the saved launch settings include vision plus embedded, detected, or explicit projector support.",
-            "The gateway itself listens on one port, then proxies each request to the requested model's direct runtime port after ensuring that model is loaded.",
-            "Prefer keeping loaded models keeps existing direct sessions running and performs a conservative VRAM admission check before adding another GPU model. Single active model unloads other sessions first.",
-            "OpenCode model ids must match entries in the config. The gateway can resolve saved model ids, model names, local OpenCode ids, and GGUF file names.",
-            "If OpenCode says a model is unknown, refresh models in this app, re-add the local model to OpenCode, then retry the exact id shown in OpenCode.");
-        AddHelpActions(panel, navigate, ("Open OpenCode", "opencode"));
     }
 
     private static void AddMaintenanceHelp(StackPanel panel, Action<string> navigate)
@@ -362,7 +324,6 @@ public static class HelpContentFactory
             "Open Runtimes" => "Open runtime source download and build actions.",
             "Open Models" => "Open model search, download, and launch settings.",
             "Open Overview" => "Open the model loading dashboard.",
-            "Open OpenCode" => "Open OpenCode setup actions.",
             "Open Settings" => "Open app preferences.",
             "Runtime Jobs" => "Open Runtimes and focus runtime jobs.",
             "Open Logs" => "Open log inspection.",
