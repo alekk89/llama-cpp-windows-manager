@@ -29,14 +29,3 @@ This file is the copy/paste source for the next GitHub release.
 The standalone executable and its checksum are required for the in-app updater
 used by v1.x and v2.0 installations. Do not publish v2.1.0 without all six
 assets above.
-
-## Verification
-
-Full local release gate:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -Runtime win-x64 -Configuration Release -IncludePublish -IncludeInstaller -InnoSetupPath "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
-```
-
-Public releases should use the protected GitHub release workflow so the
-portable executable is signed before upload.
