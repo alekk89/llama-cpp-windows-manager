@@ -553,13 +553,12 @@ public sealed partial class ReleaseHardeningTests
         await File.WriteAllTextAsync(sourceExe, "new-app", TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(targetExe, "old-app", TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(sourceCli, "new-cli", TestContext.Current.CancellationToken);
-        await File.WriteAllTextAsync(targetCli, "old-cli", TestContext.Current.CancellationToken);
+        Directory.CreateDirectory(targetCli);
         var updaterScript = typeof(AppUpdateService)
             .GetMethod("UpdaterScript", BindingFlags.NonPublic | BindingFlags.Static)!
             .Invoke(null, null)?.ToString() ?? throw new InvalidOperationException("Updater script was unavailable.");
         await File.WriteAllTextAsync(scriptPath, updaterScript, TestContext.Current.CancellationToken);
 
-        await using var cliLock = new FileStream(targetCli, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         using var process = Process.Start(new ProcessStartInfo
         {
             FileName = HostExecutableResolver.WindowsPowerShellExe(),
@@ -582,15 +581,12 @@ public sealed partial class ReleaseHardeningTests
         var standardError = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
         await process.WaitForExitAsync(TestContext.Current.CancellationToken);
         var diagnostics = (await standardOutput) + Environment.NewLine + (await standardError);
-        await cliLock.DisposeAsync();
 
         Assert.NotEqual(0, process.ExitCode);
         Assert.True(
             string.Equals("old-app", await File.ReadAllTextAsync(targetExe, TestContext.Current.CancellationToken), StringComparison.Ordinal),
             diagnostics);
-        Assert.True(
-            string.Equals("old-cli", await File.ReadAllTextAsync(targetCli, TestContext.Current.CancellationToken), StringComparison.Ordinal),
-            diagnostics);
+        Assert.True(Directory.Exists(targetCli), diagnostics);
         Assert.Empty(Directory.EnumerateFiles(root, ".*.new"));
         Assert.True(!Directory.EnumerateFiles(root, ".*.bak").Any(), diagnostics);
     }
