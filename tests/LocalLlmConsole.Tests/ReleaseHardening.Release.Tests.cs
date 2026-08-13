@@ -557,6 +557,7 @@ public sealed partial class ReleaseHardeningTests
         var updaterScript = typeof(AppUpdateService)
             .GetMethod("UpdaterScript", BindingFlags.NonPublic | BindingFlags.Static)!
             .Invoke(null, null)?.ToString() ?? throw new InvalidOperationException("Updater script was unavailable.");
+        Assert.DoesNotContain("Get-FileHash", updaterScript, StringComparison.Ordinal);
         await File.WriteAllTextAsync(scriptPath, updaterScript, TestContext.Current.CancellationToken);
 
         using var process = Process.Start(new ProcessStartInfo

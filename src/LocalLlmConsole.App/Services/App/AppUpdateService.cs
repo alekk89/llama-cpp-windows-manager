@@ -313,20 +313,39 @@ function Remove-UpdateArtifact {
   }
 }
 
+function Get-UpdateFileSha256 {
+  param([string] $Path)
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
+    } finally {
+      $sha256.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 function New-VerifiedStage {
   param([string] $Source, [string] $Target)
   if (-not $Source -or -not $Target -or -not (Test-Path -LiteralPath $Source -PathType Leaf)) { return $null }
   $targetDirectory = Split-Path -Parent $Target
   New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
   $temporary = Join-Path $targetDirectory ("." + (Split-Path -Leaf $Target) + "." + [Guid]::NewGuid().ToString("N") + ".new")
-  Copy-Item -LiteralPath $Source -Destination $temporary
-  $sourceHash = (Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash
-  $stagedHash = (Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash
-  if ($sourceHash -ne $stagedHash) {
+  try {
+    Copy-Item -LiteralPath $Source -Destination $temporary
+    $sourceHash = Get-UpdateFileSha256 -Path $Source
+    $stagedHash = Get-UpdateFileSha256 -Path $temporary
+    if ($sourceHash -ne $stagedHash) {
+      throw "Staged update verification failed for $Target"
+    }
+    return [pscustomobject]@{ Target = $Target; Temporary = $temporary; Backup = ""; HadOriginal = (Test-Path -LiteralPath $Target) }
+  } catch {
     Remove-UpdateArtifact -Path $temporary
-    throw "Staged update verification failed for $Target"
+    throw
   }
-  return [pscustomobject]@{ Target = $Target; Temporary = $temporary; Backup = ""; HadOriginal = (Test-Path -LiteralPath $Target) }
 }
 
 function Commit-VerifiedStage {
