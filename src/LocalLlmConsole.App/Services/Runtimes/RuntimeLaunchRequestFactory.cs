@@ -28,8 +28,8 @@ public static class RuntimeLaunchRequestFactory
             WslDistro = context.Mode == RuntimeMode.Wsl ? settings.WslDistro : "",
             Host = context.Host,
             AllowNetworkAccess = context.AllowNetworkAccess,
-            ApiKey = settings.RequireApiKeyAuth ? settings.ModelApiKey : "",
-            RequireApiKeyAuth = settings.RequireApiKeyAuth,
+            ApiKey = settings.ModelApiKey,
+            RequireApiKeyAuth = true,
             Port = settings.Port,
             ContextSize = settings.ContextSize,
             GpuLayers = settings.GpuLayers,
@@ -53,7 +53,10 @@ public static class RuntimeLaunchRequestFactory
             ContinuousBatching = settings.ContinuousBatching,
             ReasoningMode = settings.ReasoningMode,
             ReasoningFormat = settings.ReasoningFormat,
+            ReasoningEffort = settings.ReasoningEffort,
             ReasoningBudget = settings.ReasoningBudget,
+            ReasoningBudgetMessage = settings.ReasoningBudgetMessage,
+            ReasoningPreserve = settings.ReasoningPreserve,
             VisionMode = settings.VisionMode,
             VisionProjectorPath = context.VisionProjectorPath,
             VisionProjectorEmbedded = context.VisionProjectorEmbedded,
@@ -92,9 +95,11 @@ public static class RuntimeLaunchRequestFactory
 
     public static string Preview(AppSettings settings, RuntimeChoice? runtime)
     {
-        var previewSettings = settings.RequireApiKeyAuth
-            ? settings with { ModelApiKey = new string('x', 32) }
-            : settings;
+        var previewSettings = settings with
+        {
+            RequireApiKeyAuth = true,
+            ModelApiKey = new string('x', 32)
+        };
         var custom = CustomLaunchParameterParser.Parse(previewSettings.CustomParameters);
         RuntimeLaunchOptionPolicy.ValidateCustomArguments(custom);
         var extra = new List<string>();

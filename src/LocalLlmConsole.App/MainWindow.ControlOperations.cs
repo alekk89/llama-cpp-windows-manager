@@ -37,20 +37,9 @@ public partial class MainWindow
             "lifetime.delete" => await ControlLifetimeAsync("delete", ControlRequired(body, "model"), dryRun, cancellationToken),
             "lifetime.delete-all" => await ControlLifetimeAsync("delete-all", "", dryRun, cancellationToken),
             "downloads.delete" => await ControlDownloadDeleteAsync(ControlRequired(body, "job"), dryRun, cancellationToken),
-            "runtime.catalog" => await ControlRuntimeCatalogAsync(cancellationToken),
-            "runtime-repository.add" => await ControlRuntimeRepositoryAddAsync(body, dryRun, cancellationToken),
-            "runtime.delete" => await ControlRuntimeDeleteAsync(ControlRequired(body, "runtime"), dryRun),
-            "runtime-package.install" => await ControlRuntimePackageAsync("install", ControlRequired(body, "preset"), dryRun),
-            "runtime-package.check" => await ControlRuntimePackageAsync("check", ControlRequired(body, "preset"), dryRun),
-            "runtime-package.delete" => await ControlRuntimePackageAsync("delete", ControlRequired(body, "preset"), dryRun),
-            "runtime-source.download" => await ControlRuntimeSourceAsync("download", ControlRequired(body, "preset"), dryRun),
-            "runtime-source.check" => await ControlRuntimeSourceAsync("check", ControlRequired(body, "preset"), dryRun),
-            "runtime-source.delete" => await ControlRuntimeSourceDeleteAsync(ControlRequired(body, "source"), dryRun),
-            "runtime-build.start" => await ControlRuntimeBuildAsync(ControlRequired(body, "preset"), ControlBool(body, "update"), ControlString(body, "source"), dryRun),
-            "runtime-build.delete" => await ControlRuntimeBuildDeleteAsync(ControlRequired(body, "preset"), dryRun),
-            "runtime-job.cancel" => await ControlRuntimeJobAsync("cancel", ControlRequired(body, "job"), dryRun),
-            "runtime-job.retry" => await ControlRuntimeJobAsync("retry", ControlRequired(body, "job"), dryRun),
-            "runtime-job.clear" => await ControlRuntimeJobAsync("clear", ControlRequired(body, "job"), dryRun),
+            _ when ControlRuntimeOperationApplicationService.CanHandle(operation)
+                => await (_controlRuntimeOperations ?? throw new InvalidOperationException("Control runtime operations are not ready."))
+                    .ExecuteAsync(operation, body, dryRun, cancellationToken),
             "windows.status" => await _coreServices.Environment.WindowsToolSetupWorkflow.RefreshAsync(cancellationToken),
             "windows.setup" => ControlWindowsSetup(ControlRequired(body, "action"), dryRun, confirm),
             "wsl.status" => await _coreServices.Environment.WslPageWorkflow.RefreshAsync(_settings, cancellationToken),
@@ -191,130 +180,6 @@ public partial class MainWindow
         return new { outcome = outcome.ToString(), job = job.Id };
     }
 
-    private async Task<object> ControlRuntimeCatalogAsync(CancellationToken cancellationToken)
-    {
-        var data = _coreServices.Runtime.RuntimeCatalogData;
-        var runtimes = await AppServices.StateStore!.ListRuntimesAsync();
-        var sources = await data.LoadSourcesAsync(_settings.RuntimeRoot, cancellationToken);
-        return new
-        {
-            runtimes,
-            packages = data.PackagePresets(),
-            buildPresets = data.BuildPresets(_settings.RuntimeRoot),
-            sources
-        };
-    }
-
-    private async Task<object> ControlRuntimeDeleteAsync(string identifier, bool dryRun)
-    {
-        var runtime = (await AppServices.StateStore!.ListRuntimesAsync()).FirstOrDefault(candidate =>
-            candidate.Id.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-            || candidate.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase))
-            ?? throw new KeyNotFoundException($"Runtime '{identifier}' was not found.");
-        if (dryRun) return new { runtime, wouldDelete = true };
-        var service = RuntimeServices.RuntimeBuildDeletionApplication ?? throw new InvalidOperationException("Runtime deletion is not ready.");
-        var outcome = await service.DeleteRuntimeAsync(runtime, _settings, ControlRuntimeDeletionActions());
-        return new { outcome = outcome.ToString(), runtime = runtime.Id };
-    }
-
-    private async Task<object> ControlRuntimeRepositoryAddAsync(JsonObject body, bool dryRun, CancellationToken cancellationToken)
-    {
-        var draft = new RuntimeCustomRepositoryDraft(
-            ControlRequired(body, "label"),
-            ControlRequired(body, "repo"),
-            ControlString(body, "branch"),
-            ControlRequired(body, "backend"));
-        var service = RuntimeServices.CustomRuntimeRepositories ?? throw new InvalidOperationException("Custom runtime repositories are not ready.");
-        var validation = service.BuildPreset(draft);
-        if (!validation.Success || validation.Preset is null)
-            throw new InvalidOperationException(validation.StatusMessage);
-        if (dryRun) return new { validation.Preset, wouldAdd = true };
-        var result = await service.AddAsync(_settings.RuntimeRoot, draft, cancellationToken);
-        if (!result.Success) throw new InvalidOperationException(result.StatusMessage);
-        await RefreshRuntimesAsync();
-        return result;
-    }
-
-    private async Task<object> ControlRuntimePackageAsync(string action, string identifier, bool dryRun)
-    {
-        var preset = ResolveRuntimePackagePreset(identifier);
-        if (dryRun) return new { action, preset, wouldExecute = true };
-        var service = RuntimeServices.RuntimePackageApplication ?? throw new InvalidOperationException("Runtime packages are not ready.");
-        var actions = ControlRuntimePackageActions();
-        var outcome = action switch
-        {
-            "install" => await service.InstallAsync(preset, _settings, _runtimeCatalogState, MaxLogBytes(), actions),
-            "check" => await service.CheckUpdateAsync(preset, null, _settings, _runtimeCatalogState, MaxLogBytes(), actions),
-            "delete" => await service.DeleteBuildsAsync(preset, _settings, _runtimeCatalogState, actions),
-            _ => throw new InvalidOperationException($"Unknown runtime package action '{action}'.")
-        };
-        return new { outcome = outcome.ToString(), preset = preset.Id };
-    }
-
-    private async Task<object> ControlRuntimeSourceAsync(string action, string identifier, bool dryRun)
-    {
-        var preset = ResolveRuntimeBuildPreset(identifier);
-        if (dryRun) return new { action, preset, wouldExecute = true };
-        var service = RuntimeServices.RuntimeSourceApplication ?? throw new InvalidOperationException("Runtime sources are not ready.");
-        var actions = ControlRuntimeSourceActions();
-        var outcome = action == "download"
-            ? await service.DownloadAsync(preset, _settings, _runtimeCatalogState, MaxLogBytes(), actions)
-            : await service.CheckUpdateAsync(preset, null, _settings, _runtimeCatalogState, MaxLogBytes(), actions);
-        return new { outcome = outcome.ToString(), preset = preset.Id };
-    }
-
-    private async Task<object> ControlRuntimeSourceDeleteAsync(string identifier, bool dryRun)
-    {
-        var source = ResolveRuntimeSource(identifier);
-        if (dryRun) return new { source, wouldDelete = true };
-        var service = RuntimeServices.RuntimeBuildDeletionApplication ?? throw new InvalidOperationException("Runtime source deletion is not ready.");
-        var outcome = await service.DeleteSourceAsync(source, _settings, ControlRuntimeDeletionActions());
-        return new { outcome = outcome.ToString(), source = source.SourceDir };
-    }
-
-    private async Task<object> ControlRuntimeBuildAsync(string identifier, bool update, string sourceIdentifier, bool dryRun)
-    {
-        var preset = ResolveRuntimeBuildPreset(identifier);
-        var source = string.IsNullOrWhiteSpace(sourceIdentifier) ? null : ResolveRuntimeSource(sourceIdentifier);
-        if (dryRun) return new { preset, source, update, wouldBuild = true };
-        var service = RuntimeServices.RuntimeBuildApplication ?? throw new InvalidOperationException("Runtime builds are not ready.");
-        var outcome = await service.BuildAsync(new RuntimeBuildApplicationRequest(
-            preset,
-            _settings,
-            update,
-            source,
-            MaxLogBytes()), ControlRuntimeBuildActions());
-        return new { outcome = outcome.ToString(), preset = preset.Id, update };
-    }
-
-    private async Task<object> ControlRuntimeBuildDeleteAsync(string identifier, bool dryRun)
-    {
-        var preset = ResolveRuntimeBuildPreset(identifier);
-        if (dryRun) return new { preset, wouldDelete = true };
-        var service = RuntimeServices.RuntimeBuildDeletionApplication ?? throw new InvalidOperationException("Runtime build deletion is not ready.");
-        var outcome = await service.DeletePresetBuildsAsync(preset, _settings, ControlRuntimeDeletionActions());
-        return new { outcome = outcome.ToString(), preset = preset.Id };
-    }
-
-    private async Task<object> ControlRuntimeJobAsync(string action, string jobId, bool dryRun)
-    {
-        var job = (await AppServices.StateStore!.ListJobsAsync()).FirstOrDefault(candidate => candidate.Id.Equals(jobId, StringComparison.OrdinalIgnoreCase))
-            ?? throw new KeyNotFoundException($"Runtime job '{jobId}' was not found.");
-        if (!job.Kind.Contains("runtime", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException($"Job '{jobId}' is not a runtime job.");
-        if (dryRun) return new { action, job.Id, job.Kind, status = job.Status.ToString(), wouldExecute = true };
-        var service = RuntimeServices.RuntimeBuildJobApplication ?? throw new InvalidOperationException("Runtime job controls are not ready.");
-        var actions = ControlRuntimeBuildJobActions();
-        var outcome = action switch
-        {
-            "cancel" => await service.CancelAsync(job, _settings, MaxLogBytes(), actions),
-            "retry" => await service.RetryAsync(job, actions),
-            "clear" => await service.ClearAsync(job, actions),
-            _ => throw new InvalidOperationException($"Unknown runtime job action '{action}'.")
-        };
-        return new { outcome = outcome.ToString(), job = job.Id };
-    }
-
     private object ControlWindowsSetup(string actionName, bool dryRun, bool confirm)
     {
         if (!Enum.TryParse<WindowsToolSetupAction>(actionName, true, out var action))
@@ -362,82 +227,6 @@ public partial class MainWindow
         RunBackground(() => InstallAppUpdateAsync(check.Update, confirm: false), "Controlled app update failed");
         return new { scheduled = true, check.Update.LatestVersion };
     }
-
-    private RuntimePackagePreset ResolveRuntimePackagePreset(string identifier)
-        => _coreServices.Runtime.RuntimeCatalogData.PackagePresets().FirstOrDefault(candidate =>
-               candidate.Id.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-               || candidate.Label.Equals(identifier, StringComparison.OrdinalIgnoreCase))
-           ?? throw new KeyNotFoundException($"Runtime package preset '{identifier}' was not found.");
-
-    private RuntimeBuildPreset ResolveRuntimeBuildPreset(string identifier)
-    {
-        var presets = _coreServices.Runtime.RuntimeCatalogData.BuildPresets(_settings.RuntimeRoot);
-        return presets.FirstOrDefault(candidate =>
-                   candidate.Id.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-                   || candidate.Label.Equals(identifier, StringComparison.OrdinalIgnoreCase))
-               ?? throw new KeyNotFoundException($"Runtime build preset '{identifier}' was not found.");
-    }
-
-    private RuntimeSourceEntry ResolveRuntimeSource(string identifier)
-        => _coreServices.Runtime.RuntimeCatalogData.Sources(_settings.RuntimeRoot)
-               .OrderByDescending(source => source.DownloadedAt)
-               .FirstOrDefault(source =>
-                   source.SourceDir.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-                   || source.PresetId.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-                   || source.Label.Equals(identifier, StringComparison.OrdinalIgnoreCase))
-           ?? throw new KeyNotFoundException($"Runtime source '{identifier}' was not found.");
-
-    private RuntimePackageApplicationActions ControlRuntimePackageActions()
-        => new(
-            ControlRunBusyAsync,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => { },
-            SetStatus,
-            (_, message) => SetStatus(message),
-            _ => true,
-            _ => true);
-
-    private RuntimeSourceApplicationActions ControlRuntimeSourceActions()
-        => new(
-            ControlRunBusyAsync,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => { },
-            SetStatus,
-            (_, message) => SetStatus(message));
-
-    private RuntimeBuildApplicationActions ControlRuntimeBuildActions()
-        => new(
-            ControlRunBusyAsync,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            SetStatus,
-            (_, message) => SetStatus(message),
-            message => Dispatcher.InvokeAsync(() => SetStatus(message)).Task);
-
-    private RuntimeBuildDeletionApplicationActions ControlRuntimeDeletionActions()
-        => new(
-            _ => true,
-            ControlRunBusyAsync,
-            () => Task.CompletedTask,
-            () => Task.CompletedTask,
-            SetStatus);
-
-    private RuntimeBuildJobApplicationActions ControlRuntimeBuildJobActions()
-        => new(
-            _ => true,
-            ControlRunBusyAsync,
-            () => Task.CompletedTask,
-            retry => RuntimeServices.RuntimeBuildApplication!.BuildAsync(
-                new RuntimeBuildApplicationRequest(retry.Preset!, _settings, retry.Update, retry.Source, MaxLogBytes()),
-                ControlRuntimeBuildActions()),
-            SetStatus);
 
     private static async Task ControlRunBusyAsync(string _, Func<Task> action)
         => await action();

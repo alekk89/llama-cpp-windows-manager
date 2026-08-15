@@ -6,7 +6,8 @@ public sealed record ModelCatalogRefreshApplicationActions(
 public sealed record ModelCatalogRefreshApplicationResult(
     IReadOnlyList<ModelRecord> Models,
     IReadOnlyDictionary<string, ModelLaunchSettings> LaunchProfiles,
-    IReadOnlyList<NamedModelLaunchProfile> NamedLaunchProfiles)
+    IReadOnlyList<NamedModelLaunchProfile> NamedLaunchProfiles,
+    IReadOnlyDictionary<string, string> ModelSizeLabels)
 {
     public ModelLaunchSettings? LaunchProfileFor(ModelRecord model)
         => LaunchProfiles.TryGetValue(model.Id, out var profile) ? profile : null;
@@ -40,12 +41,32 @@ public sealed class ModelCatalogRefreshApplicationService
         }
 
         var namedProfiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
-        return new ModelCatalogRefreshApplicationResult(models, profiles, namedProfiles);
+        var sizeLabels = await Task.Run(
+            () => models.ToDictionary(
+                model => model.Id,
+                model => ModelSizeLabel(model.ModelPath),
+                StringComparer.OrdinalIgnoreCase),
+            cancellationToken);
+        return new ModelCatalogRefreshApplicationResult(models, profiles, namedProfiles, sizeLabels);
     }
 
     private static void Validate(ModelCatalogRefreshApplicationActions actions)
     {
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(actions.EnsureDefaultProfilesAsync);
+    }
+
+    private static string ModelSizeLabel(string modelPath)
+    {
+        try
+        {
+            return File.Exists(modelPath)
+                ? DisplayFormatService.Bytes(new FileInfo(modelPath).Length)
+                : "";
+        }
+        catch
+        {
+            return "";
+        }
     }
 }

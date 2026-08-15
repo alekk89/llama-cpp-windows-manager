@@ -45,9 +45,9 @@ public static class VisionProjectorSelection
     public static string Tooltip(string? value)
     {
         if (IsEmbedded(value))
-            return "Use vision support bundled in the selected model GGUF. llama-server must support embedded multimodal data for this model.";
+            return "Omit --mmproj and use multimodal data bundled in the main GGUF. This is for compatible forks or specially packaged models; upstream llama.cpp normally uses a separate mmproj file.";
         if (IsAuto(value))
-            return "Auto-detect a nearby mmproj/projector GGUF file when the model is launched.";
+            return "Find a compatible mmproj/projector GGUF in the selected model's folder. Automatic discovery never scans parent or child folders.";
 
         return $"External vision head: {value!.Trim()}{Environment.NewLine}Click to change the vision head source.";
     }

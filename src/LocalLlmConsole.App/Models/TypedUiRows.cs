@@ -5,6 +5,9 @@ public sealed class ModelGridRow
     public required string Name { get; init; }
     public required string Quant { get; init; }
     public required string Size { get; init; }
+    public string Group { get; init; } = "";
+    public string GroupAction { get; init; } = "";
+    public string GroupToolTip { get; init; } = "";
     public string BaseModel { get; init; } = "";
     public string Port { get; init; } = "";
     public string Description { get; init; } = "";
@@ -14,6 +17,7 @@ public sealed class ModelGridRow
     public string DeleteToolTip { get; init; } = "Delete this model from disk and remove it from the catalog.";
     public bool CanOpenFolder { get; init; } = true;
     public bool CanDelete { get; init; } = true;
+    public bool CanAssignGroup { get; init; }
     public required ModelRecord Model { get; init; }
     public NamedModelLaunchProfile? LaunchProfile { get; init; }
 }
@@ -32,6 +36,8 @@ public sealed class RuntimeCatalogRow
     public required string State { get; init; }
     public required string Location { get; init; }
     public required string Details { get; init; }
+    public string Vendor { get; init; } = "";
+    public string Platform { get; init; } = "";
     public string BuildAction { get; init; } = "";
     public string BuildToolTip { get; init; } = "";
     public string DeleteAction { get; init; } = "Delete";
@@ -40,6 +46,23 @@ public sealed class RuntimeCatalogRow
     public bool CanDelete { get; init; }
     public RuntimeRecord? Runtime { get; init; }
     public RuntimeSourceEntry? Source { get; init; }
+}
+
+public enum RuntimeSourceRowActionKind
+{
+    None,
+    Add,
+    Check,
+    Download,
+    Build
+}
+
+[Flags]
+public enum RuntimeDownloadDeleteKind
+{
+    None = 0,
+    Package = 1,
+    Source = 2
 }
 
 public sealed class RuntimeBuildPresetRow
@@ -69,14 +92,23 @@ public sealed class RuntimePackagePresetRow
     public string LocalStatus { get; set; } = "";
     public string LatestRelease { get; set; } = "";
     public string Assets { get; set; } = "";
+    public string BuildSourceAction { get; set; } = "";
     public string InstallAction { get; set; } = "";
     public string CheckAction { get; set; } = "Check";
     public string DeleteAction { get; set; } = "Delete All";
     public string InstallToolTip { get; set; } = "";
+    public string BuildSourceToolTip { get; set; } = "";
     public string CheckToolTip { get; set; } = "";
     public string DeleteToolTip { get; set; } = "";
     public bool CanInstall { get; set; }
+    public bool CanBuildSource { get; set; }
     public bool CanCheck { get; set; } = true;
     public bool CanDelete { get; set; }
+    public string Vendor { get; set; } = "";
+    public string Platform { get; set; } = "";
+    public RuntimeSourceRowActionKind SourceActionKind { get; set; }
+    public RuntimeBuildPreset? SourcePreset { get; set; }
+    public RuntimeSourceEntry? DownloadedSource { get; set; }
+    public RuntimeDownloadDeleteKind DeleteKind { get; set; }
     public RuntimePackagePreset? Preset { get; init; }
 }

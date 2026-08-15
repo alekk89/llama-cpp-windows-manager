@@ -55,11 +55,13 @@ internal static class Program
             "capabilities" => Get("/api/v1/capabilities"),
             "self" or "whoami" => Get("/api/v1/self" + SelfQuery(args)),
             "models" or "model" => ModelRequest(action, args),
+            "groups" or "group" or "model-groups" => ModelGroupRequest(action, args),
             "profiles" or "profile" => ProfileRequest(action, args),
             "load" => LoadRequest("load", args),
             "restart" => LoadRequest("restart", args),
             "unload" => Post($"/api/v1/models/{Segment(ModelArg(args, 1))}/unload"),
             "sessions" or "session" => SessionRequest(action, args),
+            "gateway" => GatewayRequest(action),
             "metrics" => Get("/api/v1/metrics"),
             "logs" or "log" => LogRequest(action, args),
             "settings" or "setting" => SettingsRequest(action, args),
@@ -238,6 +240,41 @@ internal static class Program
         };
     }
 
+    private static ControlRequest ModelGroupRequest(string action, Arguments args)
+    {
+        var identifier = args.Positionals.ElementAtOrDefault(2) ?? args.Value("id") ?? args.Value("group") ?? "";
+        return action switch
+        {
+            "list" => Get("/api/v1/model-groups"),
+            "get" => Get($"/api/v1/model-groups/{Segment(Required(args, "group", identifier))}"),
+            "create" => Post("/api/v1/model-groups", ModelGroupBody(args, requireName: true)),
+            "update" => Patch($"/api/v1/model-groups/{Segment(Required(args, "group", identifier))}", ModelGroupBody(args, requireName: false)),
+            "delete" => Delete($"/api/v1/model-groups/{Segment(Required(args, "group", identifier))}"),
+            "assign" => Put(
+                $"/api/v1/models/{Segment(ModelArg(args, 2))}/profiles/{Segment(Required(args, "profile", args.Value("profile-id") ?? args.Positionals.ElementAtOrDefault(3)))}/group",
+                new JsonObject { ["group"] = Required(args, "group", args.Positionals.ElementAtOrDefault(4)) }),
+            "unassign" => Delete(
+                $"/api/v1/models/{Segment(ModelArg(args, 2))}/profiles/{Segment(Required(args, "profile", args.Value("profile-id") ?? args.Positionals.ElementAtOrDefault(3)))}/group"),
+            _ => throw new InvalidOperationException($"Unknown model group action '{action}'.")
+        };
+    }
+
+    private static JsonObject ModelGroupBody(Arguments args, bool requireName)
+    {
+        var body = new JsonObject();
+        if (requireName || args.Value("name") is { Length: > 0 })
+            body["name"] = Required(args, "name");
+        if (args.Value("retention") is { Length: > 0 } retention) body["retentionMode"] = retention;
+        if (args.Value("idle-minutes") is { Length: > 0 } idleText)
+        {
+            if (!int.TryParse(idleText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var idleMinutes))
+                throw new InvalidOperationException("--idle-minutes must be a whole number.");
+            body["idleMinutes"] = idleMinutes;
+        }
+        if (args.Value("priority") is { Length: > 0 } priority) body["evictionPriority"] = priority;
+        return body;
+    }
+
     private static JsonObject ProfileBody(Arguments args, bool requireName)
     {
         var body = new JsonObject
@@ -280,7 +317,15 @@ internal static class Program
             "get" => Get($"/api/v1/sessions/{Segment(Identifier(args, 2))}"),
             "logs" => Get($"/api/v1/sessions/{Segment(Identifier(args, 2))}/logs?tail={IntValue(args, "tail", 16000)}"),
             "metrics" => Get($"/api/v1/sessions/{Segment(Identifier(args, 2))}/metrics"),
+            "inspect" => Get($"/api/v1/sessions/{Segment(Identifier(args, 2))}/inspect"),
             _ => throw new InvalidOperationException($"Unknown session action '{action}'.")
+        };
+
+    private static ControlRequest GatewayRequest(string action)
+        => action switch
+        {
+            "inspect" => Get("/api/v1/gateway/inspect"),
+            _ => throw new InvalidOperationException($"Unknown gateway action '{action}'.")
         };
 
     private static ControlRequest LogRequest(string action, Arguments args)
@@ -550,7 +595,10 @@ Core:
   llwmctl models list|get|scan|import|companions|delete
   llwmctl load|restart|unload MODEL [--profile NAME] [--runtime ID] [--set name=value] [--wait]
   llwmctl profiles list|create|update|delete --model MODEL [--id ID] [--name NAME] [--set name=value]
-  llwmctl sessions list|get|logs|metrics [SESSION]
+  llwmctl groups list|get|create|update|delete [GROUP] [--name NAME] [--retention inherit|pinned|idle-timeout] [--idle-minutes N] [--priority low|normal|high]
+  llwmctl groups assign MODEL PROFILE --group GROUP | groups unassign MODEL PROFILE
+  llwmctl sessions list|get|logs|metrics|inspect [SESSION]
+  llwmctl gateway inspect
   llwmctl metrics
   llwmctl logs list|tail FILE [--tail CHARACTERS]
   llwmctl settings get|set --set name=value | settings rotate-key

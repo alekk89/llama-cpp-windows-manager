@@ -1,6 +1,8 @@
 using LocalLlmConsole.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using WpfApplication = System.Windows.Application;
 using WpfBrush = System.Windows.Media.Brush;
@@ -16,6 +18,8 @@ public sealed record OverviewPageActions(
     Func<Task> SelectLaunchProfileAsync,
     Func<Task> LoadSelectedModelAsync,
     Func<Task> SelectLoadedSessionRowAsync,
+    Func<Task> InspectSelectedEndpointAsync,
+    RoutedEventHandler InspectEndpointRowClick,
     RoutedEventHandler UnloadLoadedSessionRowClick);
 
 public sealed record OverviewPageRequest(
@@ -29,6 +33,8 @@ public sealed record OverviewPageControls(
     WpfComboBox LaunchProfileCombo,
     WpfButton LoadButton,
     DataGrid LoadedSessionsGrid,
+    StackPanel ModelStatusSection,
+    Grid RuntimeDashboard,
     Grid RuntimeDashboardModel,
     Grid RuntimeDashboardGpu,
     Grid RuntimeDashboardKvCache,
@@ -39,7 +45,10 @@ public sealed record OverviewPageControls(
     MetricSparkline RuntimeDashboardTokensGraph,
     MetricSparkline RuntimeDashboardMtpTokensGraph,
     MetricSparkline RuntimeDashboardKvCacheGraph,
+    Grid RuntimeLogSection,
+    GridSplitter RuntimeSectionsSplitter,
     WpfTextBox RuntimeLogBox,
+    Grid MetricsSection,
     DataGrid RuntimeMetricsGrid);
 
 public static class OverviewPageFactory
@@ -61,15 +70,23 @@ public static class OverviewPageFactory
 
         var dashboardSection = Stack();
         var loadedSessionsGrid = PageSectionFactory.GridFor(
-            (Loc.T("Overview.SessionsCol.Model"), "C1", 1.45),
-            ("Profile", "C2", .9),
+            (Loc.T("Overview.SessionsCol.Model"), "C1", 1.35),
+            ("Profile", "C2", .8),
             (Loc.T("Overview.SessionsCol.Size"), "C3", .62),
-            (Loc.T("Overview.SessionsCol.State"), "C4", .9),
-            (Loc.T("Overview.SessionsCol.ApiEndpoints"), "C5", 1.9),
-            (Loc.T("Overview.SessionsCol.Runtime"), "C6", 1.15),
-            (Loc.T("Overview.SessionsCol.Backend"), "C7", .75));
+            (Loc.T("Overview.SessionsCol.State"), "C4", .8),
+            (Loc.T("Overview.SessionsCol.Runtime"), "C6", 1.7),
+            (Loc.T("Overview.SessionsCol.Backend"), "C7", .85));
+        loadedSessionsGrid.Columns.Insert(4, EndpointColumn(request.Actions.InspectEndpointRowClick));
         loadedSessionsGrid.ItemsSource = request.ViewModel.Overview.SessionRows;
         loadedSessionsGrid.SelectionChanged += async (_, _) => await request.Actions.SelectLoadedSessionRowAsync();
+        loadedSessionsGrid.MouseDoubleClick += async (_, args) =>
+        {
+            if (VisualTreeTraversal.FindAncestor<WpfButton>(args.OriginalSource as DependencyObject) is not null
+                || VisualTreeTraversal.FindAncestor<Hyperlink>(args.OriginalSource as DependencyObject) is not null)
+                return;
+            await request.Actions.InspectSelectedEndpointAsync();
+        };
+        loadedSessionsGrid.ToolTip = Loc.T("Overview.EndpointInspectionTooltip");
         PageSectionFactory.AddButtonColumn(
             loadedSessionsGrid,
             Loc.T("Common.ActionButton"),
@@ -80,7 +97,8 @@ public static class OverviewPageFactory
             tooltipProvider: _ => Loc.T("Tooltip.Unload"),
             visualRole: VisualRole.Danger);
         dashboardSection.Children.Add(PageSectionFactory.GridSection(Loc.T("Overview.LoadedSessionsTitle"), loadedSessionsGrid));
-        dashboardSection.Children.Add(Text(Loc.T("Overview.ModelStatusLabel"), 18, true));
+        var modelStatusSection = Stack();
+        modelStatusSection.Children.Add(Text(Loc.T("Overview.ModelStatusLabel"), 18, true));
 
         var runtimeDashboard = RuntimeDashboard(
             out var runtimeDashboardModel,
@@ -93,7 +111,8 @@ public static class OverviewPageFactory
             out var runtimeDashboardTokensGraph,
             out var runtimeDashboardMtpTokensGraph,
             out var runtimeDashboardKvCacheGraph);
-        dashboardSection.Children.Add(runtimeDashboard);
+        modelStatusSection.Children.Add(runtimeDashboard);
+        dashboardSection.Children.Add(modelStatusSection);
         Grid.SetRow(dashboardSection, 1);
         root.Children.Add(dashboardSection);
 
@@ -101,7 +120,8 @@ public static class OverviewPageFactory
         var runtimeLogSection = PageSectionFactory.FramedSection(Loc.T("Overview.LiveRuntimeLogTitle"), runtimeLogBox);
         Grid.SetRow(runtimeLogSection, 2);
         root.Children.Add(runtimeLogSection);
-        root.Children.Add(PageSectionFactory.HorizontalGridSplitter(3));
+        var runtimeSectionsSplitter = PageSectionFactory.HorizontalGridSplitter(3);
+        root.Children.Add(runtimeSectionsSplitter);
 
         var runtimeMetricsGrid = PageSectionFactory.GridFor(
             (Loc.T("Overview.MetricsCol.Metric"), "C1", 1.5),
@@ -122,6 +142,8 @@ public static class OverviewPageFactory
             launchProfileCombo,
             loadButton,
             loadedSessionsGrid,
+            modelStatusSection,
+            runtimeDashboard,
             runtimeDashboardModel,
             runtimeDashboardGpu,
             runtimeDashboardKvCache,
@@ -132,7 +154,10 @@ public static class OverviewPageFactory
             runtimeDashboardTokensGraph,
             runtimeDashboardMtpTokensGraph,
             runtimeDashboardKvCacheGraph,
+            runtimeLogSection,
+            runtimeSectionsSplitter,
             runtimeLogBox,
+            metricsSection,
             runtimeMetricsGrid);
     }
 
@@ -144,25 +169,30 @@ public static class OverviewPageFactory
     {
         var modelBar = new Grid { Margin = new Thickness(0, 0, 0, 10) };
         modelBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        modelBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+        modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
+        modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+        modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
         modelBar.ColumnDefinitions.Add(new ColumnDefinition());
         modelBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        modelBar.Children.Add(new TextBlock
+        var modelLabel = new TextBlock
         {
             Text = Loc.T("Overview.ModelLabel"),
             FontWeight = FontWeights.SemiBold,
             Foreground = (WpfBrush)WpfApplication.Current.Resources["TextSoft"],
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 10, 6)
-        });
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        modelBar.Children.Add(modelLabel);
         modelCombo = new WpfComboBox
         {
             ItemsSource = request.ViewModel.Overview.ModelChoices,
             ItemTemplate = ModelNameTemplate(),
-            SelectedValuePath = nameof(ModelRecord.Id),
+            SelectedValuePath = nameof(OverviewModelChoice.Id),
+            Width = 240,
             MinHeight = 30,
-            Margin = new Thickness(0, 0, 8, 6),
+            Margin = new Thickness(0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
             ToolTip = Loc.T("Tooltip.OverviewModelCombo")
         };
@@ -172,13 +202,13 @@ public static class OverviewPageFactory
 
         var profileLabel = new TextBlock
         {
-            Text = "Launch profile",
+            Text = Loc.T("ModelGroups.Column.LaunchProfile"),
             FontWeight = FontWeights.SemiBold,
             Foreground = (WpfBrush)WpfApplication.Current.Resources["TextSoft"],
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 10, 6)
+            Margin = new Thickness(0, 0, 8, 0)
         };
-        Grid.SetRow(profileLabel, 1);
+        Grid.SetColumn(profileLabel, 3);
         modelBar.Children.Add(profileLabel);
 
         launchProfileCombo = new WpfComboBox
@@ -186,23 +216,87 @@ public static class OverviewPageFactory
             ItemsSource = request.ViewModel.Overview.LaunchProfileChoices,
             ItemTemplate = LaunchProfileNameTemplate(),
             SelectedValuePath = nameof(OverviewLaunchProfileChoice.Id),
+            Width = 220,
             MinHeight = 30,
-            Margin = new Thickness(0, 0, 8, 0),
+            Margin = new Thickness(0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-            ToolTip = "Choose the named launch settings used when this model starts."
+            ToolTip = Loc.T("Overview.LaunchProfileTooltip")
         };
         launchProfileCombo.SelectionChanged += async (_, _) => await request.Actions.SelectLaunchProfileAsync();
-        Grid.SetRow(launchProfileCombo, 1);
-        Grid.SetColumn(launchProfileCombo, 1);
+        Grid.SetColumn(launchProfileCombo, 4);
         modelBar.Children.Add(launchProfileCombo);
 
         loadButton = Button(Loc.T("Overview.LoadButton"), request.Actions.LoadSelectedModelAsync, VisualRole.Primary);
         ConfigureLoadButton(loadButton);
-        Grid.SetColumn(loadButton, 2);
-        Grid.SetRow(loadButton, 1);
+        Grid.SetColumn(loadButton, 6);
         modelBar.Children.Add(loadButton);
 
+        ConfigureResponsiveModelBar(modelBar, modelLabel, modelCombo, profileLabel, launchProfileCombo, loadButton);
+
         return modelBar;
+    }
+
+    private static void ConfigureResponsiveModelBar(
+        Grid modelBar,
+        TextBlock modelLabel,
+        WpfComboBox modelCombo,
+        TextBlock profileLabel,
+        WpfComboBox launchProfileCombo,
+        WpfButton loadButton)
+    {
+        modelBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        modelBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var narrow = false;
+
+        void Apply(double availableWidth)
+        {
+            var shouldUseNarrowLayout = availableWidth < 760;
+            if (shouldUseNarrowLayout == narrow && availableWidth > 0) return;
+            narrow = shouldUseNarrowLayout;
+            if (!narrow)
+            {
+                SetColumns(modelBar, GridLength.Auto, new GridLength(240), new GridLength(16), GridLength.Auto, new GridLength(220), new GridLength(1, GridUnitType.Star), GridLength.Auto);
+                Place(modelLabel, 0, 0);
+                Place(modelCombo, 0, 1);
+                Place(profileLabel, 0, 3);
+                Place(launchProfileCombo, 0, 4);
+                Place(loadButton, 0, 6);
+                Grid.SetRowSpan(loadButton, 1);
+                modelCombo.Width = 240;
+                launchProfileCombo.Width = 220;
+                profileLabel.Margin = new Thickness(0, 0, 8, 0);
+                launchProfileCombo.Margin = new Thickness(0);
+                return;
+            }
+
+            SetColumns(modelBar, GridLength.Auto, new GridLength(1, GridUnitType.Star), new GridLength(12), GridLength.Auto, new GridLength(0), new GridLength(0), new GridLength(0));
+            Place(modelLabel, 0, 0);
+            Place(modelCombo, 0, 1);
+            Place(profileLabel, 1, 0);
+            Place(launchProfileCombo, 1, 1);
+            Place(loadButton, 0, 3);
+            Grid.SetRowSpan(loadButton, 2);
+            modelCombo.Width = double.NaN;
+            launchProfileCombo.Width = double.NaN;
+            profileLabel.Margin = new Thickness(0, 8, 8, 0);
+            launchProfileCombo.Margin = new Thickness(0, 8, 0, 0);
+        }
+
+        modelBar.Loaded += (_, _) => Apply(modelBar.ActualWidth);
+        modelBar.SizeChanged += (_, args) => Apply(args.NewSize.Width);
+        Apply(0);
+    }
+
+    private static void SetColumns(Grid grid, params GridLength[] widths)
+    {
+        for (var index = 0; index < widths.Length; index++)
+            grid.ColumnDefinitions[index].Width = widths[index];
+    }
+
+    private static void Place(FrameworkElement element, int row, int column)
+    {
+        Grid.SetRow(element, row);
+        Grid.SetColumn(element, column);
     }
 
     private static void ConfigureLoadButton(WpfButton button)
@@ -217,10 +311,10 @@ public static class OverviewPageFactory
     private static DataTemplate ModelNameTemplate()
     {
         var text = new FrameworkElementFactory(typeof(TextBlock));
-        text.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(ModelRecord.Name)));
+        text.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(OverviewModelChoice.DisplayName)));
         text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
         text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-        return new DataTemplate(typeof(ModelRecord)) { VisualTree = text };
+        return new DataTemplate(typeof(OverviewModelChoice)) { VisualTree = text };
     }
 
     private static DataTemplate LaunchProfileNameTemplate()
@@ -230,6 +324,33 @@ public static class OverviewPageFactory
         text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
         text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         return new DataTemplate(typeof(OverviewLaunchProfileChoice)) { VisualTree = text };
+    }
+
+    private static DataGridTemplateColumn EndpointColumn(RoutedEventHandler click)
+    {
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetValue(TextBlock.TextWrappingProperty, TextWrapping.NoWrap);
+        text.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        text.SetValue(FrameworkElement.MarginProperty, new Thickness(7, 2, 7, 2));
+        text.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        var link = new FrameworkElementFactory(typeof(Hyperlink));
+        link.SetBinding(Hyperlink.IsEnabledProperty, new WpfBinding("B2"));
+        link.SetBinding(FrameworkContentElement.TagProperty, new WpfBinding("."));
+        link.SetResourceReference(TextElement.ForegroundProperty, "AccentBlue");
+        link.SetValue(FrameworkContentElement.ToolTipProperty, "Inspect what this endpoint reports right now, including models, context, defaults, capabilities, and active slots when available.");
+        link.AddHandler(Hyperlink.ClickEvent, click);
+        var run = new FrameworkElementFactory(typeof(Run));
+        run.SetBinding(Run.TextProperty, new WpfBinding("T1"));
+        link.AppendChild(run);
+        text.AppendChild(link);
+        return new DataGridTemplateColumn
+        {
+            Header = Loc.T("Overview.SessionsCol.ApiEndpoints"),
+            Width = new DataGridLength(1.7, DataGridLengthUnitType.Star),
+            MinWidth = 130,
+            CanUserResize = true,
+            CellTemplate = new DataTemplate { VisualTree = text }
+        };
     }
 
     private static Grid RuntimeDashboard(
@@ -275,30 +396,35 @@ public static class OverviewPageFactory
     {
         var cards = dashboard.Children.OfType<Border>().ToArray();
         var appliedColumns = 0;
+        var appliedVisibleCards = -1;
 
         void Apply(double availableWidth)
         {
-            var columns = availableWidth >= 930 ? 3 : availableWidth >= 620 ? 2 : 1;
-            if (columns == appliedColumns) return;
+            var visibleCards = cards.Where(card => card.Visibility == Visibility.Visible).ToArray();
+            var columns = OverviewResponsiveLayout.MetricColumnCount(availableWidth, visibleCards.Length);
+            if (columns == appliedColumns && visibleCards.Length == appliedVisibleCards) return;
             appliedColumns = columns;
+            appliedVisibleCards = visibleCards.Length;
 
             dashboard.ColumnDefinitions.Clear();
             dashboard.RowDefinitions.Clear();
             for (var column = 0; column < columns; column++)
                 dashboard.ColumnDefinitions.Add(new ColumnDefinition());
-            var rows = (int)Math.Ceiling(cards.Length / (double)columns);
+            var rows = (int)Math.Ceiling(visibleCards.Length / (double)columns);
             for (var row = 0; row < rows; row++)
                 dashboard.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            for (var index = 0; index < cards.Length; index++)
+            for (var index = 0; index < visibleCards.Length; index++)
             {
                 var column = index % columns;
-                Grid.SetRow(cards[index], index / columns);
-                Grid.SetColumn(cards[index], column);
-                cards[index].Margin = new Thickness(column == 0 ? 0 : 5, 0, column == columns - 1 ? 0 : 5, 8);
+                Grid.SetRow(visibleCards[index], index / columns);
+                Grid.SetColumn(visibleCards[index], column);
+                visibleCards[index].Margin = new Thickness(column == 0 ? 0 : 5, 0, column == columns - 1 ? 0 : 5, 8);
             }
         }
 
+        foreach (var card in cards)
+            card.IsVisibleChanged += (_, _) => Apply(dashboard.ActualWidth);
         dashboard.Loaded += (_, _) => Apply(dashboard.ActualWidth);
         dashboard.SizeChanged += (_, args) => Apply(args.NewSize.Width);
         Apply(0);
@@ -308,6 +434,7 @@ public static class OverviewPageFactory
         => new()
         {
             IsReadOnly = true,
+            IsUndoEnabled = false,
             Text = Loc.T("Overview.NoRuntimeLog"),
             BorderThickness = new Thickness(0),
             Margin = new Thickness(0),

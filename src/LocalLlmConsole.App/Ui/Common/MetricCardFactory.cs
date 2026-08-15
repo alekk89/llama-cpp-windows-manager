@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -17,6 +18,7 @@ public static class MetricCardFactory
         @"\d[\d,]*(?:\.\d+)?(?:/\d[\d,]*(?:\.\d+)?)?\s*(?:t/s|/s|avg|%|\u00b0?C|GiB|GB|MiB|tokens?|t)?",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly System.Windows.Media.FontFamily MetricValueFont = new("Cascadia Mono, Consolas, Segoe UI");
+    private static readonly ConditionalWeakTable<Grid, MetricRenderState> RenderStates = new();
 
     public static Grid AddMetric(Grid grid, string label, int row, int column)
         => AddMetric(grid, label, row, column, includeProgress: false, out _, out _);
@@ -141,9 +143,17 @@ public static class MetricCardFactory
     {
         if (target is null) return;
 
+        var normalizedValue = string.IsNullOrWhiteSpace(value) ? "..." : value.TrimEnd();
+        var renderState = RenderStates.GetOrCreateValue(target);
+        if (string.Equals(renderState.Value, normalizedValue, StringComparison.Ordinal)
+            && renderState.EmphasizeLoadedStatus == emphasizeLoadedStatus)
+            return;
+        renderState.Value = normalizedValue;
+        renderState.EmphasizeLoadedStatus = emphasizeLoadedStatus;
+
         target.Children.Clear();
         target.RowDefinitions.Clear();
-        var lines = (string.IsNullOrWhiteSpace(value) ? "..." : value.TrimEnd())
+        var lines = normalizedValue
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Split('\n', StringSplitOptions.None);
 
@@ -477,5 +487,12 @@ public static class MetricCardFactory
                     : (WpfBrush)WpfApplication.Current.Resources["TextMuted"]
             });
         }
+    }
+
+    private sealed class MetricRenderState
+    {
+        public string Value { get; set; } = "";
+
+        public bool EmphasizeLoadedStatus { get; set; }
     }
 }

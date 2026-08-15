@@ -4,29 +4,87 @@ using System.Runtime.CompilerServices;
 
 namespace LocalLlmConsole.Models;
 
-public sealed class UiRow
+public sealed class UiRow : INotifyPropertyChanged
 {
-    public string C1 { get; set; } = "";
-    public string C2 { get; set; } = "";
-    public string C3 { get; set; } = "";
-    public string C4 { get; set; } = "";
-    public string C5 { get; set; } = "";
-    public string C6 { get; set; } = "";
-    public string C7 { get; set; } = "";
-    public string C8 { get; set; } = "";
-    public string C9 { get; set; } = "";
-    public string C10 { get; set; } = "";
-    public string T1 { get; set; } = "";
-    public string T2 { get; set; } = "";
-    public string T3 { get; set; } = "";
-    public string T4 { get; set; } = "";
-    public string T5 { get; set; } = "";
-    public bool B1 { get; set; } = true;
-    public bool B2 { get; set; } = true;
-    public bool B3 { get; set; } = true;
-    public bool B4 { get; set; } = true;
-    public bool B5 { get; set; } = true;
-    public JsonObject Data { get; set; } = new();
+    private string _c1 = "";
+    private string _c2 = "";
+    private string _c3 = "";
+    private string _c4 = "";
+    private string _c5 = "";
+    private string _c6 = "";
+    private string _c7 = "";
+    private string _c8 = "";
+    private string _c9 = "";
+    private string _c10 = "";
+    private string _t1 = "";
+    private string _t2 = "";
+    private string _t3 = "";
+    private string _t4 = "";
+    private string _t5 = "";
+    private bool _b1 = true;
+    private bool _b2 = true;
+    private bool _b3 = true;
+    private bool _b4 = true;
+    private bool _b5 = true;
+    private JsonObject _data = new();
+
+    public string C1 { get => _c1; set => Set(ref _c1, value); }
+    public string C2 { get => _c2; set => Set(ref _c2, value); }
+    public string C3 { get => _c3; set => Set(ref _c3, value); }
+    public string C4 { get => _c4; set => Set(ref _c4, value); }
+    public string C5 { get => _c5; set => Set(ref _c5, value); }
+    public string C6 { get => _c6; set => Set(ref _c6, value); }
+    public string C7 { get => _c7; set => Set(ref _c7, value); }
+    public string C8 { get => _c8; set => Set(ref _c8, value); }
+    public string C9 { get => _c9; set => Set(ref _c9, value); }
+    public string C10 { get => _c10; set => Set(ref _c10, value); }
+    public string T1 { get => _t1; set => Set(ref _t1, value); }
+    public string T2 { get => _t2; set => Set(ref _t2, value); }
+    public string T3 { get => _t3; set => Set(ref _t3, value); }
+    public string T4 { get => _t4; set => Set(ref _t4, value); }
+    public string T5 { get => _t5; set => Set(ref _t5, value); }
+    public bool B1 { get => _b1; set => Set(ref _b1, value); }
+    public bool B2 { get => _b2; set => Set(ref _b2, value); }
+    public bool B3 { get => _b3; set => Set(ref _b3, value); }
+    public bool B4 { get => _b4; set => Set(ref _b4, value); }
+    public bool B5 { get => _b5; set => Set(ref _b5, value); }
+    public JsonObject Data { get => _data; set => Set(ref _data, value ?? new JsonObject()); }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void Apply(UiRow source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        C1 = source.C1;
+        C2 = source.C2;
+        C3 = source.C3;
+        C4 = source.C4;
+        C5 = source.C5;
+        C6 = source.C6;
+        C7 = source.C7;
+        C8 = source.C8;
+        C9 = source.C9;
+        C10 = source.C10;
+        T1 = source.T1;
+        T2 = source.T2;
+        T3 = source.T3;
+        T4 = source.T4;
+        T5 = source.T5;
+        B1 = source.B1;
+        B2 = source.B2;
+        B3 = source.B3;
+        B4 = source.B4;
+        B5 = source.B5;
+        Data = source.Data;
+    }
+
+    private void Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }
 
 public sealed class EditableSettingRow : INotifyPropertyChanged

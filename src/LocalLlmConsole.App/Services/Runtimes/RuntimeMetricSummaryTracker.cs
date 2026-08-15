@@ -87,7 +87,8 @@ public sealed class RuntimeMetricSummaryTracker
         var predictedSeconds = RuntimeMetrics.Sum(samples, ["tokens", "predicted", "seconds", "total"], [])
             ?? RuntimeMetrics.Sum(samples, ["tokens", "generated", "seconds", "total"], [])
             ?? RuntimeMetrics.Sum(samples, ["eval", "time"], ["prompt"]);
-        var promptTokens = RuntimeDashboardService.PromptTokenCounter(samples);
+        var promptTokensProcessed = RuntimeDashboardService.PromptTokensProcessedCounter(samples);
+        var promptTokensCached = RuntimeDashboardService.PromptCachedTokenCounter(samples);
         var promptSeconds = RuntimeMetrics.Sum(samples, ["prompt", "seconds", "total"], [])
             ?? RuntimeMetrics.Sum(samples, ["prompt", "time"], []);
         var slotObservation = ObserveSlots(state, slotSnapshot, now);
@@ -104,7 +105,7 @@ public sealed class RuntimeMetricSummaryTracker
             ?? mtpGeneratedSeconds;
 
         var liveGenerationRate = CounterRateAndRemember(predictedTokens, ref state.LastPredictedTokenCounter, ref state.LastPredictedTokenPollAt, now);
-        var livePromptRate = CounterRateAndRemember(promptTokens, ref state.LastPromptTokenCounter, ref state.LastPromptTokenPollAt, now);
+        var livePromptRate = CounterRateAndRemember(promptTokensProcessed, ref state.LastPromptTokenCounter, ref state.LastPromptTokenPollAt, now);
         var liveMtpGeneratedRate = CounterRateAndRemember(observedMtpGeneratedTokens, ref state.LastMtpGeneratedTokenCounter, ref state.LastMtpGeneratedTokenPollAt, now);
         var liveMtpAcceptedRate = CounterRateAndRemember(observedMtpAcceptedTokens, ref state.LastMtpAcceptedTokenCounter, ref state.LastMtpAcceptedTokenPollAt, now);
 
@@ -112,19 +113,23 @@ public sealed class RuntimeMetricSummaryTracker
         // This avoids dilution during idle gaps between requests where the wall-clock counter rate
         // would divide tokens by total elapsed time instead of active generation time.
         var secondsBasedGenerationRate = SecondsBasedCounterRate(predictedTokens, predictedSeconds, ref state.LastPredictedTokenCounterForSeconds, ref state.LastPredictedSecondsCounter);
-        var secondsBasedPromptRate = SecondsBasedCounterRate(promptTokens, promptSeconds, ref state.LastPromptTokenCounterForSeconds, ref state.LastPromptSecondsCounter);
+        var secondsBasedPromptRate = SecondsBasedCounterRate(promptTokensProcessed, promptSeconds, ref state.LastPromptTokenCounterForSeconds, ref state.LastPromptSecondsCounter);
         // Prefer the seconds-based rate when available; fall back to wall-clock counter rate
         liveGenerationRate = secondsBasedGenerationRate ?? liveGenerationRate;
         livePromptRate = secondsBasedPromptRate ?? livePromptRate;
 
         if (predictedTokens is null) liveGenerationRate = slotObservation.GenerationRate ?? liveGenerationRate;
-        if (promptTokens is null) livePromptRate = slotObservation.PromptRate ?? livePromptRate;
+        if (promptTokensProcessed is null) livePromptRate = slotObservation.PromptRate ?? livePromptRate;
 
-        var observedAverageGenerationRate = RuntimeMetrics.Sum(samples, ["predicted", "tokens", "second"], ["total"])
-            ?? RuntimeMetrics.Sum(samples, ["generation", "tokens", "second"], ["total"])
-            ?? RuntimeDashboardService.Rate(predictedTokens, predictedSeconds);
-        var observedAveragePromptRate = RuntimeMetrics.Sum(samples, ["prompt", "tokens", "second"], ["total"])
-            ?? RuntimeDashboardService.Rate(promptTokens, promptSeconds);
+        var reportedAverageGenerationRate = RuntimeMetrics.Sum(samples, ["predicted", "tokens", "second"], ["total"])
+            ?? RuntimeMetrics.Sum(samples, ["generation", "tokens", "second"], ["total"]);
+        var reportedAveragePromptRate = RuntimeMetrics.Sum(samples, ["prompt", "tokens", "second"], ["total"]);
+        var observedAverageGenerationRate = RuntimeDashboardService.Rate(predictedTokens, predictedSeconds)
+            ?? (reportedAverageGenerationRate is > 0 ? reportedAverageGenerationRate : null)
+            ?? liveGenerationRate;
+        var observedAveragePromptRate = RuntimeDashboardService.Rate(promptTokensProcessed, promptSeconds)
+            ?? (reportedAveragePromptRate is > 0 ? reportedAveragePromptRate : null)
+            ?? livePromptRate;
         var observedAverageMtpGeneratedRate = RuntimeDashboardService.Rate(observedMtpGeneratedTokens, mtpGeneratedSeconds);
         var observedAverageMtpAcceptedRate = RuntimeDashboardService.Rate(observedMtpAcceptedTokens, mtpAcceptedSeconds);
         var displayAverageGenerationRate = observedAverageGenerationRate ?? previous?.AverageGenerationRate;
@@ -144,7 +149,7 @@ public sealed class RuntimeMetricSummaryTracker
         var kvUsagePercent = RuntimeDashboardService.KvCacheUsagePercent(kvUsage, kvTokens, contextCapacityTokens);
 
         var observedGeneratedTokens = predictedTokens ?? slotObservation.GeneratedTokens;
-        var observedPromptTokens = promptTokens ?? slotObservation.PromptTokens;
+        var observedPromptTokens = promptTokensProcessed ?? slotObservation.PromptTokens;
         var displayGeneratedTokens = RuntimeDashboardService.MaxNullable(observedGeneratedTokens, previous?.GeneratedTokens);
         var displayPromptTokens = RuntimeDashboardService.MaxNullable(observedPromptTokens, previous?.PromptTokens);
         var displayMtpGeneratedTokens = RuntimeDashboardService.MaxNullable(observedMtpGeneratedTokens, previous?.MtpGeneratedTokens);
@@ -185,13 +190,12 @@ public sealed class RuntimeMetricSummaryTracker
 
         var generationRateText = $"Gen {RuntimeDashboardService.RateLabel(liveGenerationRate, displayAverageGenerationRate)}\nPrompt {RuntimeDashboardService.RateLabel(livePromptRate, displayAveragePromptRate)}";
         var totalTokensText = RuntimeDashboardService.TokenSummaryLabel(displayGeneratedTokens, displayPromptTokens);
-        var tokensText = RuntimeDashboardService.TokenActivitySummaryLabel(
-            liveGenerationRate,
+        var tokensText = RuntimeDashboardService.TokenAverageAndTotalSummaryLabel(
             displayAverageGenerationRate,
-            livePromptRate,
             displayAveragePromptRate,
             displayGeneratedTokens,
-            displayPromptTokens);
+            displayPromptTokens,
+            promptTokensCached);
         var mtpTokensText = MtpTokensText(
             metricsSettings,
             liveMtpGeneratedRate,
@@ -246,8 +250,8 @@ public sealed class RuntimeMetricSummaryTracker
             usedLastKnown ? lastKnownCapturedAt : null,
             new RuntimeMetricGraphSample(
                 runtimeKey,
-                liveGenerationRate ?? observedAverageGenerationRate,
-                livePromptRate ?? observedAveragePromptRate,
+                displayAverageGenerationRate,
+                displayAveragePromptRate,
                 liveMtpGeneratedRate ?? observedAverageMtpGeneratedRate,
                 liveMtpAcceptedRate ?? observedAverageMtpAcceptedRate,
                 kvUsagePercent));

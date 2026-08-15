@@ -31,9 +31,6 @@ public sealed class ModelGatewayRequestAccessPolicy
 
     public bool IsAuthorized(HttpListenerRequest request)
     {
-        if (!_options.RequireApiKeyAuth)
-            return true;
-
         if (ApiSecurity.BearerTokenMatches(request.Headers["Authorization"], _options.ApiKey))
             return true;
 

@@ -129,6 +129,111 @@ public sealed class RuntimeLaunchOptionsTests
     }
 
     [Fact]
+    public void HelpParserTreatsDescriptiveDefaultsAndDisableValuesAsNumericTextNotChoices()
+    {
+        var options = RuntimeLaunchHelpParser.Parse("""
+            --dry-multiplier N       set DRY multiplier (default: 0.00, 0.0 = disabled)
+            --poll <0...100>         polling level (0 - no polling, default: 50)
+            --tags STRING            comma-separated (informational, not used for routing)
+            """);
+
+        Assert.All(options, option =>
+        {
+            Assert.Equal(RuntimeLaunchOptionValueKind.Text, option.ValueKind);
+            Assert.Empty(option.Choices);
+        });
+        Assert.Equal("0.00", Assert.Single(options, option => option.Name == "--dry-multiplier").DefaultValue);
+        Assert.Equal("50", Assert.Single(options, option => option.Name == "--poll").DefaultValue);
+    }
+
+    [Fact]
+    public void HelpParserKeepsPairedAliasesAndMultilineDefaultsWithoutTreatingReferencesAsOptions()
+    {
+        var options = RuntimeLaunchHelpParser.Parse("""
+            -ag,   --agent, -no-ag, --no-agent      whether to enable tools
+                                                    (default: disabled)
+            --cpu-strict-batch <0|1>                same as --cpu-strict
+                                                    (default: 0)
+            --spec-ngram-size-n N                   argument removed; use
+                                                    --spec-ngram-*-size-n
+            """);
+
+        var agent = Assert.Single(options, option => option.Name == "--agent");
+        Assert.Equal(RuntimeLaunchOptionValueKind.Switch, agent.ValueKind);
+        Assert.Equal(["-ag", "--agent", "-no-ag", "--no-agent"], agent.Aliases);
+        Assert.Empty(agent.ValueHint);
+        Assert.Equal("disabled", agent.DefaultValue);
+        var strict = Assert.Single(options, option => option.Name == "--cpu-strict-batch");
+        Assert.Equal(["0", "1"], strict.Choices);
+        Assert.Equal("0", strict.DefaultValue);
+        Assert.DoesNotContain(options, option => option.Name.StartsWith("--spec-ngram-", StringComparison.Ordinal)
+                                                  && option.Name != "--spec-ngram-size-n");
+    }
+
+    [Fact]
+    public void HelpParserOnlyMakesRealEnumerationsIntoChoices()
+    {
+        var options = RuntimeLaunchHelpParser.Parse("""
+            --fit [on|off]                       fit mode
+            --pooling {none,mean,cls,last,rank} pooling mode
+            --device <dev1,dev2,..>             comma-separated devices
+            --numa TYPE                         NUMA mode
+                                                - distribute: spread across nodes
+                                                - isolate: stay on one node
+                                                - numactl: use the supplied map
+            --mirostat N                        mode (default: 0, 0 = disabled, 1 = Mirostat, 2 = Mirostat 2.0)
+            --prio N                            priority: low(-1), normal(0), medium(1), high(2), realtime(3)
+            """);
+
+        Assert.Equal(["on", "off"], Assert.Single(options, option => option.Name == "--fit").Choices);
+        Assert.Equal(["none", "mean", "cls", "last", "rank"], Assert.Single(options, option => option.Name == "--pooling").Choices);
+        var device = Assert.Single(options, option => option.Name == "--device");
+        Assert.Equal(RuntimeLaunchOptionValueKind.Text, device.ValueKind);
+        Assert.Empty(device.Choices);
+        Assert.Equal(["distribute", "isolate", "numactl"], Assert.Single(options, option => option.Name == "--numa").Choices);
+        Assert.Equal(["0", "1", "2"], Assert.Single(options, option => option.Name == "--mirostat").Choices);
+        Assert.Equal(["-1", "0", "1", "2", "3"], Assert.Single(options, option => option.Name == "--prio").Choices);
+    }
+
+    [Fact]
+    public void HelpParserUsesFileEditorsForSingularFnameValuesButNotCompositeLists()
+    {
+        var options = RuntimeLaunchHelpParser.Parse("""
+            --lora FNAME                  path to a LoRA adapter
+            --lora-scaled FNAME:SCALE,...   adapter paths and scales
+            """);
+
+        Assert.Equal(RuntimeLaunchOptionValueKind.File, Assert.Single(options, option => option.Name == "--lora").ValueKind);
+        Assert.Equal(RuntimeLaunchOptionValueKind.Text, Assert.Single(options, option => option.Name == "--lora-scaled").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("--agent", "whether to enable tools")]
+    [InlineData("--mcp-servers-config", "MCP definitions")]
+    [InlineData("--cache-list", "show list of models")]
+    [InlineData("--path", "serve static files")]
+    [InlineData("--api-prefix", "change the served route")]
+    [InlineData("--tools-runtime", "run tools on the host")]
+    [InlineData("--docker-repo", "model repository")]
+    [InlineData("--old-option", "DEPRECATED in favor of another option")]
+    [InlineData("--draft", "the argument has been removed")]
+    [InlineData("--preset", "can download weights from the internet")]
+    public void PolicyHidesSecuritySensitiveActionAndUnsupportedRuntimeOptions(string name, string description)
+    {
+        var option = new RuntimeLaunchOptionDefinition(name, [name], "", description, RuntimeLaunchOptionValueKind.Switch, []);
+
+        Assert.False(RuntimeLaunchOptionPolicy.CanRender(option));
+    }
+
+    [Fact]
+    public void SlotSavePathUsesDirectoryPicker()
+    {
+        var option = Assert.Single(RuntimeLaunchHelpParser.Parse("--slot-save-path PATH   path to save slot kv cache"));
+
+        Assert.Equal(RuntimeLaunchOptionValueKind.Directory, option.ValueKind);
+    }
+
+    [Fact]
     public void PolicyOnlyRendersSafeUnmanagedOptions()
     {
         var parsed = RuntimeLaunchHelpParser.Parse("""
@@ -141,6 +246,76 @@ public sealed class RuntimeLaunchOptionsTests
         var rendered = parsed.Where(RuntimeLaunchOptionPolicy.CanRender).Select(option => option.Name).ToArray();
 
         Assert.Equal(["--slot-save-path"], rendered);
+    }
+
+    [Fact]
+    public void RuntimeOptionsAreGroupedIntoStablePolishedSectionsWithoutDroppingUnknownFlags()
+    {
+        RuntimeLaunchOptionDefinition Option(string name, string description)
+            => new(name, [name], "VALUE", description, RuntimeLaunchOptionValueKind.Text, []);
+
+        var groups = RuntimeLaunchOptionGroupingService.Group([
+            Option("--cpu-mask", "CPU affinity mask"),
+            Option("--samplers", "sampler sequence"),
+            Option("--slot-save-path", "directory used to save slots"),
+            Option("--draft-max", "maximum speculative draft tokens"),
+            Option("--vendor-experimental", "vendor-specific behavior")
+        ]);
+
+        Assert.Equal([
+            "Performance & Memory",
+            "Generation & Sampling",
+            "Speculative & Draft",
+            "Server & Slots",
+            "Other Runtime Options"
+        ], groups.Select(group => group.Title));
+        Assert.Equal(5, groups.Sum(group => group.Options.Count));
+        Assert.Equal("--vendor-experimental", Assert.Single(groups[^1].Options).Name);
+    }
+
+    [Theory]
+    [InlineData("--cpu-mask", "CPU Mask")]
+    [InlineData("--ctx-size", "Ctx Size")]
+    [InlineData("--kv-unified", "KV Unified")]
+    [InlineData("--mtp-head", "MTP Head")]
+    [InlineData("--rope-freq-base", "RoPE Freq Base")]
+    public void RuntimeOptionLabelsAreReadableWhileExactFlagsRemainUnchanged(string flag, string expectedLabel)
+    {
+        Assert.Equal(expectedLabel, LaunchSettingMetadataService.RuntimeOptionLabel(flag));
+        Assert.StartsWith("--", flag, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PositiveAndNegativeRuntimeSwitchesBecomeOneHonestTriStateControl()
+    {
+        var normalized = RuntimeLaunchOptionSwitchService.Normalize([
+            new RuntimeLaunchOptionDefinition("--log-colors", ["--log-colors"], "", "enable colors", RuntimeLaunchOptionValueKind.Switch, []),
+            new RuntimeLaunchOptionDefinition("--no-log-colors", ["--no-log-colors"], "", "disable colors", RuntimeLaunchOptionValueKind.Switch, [])
+        ]);
+
+        var option = Assert.Single(normalized);
+        Assert.Equal("--log-colors", option.Name);
+        Assert.Equal("--log-colors", option.EnabledName);
+        Assert.Equal("--no-log-colors", option.DisabledName);
+        Assert.Equal(["--log-colors", "--no-log-colors"], option.Aliases);
+        Assert.Equal("Log Colors", LaunchSettingMetadataService.RuntimeOptionLabel(RuntimeLaunchOptionSwitchService.DisplayFlag(option)));
+    }
+
+    [Fact]
+    public void UnpairedRuntimeSwitchesExposeOnlyTheirAdvertisedDirection()
+    {
+        var enableOnly = Assert.Single(RuntimeLaunchOptionSwitchService.Normalize([
+            new RuntimeLaunchOptionDefinition("--verbose", ["--verbose"], "", "verbose output", RuntimeLaunchOptionValueKind.Switch, [])
+        ]));
+        var disableOnly = Assert.Single(RuntimeLaunchOptionSwitchService.Normalize([
+            new RuntimeLaunchOptionDefinition("--no-colors", ["--no-colors"], "", "disable colors", RuntimeLaunchOptionValueKind.Switch, [])
+        ]));
+
+        Assert.Equal("--verbose", enableOnly.EnabledName);
+        Assert.Empty(enableOnly.DisabledName);
+        Assert.Empty(disableOnly.EnabledName);
+        Assert.Equal("--no-colors", disableOnly.DisabledName);
+        Assert.Equal("--colors", RuntimeLaunchOptionSwitchService.DisplayFlag(disableOnly));
     }
 
     [Theory]

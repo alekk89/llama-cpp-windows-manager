@@ -56,7 +56,7 @@ public static class ControlOperationCatalog
         new("runtime-package.check", "Check a prebuilt runtime package for updates.", Parameters: Id("preset", "Runtime package preset id or label.")),
         new("runtime-package.delete", "Delete installed copies of a prebuilt runtime package.", true, Parameters: Id("preset", "Runtime package preset id or label.")),
         new("runtime-source.download", "Download a llama.cpp runtime source repository.", true, Parameters: Id("preset", "Runtime source preset id or label.")),
-        new("runtime-source.check", "Check a downloaded runtime source repository for updates.", Parameters: Id("preset", "Runtime source preset id or label.")),
+        new("runtime-source.check", "Check a runtime source repository before download or for updates.", Parameters: Id("preset", "Runtime source preset id or label.")),
         new("runtime-source.delete", "Delete one downloaded runtime source tree.", true, Parameters: Id("source", "Source directory, preset id, or label.")),
         new("runtime-build.start", "Build or update a managed llama.cpp runtime.", true, Parameters:
         [

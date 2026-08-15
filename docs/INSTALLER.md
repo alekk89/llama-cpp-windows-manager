@@ -1,5 +1,7 @@
 # Windows Installer
 
+Last reviewed: 2026-08-15
+
 The installer is built with Inno Setup 6 from the self-contained `win-x64` publish output.
 
 ## Build
@@ -27,7 +29,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -C
 The setup executable is written to:
 
 ```text
-dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe
+dist\installer\LlamaCppWindowsManager-Setup-2.2.0-win-x64.exe
 ```
 
 ## Install Behavior
@@ -40,6 +42,8 @@ dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe
 - The final installer page includes a launch-after-install option.
 - The installer creates a Start Menu shortcut and offers an optional Desktop shortcut.
 - Fresh installs offer a checked-by-default Start with Windows task. The app also exposes the same startup preference in Settings.
+- The installer includes the project `LICENSE`, dependency notices, and the
+  self-contained .NET runtime license/notices under `licenses\dotnet`.
 
 ## Data Preservation
 
@@ -55,5 +59,10 @@ data\
 ```
 
 Installer updates and repairs overwrite application files only. They do not delete `data`, models, runtimes, logs, cache, or state.
+
+UI visibility choices are stored in the preserved SQLite state. An update keeps
+existing choices. When upgrading a workspace that predates the **Settings >
+UI** fields, the six Overview status cards and live log default visible; raw
+llama.cpp metrics and the Models Hugging Face section default hidden.
 
 Uninstall keeps `data` by default. If `data` exists, the uninstaller asks whether to delete it, with the safe default set to keep the data.

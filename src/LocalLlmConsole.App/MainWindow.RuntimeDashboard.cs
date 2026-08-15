@@ -15,17 +15,21 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private async Task RefreshJobsAsync()
-    {
-        var selectedRuntimeJobId = _runtimesPage.SelectedRuntimeJobId();
-        _viewModel.Jobs.ReplaceJobs(await AppServices.StateStore.ListJobsAsync());
-        _runtimesPage.RestoreRuntimeJobSelection(selectedRuntimeJobId, _viewModel.Jobs.RuntimeRows);
-    }
+        => _viewModel.Jobs.ReplaceJobs(await AppServices.StateStore.ListJobsAsync());
 
     private async Task RefreshOverviewAsync()
     {
         await MarkLoadedSessionsIfReadyAsync();
-        UpdateFolderText(_modelsPage.ModelsFolderText, _settings.ModelsRoot);
-        UpdateFolderText(_runtimesPage.RuntimesFolderText, _settings.RuntimeRoot);
+        if (_modelsPage.ModelsFolderText is { } modelsFolderText)
+        {
+            modelsFolderText.Text = _settings.ModelsRoot;
+            modelsFolderText.ToolTip = _settings.ModelsRoot;
+        }
+        if (_runtimesPage.RuntimesFolderText is { } runtimesFolderText)
+        {
+            runtimesFolderText.Text = _settings.RuntimeRoot;
+            runtimesFolderText.ToolTip = _settings.RuntimeRoot;
+        }
         RefreshOverviewSessionRows();
     }
 
@@ -52,20 +56,18 @@ public partial class MainWindow
         ResetMetricCounters();
         if (!renderOverview || selectedOverviewModel is null) return;
 
-        SetMetricText(_runtimeDashboardPage.ModelMetric, $"Stopped: {selectedOverviewModel.Name}");
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.ModelMetric, $"Stopped: {selectedOverviewModel.Name}");
         SetRuntimeModelProgress(LlamaRuntimeState.Stopped);
-        SetMetricText(_runtimeDashboardPage.GpuMetric, await CachedGpuSummaryAsync());
-        if (_runtimeDashboardPage.RuntimeLogBox is not null)
-            _runtimeDashboardPage.RuntimeLogBox.Text = "No runtime is loaded for the selected model.";
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.GpuMetric, await CachedGpuSummaryAsync());
+        _runtimeDashboardPage.SetRuntimeLogText("No runtime is loaded for the selected model.", followTail: false);
         ApplyRuntimeMetricRows(new RuntimeMetricRowsRenderPlan([], null));
         ApplyRuntimeMetricSummary(RuntimeMetricSummaryPresentation.NoRuntime);
     }
 
     private RuntimeDashboardMetricsApplicationActions RuntimeDashboardMetricsActions()
         => new(
-            RefreshRuntimeLogTail,
+            RefreshRuntimeLogTailAsync,
             ApplyRuntimeMetricRows,
-            ReadMtpTokenStatsFromRuntimeLog,
             ApplyRuntimeMetricSummary);
 
     private RuntimeDashboardRefreshApplicationActions RuntimeDashboardRefreshActions()
@@ -90,7 +92,7 @@ public partial class MainWindow
             SaveActiveRuntimeSessionsAsync,
             UpdateRuntimeModelProgress,
             CachedGpuSummaryAsync,
-            summary => SetMetricText(_runtimeDashboardPage.GpuMetric, summary),
+            summary => MetricCardFactory.SetMetricText(_runtimeDashboardPage.GpuMetric, summary),
             RenderStoppedSelectedOverviewModelAsync,
             RuntimeDashboardMetricsActions(),
             UpdateOverviewModelActions);

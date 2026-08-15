@@ -21,7 +21,7 @@ public partial class MainWindow
             _viewModel.Updates,
             new UpdatesPageActions(
                 ShowUpdatesPrimaryActionAsync,
-                () => OpenUrl(AppUpdateService.RepositoryUrl))));
+                () => _coreServices.App.ShellIntegration.OpenUrl(AppUpdateService.RepositoryUrl))));
         PageHost.Content = page.Content;
     }
 

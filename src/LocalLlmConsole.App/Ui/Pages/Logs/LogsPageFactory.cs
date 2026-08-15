@@ -71,6 +71,7 @@ public static class LogsPageFactory
         var logsBox = new WpfTextBox
         {
             IsReadOnly = true,
+            IsUndoEnabled = false,
             TextWrapping = TextWrapping.NoWrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto

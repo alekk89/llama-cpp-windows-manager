@@ -9,6 +9,8 @@ public sealed class LogsPageState
 
     private WpfTextBox? LogsBox { get; set; }
 
+    private string PreviewIdentity { get; set; } = "";
+
     public UiRow? SelectedLogRow => LogsGrid?.SelectedItem as UiRow;
 
     public string SelectedLogPath => LogPathFromRow(SelectedLogRow);
@@ -19,6 +21,7 @@ public sealed class LogsPageState
 
         LogsGrid = controls.LogsGrid;
         LogsBox = controls.LogsBox;
+        PreviewIdentity = "";
     }
 
     public void FocusLogsGrid()
@@ -49,24 +52,21 @@ public sealed class LogsPageState
             LogsGrid.SelectedItems.Add(row);
         if (LogsGrid.SelectedItems.Count == 0)
             LogsGrid.SelectedItem = rows.FirstOrDefault();
-        LogsGrid.Items.Refresh();
     }
 
     public bool HasPreviewBox => LogsBox is not null;
 
     public void ClearPreview()
     {
-        if (LogsBox is not null) LogsBox.Text = "";
+        PreviewIdentity = "";
+        TextBoxTailPresenter.SetText(LogsBox, "", followTail: false);
     }
 
-    public void SetPreviewText(string text, bool scrollToEnd = false)
+    public void SetPreviewText(string text, string identity = "", bool scrollToEnd = false)
     {
-        if (LogsBox is null) return;
-
-        LogsBox.Text = text;
-        if (!scrollToEnd) return;
-        LogsBox.CaretIndex = LogsBox.Text.Length;
-        LogsBox.ScrollToEnd();
+        var identityChanged = !string.Equals(PreviewIdentity, identity, StringComparison.OrdinalIgnoreCase);
+        PreviewIdentity = identity;
+        TextBoxTailPresenter.SetText(LogsBox, text, scrollToEnd, forceFollowTail: identityChanged);
     }
 
     private static string LogPathFromRow(UiRow? row)

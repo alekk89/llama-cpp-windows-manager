@@ -2,8 +2,11 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
+    private const double ExpandedNavigationWidth = 244;
+
     private void SetActiveNavigation(string title)
     {
+        System.Windows.Automation.AutomationProperties.SetName(PageHost, title);
         foreach (var button in new[] { OverviewNavButton, ModelsNavButton, RuntimesNavButton, WindowsNavButton, WslLinuxNavButton, SettingsNavButton, LifetimeNavButton, LogsNavButton, UpdatesNavButton, HelpNavButton })
             button.Tag = null;
 
@@ -26,19 +29,34 @@ public partial class MainWindow
 
     private void ApplyStaticButtonToolTips()
     {
-        SetButtonToolTip(MinimizeButton, "Minimize the app window.");
-        SetButtonToolTip(MaximizeButton, "Maximize or restore the app window.");
-        SetButtonToolTip(CloseButton, "Close the app. Running models and downloads will be handled safely.");
-        SetButtonToolTip(OverviewNavButton, "Open the model loading dashboard.");
-        SetButtonToolTip(ModelsNavButton, "Open local models, Hugging Face search, and launch settings.");
-        SetButtonToolTip(RuntimesNavButton, "Open llama.cpp source downloads, builds, and runtime jobs.");
-        SetButtonToolTip(WindowsNavButton, "Open advanced native Windows tool setup actions.");
-        SetButtonToolTip(WslLinuxNavButton, "Open advanced WSL, Ubuntu, and toolkit setup actions.");
-        SetButtonToolTip(SettingsNavButton, "Open app preferences.");
-        SetButtonToolTip(LifetimeNavButton, "Open persisted lifetime token counters.");
-        SetButtonToolTip(LogsNavButton, "Open app, runtime, and job logs.");
-        SetButtonToolTip(UpdatesNavButton, "Check for app updates from GitHub releases.");
-        SetButtonToolTip(HelpNavButton, "Open first-run setup and app help.");
+        UiAccessibility.SetButtonToolTip(MinimizeButton, Loc.T("Tooltip.MinimizeButton"));
+        UiAccessibility.SetButtonToolTip(MaximizeButton, Loc.T("Tooltip.MaximizeRestoreButton"));
+        UiAccessibility.SetButtonToolTip(CloseButton, Loc.T("Tooltip.CloseButton"));
+        UiAccessibility.SetButtonToolTip(OverviewNavButton, Loc.T("Tooltip.NavOverview"));
+        UiAccessibility.SetButtonToolTip(ModelsNavButton, Loc.T("Tooltip.NavModels"));
+        UiAccessibility.SetButtonToolTip(RuntimesNavButton, Loc.T("Tooltip.NavRuntimes"));
+        UiAccessibility.SetButtonToolTip(WindowsNavButton, Loc.T("Tooltip.NavWindows"));
+        UiAccessibility.SetButtonToolTip(WslLinuxNavButton, Loc.T("Tooltip.NavWslLinux"));
+        UiAccessibility.SetButtonToolTip(SettingsNavButton, Loc.T("Tooltip.NavSettings"));
+        UiAccessibility.SetButtonToolTip(LifetimeNavButton, Loc.T("Tooltip.NavLifetime"));
+        UiAccessibility.SetButtonToolTip(LogsNavButton, Loc.T("Tooltip.NavLogs"));
+        UiAccessibility.SetButtonToolTip(UpdatesNavButton, Loc.T("Tooltip.NavUpdates"));
+        UiAccessibility.SetButtonToolTip(HelpNavButton, Loc.T("Tooltip.NavHelp"));
+        System.Windows.Automation.AutomationProperties.SetName(MinimizeButton, Loc.T("Tooltip.MinimizeButton"));
+        System.Windows.Automation.AutomationProperties.SetName(MaximizeButton, Loc.T("Tooltip.MaximizeRestoreButton"));
+        System.Windows.Automation.AutomationProperties.SetName(CloseButton, Loc.T("Tooltip.CloseButton"));
+    }
+
+    private void NavigationToggleButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        => ApplyNavigationToggleState(SidebarNavigation.Visibility == System.Windows.Visibility.Visible);
+
+    private void ApplyNavigationToggleState(bool collapsed)
+    {
+        SidebarColumn.Width = collapsed ? new System.Windows.GridLength(0) : new System.Windows.GridLength(ExpandedNavigationWidth);
+        SidebarNavigation.Visibility = collapsed ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+        var accessibleText = collapsed ? "Expand navigation menu" : "Collapse navigation menu";
+        System.Windows.Automation.AutomationProperties.SetName(NavigationToggleButton, accessibleText);
+        UiAccessibility.SetButtonToolTip(NavigationToggleButton, accessibleText + ".");
     }
 
     private static string ButtonToolTip(string text)
@@ -61,7 +79,6 @@ public partial class MainWindow
             "Update" => "Update the selected item.",
             "Search Hugging Face" => "Search Hugging Face for GGUF model files.",
             "History" => "Show model download history and controls.",
-            "Save Settings" => "Save the current app preferences.",
             "Open GitHub" => "Open the app's GitHub repository in your browser.",
             "Refresh" => "Refresh the current page.",
             "Choose" => "Choose a folder.",
@@ -95,7 +112,6 @@ public partial class MainWindow
             "Gateway Settings" => "Open Settings and show gateway options.",
             "Windows Tools" => "Open advanced Windows setup actions.",
             "WSL Tools" => "Open advanced WSL setup actions.",
-            "Runtime Jobs" => "Open Runtimes and focus runtime jobs.",
             "Open Logs" => "Open log inspection.",
             "Open Lifetime" => "Open lifetime token counters.",
             "Check Updates" => "Open app update checks.",

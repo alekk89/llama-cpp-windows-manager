@@ -33,7 +33,7 @@ public sealed record CacheClearApplicationActions(
 
 public sealed class CacheClearApplicationService
 {
-    private const string Title = "Clear cache";
+    private static string Title => Loc.T("Cache.Clear.Title");
 
     public async Task<CacheClearApplicationOutcome> ClearAsync(
         AppSettings settings,
@@ -65,10 +65,10 @@ public sealed class CacheClearApplicationService
         if (!actions.Confirm(Prompt(plan, CacheClearPromptKind.Warning)))
             return CacheClearApplicationOutcome.Declined;
 
-        await actions.RunBusyAsync("Clearing cache...", async () =>
+        await actions.RunBusyAsync(Loc.T("Cache.Clear.Progress"), async () =>
         {
             await actions.ClearAsync(settings, cancellationToken);
-            actions.SetStatus($"Cleared cache ({plan.DisplaySize}).");
+            actions.SetStatus(Loc.T("Cache.Clear.Success", plan.DisplaySize));
             RefreshSettingsIfVisible(actions);
         });
         return CacheClearApplicationOutcome.Cleared;

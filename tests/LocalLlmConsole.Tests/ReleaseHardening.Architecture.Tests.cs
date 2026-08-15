@@ -76,6 +76,25 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Fact]
+    public void ModelGroupDialogFactoryStaysSplitByDialogResponsibility()
+    {
+        var mainWindowPath = FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.xaml.cs");
+        var appRoot = Path.GetDirectoryName(mainWindowPath)!;
+        var shell = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Ui", "Pages", "Models", "ModelGroupDialogFactory.cs"));
+
+        AssertServicePartials(appRoot, Path.Combine("Ui", "Pages", "Models"), "ModelGroupDialogFactory", 300,
+            "ModelGroupDialogFactory.Assignment.cs",
+            "ModelGroupDialogFactory.Common.cs",
+            "ModelGroupDialogFactory.Editor.cs",
+            "ModelGroupDialogFactory.Manager.cs");
+        Assert.Contains("public static partial class ModelGroupDialogFactory", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("public static ModelGroupManagerResult? ShowManager", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("public static ModelGroupAssignmentResult? ShowAssignment", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static ModelGroupEditorResult? ShowGroupEditor", shell, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindowPartialsDoNotKeepEmptyPlaceholders()
     {
         var mainWindowPath = FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.xaml.cs");
@@ -87,6 +106,55 @@ public sealed partial class ReleaseHardeningTests
             .ToArray();
 
         Assert.Empty(emptyPartials);
+    }
+
+    [Fact]
+    public void MainWindowPartialsRemainBoundedShellAdapters()
+    {
+        var mainWindowPath = FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.xaml.cs");
+        var appRoot = Path.GetDirectoryName(mainWindowPath)!;
+        var oversizedPartials = Directory
+            .EnumerateFiles(appRoot, "MainWindow*.cs", SearchOption.TopDirectoryOnly)
+            .Select(path => new
+            {
+                Path = path,
+                NonBlankLines = File.ReadLines(path).Count(line => !string.IsNullOrWhiteSpace(line))
+            })
+            .Where(file => file.NonBlankLines > 300)
+            .Select(file => $"{Path.GetFileName(file.Path)}: {file.NonBlankLines}")
+            .ToArray();
+        var shell = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(appRoot, "MainWindow*.cs", SearchOption.TopDirectoryOnly)
+                .Select(File.ReadAllText));
+
+        Assert.Empty(oversizedPartials);
+        Assert.DoesNotContain("private static DataGrid GridFor", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static Grid AddMetric", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static void ApplyTheme", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlRuntimePackageAsync", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlRuntimeBuildAsync", shell, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ControlRuntimeOperationsOwnRuntimeAutomationWorkflows()
+    {
+        var service = File.ReadAllText(FindRepositoryFile(
+            "src",
+            "LocalLlmConsole.App",
+            "Services",
+            "Control",
+            "ControlRuntimeOperationApplicationService.cs"));
+        var shell = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.ControlOperations.cs"));
+
+        Assert.Contains("RuntimePackageApplicationService", service, StringComparison.Ordinal);
+        Assert.Contains("RuntimeSourceApplicationService", service, StringComparison.Ordinal);
+        Assert.Contains("RuntimeBuildApplicationService", service, StringComparison.Ordinal);
+        Assert.Contains("RuntimeBuildJobApplicationService", service, StringComparison.Ordinal);
+        Assert.Contains("ControlRuntimeOperationApplicationService.CanHandle", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveRuntimePackagePreset", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveRuntimeBuildPreset", shell, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveRuntimeSource", shell, StringComparison.Ordinal);
     }
 
 
@@ -171,5 +239,20 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("VerifyChecksumAssetAsync", verifier, StringComparison.Ordinal);
         Assert.Contains("ExtractSha256", verifier, StringComparison.Ordinal);
         Assert.Contains("ComputeSha256", verifier, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LocalControlApiDelegatesSettingsMutationAndValidation()
+    {
+        var api = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Control", "LocalControlApi.cs"));
+        var mutations = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Control", "ControlAppSettingsMutationService.cs"));
+
+        Assert.Contains("_settingsMutations.Patch", api, StringComparison.Ordinal);
+        Assert.Contains("_settingsMutations.RotateModelApiKey", api, StringComparison.Ordinal);
+        Assert.DoesNotContain("private void ValidateAppSettings", api, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static AppSettings NormalizeAppSettings", api, StringComparison.Ordinal);
+        Assert.Contains("ControlJsonPatch.Apply", mutations, StringComparison.Ordinal);
+        Assert.Contains("RequireApiKeyAuth = true", mutations, StringComparison.Ordinal);
+        Assert.Contains("Gateway port", mutations, StringComparison.Ordinal);
     }
 }

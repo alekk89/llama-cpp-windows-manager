@@ -35,10 +35,28 @@ public sealed partial class ReleaseHardeningTests
     {
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
 
-        Assert.Contains("<Version>2.1.0</Version>", project, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>2.1.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>2.1.0.0</FileVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>v2.1.0</InformationalVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<Version>2.2.0</Version>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>2.2.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>2.2.0.0</FileVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>v2.2.0</InformationalVersion>", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThirdPartyNoticesMatchDeclaredDatabaseDependencies()
+    {
+        var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
+        var notices = File.ReadAllText(FindRepositoryFile("THIRD-PARTY-NOTICES.md"));
+        var apache = File.ReadAllText(FindRepositoryFile("licenses", "Apache-2.0.txt"));
+
+        Assert.Contains("Microsoft.Data.Sqlite\" Version=\"10.0.11\"", project, StringComparison.Ordinal);
+        Assert.Contains("SQLitePCLRaw.bundle_e_sqlite3\" Version=\"3.0.5\"", project, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.Data.Sqlite 10.0.11", notices, StringComparison.Ordinal);
+        Assert.Contains("SQLitePCLRaw.bundle_e_sqlite3", notices, StringComparison.Ordinal);
+        Assert.Contains("3.0.5", notices, StringComparison.Ordinal);
+        Assert.Contains("SQLite 3.53.4", notices, StringComparison.Ordinal);
+        Assert.Contains("licenses/Apache-2.0.txt", notices, StringComparison.Ordinal);
+        Assert.Contains("TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION", apache, StringComparison.Ordinal);
+        Assert.Contains("END OF TERMS AND CONDITIONS", apache, StringComparison.Ordinal);
     }
 
 
@@ -109,6 +127,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("package --deprecated --include-transitive --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
         Assert.Contains(".\\publish-app.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("\"version\": \"10.0.400\"", globalJson, StringComparison.Ordinal);
+        Assert.Contains("\"runner\": \"Microsoft.Testing.Platform\"", globalJson, StringComparison.Ordinal);
         Assert.Contains("TreatWarningsAsErrors", File.ReadAllText(FindRepositoryFile("Directory.Build.props")), StringComparison.Ordinal);
         Assert.Contains("root = true", editorConfig, StringComparison.Ordinal);
         Assert.Contains("*.ps1 text eol=lf", gitAttributes, StringComparison.Ordinal);
@@ -142,9 +161,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("-RequireSigned", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("workflow_dispatch:", releaseWorkflow, StringComparison.Ordinal);
         Assert.DoesNotContain("tags:", releaseWorkflow, StringComparison.Ordinal);
-        Assert.Contains("actions/checkout@v7", releaseWorkflow, StringComparison.Ordinal);
-        Assert.Contains("actions/setup-dotnet@v6", releaseWorkflow, StringComparison.Ordinal);
-        Assert.Contains("actions/upload-artifact@v7", releaseWorkflow, StringComparison.Ordinal);
+        Assert.Matches(@"actions/checkout@[0-9a-f]{40}\s+# v7", releaseWorkflow);
+        Assert.Matches(@"actions/setup-dotnet@[0-9a-f]{40}\s+# v6", releaseWorkflow);
+        Assert.Matches(@"actions/upload-artifact@[0-9a-f]{40}\s+# v7", releaseWorkflow);
         Assert.Contains(".\\test-release-gate.ps1", development, StringComparison.Ordinal);
         Assert.Contains("-IncludePublish -IncludeInstaller", development, StringComparison.Ordinal);
     }
@@ -297,8 +316,8 @@ public sealed partial class ReleaseHardeningTests
     {
         var release = System.Text.Json.Nodes.JsonNode.Parse("""
         {
-          "tag_name": "v2.1.0",
-          "name": "v2.1.0",
+          "tag_name": "v2.2.0",
+          "name": "v2.2.0",
           "assets": [
             { "name": "LlamaCppWindowsManager-win-x64.zip", "browser_download_url": "https://example.invalid/app.zip", "size": 1234 },
             { "name": "LlamaCppWindowsManager-win-x64.zip.sha256", "browser_download_url": "https://example.invalid/app.zip.sha256", "size": 64 },
@@ -308,7 +327,7 @@ public sealed partial class ReleaseHardeningTests
         }
         """)!.AsObject();
 
-        var update = AppUpdateReleaseParser.ParseLatestRelease(release, "v2.0.0");
+        var update = AppUpdateReleaseParser.ParseLatestRelease(release, "v2.1.0");
 
         Assert.True(update.IsAvailable);
         Assert.Equal("LlamaCppWindowsManager.exe", update.AssetName);

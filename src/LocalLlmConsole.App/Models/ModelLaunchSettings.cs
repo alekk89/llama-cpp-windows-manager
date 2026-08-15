@@ -66,7 +66,10 @@ public sealed record ModelLaunchSettings(
     string CustomParameters = "",
     string GpuMode = AppSettings.DefaultGpuMode,
     string GpuDevices = "",
-    string GpuSplit = "")
+    string GpuSplit = "",
+    string ReasoningEffort = "default",
+    string ReasoningBudgetMessage = "",
+    string ReasoningPreserve = "auto")
 {
     public static ModelLaunchSettings FromAppSettings(AppSettings settings, string runtimeId = "") => new(
         settings.ContextSize,
@@ -126,7 +129,10 @@ public sealed record ModelLaunchSettings(
         settings.CustomParameters,
         settings.GpuMode,
         settings.GpuDevices,
-        settings.GpuSplit);
+        settings.GpuSplit,
+        settings.ReasoningEffort,
+        settings.ReasoningBudgetMessage,
+        settings.ReasoningPreserve);
 
     public AppSettings ApplyTo(AppSettings settings) => settings with
     {
@@ -136,6 +142,9 @@ public sealed record ModelLaunchSettings(
         ReasoningMode = ReasoningMode,
         ReasoningFormat = ReasoningFormat,
         ReasoningBudget = ReasoningBudget,
+        ReasoningEffort = ReasoningEffort ?? "default",
+        ReasoningBudgetMessage = ReasoningBudgetMessage ?? "",
+        ReasoningPreserve = ReasoningPreserve ?? "auto",
         VisionMode = VisionMode,
         VisionProjectorPath = VisionProjectorPath ?? "",
         FlashAttention = FlashAttention,

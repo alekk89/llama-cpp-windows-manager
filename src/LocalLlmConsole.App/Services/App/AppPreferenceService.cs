@@ -12,6 +12,10 @@ public static class AppPreferenceService
 
     public static string MinimizeBehavior(string text)
     {
+        if (LocalizedEquals(text, "Pref.TrayOnly")) return "trayOnly";
+        if (LocalizedEquals(text, "Pref.TrayAndTaskbar")) return "trayAndTaskbar";
+        if (LocalizedEquals(text, "Pref.TaskbarOnly")) return "taskbarOnly";
+
         var value = (text ?? "").Trim()
             .Replace("-", "", StringComparison.OrdinalIgnoreCase)
             .Replace("_", "", StringComparison.OrdinalIgnoreCase)
@@ -41,6 +45,11 @@ public static class AppPreferenceService
 
     public static string ModelAccessMode(string text)
     {
+        if (LocalizedEquals(text, "Pref.GatewayLanOnly")) return "gateway";
+        if (LocalizedEquals(text, "Pref.DirectModelsLanOnly")) return "models";
+        if (LocalizedEquals(text, "Pref.GatewayAndDirectLan")) return "both";
+        if (LocalizedEquals(text, "Pref.LocalOnly")) return "local";
+
         var value = (text ?? "").Trim()
             .Replace("-", "", StringComparison.OrdinalIgnoreCase)
             .Replace("_", "", StringComparison.OrdinalIgnoreCase)
@@ -87,6 +96,9 @@ public static class AppPreferenceService
 
     public static string GatewaySwapPolicy(string text)
     {
+        if (LocalizedEquals(text, "Pref.SingleActiveModel")) return "singleActive";
+        if (LocalizedEquals(text, "Pref.PreferKeepingLoaded")) return "keepLoaded";
+
         var value = (text ?? "").Trim()
             .Replace("-", "", StringComparison.OrdinalIgnoreCase)
             .Replace("_", "", StringComparison.OrdinalIgnoreCase)
@@ -108,6 +120,9 @@ public static class AppPreferenceService
 
     public static string CudaPackagePreference(string text)
     {
+        if (LocalizedEquals(text, "Pref.Compatibility")) return "compatibility";
+        if (LocalizedEquals(text, "Pref.Latest")) return "latest";
+
         var value = (text ?? "").Trim()
             .Replace("-", "", StringComparison.OrdinalIgnoreCase)
             .Replace("_", "", StringComparison.OrdinalIgnoreCase)
@@ -133,8 +148,33 @@ public static class AppPreferenceService
         Loc.T("Pref.No")
     ];
 
+    public static string ShowHideLabel(bool value) => value ? Loc.T("Pref.Show") : Loc.T("Pref.Hide");
+
+    public static IEnumerable<string> ShowHideOptions() =>
+    [
+        Loc.T("Pref.Show"),
+        Loc.T("Pref.Hide")
+    ];
+
+    public static bool ShowHideValue(string text, bool fallback)
+    {
+        if (LocalizedEquals(text, "Pref.Show")) return true;
+        if (LocalizedEquals(text, "Pref.Hide")) return false;
+
+        var value = (text ?? "").Trim().ToLowerInvariant();
+        return value switch
+        {
+            "show" or "shown" or "visible" => true,
+            "hide" or "hidden" => false,
+            _ => YesNoValue(text ?? "", fallback)
+        };
+    }
+
     public static bool YesNoValue(string text, bool fallback)
     {
+        if (LocalizedEquals(text, "Pref.Yes")) return true;
+        if (LocalizedEquals(text, "Pref.No")) return false;
+
         var value = (text ?? "").Trim().ToLowerInvariant();
         return value switch
         {
@@ -143,6 +183,9 @@ public static class AppPreferenceService
             _ => fallback
         };
     }
+
+    private static bool LocalizedEquals(string? value, string localizationKey)
+        => string.Equals((value ?? "").Trim(), Loc.T(localizationKey).Trim(), StringComparison.CurrentCultureIgnoreCase);
 
     public static string RuntimeHostForAccessMode(string accessMode)
         => DirectModelsAllowLanAccess(accessMode) ? "0.0.0.0" : "127.0.0.1";

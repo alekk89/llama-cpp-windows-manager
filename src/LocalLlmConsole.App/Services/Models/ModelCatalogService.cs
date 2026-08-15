@@ -214,7 +214,8 @@ public sealed partial class ModelCatalogService
         var name = Path.GetFileName(file);
         return name.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase)
             && !LooksLikeVisionProjectorName(name)
-            && !LooksLikeDraftOrMtpHeadName(name);
+            && !LooksLikeDraftOrMtpHeadName(name)
+            && !HasStandaloneSpeculativeArchitecture(file);
     }
 
     private static string? FindLegacyModelJson(string modelPath)

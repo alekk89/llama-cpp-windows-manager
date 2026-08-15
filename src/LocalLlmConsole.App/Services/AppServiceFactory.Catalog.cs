@@ -8,6 +8,9 @@ public sealed partial class AppServiceFactory
     public ModelCatalogService CreateModelCatalogService(StateStore stateStore)
         => new(stateStore);
 
+    public ModelGroupService CreateModelGroupService(StateStore stateStore)
+        => new(stateStore);
+
     public ModelCatalogRefreshApplicationService CreateModelCatalogRefreshApplicationService(
         StateStore stateStore,
         ModelCatalogService catalog)

@@ -23,20 +23,18 @@ public partial class MainWindow
         var page = SettingsPageFactory.Create(new SettingsPageRequest(
             _viewModel.Settings.Rows,
             _settings.ThemeMode,
-            _pageControllers.Settings.Build(),
-            ButtonToolTip));
+            _pageControllers.Settings.Build()));
         _settingsPage.Apply(
             page,
             _viewModel.Settings.Rows,
-            definitions.ToDictionary(definition => definition.Key, definition => definition.Value, StringComparer.OrdinalIgnoreCase),
-            _settings.ThemeMode);
+            ScheduleSettingsApply);
         PageHost.Content = page.Root;
     }
 
     private void PreviewSettingsTheme()
     {
         var mode = AppPreferenceService.ThemeMode(_settingsPage.SelectedThemeValue);
-        ApplyTheme(mode);
+        ApplicationThemeService.Apply(mode);
         SetStatus(Loc.T("Status.ThemePreviewApplied"));
     }
 
@@ -50,7 +48,7 @@ public partial class MainWindow
         => _coreServices.App.SettingsRowActions.CopySecret(row, SettingsSecretCopyActions());
 
     private SettingsRowActionApplicationActions SettingsRowActionActions()
-        => new(ClearCacheAsync, PickFolder, SetStatus);
+        => new(ClearCacheAsync, initial => _coreServices.App.FileSystemDialogs.PickFolder(initial), SetStatus);
 
     private SettingsSecretCopyApplicationActions SettingsSecretCopyActions()
         => new(_coreServices.App.Clipboard.SetText, SetStatus);

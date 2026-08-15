@@ -277,13 +277,30 @@ public sealed partial class ReleaseHardeningTests
             statuses.Add,
             (title, message) => infoMessages.Add($"{title}: {message}"));
 
+        var row = new RuntimeBuildPresetRow { CanCheck = true, CanDownload = false };
+        var initialCheck = await service.CheckUpdateAsync(preset, row, settings, sessionState, BoundedLogFile.MegabytesToBytes(1), Actions());
         var downloaded = await service.DownloadAsync(preset, settings, sessionState, BoundedLogFile.MegabytesToBytes(1), Actions());
         var blockedDownload = await service.DownloadAsync(preset, settings, sessionState, BoundedLogFile.MegabytesToBytes(1), Actions());
-        var row = new RuntimeBuildPresetRow { CanCheck = true, CanDownload = false };
         var checkedUpdate = await service.CheckUpdateAsync(preset, row, settings, sessionState, BoundedLogFile.MegabytesToBytes(1), Actions());
+        var missingPreset = new RuntimeBuildPreset("missing-app-source", "Missing App Source", "https://example.invalid/missing.git", "main", false, Mode: RuntimeMode.Native);
+        var missingSourceDir = RuntimeBuildCatalogService.SourceDir(settings.RuntimeRoot, missingPreset);
+        Directory.CreateDirectory(missingSourceDir);
+        await File.WriteAllTextAsync(
+            RuntimeBuildCatalogService.SourceMetadataPath(missingSourceDir),
+            System.Text.Json.JsonSerializer.Serialize(new RuntimeSourceEntry(
+                missingPreset.Id,
+                missingPreset.Label,
+                missingPreset.RepoUrl,
+                missingPreset.Branch,
+                missingPreset.Cuda,
+                "missing-source",
+                "unknown",
+                DateTimeOffset.UtcNow,
+                Mode: RuntimeMode.Native)),
+            TestContext.Current.CancellationToken);
         var unknownRow = new RuntimeBuildPresetRow { CanCheck = true, CanDownload = true };
         var unknown = await service.CheckUpdateAsync(
-            new RuntimeBuildPreset("missing-app-source", "Missing App Source", "https://example.invalid/missing.git", "main", false, Mode: RuntimeMode.Native),
+            missingPreset,
             unknownRow,
             settings,
             sessionState,
@@ -291,6 +308,7 @@ public sealed partial class ReleaseHardeningTests
             Actions());
         var jobsList = await store.ListJobsAsync();
 
+        Assert.Equal(RuntimeSourceApplicationOutcome.Applied, initialCheck);
         Assert.Equal(RuntimeSourceApplicationOutcome.Applied, downloaded);
         Assert.Equal(RuntimeSourceApplicationOutcome.Blocked, blockedDownload);
         Assert.Equal(RuntimeSourceApplicationOutcome.Applied, checkedUpdate);
@@ -301,21 +319,21 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("fedcba9876543210", state.RemoteCommit);
         Assert.Equal("Update available", row.LocalStatus);
         Assert.Contains("Update available", row.LatestLocal, StringComparison.Ordinal);
-        Assert.Equal("Download", row.DownloadAction);
-        Assert.True(row.CanDownload);
+        Assert.Equal("Downloaded", row.DownloadAction);
+        Assert.False(row.CanDownload);
         Assert.Equal("Version unknown", unknownRow.LocalStatus);
         Assert.False(unknownRow.CanDownload);
         Assert.Contains("Local runtime version is unknown", Assert.Single(statuses), StringComparison.Ordinal);
-        Assert.Contains("Download disabled", infoMessages[0], StringComparison.Ordinal);
+        Assert.Contains(infoMessages, message => message.Contains("Download disabled", StringComparison.Ordinal));
         Assert.Contains(infoMessages, message => message.Contains("Runtime update check", StringComparison.Ordinal));
-        Assert.Equal(["Downloading Custom App Source CPU...", "Checking Custom App Source CPU for updates..."], busyMessages);
-        Assert.Equal(2, jobsList.Count);
+        Assert.Equal(["Checking Custom App Source CPU for updates...", "Downloading Custom App Source CPU...", "Checking Custom App Source CPU for updates..."], busyMessages);
+        Assert.Equal(3, jobsList.Count);
         Assert.All(jobsList, job => Assert.Equal(JobStatus.Completed, job.Status));
         Assert.True(jobRefreshes >= 6);
-        Assert.Equal(3, runtimeRefreshes);
+        Assert.Equal(4, runtimeRefreshes);
         Assert.Equal(1, overviewRefreshes);
         Assert.True(gridRefreshes >= 4);
-        Assert.Equal(2, yields);
+        Assert.Equal(3, yields);
     }
 
 
@@ -610,7 +628,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("var buildJobApplication = RuntimeServices.RuntimeBuildJobApplication;", source, StringComparison.Ordinal);
         Assert.Contains("buildJobApplication.RetryAsync(job, RuntimeBuildJobApplicationActions())", source, StringComparison.Ordinal);
         Assert.Contains("retry => BuildManagedRuntimeAsync(retry.Preset!, retry.Update, retry.Source)", source, StringComparison.Ordinal);
-        Assert.Contains("buildApplication.BuildSourceAsync(source, _settings, MaxLogBytes(), RuntimeBuildApplicationActions())", source, StringComparison.Ordinal);
+        Assert.Contains("buildApplication.BuildSourceAsync(source, settings, MaxLogBytes(), RuntimeBuildApplicationActions())", source, StringComparison.Ordinal);
         Assert.Contains("var buildApplication = RuntimeServices.RuntimeBuildApplication;", source, StringComparison.Ordinal);
         Assert.Contains("RuntimeBuildApplicationActions()", source, StringComparison.Ordinal);
         Assert.Contains("var retry = _controls.PlanRetry(job)", jobApplicationSource, StringComparison.Ordinal);

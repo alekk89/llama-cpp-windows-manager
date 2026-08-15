@@ -1,10 +1,13 @@
 using System.Windows.Controls;
+using System.Windows;
 using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace LocalLlmConsole;
 
 public sealed class ModelsPageState
 {
+    private ModelsPageControls? _controls;
+
     public TextBlock? ModelsFolderText { get; private set; }
 
     public DataGrid? ModelsGrid { get; private set; }
@@ -48,12 +51,26 @@ public sealed class ModelsPageState
     {
         ArgumentNullException.ThrowIfNull(controls);
 
+        _controls = controls;
         ModelsFolderText = controls.ModelsFolderText;
         ModelsGrid = controls.ModelsGrid;
         ModelVariantsGrid = controls.ModelVariantsGrid;
         HuggingFaceQueryBox = controls.HuggingFaceQueryBox;
         HuggingFaceGrid = controls.HuggingFaceGrid;
         DownloadHistoryGrid = null;
+    }
+
+    public void ApplyUiPreferences(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (_controls is not { } controls) return;
+
+        var visible = settings.ShowModelsHuggingFace;
+        controls.HuggingFaceSection.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        controls.HuggingFaceSplitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        controls.Root.RowDefinitions[2].Height = visible ? new GridLength(8) : new GridLength(0);
+        controls.Root.RowDefinitions[3].MinHeight = visible ? 120 : 0;
+        controls.Root.RowDefinitions[3].Height = visible ? new GridLength(230) : new GridLength(0);
     }
 
     public void FocusModelsGrid()
@@ -101,9 +118,6 @@ public sealed class ModelsPageState
             ?? variantRows.FirstOrDefault(row => row.LaunchProfile?.IsDefault == true)
             ?? variantRows.FirstOrDefault();
     }
-
-    public void RefreshHuggingFaceGrid()
-        => HuggingFaceGrid?.Items.Refresh();
 
     public DataGrid? UseHuggingFaceSearchGrid()
     {

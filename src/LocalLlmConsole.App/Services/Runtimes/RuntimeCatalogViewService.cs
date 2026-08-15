@@ -28,7 +28,13 @@ public sealed class RuntimeCatalogViewService
         => new(
             BuildRuntimeRows(request.Runtimes, request.Sources, request.ModelsByRuntime, request.ActiveRuntimeIds),
             BuildPresetRows(request.BuildPresets, request.Runtimes, request.Sources, request.RuntimeUpdateStates),
-            BuildPackageRows(request.PackagePresets, request.Runtimes, request.RuntimePackageUpdateStates));
+            BuildPackageRows(
+                request.PackagePresets,
+                request.BuildPresets,
+                request.Runtimes,
+                request.Sources,
+                request.RuntimeUpdateStates,
+                request.RuntimePackageUpdateStates));
 
     public static IReadOnlyList<RuntimeCatalogRow> BuildRuntimeRows(
         IReadOnlyList<RuntimeRecord> runtimes,
@@ -55,6 +61,8 @@ public sealed class RuntimeCatalogViewService
                     : modelNames.Count == 0
                     ? "No saved model launch settings use this runtime."
                     : "Models using this runtime:" + Environment.NewLine + string.Join(Environment.NewLine, modelNames.Select(model => $"- {model}")),
+                Vendor = RuntimeInventoryFilterService.Vendor(runtime.Backend),
+                Platform = RuntimeInventoryFilterService.Platform(runtime.Mode),
                 CanBuild = false,
                 BuildToolTip = availability.IsAvailable
                     ? "This source has already been built."
@@ -75,6 +83,8 @@ public sealed class RuntimeCatalogViewService
                 State = "Downloaded",
                 Location = source.SourceDir,
                 Details = $"Downloaded source at {RuntimeMetadataService.ShortCommit(source.Commit)}. Build it before using it to launch models.",
+                Vendor = RuntimeInventoryFilterService.Vendor(RuntimeBuildCatalogService.BuildBackend(source)),
+                Platform = RuntimeInventoryFilterService.Platform(RuntimeBuildCatalogService.BuildMode(source)),
                 BuildAction = "Build",
                 BuildToolTip = "Build this downloaded llama.cpp source into a usable runtime.",
                 CanBuild = true,
@@ -89,11 +99,121 @@ public sealed class RuntimeCatalogViewService
 
     public IReadOnlyList<RuntimePackagePresetRow> BuildPackageRows(
         IReadOnlyList<RuntimePackagePreset> presets,
+        IReadOnlyList<RuntimeBuildPreset> buildPresets,
         IReadOnlyList<RuntimeRecord> runtimes,
+        IReadOnlyList<RuntimeSourceEntry> sources,
+        IReadOnlyDictionary<string, RuntimeUpdateState> runtimeUpdateStates,
         IReadOnlyDictionary<string, RuntimePackageUpdateState> updateStates)
-        => presets
-            .Select(preset => _packageStatus.CreateRow(preset, _packageStatus.BuildInventory(preset, runtimes, updateStates)))
-            .ToList();
+    {
+        var rows = new List<RuntimePackagePresetRow>();
+        var buildPresetsById = buildPresets.ToDictionary(preset => preset.Id, StringComparer.OrdinalIgnoreCase);
+        var attachedBuildPresetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var preset in presets)
+        {
+            var row = _packageStatus.CreateRow(preset, _packageStatus.BuildInventory(preset, runtimes, updateStates));
+            row.DeleteKind = row.CanDelete ? RuntimeDownloadDeleteKind.Package : RuntimeDownloadDeleteKind.None;
+            row.Vendor = RuntimeInventoryFilterService.Vendor(preset.Backend);
+            row.Platform = RuntimeInventoryFilterService.Platform(preset.Mode);
+            if (buildPresetsById.TryGetValue(preset.SourcePresetId, out var sourcePreset))
+            {
+                attachedBuildPresetIds.Add(sourcePreset.Id);
+                ApplySourceAction(row, sourcePreset, runtimes, sources, runtimeUpdateStates);
+            }
+            rows.Add(row);
+        }
+
+        foreach (var sourcePreset in buildPresets.Where(preset => !attachedBuildPresetIds.Contains(preset.Id)))
+            rows.Add(CreateSourceOnlyRow(sourcePreset, runtimes, sources, runtimeUpdateStates));
+
+        rows.Add(new RuntimePackagePresetRow
+        {
+            Label = "Add custom source repository",
+            LocalStatus = "Custom",
+            BuildSourceAction = "Add",
+            BuildSourceToolTip = "Add a custom llama.cpp Git repository preset.",
+            CanBuildSource = true,
+            Vendor = RuntimeInventoryFilterService.All,
+            Platform = RuntimeInventoryFilterService.All,
+            SourceActionKind = RuntimeSourceRowActionKind.Add
+        });
+        return rows;
+    }
+
+    private static RuntimePackagePresetRow CreateSourceOnlyRow(
+        RuntimeBuildPreset preset,
+        IReadOnlyList<RuntimeRecord> runtimes,
+        IReadOnlyList<RuntimeSourceEntry> sources,
+        IReadOnlyDictionary<string, RuntimeUpdateState> updateStates)
+    {
+        var local = RuntimeCatalogDataService.BuildPresetLocalState(preset, runtimes, sources, updateStates);
+        var row = new RuntimePackagePresetRow
+        {
+            Label = preset.Label,
+            Backend = RuntimeBuildCatalogService.BackendLabel(preset),
+            LocalStatus = RuntimeBuildCatalogService.LocalStatusLabel(local.DownloadedSources, local.InstalledRuntimes, local.CommitUnavailable),
+            LatestRelease = RuntimeBuildCatalogService.LatestLocalCommitLabel(local.DownloadedSources, local.InstalledRuntimes),
+            Assets = preset.RepoUrl,
+            InstallAction = "Unavailable",
+            InstallToolTip = "This repository provides source builds only.",
+            CanInstall = false,
+            CheckAction = "",
+            CanCheck = false,
+            DeleteAction = preset.Custom && local.LocalCount == 0 ? "Remove" : "Delete All",
+            DeleteToolTip = preset.Custom && local.LocalCount == 0
+                ? "Remove this custom repository preset."
+                : "Delete local sources and built runtimes for this preset.",
+            CanDelete = preset.Custom || local.LocalCount > 0,
+            DeleteKind = RuntimeDownloadDeleteKind.Source,
+            Vendor = RuntimeInventoryFilterService.Vendor(RuntimeBuildCatalogService.BuildBackend(preset)),
+            Platform = RuntimeInventoryFilterService.Platform(RuntimeBuildCatalogService.BuildMode(preset)),
+            SourcePreset = preset
+        };
+        ApplySourceAction(row, preset, runtimes, sources, updateStates);
+        return row;
+    }
+
+    private static void ApplySourceAction(
+        RuntimePackagePresetRow row,
+        RuntimeBuildPreset preset,
+        IReadOnlyList<RuntimeRecord> runtimes,
+        IReadOnlyList<RuntimeSourceEntry> sources,
+        IReadOnlyDictionary<string, RuntimeUpdateState> updateStates)
+    {
+        var local = RuntimeCatalogDataService.BuildPresetLocalState(preset, runtimes, sources, updateStates);
+        row.SourcePreset = preset;
+        row.DownloadedSource = local.DownloadedSources.FirstOrDefault();
+        row.CanBuildSource = true;
+        if (local.LocalCount > 0)
+        {
+            row.DeleteKind = RuntimeDownloadDeleteKind.Source;
+            row.CanDelete = true;
+            row.DeleteAction = "Delete Source";
+            row.DeleteToolTip = "Delete the downloaded source and source-built runtimes for this row. Prebuilt installs are kept.";
+        }
+        if (row.DownloadedSource is not null)
+        {
+            row.SourceActionKind = RuntimeSourceRowActionKind.Build;
+            row.BuildSourceAction = "Build";
+            row.BuildSourceToolTip = "Build the downloaded source. The source folder is deleted automatically after a successful build.";
+            return;
+        }
+
+        if (local.CanDownload)
+        {
+            row.SourceActionKind = RuntimeSourceRowActionKind.Download;
+            row.BuildSourceAction = "Download";
+            row.BuildSourceToolTip = "Download the source revision found by the most recent check.";
+            return;
+        }
+
+        row.SourceActionKind = RuntimeSourceRowActionKind.Check;
+        row.BuildSourceAction = "Check";
+        row.BuildSourceToolTip = local.CommitUnavailable
+            ? "The local commit is unavailable. Delete the local source/build before checking again."
+            : "Check the source repository before downloading or updating it.";
+        row.CanBuildSource = !local.CommitUnavailable;
+    }
 
     public static IReadOnlyList<RuntimeBuildPresetRow> BuildPresetRows(
         IReadOnlyList<RuntimeBuildPreset> presets,

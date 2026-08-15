@@ -73,6 +73,9 @@ public sealed partial class AppServiceFactory
     public RuntimeEndpointProbeService CreateRuntimeEndpointProbeService(HttpClient client)
         => new(client);
 
+    public EndpointInspectionService CreateEndpointInspectionService(HttpClient client)
+        => new(client);
+
     public RuntimeMetricPollerService CreateRuntimeMetricPollerService(HttpClient client)
         => new(client);
 

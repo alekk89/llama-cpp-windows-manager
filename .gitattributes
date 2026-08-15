@@ -5,6 +5,7 @@
 *.xaml text eol=lf
 *.sln text eol=lf
 *.ps1 text eol=lf
+*.py text eol=lf
 *.iss text eol=lf
 .gitattributes text eol=lf
 .gitignore text eol=lf

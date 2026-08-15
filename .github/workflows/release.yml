@@ -15,12 +15,23 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
+
+      - name: Install pinned Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Pinned Inno Setup installation failed with exit code $LASTEXITCODE." }
+          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) { $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw "Inno Setup compiler was not found." }
+          "path=$compiler" >> $env:GITHUB_OUTPUT
 
       - name: Import code-signing certificate
         id: signing
@@ -46,16 +57,6 @@ jobs:
             if (Test-Path -LiteralPath $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force }
           }
 
-      - name: Install Inno Setup
-        id: inno
-        shell: pwsh
-        run: |
-          choco install innosetup --yes --no-progress
-          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
-          if (-not $compiler) { $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
-          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw "Inno Setup compiler was not found." }
-          "path=$compiler" >> $env:GITHUB_OUTPUT
-
       - name: Run signed release gate
         shell: pwsh
         run: >-
@@ -65,7 +66,7 @@ jobs:
           -RequireSigned
 
       - name: Upload signed release artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: LlamaCppWindowsManager-win-x64-signed-release
           if-no-files-found: error
@@ -77,6 +78,9 @@ jobs:
             dist/LlamaCppWindowsManager-win-x64/AGENTS.md
             dist/LlamaCppWindowsManager-win-x64/agent.md
             dist/LlamaCppWindowsManager-win-x64/docs/CONTROL_API.md
+            dist/LlamaCppWindowsManager-win-x64/LICENSE
+            dist/LlamaCppWindowsManager-win-x64/THIRD-PARTY-NOTICES.md
+            dist/LlamaCppWindowsManager-win-x64/licenses/**
             dist/LlamaCppWindowsManager-win-x64.zip
             dist/LlamaCppWindowsManager-win-x64.zip.sha256
             dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe

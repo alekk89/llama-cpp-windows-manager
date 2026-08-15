@@ -27,7 +27,7 @@ public partial class MainWindow
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RunAsync(Loc.T("Status.Refreshing"), RefreshAllAsync);
-    private void OpenWorkspace_Click(object sender, RoutedEventArgs e) => OpenFolder(_workspaceRoot);
+    private void OpenWorkspace_Click(object sender, RoutedEventArgs e) => _coreServices.App.ShellIntegration.OpenFolder(_workspaceRoot);
     private void ShowOverview_Click(object sender, RoutedEventArgs e) => ShowOverview();
     private void ShowModels_Click(object sender, RoutedEventArgs e) => ShowModels();
     private void ShowRuntimes_Click(object sender, RoutedEventArgs e) => ShowRuntimes();

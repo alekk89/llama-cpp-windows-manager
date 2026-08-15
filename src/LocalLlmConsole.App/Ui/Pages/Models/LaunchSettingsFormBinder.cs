@@ -31,6 +31,7 @@ public sealed class LaunchSettingsFormControls
     public WpfTextBox? MicroBatchSizeBox => Text(nameof(AppSettings.MicroBatchSize));
     public WpfTextBox? ThreadsBox => Text(nameof(AppSettings.Threads));
     public WpfTextBox? ReasoningBudgetBox => Text(nameof(AppSettings.ReasoningBudget));
+    public WpfTextBox? ReasoningBudgetMessageBox => Text(nameof(AppSettings.ReasoningBudgetMessage));
     public WpfTextBox? VisionProjectorPathBox => Text(nameof(AppSettings.VisionProjectorPath));
     public WpfButton? VisionProjectorButton => Button(nameof(AppSettings.VisionProjectorPath));
     public WpfTextBox? VisionImageMinTokensBox => Text(nameof(AppSettings.VisionImageMinTokens));
@@ -63,6 +64,8 @@ public sealed class LaunchSettingsFormControls
     public WpfComboBox? GpuModeCombo => Combo(nameof(AppSettings.GpuMode));
     public WpfComboBox? ReasoningCombo => Combo(nameof(AppSettings.ReasoningMode));
     public WpfComboBox? ReasoningFormatCombo => Combo(nameof(AppSettings.ReasoningFormat));
+    public WpfComboBox? ReasoningEffortCombo => Combo(nameof(AppSettings.ReasoningEffort));
+    public WpfComboBox? ReasoningPreserveCombo => Combo(nameof(AppSettings.ReasoningPreserve));
     public WpfComboBox? VisionCombo => Combo(nameof(AppSettings.VisionMode));
     public WpfComboBox? FlashAttentionCombo => Combo(nameof(AppSettings.FlashAttention));
     public WpfComboBox? CacheTypeKCombo => Combo(nameof(AppSettings.CacheTypeK));
@@ -90,7 +93,7 @@ public sealed class LaunchSettingsFormControls
     public IEnumerable<WpfTextBox?> TextBoxes =>
     [
         LaunchPortBox, ContextSizeBox, GpuLayersBox, GpuDevicesBox, GpuSplitBox, ParallelSlotsBox, BatchSizeBox, MicroBatchSizeBox,
-        ThreadsBox, ReasoningBudgetBox, VisionProjectorPathBox, VisionImageMinTokensBox, VisionImageMaxTokensBox,
+        ThreadsBox, ReasoningBudgetBox, ReasoningBudgetMessageBox, VisionProjectorPathBox, VisionImageMinTokensBox, VisionImageMaxTokensBox,
         TemperatureBox, TopKBox, TopPBox, MinPBox, MaxTokensBox, SeedBox, RepeatLastNBox,
         RepeatPenaltyBox, PresencePenaltyBox, FrequencyPenaltyBox, RopeScaleBox, RopeFreqBaseBox,
         RopeFreqScaleBox, SpecDraftModelPathBox, MtpHeadPathBox, SpecDraftGpuLayersBox, SpecDraftMinTokensBox,
@@ -100,7 +103,7 @@ public sealed class LaunchSettingsFormControls
 
     public IEnumerable<WpfComboBox?> ComboBoxes =>
     [
-        MetricsCombo, GpuModeCombo, ReasoningCombo, ReasoningFormatCombo, VisionCombo, FlashAttentionCombo,
+        MetricsCombo, GpuModeCombo, ReasoningCombo, ReasoningFormatCombo, ReasoningEffortCombo, ReasoningPreserveCombo, VisionCombo, FlashAttentionCombo,
         CacheTypeKCombo, CacheTypeVCombo, KvOffloadCombo, KvUnifiedCombo, PromptCacheCombo,
         ContextCheckpointsCombo, ContinuousBatchingCombo, JinjaCombo, MmapCombo, MlockCombo, RopeScalingCombo, SpeculativeTypeCombo,
         SpecDraftCacheTypeKCombo, SpecDraftCacheTypeVCombo
@@ -125,7 +128,10 @@ public static class LaunchSettingsFormBinder
             Threads = ReadInt(controls.ThreadsBox, "Threads", min: 0),
             ReasoningMode = ComboValue(controls.ReasoningCombo),
             ReasoningFormat = ComboValue(controls.ReasoningFormatCombo),
+            ReasoningEffort = ComboValue(controls.ReasoningEffortCombo),
             ReasoningBudget = ReadInt(controls.ReasoningBudgetBox, "Reasoning budget", min: -1),
+            ReasoningBudgetMessage = controls.ReasoningBudgetMessageBox?.Text.Trim() ?? "",
+            ReasoningPreserve = ComboValue(controls.ReasoningPreserveCombo),
             VisionMode = ComboValue(controls.VisionCombo),
             VisionProjectorPath = controls.VisionProjectorPathBox?.Text.Trim() ?? "",
             VisionImageMinTokens = ReadInt(controls.VisionImageMinTokensBox, "Image min tokens", min: 0),
@@ -190,6 +196,7 @@ public static class LaunchSettingsFormBinder
         SetText(controls.MicroBatchSizeBox, settings.MicroBatchSize);
         SetText(controls.ThreadsBox, settings.Threads);
         SetText(controls.ReasoningBudgetBox, settings.ReasoningBudget);
+        SetText(controls.ReasoningBudgetMessageBox, settings.ReasoningBudgetMessage);
         SetText(controls.VisionProjectorPathBox, settings.VisionProjectorPath);
         SetText(controls.VisionImageMinTokensBox, settings.VisionImageMinTokens);
         SetText(controls.VisionImageMaxTokensBox, settings.VisionImageMaxTokens);
@@ -219,6 +226,8 @@ public static class LaunchSettingsFormBinder
         SetCombo(controls.GpuModeCombo, LocalLlmConsole.Services.LaunchSettingMetadataService.NormalizeGpuMode(settings.GpuMode));
         SetCombo(controls.ReasoningCombo, settings.ReasoningMode);
         SetCombo(controls.ReasoningFormatCombo, settings.ReasoningFormat);
+        SetCombo(controls.ReasoningEffortCombo, settings.ReasoningEffort);
+        SetCombo(controls.ReasoningPreserveCombo, settings.ReasoningPreserve);
         SetCombo(controls.VisionCombo, settings.VisionMode);
         SetCombo(controls.FlashAttentionCombo, settings.FlashAttention);
         SetCombo(controls.CacheTypeKCombo, settings.CacheTypeK);

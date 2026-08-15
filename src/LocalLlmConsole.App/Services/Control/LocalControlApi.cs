@@ -11,13 +11,16 @@ public sealed class LocalControlApi
     };
 
     private readonly LocalControlDependencies _deps;
+    private readonly ModelGroupService _modelGroups;
     private readonly ControlRequestAdmissionService _admission;
+    private readonly ControlAppSettingsMutationService _settingsMutations = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _modelOperationGates = new(StringComparer.OrdinalIgnoreCase);
 
     public LocalControlApi(LocalControlDependencies dependencies)
     {
         _deps = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
         ArgumentNullException.ThrowIfNull(dependencies.Actions);
+        _modelGroups = dependencies.ModelGroups ?? new ModelGroupService(dependencies.StateStore);
         _admission = new ControlRequestAdmissionService(dependencies);
     }
 
@@ -109,8 +112,10 @@ public sealed class LocalControlApi
             "capabilities" when method == "GET" => Ok(Capabilities()),
             "self" when method == "GET" => await IdentifySelfAsync(request, cancellationToken),
             "models" => await ModelsAsync(method, segments, request, cancellationToken),
+            "model-groups" => await ModelGroupsAsync(method, segments, request, cancellationToken),
             "runtimes" => await RuntimesAsync(method, segments, request, cancellationToken),
             "sessions" => await SessionsAsync(method, segments, request, cancellationToken),
+            "gateway" => await GatewayAsync(method, segments, cancellationToken),
             "settings" => await SettingsAsync(method, segments, request, cancellationToken),
             "logs" => await LogsAsync(method, segments, request, cancellationToken),
             "metrics" when method == "GET" => await AllMetricsAsync(cancellationToken),
@@ -145,12 +150,12 @@ public sealed class LocalControlApi
             apiVersion = "v1",
             features = new[]
             {
-                "self-identification", "model-catalog", "model-scan", "model-import", "model-delete",
-                "model-load", "model-restart", "model-unload", "session-status", "live-metrics",
+                "self-identification", "model-catalog", "model-scan", "model-import", "model-delete", "launch-profile-groups",
+                "model-load", "model-restart", "model-unload", "session-status", "endpoint-inspection", "live-metrics",
                 "runtime-and-app-logs", "profile-crud", "one-shot-setting-overrides", "vision-heads",
                 "draft-and-mtp-heads", "app-settings", "runtime-scan", "runtime-register",
-                "huggingface-search", "huggingface-download", "download-pause-resume-cancel", "jobs"
-                , "runtime-packages-and-builds", "windows-and-wsl-management", "maintenance",
+                "huggingface-search", "huggingface-download", "download-pause-resume-cancel", "jobs",
+                "runtime-packages-and-builds", "windows-and-wsl-management", "maintenance",
                 "lifetime-metrics", "gateway-control", "app-updates-and-lifecycle", "dry-run-operations"
             },
             routes = new[]
@@ -161,16 +166,28 @@ public sealed class LocalControlApi
                 "POST /api/v1/models/{model}/restart", "POST /api/v1/models/{model}/unload",
                 "DELETE /api/v1/models/{model}?confirm=true", "GET /api/v1/models/{model}/profiles",
                 "POST /api/v1/models/{model}/profiles", "PUT /api/v1/models/{model}/profiles/{profile}",
-                "DELETE /api/v1/models/{model}/profiles/{profile}", "GET|PATCH /api/v1/settings",
+                "DELETE /api/v1/models/{model}/profiles/{profile}",
+                "GET|PUT|DELETE /api/v1/models/{model}/profiles/{profile}/group",
+                "GET|POST /api/v1/model-groups", "GET|PATCH|DELETE /api/v1/model-groups/{group}",
+                "GET|PATCH /api/v1/settings",
                 "POST /api/v1/settings/model-api-key/rotate",
                 "GET /api/v1/runtimes", "POST /api/v1/runtimes/scan", "POST /api/v1/runtimes/register",
                 "GET /api/v1/sessions", "GET /api/v1/sessions/{session}/logs",
-                "GET /api/v1/sessions/{session}/metrics", "GET /api/v1/logs", "GET /api/v1/logs/{file}",
+                "GET /api/v1/sessions/{session}/metrics", "GET /api/v1/sessions/{session}/inspect",
+                "GET /api/v1/gateway/inspect",
+                "GET /api/v1/logs", "GET /api/v1/logs/{file}",
                 "GET /api/v1/metrics", "GET /api/v1/jobs", "POST /api/v1/jobs/{job}/pause|resume|cancel",
                 "GET /api/v1/huggingface/search?q=...", "POST /api/v1/huggingface/download",
                 "GET /api/v1/operations", "POST /api/v1/operations/{operation}"
             },
             operations = ControlOperationCatalog.All,
+            modelGroups = new
+            {
+                retentionModes = new[] { "Inherit", "Pinned", "IdleTimeout" },
+                evictionPriorities = new[] { "Low", "Normal", "High" },
+                idleMinutes = new { minimum = ModelGroupService.MinimumIdleMinutes, maximum = ModelGroupService.MaximumIdleMinutes },
+                priorityMeaning = "Automatic idle eviction order only; active inference request scheduling is unchanged."
+            },
             modelLaunchSettings = SettingsSchema<ModelLaunchSettings>(),
             appSettings = SettingsSchema<AppSettings>(),
             selfIdentificationHints = new[] { "sessionId", "model", "endpoint", "port", "processId" }
@@ -209,12 +226,15 @@ public sealed class LocalControlApi
         {
             var models = await _deps.StateStore.ListModelsAsync();
             var profiles = await _deps.StateStore.ListNamedModelLaunchProfilesAsync();
+            var groups = await _modelGroups.SnapshotAsync();
             return Ok(new
             {
                 ok = true,
                 models = models.Select(model => ModelView(
                     model,
-                    profiles.Where(profile => profile.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase)).ToArray())).ToArray()
+                    profiles.Where(profile => profile.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase)).ToArray(),
+                    groups,
+                    _deps.Actions.GetSettings().AutoUnloadIdleMinutes)).ToArray()
             });
         }
 
@@ -233,14 +253,73 @@ public sealed class LocalControlApi
             var importedModel = await _deps.ModelCatalog.ImportFolderAsync(folder);
             await _deps.LaunchProfiles.EnsureDefaultAsync(importedModel, _deps.Actions.GetSettings());
             await _deps.Actions.RefreshAsync(cancellationToken);
-            return Ok(new { ok = true, model = ModelView(importedModel, await _deps.LaunchProfiles.ListNamedAsync(importedModel)) });
+            return Ok(new
+            {
+                ok = true,
+                model = ModelView(
+                    importedModel,
+                    await _deps.LaunchProfiles.ListNamedAsync(importedModel),
+                    await _modelGroups.SnapshotAsync(),
+                    _deps.Actions.GetSettings().AutoUnloadIdleMinutes)
+            });
         }
 
         if (segments.Length < 4) return Error(404, "Not found.");
         var model = await ResolveModelAsync(segments[3]);
 
         if (segments.Length == 4 && method == "GET")
-            return Ok(new { ok = true, model = ModelView(model, await _deps.LaunchProfiles.ListNamedAsync(model)) });
+        {
+            var groups = await _modelGroups.SnapshotAsync();
+            return Ok(new
+            {
+                ok = true,
+                model = ModelView(
+                    model,
+                    await _deps.LaunchProfiles.ListNamedAsync(model),
+                    groups,
+                    _deps.Actions.GetSettings().AutoUnloadIdleMinutes)
+            });
+        }
+
+        if (segments.Length == 5 && segments[4].Equals("group", StringComparison.OrdinalIgnoreCase))
+        {
+            var defaultProfile = (await _deps.LaunchProfiles.ListNamedAsync(model)).FirstOrDefault(profile => profile.IsDefault)
+                ?? throw new InvalidOperationException($"{model.Name} does not have a default launch profile.");
+            if (method == "GET")
+            {
+                var snapshot = await _modelGroups.SnapshotAsync();
+                return Ok(new
+                {
+                    ok = true,
+                    model = model.Id,
+                    profile = defaultProfile.Id,
+                    group = ModelGroupDetails(snapshot.GroupForProfile(defaultProfile.Id)),
+                    effectivePolicy = ModelGroupPolicyView(ModelGroupService.EffectivePolicy(snapshot, defaultProfile.Id, _deps.Actions.GetSettings().AutoUnloadIdleMinutes)),
+                    compatibilityRoute = true
+                });
+            }
+            if (method == "PUT")
+            {
+                var groupIdentifier = RequiredString(request.Body, "group");
+                var assignment = await _modelGroups.AssignAsync(defaultProfile.Id, groupIdentifier);
+                await _deps.Actions.RefreshAsync(cancellationToken);
+                var snapshot = await _modelGroups.SnapshotAsync();
+                return Ok(new
+                {
+                    ok = true,
+                    assignment,
+                    group = ModelGroupDetails(snapshot.GroupForProfile(defaultProfile.Id)),
+                    effectivePolicy = ModelGroupPolicyView(ModelGroupService.EffectivePolicy(snapshot, defaultProfile.Id, _deps.Actions.GetSettings().AutoUnloadIdleMinutes)),
+                    compatibilityRoute = true
+                });
+            }
+            if (method == "DELETE")
+            {
+                await _modelGroups.UnassignAsync(defaultProfile.Id);
+                await _deps.Actions.RefreshAsync(cancellationToken);
+                return Ok(new { ok = true, model = model.Id, profile = defaultProfile.Id, group = (object?)null, inherited = true, compatibilityRoute = true });
+            }
+        }
 
         if (segments.Length == 4 && method == "DELETE")
         {
@@ -260,7 +339,15 @@ public sealed class LocalControlApi
                 model = model.Id,
                 visionProjectors = ModelCatalogService.FindVisionProjectors(model.ModelPath),
                 draftAndMtpHeads = ModelCatalogService.FindDraftModels(model.ModelPath),
-                embeddedVisionToken = VisionProjectorSelection.EmbeddedToken
+                mtpHeads = ModelCatalogService.FindDraftModels(model.ModelPath, "draft-mtp"),
+                dflashHeads = ModelCatalogService.FindDraftModels(model.ModelPath, "draft-dflash"),
+                dsparkHeads = ModelCatalogService.FindDraftModels(model.ModelPath, "draft-dspark"),
+                eagle3Heads = ModelCatalogService.FindDraftModels(model.ModelPath, "draft-eagle3"),
+                simpleDraftModels = ModelCatalogService.FindDraftModels(model.ModelPath, "draft-simple"),
+                embeddedDraftMtp = ModelCatalogService.HasEmbeddedDraftMtp(model.ModelPath),
+                embeddedVisionToken = VisionProjectorSelection.EmbeddedToken,
+                autoDiscoveryScope = "model-folder-only",
+                draftMtpAutoPrecedence = "embedded-main-gguf-then-matching-mtp-sidecar"
             });
 
         if (segments.Length == 5 && segments[4].Equals("load", StringComparison.OrdinalIgnoreCase) && method == "POST")
@@ -281,6 +368,60 @@ public sealed class LocalControlApi
         return Error(404, "Not found.");
     }
 
+    private async Task<LocalControlApiResponse> ModelGroupsAsync(
+        string method,
+        string[] segments,
+        LocalControlRequest request,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await _modelGroups.SnapshotAsync();
+        if (segments.Length == 3 && method == "GET")
+            return Ok(new
+            {
+                ok = true,
+                groups = snapshot.Groups.Select(group => ModelGroupView(group, snapshot)).ToArray()
+            });
+
+        if (segments.Length == 3 && method == "POST")
+        {
+            var body = Body<LocalControlModelGroupWriteRequest>(request.Body);
+            var group = await _modelGroups.CreateAsync(
+                body.Name,
+                EnumRequest<ModelGroupRetentionMode>(body.RetentionMode, "retentionMode"),
+                body.IdleMinutes,
+                EnumRequest<ModelGroupEvictionPriority>(body.EvictionPriority, "evictionPriority"));
+            await _deps.Actions.RefreshAsync(cancellationToken);
+            return new LocalControlApiResponse(201, new { ok = true, group = ModelGroupView(group, await _modelGroups.SnapshotAsync()) });
+        }
+
+        if (segments.Length != 4) return Error(404, "Not found.");
+        var existing = ModelGroupService.Resolve(snapshot, segments[3]);
+        if (method == "GET")
+            return Ok(new { ok = true, group = ModelGroupView(existing, snapshot) });
+        if (method is "PATCH" or "PUT")
+        {
+            var body = request.Body ?? new JsonObject();
+            var name = body["name"]?.ToString() ?? existing.Name;
+            var retentionMode = body["retentionMode"] is null
+                ? existing.RetentionMode
+                : EnumRequest<ModelGroupRetentionMode>(body["retentionMode"]!.ToString(), "retentionMode");
+            var idleMinutes = body["idleMinutes"]?.GetValue<int>() ?? existing.IdleMinutes;
+            var priority = body["evictionPriority"] is null
+                ? existing.EvictionPriority
+                : EnumRequest<ModelGroupEvictionPriority>(body["evictionPriority"]!.ToString(), "evictionPriority");
+            var updated = await _modelGroups.UpdateAsync(existing.Id, name, retentionMode, idleMinutes, priority);
+            await _deps.Actions.RefreshAsync(cancellationToken);
+            return Ok(new { ok = true, group = ModelGroupView(updated, await _modelGroups.SnapshotAsync()) });
+        }
+        if (method == "DELETE")
+        {
+            await _modelGroups.DeleteAsync(existing.Id);
+            await _deps.Actions.RefreshAsync(cancellationToken);
+            return Ok(new { ok = true, deleted = existing.Id });
+        }
+        return Error(404, "Not found.");
+    }
+
     private async Task<LocalControlApiResponse> ProfilesAsync(
         string method,
         string[] segments,
@@ -289,7 +430,16 @@ public sealed class LocalControlApi
         CancellationToken cancellationToken)
     {
         if (segments.Length == 5 && method == "GET")
-            return Ok(new { ok = true, model = model.Id, profiles = await _deps.LaunchProfiles.ListNamedAsync(model) });
+        {
+            var snapshot = await _modelGroups.SnapshotAsync();
+            var profiles = await _deps.LaunchProfiles.ListNamedAsync(model);
+            return Ok(new
+            {
+                ok = true,
+                model = model.Id,
+                profiles = profiles.Select(profile => ProfileView(profile, snapshot, _deps.Actions.GetSettings().AutoUnloadIdleMinutes)).ToArray()
+            });
+        }
 
         if (segments.Length == 5 && method == "POST")
         {
@@ -308,7 +458,42 @@ public sealed class LocalControlApi
                 write.IsDefault);
             await SaveProfileAsync(model, profile);
             await _deps.Actions.RefreshAsync(cancellationToken);
-            return new LocalControlApiResponse(201, new { ok = true, profile });
+            return new LocalControlApiResponse(201, new
+            {
+                ok = true,
+                profile = ProfileView(
+                    profile,
+                    await _modelGroups.SnapshotAsync(),
+                    _deps.Actions.GetSettings().AutoUnloadIdleMinutes)
+            });
+        }
+
+        if (segments.Length == 7 && segments[6].Equals("group", StringComparison.OrdinalIgnoreCase))
+        {
+            var profiles = await _deps.LaunchProfiles.ListNamedAsync(model);
+            var profile = profiles.FirstOrDefault(candidate =>
+                              candidate.Id.Equals(segments[5], StringComparison.OrdinalIgnoreCase)
+                              || candidate.Name.Equals(segments[5], StringComparison.OrdinalIgnoreCase))
+                          ?? throw new KeyNotFoundException($"Launch profile '{segments[5]}' was not found for {model.Name}.");
+            if (method == "GET")
+            {
+                var snapshot = await _modelGroups.SnapshotAsync();
+                return Ok(new { ok = true, model = model.Id, profile = ProfileView(profile, snapshot, _deps.Actions.GetSettings().AutoUnloadIdleMinutes) });
+            }
+            if (method == "PUT")
+            {
+                var groupIdentifier = RequiredString(request.Body, "group");
+                await _modelGroups.AssignAsync(profile.Id, groupIdentifier);
+                await _deps.Actions.RefreshAsync(cancellationToken);
+                var snapshot = await _modelGroups.SnapshotAsync();
+                return Ok(new { ok = true, model = model.Id, profile = ProfileView(profile, snapshot, _deps.Actions.GetSettings().AutoUnloadIdleMinutes) });
+            }
+            if (method == "DELETE")
+            {
+                await _modelGroups.UnassignAsync(profile.Id);
+                await _deps.Actions.RefreshAsync(cancellationToken);
+                return Ok(new { ok = true, model = model.Id, profile = profile.Id, group = (object?)null, inherited = true });
+            }
         }
 
         if (segments.Length == 6 && method == "PUT")
@@ -327,7 +512,8 @@ public sealed class LocalControlApi
             };
             await SaveProfileAsync(model, updated);
             await _deps.Actions.RefreshAsync(cancellationToken);
-            return Ok(new { ok = true, profile = updated });
+            var snapshot = await _modelGroups.SnapshotAsync();
+            return Ok(new { ok = true, profile = ProfileView(updated, snapshot, _deps.Actions.GetSettings().AutoUnloadIdleMinutes) });
         }
 
         if (segments.Length == 6 && method == "DELETE")
@@ -490,7 +676,35 @@ public sealed class LocalControlApi
             return SessionLogs(session, IntQuery(request.Query, "tail", 16000, 1000, 250000));
         if (segments.Length == 5 && segments[4].Equals("metrics", StringComparison.OrdinalIgnoreCase))
             return await MetricsAsync([session], cancellationToken);
+        if (segments.Length == 5 && segments[4].Equals("inspect", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_deps.EndpointInspection is null)
+                return Error(501, "Endpoint inspection is not available in this Manager build.");
+            var report = await _deps.EndpointInspection.InspectDirectAsync(session, cancellationToken);
+            return Ok(new { ok = true, report });
+        }
         return Error(404, "Not found.");
+    }
+
+    private async Task<LocalControlApiResponse> GatewayAsync(
+        string method,
+        string[] segments,
+        CancellationToken cancellationToken)
+    {
+        if (method != "GET"
+            || segments.Length != 4
+            || !segments[3].Equals("inspect", StringComparison.OrdinalIgnoreCase))
+            return Error(404, "Not found.");
+        if (_deps.EndpointInspection is null)
+            return Error(501, "Endpoint inspection is not available in this Manager build.");
+
+        var settings = _deps.Actions.GetSettings();
+        var report = await _deps.EndpointInspection.InspectGatewayAsync(
+            settings,
+            AppPreferenceService.GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy),
+            AppPreferenceService.ModelAccessModeLabel(settings.ModelAccessMode),
+            cancellationToken);
+        return Ok(new { ok = true, report });
     }
 
     private async Task<LocalControlApiResponse> SettingsAsync(
@@ -504,13 +718,7 @@ public sealed class LocalControlApi
             && segments[4].Equals("rotate", StringComparison.OrdinalIgnoreCase)
             && method == "POST")
         {
-            var key = ApiSecurity.GenerateHexToken(32);
-            var rotated = _deps.Actions.GetSettings() with
-            {
-                RequireApiKeyAuth = true,
-                ModelApiKey = key,
-                ModelApiKeyBackup = key
-            };
+            var rotated = _settingsMutations.RotateModelApiKey(_deps.Actions.GetSettings());
             await _deps.Actions.ApplySettingsAsync(rotated, cancellationToken);
             return Ok(new { ok = true, modelApiKey = "[rotated]", requireApiKeyAuth = true });
         }
@@ -520,14 +728,7 @@ public sealed class LocalControlApi
         if (method is not ("PATCH" or "PUT")) return Error(404, "Not found.");
 
         var current = _deps.Actions.GetSettings();
-        var updated = ControlJsonPatch.Apply(
-            current,
-            request.Body,
-            nameof(AppSettings.WorkspaceRoot),
-            nameof(AppSettings.ModelApiKey),
-            nameof(AppSettings.ModelApiKeyBackup));
-        updated = NormalizeAppSettings(current, updated);
-        ValidateAppSettings(updated);
+        var updated = _settingsMutations.Patch(current, request.Body, _deps.Sessions.Snapshots());
         updated = await _deps.Actions.ApplySettingsAsync(updated, cancellationToken);
         return Ok(new { ok = true, settings = ControlJsonPatch.RedactedAppSettings(updated) });
     }
@@ -783,7 +984,11 @@ public sealed class LocalControlApi
         }
     }
 
-    private static object ModelView(ModelRecord model, IReadOnlyList<NamedModelLaunchProfile> profiles)
+    private static object ModelView(
+        ModelRecord model,
+        IReadOnlyList<NamedModelLaunchProfile> profiles,
+        ModelGroupSnapshot? groupSnapshot = null,
+        int globalIdleMinutes = 0)
         => new
         {
             model.Id,
@@ -792,7 +997,66 @@ public sealed class LocalControlApi
             ownership = model.Ownership.ToString(),
             metadata = ParseJson(model.MetadataJson),
             model.UpdatedAt,
-            profiles
+            profiles = profiles.Select(profile => ProfileView(profile, groupSnapshot, globalIdleMinutes)).ToArray()
+        };
+
+    private static object ProfileView(
+        NamedModelLaunchProfile profile,
+        ModelGroupSnapshot? snapshot = null,
+        int globalIdleMinutes = 0)
+        => new
+        {
+            profile.Id,
+            profile.ModelId,
+            profile.Name,
+            profile.Settings,
+            profile.UpdatedAt,
+            profile.IsDefault,
+            group = ModelGroupDetails(snapshot?.GroupForProfile(profile.Id)),
+            effectivePolicy = snapshot is null
+                ? null
+                : ModelGroupPolicyView(ModelGroupService.EffectivePolicy(snapshot, profile.Id, globalIdleMinutes))
+        };
+
+    private static object ModelGroupView(ModelGroupRecord group, ModelGroupSnapshot snapshot)
+    {
+        var profileIds = snapshot.Assignments.Values
+            .Where(assignment => assignment.GroupId.Equals(group.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(assignment => assignment.LaunchProfileId)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return new
+        {
+            group.Id,
+            group.Name,
+            retentionMode = group.RetentionMode.ToString(),
+            group.IdleMinutes,
+            evictionPriority = group.EvictionPriority.ToString(),
+            group.UpdatedAt,
+            profileCount = profileIds.Length,
+            profileIds
+        };
+    }
+
+    private static object? ModelGroupDetails(ModelGroupRecord? group)
+        => group is null ? null : new
+        {
+            group.Id,
+            group.Name,
+            retentionMode = group.RetentionMode.ToString(),
+            group.IdleMinutes,
+            evictionPriority = group.EvictionPriority.ToString(),
+            group.UpdatedAt
+        };
+
+    private static object ModelGroupPolicyView(EffectiveModelRetentionPolicy policy)
+        => new
+        {
+            policy.AllowsIdleUnload,
+            policy.IdleMinutes,
+            evictionPriority = policy.EvictionPriority.ToString(),
+            policy.GroupId,
+            policy.GroupName
         };
 
     private static object SessionView(LoadedModelSessionSnapshot session)
@@ -856,6 +1120,18 @@ public sealed class LocalControlApi
         return value;
     }
 
+    private static TEnum EnumRequest<TEnum>(string value, string field)
+        where TEnum : struct, Enum
+    {
+        var normalized = (value ?? "").Replace("-", "", StringComparison.Ordinal).Replace("_", "", StringComparison.Ordinal).Trim();
+        foreach (var name in Enum.GetNames<TEnum>())
+        {
+            if (name.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+                return Enum.Parse<TEnum>(name);
+        }
+        throw new InvalidOperationException($"'{field}' must be one of: {string.Join(", ", Enum.GetNames<TEnum>())}.");
+    }
+
     private static bool BoolQuery(IReadOnlyDictionary<string, string> query, string name)
         => query.TryGetValue(name, out var value) && bool.TryParse(value, out var parsed) && parsed;
 
@@ -867,47 +1143,6 @@ public sealed class LocalControlApi
         value = 0;
         return query.TryGetValue(name, out var text)
             && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
-    }
-
-    private void ValidateAppSettings(AppSettings settings)
-    {
-        if (settings.AutoLoadGatewayPort is < 1 or > 65535) throw new InvalidOperationException("Gateway port must be between 1 and 65535.");
-        if (settings.Port is < 1 or > 65535) throw new InvalidOperationException("Default model port must be between 1 and 65535.");
-        if (settings.RequireApiKeyAuth && !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKey))
-            throw new InvalidOperationException("The existing model API key is missing or invalid. Rotate it in the app before enabling API-key authentication.");
-        if (string.IsNullOrWhiteSpace(settings.ModelsRoot) || string.IsNullOrWhiteSpace(settings.RuntimeRoot) || string.IsNullOrWhiteSpace(settings.CacheRoot))
-            throw new InvalidOperationException("Models, runtime, and cache roots are required.");
-        if (settings.AutoLoadGatewayEnabled && _deps.Sessions.Snapshots().Any(session =>
-                session.IsRunning && session.LaunchSettings.Port == settings.AutoLoadGatewayPort))
-            throw new InvalidOperationException($"Gateway port {settings.AutoLoadGatewayPort} is already used by a running model.");
-        if (settings.MaxLogFileSizeMb is < 1 or > 4096)
-            throw new InvalidOperationException("Maximum log file size must be between 1 and 4096 MiB.");
-        if (settings.AutoUnloadIdleMinutes is < 0 or > 10080)
-            throw new InvalidOperationException("Auto-unload idle minutes must be between 0 and 10080.");
-    }
-
-    private static AppSettings NormalizeAppSettings(AppSettings current, AppSettings updated)
-    {
-        var accessMode = AppPreferenceService.ModelAccessMode(updated.ModelAccessMode);
-        var normalized = updated with
-        {
-            WorkspaceRoot = current.WorkspaceRoot,
-            ThemeMode = AppPreferenceService.ThemeMode(updated.ThemeMode),
-            MinimizeBehavior = AppPreferenceService.MinimizeBehavior(updated.MinimizeBehavior),
-            ModelAccessMode = accessMode,
-            Host = AppPreferenceService.RuntimeHostForAccessMode(accessMode),
-            AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(updated.AutoLoadGatewayPolicy),
-            CudaPackagePreference = AppPreferenceService.CudaPackagePreference(updated.CudaPackagePreference),
-            UiCulture = string.IsNullOrWhiteSpace(updated.UiCulture) ? current.UiCulture : updated.UiCulture.Trim()
-        };
-        if (!normalized.RequireApiKeyAuth)
-        {
-            var backup = string.IsNullOrWhiteSpace(current.ModelApiKey)
-                ? current.ModelApiKeyBackup
-                : current.ModelApiKey;
-            normalized = normalized with { ModelApiKey = "", ModelApiKeyBackup = backup };
-        }
-        return normalized;
     }
 
     private static LocalControlApiResponse Ok(object body) => new(200, body);

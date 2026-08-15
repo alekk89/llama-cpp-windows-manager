@@ -127,9 +127,12 @@ public static partial class LaunchSettingsPanelFactory
     {
         private readonly Dictionary<Grid, List<string>> _sectionLabelsByGrid = new();
 
-        public void AddLaunchSetting(Grid grid, string label, FrameworkElement control)
+        public void AddLaunchSetting(Grid grid, string label, FrameworkElement control, string? tooltip = null)
         {
-            control.ToolTip = TooltipText(LaunchSettingMetadataService.Tooltip(label));
+            var tooltipText = TooltipText(string.IsNullOrWhiteSpace(tooltip)
+                ? LaunchSettingMetadataService.Tooltip(label)
+                : tooltip);
+            control.ToolTip = tooltipText;
             var index = grid.Children.Count / 2;
             var row = index / 2;
             var rightSide = index % 2 == 1;
@@ -140,7 +143,8 @@ public static partial class LaunchSettingsPanelFactory
                 Foreground = (WpfBrush)WpfApplication.Current.Resources["TextSoft"],
                 FontSize = 11.5,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 7, 1)
+                Margin = new Thickness(0, 0, 7, 1),
+                ToolTip = tooltipText
             };
             Grid.SetRow(labelText, row);
             Grid.SetColumn(labelText, rightSide ? 3 : 0);
@@ -163,9 +167,9 @@ public static partial class LaunchSettingsPanelFactory
             labels.Add(label);
         }
 
-        public void AddAdvancedLaunchSetting(Grid grid, string label, FrameworkElement control)
+        public void AddAdvancedLaunchSetting(Grid grid, string label, FrameworkElement control, string? tooltip = null)
         {
-            AddLaunchSetting(grid, label, control);
+            AddLaunchSetting(grid, label, control, tooltip);
             advancedLaunchSettingLabels.Add(label);
             if (launchSettingElements.TryGetValue(label, out var elements))
                 advancedLaunchSections.AddRange(elements);

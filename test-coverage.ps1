@@ -32,7 +32,15 @@ New-Item -ItemType Directory -Path $ResultsRoot -Force | Out-Null
 $testIndex = 0
 foreach ($TestProject in $TestProjects) {
   $testIndex++
-  & $Dotnet test $TestProject -c $Configuration --collect:"XPlat Code Coverage" --logger:"trx;LogFileName=tests-$testIndex.trx" --results-directory $ResultsRoot
+  & $Dotnet test --project $TestProject -c $Configuration `
+    --results-directory $ResultsRoot `
+    --minimum-expected-tests 1 `
+    --fail-skips on `
+    --coverage `
+    --coverage-output "coverage-$testIndex.cobertura.xml" `
+    --coverage-output-format cobertura `
+    --report-xunit-trx `
+    --report-xunit-trx-filename "tests-$testIndex.trx"
   if ($LASTEXITCODE -ne 0) { throw "Coverage test run failed for $TestProject." }
 }
 
@@ -47,8 +55,7 @@ foreach ($Trx in $TrxFiles) {
 if ($Skipped -ne 0) { throw "Skipped or not-executed tests are not allowed: $Skipped" }
 
 $CoverageFiles = @(
-  Get-ChildItem -LiteralPath $ResultsRoot -Recurse -Filter coverage.cobertura.xml -File |
-    Where-Object { $_.Directory.Parent.FullName -eq $ResultsRoot }
+  Get-ChildItem -LiteralPath $ResultsRoot -Filter coverage-*.cobertura.xml -File
 )
 if ($CoverageFiles.Count -ne $TestProjects.Count) { throw "The coverage test run did not produce one coverage report per test project." }
 

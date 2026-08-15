@@ -14,6 +14,26 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
+    private async Task RunRuntimeSourceRowActionAsync(RuntimePackagePresetRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        switch (row.SourceActionKind)
+        {
+            case RuntimeSourceRowActionKind.Add:
+                await AddCustomRuntimeRepositoryAsync();
+                break;
+            case RuntimeSourceRowActionKind.Check when row.SourcePreset is not null:
+                await CheckRuntimePresetUpdateAsync(row.SourcePreset, null);
+                break;
+            case RuntimeSourceRowActionKind.Download when row.SourcePreset is not null:
+                await DownloadRuntimeSourceAsync(row.SourcePreset);
+                break;
+            case RuntimeSourceRowActionKind.Build when row.DownloadedSource is not null:
+                await BuildRuntimeSourceAsync(row.DownloadedSource, deleteSourceAfterBuild: true);
+                break;
+        }
+    }
+
     private async Task DownloadRuntimeSourceAsync(RuntimeBuildPreset preset)
     {
         var sourceApplication = RuntimeServices.RuntimeSourceApplication;
@@ -46,7 +66,7 @@ public partial class MainWindow
             RefreshRuntimesAsync,
             RefreshOverviewAsync,
             () => Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background).Task,
-            _runtimesPage.RefreshRuntimeBuildGrid,
+            _runtimesPage.RefreshRuntimeDownloadsGrid,
             SetStatus,
             (title, message) => _coreServices.App.Dialogs.Notify(this, message, title, MessageBoxImage.Information));
 }

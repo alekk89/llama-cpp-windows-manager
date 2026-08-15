@@ -22,9 +22,8 @@ public partial class MainWindow
     private void CancelLaunchSettingsRefresh()
     {
         _coreServices.Ui.LaunchSettingsRefresh.Cancel();
-        _runtimeLaunchOptionDiscoveryCancellation?.Cancel();
-        _runtimeLaunchOptionDiscoveryCancellation?.Dispose();
-        _runtimeLaunchOptionDiscoveryCancellation = null;
+        _coreServices.Ui.LaunchSettingsInputRefresh.Cancel();
+        CancelRuntimeLaunchOptionDiscovery();
     }
 
     private async Task RenderSelectedModelLaunchSettingsAsync(CancellationToken cancellationToken = default)
@@ -224,14 +223,24 @@ public partial class MainWindow
             if (!_coreServices.Ui.LaunchSettingsEditor.IsProgrammaticUpdate)
             {
                 UpdateContextSizeSuggestion();
-                UpdateLaunchControlVisibility();
-                UpdateLaunchSaveButtonState();
-                UpdateRuntimeCommandPreview();
+                ScheduleLaunchSettingsInputRefresh();
             }
         }
 
         LaunchSettingsFormBinder.AttachChangeHandlers(_launchSettingsPanel.FormControls, Changed, (_, _) => NormalizeContextSizeBox());
     }
+
+    private void ScheduleLaunchSettingsInputRefresh()
+        => _coreServices.Ui.LaunchSettingsInputRefresh.Schedule(
+            cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                UpdateLaunchControlVisibility();
+                UpdateLaunchSaveButtonState();
+                UpdateRuntimeCommandPreview();
+                return Task.CompletedTask;
+            },
+            action => RunBackground(action, "Launch settings input refresh failed"));
 
     private void UpdateLaunchSaveButtonState()
     {

@@ -43,11 +43,11 @@ public partial class MainWindow
 
     private void PopulateWindowsPage(WindowsToolSnapshot tools)
     {
-        SetMetricText(_windowsPage.StatusMetric, WindowsEnvironmentService.Status(tools));
-        SetMetricText(_windowsPage.CpuMetric, tools.CpuToolsInstalled ? "Ready" : "Incomplete");
-        SetMetricText(_windowsPage.CudaMetric, tools.CudaToolsInstalled ? "Ready" : "Incomplete");
-        SetMetricText(_windowsPage.VulkanMetric, tools.VulkanToolsInstalled ? "Ready" : "Incomplete");
-        SetMetricText(_windowsPage.SyclMetric, tools.SyclToolsInstalled ? "Ready" : "Incomplete");
+        MetricCardFactory.SetMetricText(_windowsPage.StatusMetric, WindowsEnvironmentService.Status(tools));
+        MetricCardFactory.SetMetricText(_windowsPage.CpuMetric, tools.CpuToolsInstalled ? "Ready" : "Incomplete");
+        MetricCardFactory.SetMetricText(_windowsPage.CudaMetric, tools.CudaToolsInstalled ? "Ready" : "Incomplete");
+        MetricCardFactory.SetMetricText(_windowsPage.VulkanMetric, tools.VulkanToolsInstalled ? "Ready" : "Incomplete");
+        MetricCardFactory.SetMetricText(_windowsPage.SyclMetric, tools.SyclToolsInstalled ? "Ready" : "Incomplete");
 
         if (_windowsPage.InstallCpuToolsButton is not null)
             _windowsPage.InstallCpuToolsButton.Content = WindowsEnvironmentService.CpuToolsActionLabel(tools);
@@ -59,7 +59,6 @@ public partial class MainWindow
             _windowsPage.InstallSyclToolsButton.Content = WindowsEnvironmentService.SyclToolsActionLabel(tools);
 
         _viewModel.Windows.ReplaceToolRows(tools);
-        _windowsPage.ToolsGrid?.Items.Refresh();
     }
 
     private async Task InstallWindowsCpuToolsAsync()

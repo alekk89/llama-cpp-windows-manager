@@ -83,7 +83,10 @@ public sealed record RuntimeLaunchRequest
     public string ContinuousBatching { get; init; } = "on";
     public string ReasoningMode { get; init; } = "auto";
     public string ReasoningFormat { get; init; } = "auto";
+    public string ReasoningEffort { get; init; } = "default";
     public int ReasoningBudget { get; init; } = -1;
+    public string ReasoningBudgetMessage { get; init; } = "";
+    public string ReasoningPreserve { get; init; } = "auto";
     public string JinjaMode { get; init; } = "auto";
     public string VisionMode { get; init; } = "auto";
     public string? VisionProjectorPath { get; init; }

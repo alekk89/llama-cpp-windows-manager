@@ -15,17 +15,10 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private void ShowHelp()
-        => ShowHelpSection(_coreServices.App.HelpSections.ActiveSection);
-
-    private void ShowHelpSection(string sectionKey)
     {
-        var definition = _coreServices.App.HelpSections.Select(sectionKey);
         SetPage("Help", Loc.T("Help.Summary"));
-
-        var page = HelpPageFactory.Create(new HelpPageRequest(
-            definition,
-            _coreServices.App.HelpSections.Sections,
-            new HelpPageActions(ShowHelpSection, NavigateFromHelp)));
+        var controller = new HelpPageController(_coreServices.App.HelpCatalog, NavigateFromHelp);
+        var page = controller.Create();
         PageHost.Content = page.Content;
     }
 
@@ -84,9 +77,6 @@ public partial class MainWindow
                 break;
             case HelpNavigationFocusTarget.ModelsGrid:
                 _modelsPage.FocusModelsGrid();
-                break;
-            case HelpNavigationFocusTarget.RuntimeJobsGrid:
-                _runtimesPage.FocusRuntimeJobsGrid();
                 break;
             case HelpNavigationFocusTarget.HuggingFaceQueryBox:
                 _modelsPage.FocusHuggingFaceQueryBox();

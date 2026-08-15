@@ -74,6 +74,110 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Fact]
+    public void DraftMtpUsesEmbeddedNextNAndRejectsDifferentModelHelpers()
+    {
+        var root = CreateTempRoot();
+        var models = Path.Combine(root, "models");
+        var modelFolder = Path.Combine(models, "qwen3.8-27b");
+        Directory.CreateDirectory(modelFolder);
+        var main = Path.Combine(modelFolder, "Qwen3.8-27B-Q8_0.gguf");
+        using (var stream = File.Create(main))
+        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: false))
+        {
+            writer.Write(System.Text.Encoding.ASCII.GetBytes("GGUF"));
+            writer.Write((uint)3);
+            writer.Write((ulong)0);
+            writer.Write((ulong)2);
+            WriteGgufString(writer, "general.architecture");
+            writer.Write((uint)8);
+            WriteGgufString(writer, "qwen35");
+            WriteGgufString(writer, "qwen35.nextn_predict_layers");
+            writer.Write((uint)4);
+            writer.Write((uint)1);
+        }
+
+        var unrelated = Path.Combine(models, "Qwen3.6-27B-DSpark.gguf");
+        var compatible = Path.Combine(modelFolder, "Qwen3.8-27B-DFlash.gguf");
+        File.WriteAllText(unrelated, "unrelated");
+        File.WriteAllText(compatible, "compatible");
+
+        Assert.True(ModelCatalogService.HasEmbeddedDraftMtp(main));
+        Assert.DoesNotContain(unrelated, ModelCatalogService.FindDraftModels(main), StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(compatible, ModelCatalogService.FindDraftModels(main), StringComparer.OrdinalIgnoreCase);
+        Assert.Null(ModelCatalogService.ResolveDraftModelPath(main, "", "draft-mtp"));
+        Assert.Equal(compatible, ModelCatalogService.ResolveDraftModelPath(main, compatible, "draft-mtp"));
+        Assert.Equal(compatible, ModelCatalogService.ResolveDraftModelPath(main, "", "draft-dflash"));
+    }
+
+    [Fact]
+    public void CompanionDiscoveryStaysInModelFolderAndMatchesRequestedSpeculativeType()
+    {
+        var root = CreateTempRoot();
+        var modelFolder = Path.Combine(root, "Qwen3.8-27B");
+        var childFolder = Path.Combine(modelFolder, "old");
+        Directory.CreateDirectory(childFolder);
+        var main = Path.Combine(modelFolder, "Qwen3.8-27B-Q4_K_M.gguf");
+        var mtp = Path.Combine(modelFolder, "mtp-Qwen3.8-27B-Q8_0.gguf");
+        var dflash = Path.Combine(modelFolder, "Qwen3.8-27B-DFlash.gguf");
+        var dspark = Path.Combine(modelFolder, "Qwen3.8-27B-DSpark.gguf");
+        var eagle = Path.Combine(modelFolder, "Qwen3.8-27B-EAGLE3.gguf");
+        var parentMtp = Path.Combine(root, "mtp-Qwen3.8-27B-parent.gguf");
+        var childProjector = Path.Combine(childFolder, "mmproj-Qwen3.8-27B-f16.gguf");
+        var localProjector = Path.Combine(modelFolder, "mmproj-Qwen3.8-27B-f16.gguf");
+        foreach (var path in new[] { main, mtp, dflash, dspark, eagle, parentMtp, childProjector, localProjector })
+            File.WriteAllText(path, path);
+
+        Assert.Equal(mtp, ModelCatalogService.ResolveDraftModelPath(main, "", "draft-mtp"));
+        Assert.Equal(dflash, ModelCatalogService.ResolveDraftModelPath(main, "", "draft-dflash"));
+        Assert.Equal(dspark, ModelCatalogService.ResolveDraftModelPath(main, "", "draft-dspark"));
+        Assert.Equal(eagle, ModelCatalogService.ResolveDraftModelPath(main, "", "draft-eagle3"));
+        Assert.Equal(mtp, ModelCatalogService.ResolveMtpHeadPath(main, "", "atomic-mtp"));
+        Assert.Equal(localProjector, ModelCatalogService.FindVisionProjector(main));
+        Assert.DoesNotContain(parentMtp, ModelCatalogService.FindDraftModels(main), StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain(childProjector, ModelCatalogService.FindVisionProjectors(main), StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CompanionDiscoveryUsesGgufArchitectureMetadataAndAllowsSmallerSimpleDrafts()
+    {
+        var root = CreateTempRoot();
+        Directory.CreateDirectory(root);
+        var gemma = Path.Combine(root, "Gemma-4-12B-it-Q4_K_M.gguf");
+        var gemmaAssistant = Path.Combine(root, "Gemma-4-12B-it-assistant-Q8_0.gguf");
+        var mistral = Path.Combine(root, "Mistral-Small-3.1-24B-Q4_K_M.gguf");
+        var mistralDraft = Path.Combine(root, "draft-Mistral-Small-3.1-7B-Q8_0.gguf");
+        File.WriteAllText(gemma, "main");
+        File.WriteAllText(mistral, "main");
+        File.WriteAllText(mistralDraft, "draft");
+        WriteMinimalGguf(gemmaAssistant, "gemma4-assistant", ("gemma4.nextn_predict_layers", 4u));
+
+        Assert.Equal(gemmaAssistant, ModelCatalogService.ResolveDraftModelPath(gemma, "", "draft-mtp"));
+        Assert.Equal(mistralDraft, ModelCatalogService.ResolveDraftModelPath(mistral, "", "draft-simple"));
+        Assert.Null(ModelCatalogService.ResolveDraftModelPath(mistral, "", "draft-mtp"));
+    }
+
+    [Fact]
+    public async Task ModelScanKeepsEmbeddedMtpMainAndSkipsStandaloneAssistantArchitecture()
+    {
+        var root = CreateTempRoot();
+        var models = Path.Combine(root, "models");
+        Directory.CreateDirectory(models);
+        var qwenMain = Path.Combine(models, "Qwen3.8-27B-Q4_K_M.gguf");
+        var gemmaAssistant = Path.Combine(models, "Gemma-4-12B-it-assistant-Q8_0.gguf");
+        WriteMinimalGguf(qwenMain, "qwen35", ("qwen35.nextn_predict_layers", 1u));
+        WriteMinimalGguf(gemmaAssistant, "gemma4-assistant", ("gemma4.nextn_predict_layers", 4u));
+        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
+        await store.InitializeAsync();
+        var catalog = new ModelCatalogService(store);
+
+        var registered = await catalog.ScanAsync(models);
+        var saved = await store.ListModelsAsync();
+
+        Assert.Equal(1, registered);
+        Assert.Equal(qwenMain, Assert.Single(saved).ModelPath);
+    }
+
+    [Fact]
     public async Task ModelCatalogTreatsVisionHeadCompanionsAsProjectorsNotMainModels()
     {
         var root = CreateTempRoot();
@@ -765,6 +869,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(appOwned.Id, model.Id);
         Assert.Equal(["app-owned-model"], readIds);
         Assert.Equal(8096, result.LaunchProfileFor(model)?.Port);
+        Assert.Equal(DisplayFormatService.Bytes(new FileInfo(modelPath).Length), result.ModelSizeLabels[model.Id]);
     }
 
 
@@ -865,6 +970,22 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(@"D:\models\mtp-gemma-4-31B-it.gguf", settings.MtpHeadPath);
     }
 
+    [Theory]
+    [InlineData("draft-dflash")]
+    [InlineData("draft-dspark")]
+    [InlineData("draft-eagle3")]
+    public void HuggingFaceSuggestedLaunchSettingsKeepCurrentDraftTypes(string speculativeType)
+    {
+        var defaults = AppSettings.CreateDefault(CreateTempRoot());
+        var settings = HuggingFaceLaunchSettingsSuggester.TryCreate(
+            defaults,
+            $"llama-server -m target.gguf --spec-type {speculativeType} --model-draft helper.gguf");
+
+        Assert.NotNull(settings);
+        Assert.Equal(speculativeType, settings.SpeculativeType);
+        Assert.Equal("helper.gguf", settings.SpecDraftModelPath);
+    }
+
 
     [Fact]
     public void HuggingFaceSuggestedLaunchSettingsApplyConfigJsonAndFallbackToCli()
@@ -950,6 +1071,25 @@ public sealed partial class ReleaseHardeningTests
         var metadata = GgufMetadataReader.TryRead(path);
 
         Assert.Empty(metadata);
+    }
+
+    private static void WriteMinimalGguf(string path, string architecture, params (string Key, uint Value)[] numericMetadata)
+    {
+        using var stream = File.Create(path);
+        using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: false);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("GGUF"));
+        writer.Write((uint)3);
+        writer.Write((ulong)0);
+        writer.Write((ulong)(1 + numericMetadata.Length));
+        WriteGgufString(writer, "general.architecture");
+        writer.Write((uint)8);
+        WriteGgufString(writer, architecture);
+        foreach (var (key, value) in numericMetadata)
+        {
+            WriteGgufString(writer, key);
+            writer.Write((uint)4);
+            writer.Write(value);
+        }
     }
 
 }

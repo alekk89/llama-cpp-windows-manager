@@ -3,7 +3,8 @@ namespace LocalLlmConsole.Services;
 public sealed record RuntimeIdleUnloadApplicationActions(
     Func<string, Task<ModelRecord?>> FindModelByIdAsync,
     Func<ModelRecord, Task> StopModelRuntimeAsync,
-    Action<string> SetStatus);
+    Action<string> SetStatus,
+    Func<string, int, EffectiveModelRetentionPolicy>? ResolveRetentionPolicy = null);
 
 public sealed class RuntimeTelemetryApplicationService
 {
@@ -67,7 +68,7 @@ public sealed class RuntimeTelemetryApplicationService
         foreach (var result in pollResults)
         {
             var generatedCounter = RuntimeDashboardService.GeneratedTokenCounter(result.Samples);
-            var promptCounter = RuntimeDashboardService.PromptTokenCounter(result.Samples);
+            var promptCounter = RuntimeDashboardService.PromptTokensProcessedCounter(result.Samples);
             var delta = _lifetimeCounters.Observe(
                 result.RuntimeKey,
                 result.Session.ModelId,
@@ -108,6 +109,28 @@ public sealed class RuntimeTelemetryApplicationService
         CancellationToken cancellationToken = default)
     {
         Validate(actions);
+        if (actions.ResolveRetentionPolicy is not null)
+        {
+            var policies = new Dictionary<string, EffectiveModelRetentionPolicy>(StringComparer.OrdinalIgnoreCase);
+            foreach (var result in pollResults)
+                policies[result.RuntimeKey] = actions.ResolveRetentionPolicy(result.Session.LaunchProfileId, idleMinutes);
+            return _idleUnloadPolicy.ApplyAsync(
+                pollResults,
+                result => policies[result.RuntimeKey],
+                now,
+                async (idle, _) =>
+                {
+                    var model = await actions.FindModelByIdAsync(idle.Session.ModelId);
+                    if (model is null) return;
+
+                    var policy = policies[idle.RuntimeKey];
+                    actions.SetStatus(AutoUnloadStatus(model, policy.IdleMinutes, policy.GroupName));
+                    await actions.StopModelRuntimeAsync(model);
+                },
+                maximumUnloads: 1,
+                cancellationToken);
+        }
+
         return ApplyIdleUnloadPoliciesAsync(
             pollResults,
             idleMinutes,
@@ -137,6 +160,11 @@ public sealed class RuntimeTelemetryApplicationService
         ArgumentNullException.ThrowIfNull(model);
         return $"Auto-unloading {model.Name} after {idleMinutes} idle minute{(idleMinutes == 1 ? "" : "s")}.";
     }
+
+    public static string AutoUnloadStatus(ModelRecord model, int idleMinutes, string groupName)
+        => string.IsNullOrWhiteSpace(groupName)
+            ? AutoUnloadStatus(model, idleMinutes)
+            : $"Auto-unloading {model.Name} from group {groupName} after {idleMinutes} idle minute{(idleMinutes == 1 ? "" : "s")}.";
 
     private static void Validate(RuntimeIdleUnloadApplicationActions actions)
     {

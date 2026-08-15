@@ -7,8 +7,8 @@ public static partial class RuntimeBuildCatalogService
         IReadOnlyList<RuntimeSourceEntry> downloaded,
         RuntimeUpdateState? checkedState)
     {
-        if (checkedState?.HasUpdate == true) return true;
-        return installed.Count == 0 && downloaded.Count == 0;
+        if (downloaded.Count > 0) return false;
+        return checkedState?.HasUpdate == true;
     }
 
     public static string DownloadButtonLabel(
@@ -16,10 +16,10 @@ public static partial class RuntimeBuildCatalogService
         IReadOnlyList<RuntimeRecord> installed,
         RuntimeUpdateState? checkedState)
     {
-        if (checkedState?.HasUpdate == true) return "Download";
         if (downloaded.Count > 0) return "Downloaded";
+        if (checkedState?.HasUpdate == true) return "Download";
         if (installed.Count > 0) return "Built";
-        return "Download";
+        return "Check first";
     }
 
     public static string LocalStatusLabel(

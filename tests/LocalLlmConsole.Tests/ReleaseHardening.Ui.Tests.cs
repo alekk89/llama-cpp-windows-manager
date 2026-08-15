@@ -1,13 +1,76 @@
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
+using LocalLlmConsole.Localization;
 using Microsoft.Data.Sqlite;
+using System.Text.Json.Nodes;
 
 namespace LocalLlmConsole.Tests;
 
 
 public sealed partial class ReleaseHardeningTests
 {
+    [Theory]
+    [InlineData(580, 6, 1)]
+    [InlineData(620, 6, 2)]
+    [InlineData(1024, 6, 2)]
+    [InlineData(1139, 6, 2)]
+    [InlineData(1140, 6, 3)]
+    [InlineData(1600, 2, 2)]
+    [InlineData(1600, 0, 1)]
+    public void OverviewMetricLayoutProtectsReadableCardWidths(double width, int visibleCards, int expectedColumns)
+        => Assert.Equal(expectedColumns, OverviewResponsiveLayout.MetricColumnCount(width, visibleCards));
+
+    [Fact]
+    public void InitialWindowSizingFitsHighDpiWorkAreasWithoutDroppingBelowRequestedMinimumWhenSpaceAllows()
+    {
+        var constrained = WindowWorkAreaSizingService.Fit(1200, 780, 900, 600, 0, 0, 1056, 672);
+
+        Assert.Equal(1024, constrained.Width);
+        Assert.Equal(640, constrained.Height);
+        Assert.Equal(900, constrained.MinimumWidth);
+        Assert.Equal(600, constrained.MinimumHeight);
+        Assert.Equal(16, constrained.Left);
+        Assert.Equal(16, constrained.Top);
+
+        var smaller = WindowWorkAreaSizingService.Fit(1200, 780, 900, 600, 0, 0, 820, 560);
+        Assert.Equal(788, smaller.Width);
+        Assert.Equal(528, smaller.Height);
+        Assert.Equal(788, smaller.MinimumWidth);
+        Assert.Equal(528, smaller.MinimumHeight);
+    }
+
+    [Fact]
+    public void UiRowReconciliationPreservesIdentityOrderAndBindingNotifications()
+    {
+        var first = new UiRow { C1 = "first", Data = new JsonObject { ["Id"] = "1" } };
+        var second = new UiRow { C1 = "second", Data = new JsonObject { ["Id"] = "2" } };
+        var rows = new System.Collections.ObjectModel.ObservableCollection<UiRow>([first, second]);
+        var changes = new List<string?>();
+        second.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+
+        var changed = UiRowCollectionUpdater.Reconcile(
+            rows,
+            [
+                new UiRow { C1 = "second updated", Data = new JsonObject { ["Id"] = "2" } },
+                new UiRow { C1 = "first", Data = new JsonObject { ["Id"] = "1" } }
+            ],
+            row => row.Data["Id"]?.ToString() ?? "");
+
+        Assert.True(changed);
+        Assert.Same(second, rows[0]);
+        Assert.Same(first, rows[1]);
+        Assert.Equal("second updated", rows[0].C1);
+        Assert.Contains(nameof(UiRow.C1), changes);
+        Assert.False(UiRowCollectionUpdater.Reconcile(
+            rows,
+            [
+                new UiRow { C1 = "second updated", Data = new JsonObject { ["Id"] = "2" } },
+                new UiRow { C1 = "first", Data = new JsonObject { ["Id"] = "1" } }
+            ],
+            row => row.Data["Id"]?.ToString() ?? ""));
+    }
+
     [Fact]
     public void CurrentActionIsPinnedBelowHelpInItsOwnSidebarRow()
     {
@@ -49,6 +112,23 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Fact]
+    public void CoreUiSurfacesExposeAutomationNamesHelpAndLiveStatus()
+    {
+        var xaml = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.xaml"));
+        var localization = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.Localization.cs"));
+        var accessibility = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "UiAccessibility.cs"));
+        var sections = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "PageSectionFactory.cs"));
+
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetName(LanguageCombo", localization, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetName(AppStatusText", localization, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetHelpText(button", accessibility, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.NameProperty", sections, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.HelpTextProperty", sections, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.SetHeadingLevel", sections, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MainWindowCancelsClosingSynchronouslyBeforeAsyncCleanup()
     {
         var source = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.xaml.cs"));
@@ -70,10 +150,10 @@ public sealed partial class ReleaseHardeningTests
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
         var iconPath = FindRepositoryFile("src", "LocalLlmConsole.App", "Assets", "AppIcon.ico");
 
-        Assert.Contains("Title=\"llama.cpp Windows Manager v2.1.0\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"v2.1.0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"llama.cpp Windows Manager v2.2.0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"v2.2.0\"", xaml, StringComparison.Ordinal);
 
-        Assert.Contains("AppVersionLabel = \"v2.1.0\"", source, StringComparison.Ordinal);
+        Assert.Contains("AppVersionLabel = \"v2.2.0\"", source, StringComparison.Ordinal);
         Assert.Contains("<AssemblyName>LlamaCppWindowsManager</AssemblyName>", project, StringComparison.Ordinal);
         Assert.Contains("<ApplicationIcon>Assets\\AppIcon.ico</ApplicationIcon>", project, StringComparison.Ordinal);
         Assert.True(new FileInfo(iconPath).Length > 1024);
@@ -140,7 +220,7 @@ public sealed partial class ReleaseHardeningTests
 
         Assert.False(coordinator.IsLoadedSessionSelectionChanging);
         Assert.Contains("_coreServices.Ui.SelectionReentrancy.TryBeginModelGridSelection()", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Ui.SelectionReentrancy.TryBeginLoadedSessionSelection()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_coreServices.Ui.SelectionReentrancy.TryBeginLoadedSessionSelection()", source, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Ui.SelectionReentrancy.SuppressLoadedSessionSelection()", source, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Ui.SelectionReentrancy.IsLoadedSessionSelectionChanging", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_selectingModelGridRow", source, StringComparison.Ordinal);
@@ -219,6 +299,7 @@ public sealed partial class ReleaseHardeningTests
     {
         var appXaml = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "App.xaml"));
         var source = ReadMainWindowSources();
+        var theme = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Infrastructure", "ApplicationThemeService.cs"));
         var metricFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "MetricCardFactory.cs"));
         var overviewFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewPageFactory.cs"));
 
@@ -235,6 +316,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("<Style TargetType=\"MenuItem\">", appXaml, StringComparison.Ordinal);
         Assert.Contains("Property=\"HasDropShadow\" Value=\"False\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("Property=\"Background\" Value=\"{DynamicResource PanelBackAlt}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("RefreshProgrammaticBrushReferences", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"AppBack\", \"#F3F5F8\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"SidebarBack\", \"#E9EDF2\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"PanelBorderStrong\", \"#B8C3D0\")", theme, StringComparison.Ordinal);
         Assert.Contains("ControlTemplate TargetType=\"ContextMenu\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("private static string TooltipText(string text) => text;", source, StringComparison.Ordinal);
         Assert.Contains("MetricImportantValuePattern", metricFactory, StringComparison.Ordinal);
@@ -251,7 +336,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("MetricLabelColumnWidth(label)", metricFactory, StringComparison.Ordinal);
         Assert.Contains("=> string.Equals(label, Loc.T(\"Overview.Metric.ModelStatus\"), StringComparison.Ordinal)", metricFactory, StringComparison.Ordinal);
         Assert.Contains("header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto })", metricFactory, StringComparison.Ordinal);
-        Assert.Contains("MetricCardFactory.SetMetricText(target, value, emphasizeLoadedStatus)", source, StringComparison.Ordinal);
+        Assert.Contains("MetricCardFactory.SetMetricText", source, StringComparison.Ordinal);
         Assert.Contains("gpu = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T(\"Overview.Metric.Hardware\"), 0, 1)", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("slots = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T(\"Overview.Metric.Slots\"), 0, 2)", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("tokens = MetricCardFactory.AddMetricGraph(runtimeDashboard, Loc.T(\"Overview.Metric.Tokens\"), 1, 0", overviewFactory, StringComparison.Ordinal);
@@ -281,19 +366,19 @@ public sealed partial class ReleaseHardeningTests
         Assert.DoesNotContain("text.StartsWith(\"Loading \", StringComparison.OrdinalIgnoreCase)", metricFactory, StringComparison.Ordinal);
         Assert.Contains("MetricValueFont", metricFactory, StringComparison.Ordinal);
         Assert.Contains("Typography.SetNumeralAlignment(valueRun, FontNumeralAlignment.Tabular)", metricFactory, StringComparison.Ordinal);
-        Assert.Contains("(\"AppBack\", \"#F7F7F5\")", source, StringComparison.Ordinal);
-        Assert.Contains("(\"PanelBack\", \"#FFFFFF\")", source, StringComparison.Ordinal);
-        Assert.Contains("(\"PanelBorder\", \"#E1E1DC\")", source, StringComparison.Ordinal);
-        Assert.Contains("(\"PanelBorderStrong\", \"#C7C7C0\")", source, StringComparison.Ordinal);
-        Assert.Contains("(\"GridRowAlt\", \"#F8F8F5\")", source, StringComparison.Ordinal);
-        Assert.Contains("(\"Accent\", \"#1F1F1D\")", source, StringComparison.Ordinal);
+        Assert.Contains("(\"AppBack\", \"#F3F5F8\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"PanelBack\", \"#FFFFFF\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"PanelBorder\", \"#D5DCE5\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"PanelBorderStrong\", \"#B8C3D0\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"GridRowAlt\", \"#F6F8FA\")", theme, StringComparison.Ordinal);
+        Assert.Contains("(\"Accent\", \"#263545\")", theme, StringComparison.Ordinal);
     }
 
     [Fact]
     public void DisabledPrimaryButtonsRemainReadableInBothThemes()
     {
         var appXaml = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "App.xaml"));
-        var themeSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.Theme.cs"));
+        var themeSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Infrastructure", "ApplicationThemeService.cs"));
         var sectionFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "PageSectionFactory.cs"));
         var updatesFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Updates", "UpdatesPageFactory.cs"));
         var windowsFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Environment", "WindowsPageFactory.cs"));
@@ -306,8 +391,8 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("x:Key=\"DisabledPrimaryForeground\" Color=\"#C7C7C1\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("Property=\"Foreground\" Value=\"{DynamicResource DisabledPrimaryForeground}\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("Property=\"Opacity\" Value=\"1\"", appXaml, StringComparison.Ordinal);
-        Assert.Contains("(\"DisabledPrimaryBack\", \"#E3E3DE\")", themeSource, StringComparison.Ordinal);
-        Assert.Contains("(\"DisabledPrimaryForeground\", \"#555550\")", themeSource, StringComparison.Ordinal);
+        Assert.Contains("(\"DisabledPrimaryBack\", \"#DCE2E8\")", themeSource, StringComparison.Ordinal);
+        Assert.Contains("(\"DisabledPrimaryForeground\", \"#526171\")", themeSource, StringComparison.Ordinal);
         Assert.Contains("ContentControl.ContentTemplateProperty", sectionFactory, StringComparison.Ordinal);
         Assert.Contains("TextBlock.ForegroundProperty", sectionFactory, StringComparison.Ordinal);
         Assert.Contains("RelativeSourceMode.FindAncestor, typeof(WpfButton), 1", sectionFactory, StringComparison.Ordinal);
@@ -341,7 +426,7 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void MetricCardFactoryKeepsMetricParsingRulesOutOfMainWindow()
     {
-        var uiHelpers = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.UiHelpers.cs"));
+        var mainWindow = ReadMainWindowSources();
 
         Assert.Equal(("Gen", "12.3 t/s"), MetricCardFactory.SplitMetricLine("Gen 12.3 t/s"));
         Assert.Equal(("Context", "32,768"), MetricCardFactory.SplitMetricLine("Context 32,768"));
@@ -349,10 +434,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.True(MetricCardFactory.IsNeutralMetricStatus("No loaded runtime"));
         Assert.True(MetricCardFactory.IsNeutralMetricStatus("Failed to load"));
         Assert.False(MetricCardFactory.IsNeutralMetricStatus("Qwen3 30B"));
-        Assert.DoesNotContain("private static readonly Regex MetricImportantValuePattern", uiHelpers, StringComparison.Ordinal);
-        Assert.DoesNotContain("private static bool MetricShouldRenderNeutralStatus", uiHelpers, StringComparison.Ordinal);
-        Assert.Contains("MetricCardFactory.AddMetric", uiHelpers, StringComparison.Ordinal);
-        Assert.Contains("MetricCardFactory.SetMetricText", uiHelpers, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static readonly Regex MetricImportantValuePattern", mainWindow, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static bool MetricShouldRenderNeutralStatus", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("MetricCardFactory.SetMetricText", mainWindow, StringComparison.Ordinal);
     }
 
 
@@ -385,8 +469,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("Overview.MetricsCol.Metric", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("ConfigureLoadButton(loadButton)", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("button.MinHeight = 30", overviewFactory, StringComparison.Ordinal);
-        Assert.Contains("Grid.SetRow(loadButton, 1)", overviewFactory, StringComparison.Ordinal);
-        Assert.DoesNotContain("Grid.SetRowSpan(loadButton", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetColumn(loadButton, 6)", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("Width = 240", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("Width = 220", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("ConfigureResponsiveModelBar", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("request.Actions.UnloadLoadedSessionRowClick", overviewFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("unloadButton = Button", overviewFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("static readonly (string Header", overviewFactory, StringComparison.Ordinal);
@@ -428,7 +514,8 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("FolderStripActionsFirst(\n            Loc.T(\"Models.FolderLabel\")", normalizedModelsFactory, StringComparison.Ordinal);
         Assert.Contains("ScanModelsFolderAsync", modelsFactory, StringComparison.Ordinal);
         Assert.Contains("Scanning models...", source, StringComparison.Ordinal);
-        Assert.Contains("Settings.SaveSettingsButton", settingsFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("Settings.SaveSettingsButton", settingsFactory, StringComparison.Ordinal);
+        Assert.Contains("Settings.AutoApplyHint", settingsFactory, StringComparison.Ordinal);
         Assert.Contains("SettingsPageFactory.Create(new SettingsPageRequest(", source, StringComparison.Ordinal);
         Assert.Contains("Select the loading or loaded model to unload it.", modelRuntimeCommands, StringComparison.Ordinal);
         Assert.Contains("Choose the loading or loaded model to unload it.", modelRuntimeCommands, StringComparison.Ordinal);
@@ -470,7 +557,8 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("Unknown runtime", runtimeOverviewStatus, StringComparison.Ordinal);
         Assert.DoesNotContain("active.RuntimeName", source, StringComparison.Ordinal);
         Assert.DoesNotContain("includeProgress: true", source, StringComparison.Ordinal);
-        Assert.Contains("root.Children.Add(PageSectionFactory.HorizontalGridSplitter(2))", modelsFactory, StringComparison.Ordinal);
+        Assert.Contains("var huggingFaceSplitter = PageSectionFactory.HorizontalGridSplitter(2)", modelsFactory, StringComparison.Ordinal);
+        Assert.Contains("root.Children.Add(huggingFaceSplitter)", modelsFactory, StringComparison.Ordinal);
         Assert.Contains("BorderThickness = new Thickness(0)", overviewFactory, StringComparison.Ordinal);
     }
 
@@ -487,6 +575,23 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("nameof(ModelGridRow.Name)", modelsFactory, StringComparison.Ordinal);
         Assert.Contains("nameof(ModelGridRow.Size)", modelsFactory, StringComparison.Ordinal);
         Assert.Contains("Models.SavedVariantsTitle", modelsFactory, StringComparison.Ordinal);
+        var modelGroupDialogDirectory = Path.GetDirectoryName(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Models", "ModelGroupDialogFactory.cs"))!;
+        var modelGroupDialog = string.Join(
+            Environment.NewLine,
+            Directory.GetFiles(modelGroupDialogDirectory, "ModelGroupDialogFactory*.cs")
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(File.ReadAllText));
+        Assert.Contains("Loc.T(\"ModelGroups.NewGroup\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Loc.T(\"ModelGroups.Edit\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("ShowGroupEditor(", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Dialog(owner, title, 440, 330)", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("CompactToolbar(Loc.T(\"ModelGroups.Title\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("PageSectionFactory.GridFrame(grid)", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Loc.T(\"ModelGroups.DeleteGroup\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Loc.T(\"ModelGroups.Column.Policy\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Loc.T(\"ModelGroups.Column.IdleMinutes\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Loc.T(\"ModelGroups.Column.Priority\")", modelGroupDialog, StringComparison.Ordinal);
+        Assert.Contains("Loc.T(\"ModelGroups.EditDescription\")", modelGroupDialog, StringComparison.Ordinal);
         Assert.DoesNotContain("RowDetailsVisibilityMode", modelsFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("Saved launch variant. Same GGUF file", File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "ViewModels", "ModelsPageViewModel.cs")), StringComparison.Ordinal);
         Assert.Contains("private readonly ModelsPageState _modelsPage;", source, StringComparison.Ordinal);
@@ -499,6 +604,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("Launch.SaveAsNewButton", launchPanelFactory, StringComparison.Ordinal);
         Assert.Contains("SaveLaunchSettingsAsNewModelAsync", source, StringComparison.Ordinal);
         Assert.Contains("nameof(ModelGridRow.OpenFolderAction)", modelsFactory, StringComparison.Ordinal);
+        Assert.Equal(1, modelsFactory.Split("nameof(ModelGridRow.OpenFolderAction)", StringSplitOptions.None).Length - 1);
         Assert.Contains("nameof(ModelGridRow.CanDelete)", modelsFactory, StringComparison.Ordinal);
         Assert.Contains("OpenModelFolderRow_Click", modelsPageActions, StringComparison.Ordinal);
         Assert.Contains("DeleteModelRow_Click", modelsPageActions, StringComparison.Ordinal);
@@ -522,20 +628,19 @@ public sealed partial class ReleaseHardeningTests
     public void FolderSettingsWorkflowStaysOutOfMainWindow()
     {
         var folderSettings = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.FolderSettings.cs"));
-        var uiHelpers = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.UiHelpers.cs"));
         var application = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "App", "FolderSettingsApplicationService.cs"));
         var dialogs = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Infrastructure", "FileSystemDialogService.cs"));
 
         Assert.Contains("_coreServices.App.FolderSettingsApplication.ChooseModelsFolderAsync", folderSettings, StringComparison.Ordinal);
         Assert.Contains("_coreServices.App.FolderSettingsApplication.ChooseRuntimeFolderAsync", folderSettings, StringComparison.Ordinal);
         Assert.Contains("FolderSettingsActions()", folderSettings, StringComparison.Ordinal);
-        Assert.Contains("=> _coreServices.App.FileSystemDialogs.PickFolder(initial)", uiHelpers, StringComparison.Ordinal);
+        Assert.Contains("initial => _coreServices.App.FileSystemDialogs.PickFolder(initial)", folderSettings, StringComparison.Ordinal);
         Assert.Contains("Forms.FolderBrowserDialog", dialogs, StringComparison.Ordinal);
         Assert.Contains("Models folder set to", application, StringComparison.Ordinal);
         Assert.Contains("Runtimes folder set to", application, StringComparison.Ordinal);
         Assert.DoesNotContain("Path.GetFullPath(folder)", folderSettings, StringComparison.Ordinal);
-        Assert.DoesNotContain("FolderBrowserDialog", uiHelpers, StringComparison.Ordinal);
-        Assert.DoesNotContain("Directory.Exists(initial)", uiHelpers, StringComparison.Ordinal);
+        Assert.DoesNotContain("FolderBrowserDialog", folderSettings, StringComparison.Ordinal);
+        Assert.DoesNotContain("Directory.Exists(initial)", folderSettings, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Changing models folder...\"", folderSettings, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Changing runtimes folder...\"", folderSettings, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Models folder set to", folderSettings, StringComparison.Ordinal);
@@ -697,6 +802,7 @@ public sealed partial class ReleaseHardeningTests
         var themedMessageBox = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "ThemedMessageBox.cs"));
         var settingsDefinitions = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "App", "SettingsPageDefinitionService.cs"));
         var settingsPageState = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Settings", "SettingsPageState.cs"));
+        var settingsPersistence = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.SettingsPersistence.cs"));
         var updatesPageFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Updates", "UpdatesPageFactory.cs"));
 
         Assert.Contains("x:Name=\"UpdatesNavButton\"", xaml, StringComparison.Ordinal);
@@ -716,7 +822,8 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("_settingsPage = uiState.SettingsPage", source, StringComparison.Ordinal);
         Assert.DoesNotContain("private readonly SettingsPageState _settingsPage = new();", source, StringComparison.Ordinal);
         Assert.Contains("_settingsPage.Apply(", source, StringComparison.Ordinal);
-        Assert.Contains("definitions.ToDictionary", source, StringComparison.Ordinal);
+        Assert.Contains("Rows.ToDictionary", settingsPersistence, StringComparison.Ordinal);
+        Assert.Contains("ScheduleSettingsApply", settingsPersistence, StringComparison.Ordinal);
         Assert.Contains("public sealed class SettingsPageState", settingsPageState, StringComparison.Ordinal);
         Assert.Contains("public string SelectedThemeValue", settingsPageState, StringComparison.Ordinal);
         Assert.DoesNotContain("_themeCombo", source, StringComparison.Ordinal);
@@ -781,7 +888,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.True(handlerEnd > handlerStart);
         var handler = settings[handlerStart..handlerEnd];
         Assert.Contains("AppPreferenceService.ThemeMode(_settingsPage.SelectedThemeValue)", handler, StringComparison.Ordinal);
-        Assert.Contains("ApplyTheme(mode);", handler, StringComparison.Ordinal);
+        Assert.Contains("ApplicationThemeService.Apply(mode);", handler, StringComparison.Ordinal);
         Assert.Contains("Status.ThemePreviewApplied", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("_themeCombo", handler, StringComparison.Ordinal);
         Assert.DoesNotContain("ShowSettings()", handler, StringComparison.Ordinal);
@@ -804,7 +911,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("Loc.T(\"Setting.ApiKey\"), \"modelApiKey\", settings.ModelApiKey", settingsDefinitions, StringComparison.Ordinal);
         Assert.Contains("Tooltip.Setting.ApiKey", settingsDefinitions, StringComparison.Ordinal);
         Assert.Contains("Tooltip.Setting.ApiKey", settingsDefinitions, StringComparison.Ordinal);
-        Assert.Contains("SettingsGridColumnFactory.ActionsColumn", settingsFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("SettingsGridColumnFactory.ActionsColumn", settingsFactory, StringComparison.Ordinal);
+        Assert.Contains("SettingsGridColumnFactory.ValueColumn", settingsFactory, StringComparison.Ordinal);
+        Assert.Contains("DockPanel.DockProperty, Dock.Right", settingsGridColumns, StringComparison.Ordinal);
         Assert.Contains("Value = \"cache\"", settingsGridColumns, StringComparison.Ordinal);
         Assert.Contains("VisualRole.Danger", settingsGridColumns, StringComparison.Ordinal);
         Assert.DoesNotContain("FrameworkElementFactory", settings, StringComparison.Ordinal);
@@ -824,7 +933,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("nameof(EditableSettingRow.RevealAction)", settingsGridColumns, StringComparison.Ordinal);
         Assert.Contains("nameof(EditableSettingRow.CopyAction)", settingsGridColumns, StringComparison.Ordinal);
         Assert.Contains("nameof(EditableSettingRow.Action)", settingsGridColumns, StringComparison.Ordinal);
-        Assert.Contains("public static DataGridTemplateColumn ValueColumn()", settingsGridColumns, StringComparison.Ordinal);
+        Assert.Contains("public static DataGridTemplateColumn ValueColumn(", settingsGridColumns, StringComparison.Ordinal);
         Assert.Contains("API key copied to clipboard.", settingsRowActions, StringComparison.Ordinal);
         Assert.DoesNotContain("API key copied to clipboard.", settings, StringComparison.Ordinal);
         Assert.Contains("IsSecretVisible", rows, StringComparison.Ordinal);
@@ -836,7 +945,7 @@ public sealed partial class ReleaseHardeningTests
 
 
     [Fact]
-    public void MainWindowKeepsLogDeletionActionsAndReadableRuntimeJobRows()
+    public void MainWindowKeepsLogDeletionActionsAndRemovesRuntimeJobsFromRuntimesPage()
     {
         var source = ReadMainWindowSources();
         var themedMessageBox = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "ThemedMessageBox.cs"));
@@ -857,8 +966,6 @@ public sealed partial class ReleaseHardeningTests
         var runtimesRowActions = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Runtimes", "RuntimesPageRowActionController.cs"));
         var logWorkflow = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "App", "LogPageWorkflowService.cs"));
         var advancedSections = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "App", "AdvancedSectionStateController.cs"));
-        var advancedState = new AdvancedSectionStateController();
-
         Assert.Contains("Logs.DeleteSelectedButton", logsFactory, StringComparison.Ordinal);
         Assert.Contains("Logs.DeleteAllButton", logsFactory, StringComparison.Ordinal);
         Assert.Contains("DeleteLogRow_Click", logsActions, StringComparison.Ordinal);
@@ -867,29 +974,24 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("SelectedLogPaths", source, StringComparison.Ordinal);
         Assert.Contains("LifetimePageFactory.Create(new LifetimePageRequest(", source, StringComparison.Ordinal);
         Assert.Contains("public sealed class LifetimePageState", lifetimePageState, StringComparison.Ordinal);
-        Assert.Contains("public void RefreshMetricsGrid()", lifetimePageState, StringComparison.Ordinal);
+        Assert.DoesNotContain("Items.Refresh()", lifetimePageState, StringComparison.Ordinal);
         Assert.Contains("Loc.T(\"Lifetime.TokenUsageTitle\")", lifetimeFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("PageSectionFactory.GridFor(MetricColumns)", lifetimeFactory, StringComparison.Ordinal);
         Assert.Contains("PageSectionFactory.GridFor(", lifetimeFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("_lifetimeMetricsGrid", source, StringComparison.Ordinal);
         Assert.Contains("IsActiveRuntimeLog", logWorkflow, StringComparison.Ordinal);
         Assert.Contains("BuildSelectedDeletionCommand", logWorkflow, StringComparison.Ordinal);
-        Assert.Contains("Resources[\"TextMain\"]", pageSectionFactory, StringComparison.Ordinal);
-        Assert.Contains("StatusRunning", pageSectionFactory, StringComparison.Ordinal);
-        Assert.Contains("StatusFailed", pageSectionFactory, StringComparison.Ordinal);
-        Assert.Contains("Runtimes.RuntimeJobsDesc", runtimesFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("Runtimes.RuntimeJobsDesc", runtimesFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("RuntimeJobsGrid", runtimesFactory, StringComparison.Ordinal);
         Assert.Contains("OpenRuntimeJobLogRow_Click", runtimesRowActions, StringComparison.Ordinal);
         Assert.Contains("OpenLogPath(job.LogPath)", runtimesRowActions, StringComparison.Ordinal);
         Assert.Contains("Status.LogsNotReady", logsPartial, StringComparison.Ordinal);
         Assert.DoesNotContain("Status.LogsNotReady", downloadHistoryPartial, StringComparison.Ordinal);
         Assert.DoesNotContain("logPageApplication.Open(job.LogPath", downloadHistoryPartial, StringComparison.Ordinal);
-        Assert.Contains("Common.LogButton", runtimesFactory, StringComparison.Ordinal);
-        Assert.False(advancedState.ShowRuntimes);
-        Assert.True(advancedState.ToggleRuntimes());
-        Assert.True(advancedState.ShowRuntimes);
-        Assert.Contains("public bool ShowRuntimes { get; private set; }", advancedSections, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Ui.AdvancedSections.ShowRuntimes", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Ui.AdvancedSections.ToggleRuntimes();", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Common.LogButton", runtimesFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowRuntimes", advancedSections, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdvancedSections.ShowRuntimes", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToggleAdvancedRuntimes", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_showAdvancedRuntimes", source, StringComparison.Ordinal);
         Assert.Contains("private readonly RuntimesPageState _runtimesPage;", source, StringComparison.Ordinal);
         Assert.Contains("_runtimesPage = uiState.RuntimesPage", source, StringComparison.Ordinal);
@@ -898,21 +1000,25 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("public sealed class RuntimesPageState", runtimesPageState, StringComparison.Ordinal);
         Assert.Contains("public RuntimeRecord? SelectedRuntime", runtimesPageState, StringComparison.Ordinal);
         Assert.Contains("public string SelectedCudaPackagePreference", runtimesPageState, StringComparison.Ordinal);
-        Assert.Contains("public void RestoreRuntimeJobSelection", runtimesPageState, StringComparison.Ordinal);
+        Assert.DoesNotContain("RestoreRuntimeJobSelection", runtimesPageState, StringComparison.Ordinal);
         Assert.Contains("public void RefreshRuntimePackageGrid()", runtimesPageState, StringComparison.Ordinal);
+        Assert.Contains("public void RefreshRuntimeDownloadsGrid()", runtimesPageState, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimeGrid", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimePackageGrid", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimeBuildGrid", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimeJobsGrid", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("source downloads, builds, and runtime jobs", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimeCudaPreferenceCombo", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimesFolderText", source, StringComparison.Ordinal);
-        Assert.Contains("request.ShowAdvancedRuntimes ? Loc.T(\"Runtimes.HideAdvancedButton\") : Loc.T(\"Runtimes.ShowAdvancedButton\")", runtimesFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowAdvancedRuntimes", runtimesFactory, StringComparison.Ordinal);
+        Assert.DoesNotContain("RuntimeAdvancedToggleButton", runtimesFactory, StringComparison.Ordinal);
         Assert.Contains("Runtimes.CudaDownloadsLabel", runtimesFactory, StringComparison.Ordinal);
         Assert.Contains("LaunchCombo(AppPreferenceService.CudaPackagePreferenceOptions())", runtimesFactory, StringComparison.Ordinal);
         Assert.Contains("ChangeRuntimeCudaPackagePreferenceAsync", source, StringComparison.Ordinal);
-        Assert.Contains("if (request.ShowAdvancedRuntimes)", runtimesFactory, StringComparison.Ordinal);
-        Assert.True(runtimesFactory.IndexOf("var (header, runtimesFolderText, runtimeAdvancedToggleButton, runtimeCudaPreferenceCombo) = Header(request)", StringComparison.Ordinal)
-            < runtimesFactory.IndexOf("var runtimeBuildGrid = request.ShowAdvancedRuntimes ? RuntimeBuildGrid(request) : null", StringComparison.Ordinal));
+        Assert.Contains("nameof(RuntimePackagePresetRow.BuildSourceAction)", runtimesFactory, StringComparison.Ordinal);
+        Assert.Contains("request.Actions.RuntimeSourceRowClick, .75", runtimesFactory, StringComparison.Ordinal);
+        Assert.Contains("\"RuntimeDownload\"", runtimesFactory, StringComparison.Ordinal);
+        Assert.Contains("\"InstalledRuntime\"", runtimesFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("Runtime Job Log Tail", source, StringComparison.Ordinal);
         Assert.DoesNotContain("LoadSelectedRuntimeJobLog", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimeJobLogBox", source, StringComparison.Ordinal);
@@ -929,7 +1035,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("ApplyStaticButtonToolTips", source, StringComparison.Ordinal);
         Assert.Contains("ToolTipService.ShowOnDisabledProperty", pageSectionFactory, StringComparison.Ordinal);
         Assert.Contains("nameof(ModelGridRow.DeleteToolTip)", modelsFactory, StringComparison.Ordinal);
-        Assert.Contains("nameof(RuntimeBuildPresetRow.DownloadToolTip)", runtimesFactory, StringComparison.Ordinal);
+        Assert.Contains("nameof(RuntimePackagePresetRow.BuildSourceToolTip)", runtimesFactory, StringComparison.Ordinal);
         Assert.Contains("nameof(EditableSettingRow.ActionToolTip)", settingsGridColumns, StringComparison.Ordinal);
         Assert.Contains("tooltipBinding: \"T1\"", lifetimeFactory, StringComparison.Ordinal);
         Assert.Contains("DialogButtonToolTip", themedMessageBox, StringComparison.Ordinal);
@@ -961,13 +1067,16 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void MinimizeBehaviorUsesExplicitTrayAndTaskbarModes()
     {
+        Loc.LoadLanguage("en");
         var root = CreateTempRoot();
         var settings = AppSettings.CreateDefault(root);
         var source = ReadMainWindowSources();
         var controller = new TrayWindowStateController();
 
         Assert.Equal("taskbarOnly", settings.MinimizeBehavior);
-        Assert.Equal(["Pref.TaskbarOnly", "Pref.TrayOnly", "Pref.TrayAndTaskbar"], AppPreferenceService.MinimizeBehaviorOptions());
+        Assert.Equal(
+            [Loc.T("Pref.TaskbarOnly"), Loc.T("Pref.TrayOnly"), Loc.T("Pref.TrayAndTaskbar")],
+            AppPreferenceService.MinimizeBehaviorOptions());
         Assert.Equal("trayAndTaskbar", AppPreferenceService.MinimizeBehavior("Tray + taskbar"));
         Assert.Equal("both", AppPreferenceService.ModelAccessMode("network access"));
         Assert.Equal("gateway", AppPreferenceService.ModelAccessMode("Gateway LAN only"));
@@ -976,7 +1085,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("127.0.0.1", AppPreferenceService.RuntimeHostForAccessMode("Gateway LAN only"));
         Assert.Equal("0.0.0.0", AppPreferenceService.RuntimeHostForAccessMode("Direct models LAN only"));
         Assert.Equal("latest", settings.CudaPackagePreference);
-        Assert.Equal(["Pref.Latest", "Pref.Compatibility"], AppPreferenceService.CudaPackagePreferenceOptions());
+        Assert.Equal(
+            [Loc.T("Pref.Latest"), Loc.T("Pref.Compatibility")],
+            AppPreferenceService.CudaPackagePreferenceOptions());
         Assert.Equal("latest", AppPreferenceService.CudaPackagePreference("Latest"));
         Assert.Equal("compatibility", AppPreferenceService.CudaPackagePreference("CUDA 12 compatibility"));
         Assert.True(AppPreferenceService.YesNoValue("on", fallback: false));
@@ -1035,6 +1146,7 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void MainWindowViewModelTracksPageStatusAndBusyState()
     {
+        Loc.LoadLanguage("en");
         var vm = new MainWindowViewModel();
         var changes = new List<string?>();
         vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
@@ -1044,11 +1156,11 @@ public sealed partial class ReleaseHardeningTests
         bool? waitCursor = null;
 
         Assert.Equal("Overview", vm.CurrentPage);
-        Assert.Equal("Status.Starting", vm.StatusText);
+        Assert.Equal(Loc.T("Status.Starting"), vm.StatusText);
         Assert.True(vm.TryBeginBusy(out var busyMessage));
         Assert.Equal("", busyMessage);
         Assert.False(vm.TryBeginBusy(out busyMessage));
-        Assert.Equal("Status.PleaseWaitFor", busyMessage);
+        Assert.Equal(Loc.T("Status.PleaseWaitFor", vm.StatusText), busyMessage);
         Assert.True(vm.EndBusy());
         Assert.False(vm.EndBusy());
 
@@ -1056,7 +1168,7 @@ public sealed partial class ReleaseHardeningTests
         vm.SetStatus("");
 
         Assert.Equal("Models", vm.CurrentPage);
-        Assert.Equal("Status.Ready", vm.DisplayStatusText);
+        Assert.Equal(Loc.T("Status.Ready"), vm.DisplayStatusText);
         Assert.Contains(nameof(MainWindowViewModel.CurrentPage), changes);
         Assert.Contains(nameof(MainWindowViewModel.StatusText), changes);
         Assert.Contains(nameof(MainWindowViewModel.DisplayStatusText), changes);

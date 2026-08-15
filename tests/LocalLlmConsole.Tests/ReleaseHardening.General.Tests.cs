@@ -755,6 +755,51 @@ ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = ex
 
 
     [Fact]
+    public async Task OverviewModelSelectionControllerCancelsSupersededSelection()
+    {
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completed = new List<int>();
+        var invocation = 0;
+        var actionUpdates = 0;
+        var controller = new OverviewPageActionController(new OverviewPageActionControllerActions(
+            async cancellationToken =>
+            {
+                var current = Interlocked.Increment(ref invocation);
+                if (current == 1)
+                {
+                    firstStarted.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+
+                completed.Add(current);
+            },
+            () => Task.CompletedTask,
+            () => actionUpdates++,
+            () => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            () => Task.CompletedTask,
+            _ => null,
+            _ => Task.CompletedTask,
+            _ => "",
+            _ => Task.CompletedTask,
+            async action =>
+            {
+                try { await action(); }
+                catch (OperationCanceledException) { }
+            }));
+        var actions = controller.Build();
+
+        var first = actions.SelectModelSessionAsync();
+        await firstStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var second = actions.SelectModelSessionAsync();
+        await Task.WhenAll(first, second).WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([2], completed);
+        Assert.Equal(1, actionUpdates);
+    }
+
+
+    [Fact]
     public void DownloadHistoryPageStateOwnsModeAndTimerRefreshGate()
     {
         var state = new DownloadHistoryPageState();

@@ -34,7 +34,7 @@ if (-not (Test-Path -LiteralPath $TestProject)) {
   throw "Test project not found: $TestProject"
 }
 
-$args = @("test", $TestProject, "-c", $Configuration)
+$args = @("test", "--project", $TestProject, "-c", $Configuration)
 if (-not [string]::IsNullOrWhiteSpace($Filter)) {
   $args += @("--filter", $Filter)
 }

@@ -13,7 +13,8 @@ public static class RuntimePackageInventoryPresenter
 
     public static IReadOnlyList<RuntimeRecord> MatchingSourceBuilds(IReadOnlyList<RuntimeRecord> runtimes, RuntimePackagePreset preset)
         => runtimes
-            .Where(runtime => string.Equals(RuntimeMetadataService.ManagedPresetId(runtime), preset.SourcePresetId, StringComparison.OrdinalIgnoreCase))
+            .Where(runtime => RuntimeMetadataService.IsManagedSourceBuild(runtime)
+                && string.Equals(RuntimeMetadataService.ManagedPresetId(runtime), preset.SourcePresetId, StringComparison.OrdinalIgnoreCase))
             .GroupBy(runtime => RuntimeMetadataService.Folder(runtime), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(runtime => runtime.UpdatedAt).First())
             .OrderByDescending(runtime => runtime.UpdatedAt)

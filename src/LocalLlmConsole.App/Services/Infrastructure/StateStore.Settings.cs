@@ -57,6 +57,15 @@ public sealed partial class StateStore
             RuntimeRoot = StringValue("runtimeRoot", defaults.RuntimeRoot),
             CacheRoot = StringValue("cacheRoot", defaults.CacheRoot),
             ThemeMode = StringValue("themeMode", defaults.ThemeMode),
+            ShowOverviewModelStatus = BoolValue("showOverviewModelStatus", defaults.ShowOverviewModelStatus),
+            ShowOverviewHardware = BoolValue("showOverviewHardware", defaults.ShowOverviewHardware),
+            ShowOverviewSlots = BoolValue("showOverviewSlots", defaults.ShowOverviewSlots),
+            ShowOverviewTokens = BoolValue("showOverviewTokens", defaults.ShowOverviewTokens),
+            ShowOverviewMtpTokens = BoolValue("showOverviewMtpTokens", defaults.ShowOverviewMtpTokens),
+            ShowOverviewKvCache = BoolValue("showOverviewKvCache", defaults.ShowOverviewKvCache),
+            ShowOverviewLiveRuntimeLog = BoolValue("showOverviewLiveRuntimeLog", defaults.ShowOverviewLiveRuntimeLog),
+            ShowOverviewAllMetrics = BoolValue("showOverviewAllMetrics", defaults.ShowOverviewAllMetrics),
+            ShowModelsHuggingFace = BoolValue("showModelsHuggingFace", defaults.ShowModelsHuggingFace),
             MinimizeBehavior = StringValue("minimizeBehavior", defaults.MinimizeBehavior),
             StartWithWindows = BoolValue("startWithWindows", defaults.StartWithWindows),
             ModelAccessMode = AppPreferenceService.ModelAccessMode(StringValue("modelAccessMode", defaults.ModelAccessMode)),
@@ -64,7 +73,7 @@ public sealed partial class StateStore
             AutoLoadGatewayPort = Math.Clamp(IntValue("autoLoadGatewayPort", defaults.AutoLoadGatewayPort), 1, 65535),
             AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(StringValue("autoLoadGatewayPolicy", defaults.AutoLoadGatewayPolicy)),
             Host = StringValue("host", defaults.Host),
-            RequireApiKeyAuth = BoolValue("requireApiKeyAuth", defaults.RequireApiKeyAuth),
+            RequireApiKeyAuth = true,
             ModelApiKey = SecretProtector.UnprotectSetting(StringValue("modelApiKey", defaults.ModelApiKey)),
             ModelApiKeyBackup = SecretProtector.UnprotectSetting(StringValue("modelApiKeyBackup", defaults.ModelApiKeyBackup)),
             WslDistro = StringValue("wslDistro", defaults.WslDistro),
@@ -80,7 +89,10 @@ public sealed partial class StateStore
             DeleteRuntimeSourceAfterSuccessfulBuild = BoolValue("deleteRuntimeSourceAfterSuccessfulBuild", defaults.DeleteRuntimeSourceAfterSuccessfulBuild),
             ReasoningMode = StringValue("reasoningMode", defaults.ReasoningMode),
             ReasoningFormat = StringValue("reasoningFormat", defaults.ReasoningFormat),
+            ReasoningEffort = StringValue("reasoningEffort", defaults.ReasoningEffort),
             ReasoningBudget = IntValue("reasoningBudget", defaults.ReasoningBudget),
+            ReasoningBudgetMessage = StringValue("reasoningBudgetMessage", defaults.ReasoningBudgetMessage),
+            ReasoningPreserve = StringValue("reasoningPreserve", defaults.ReasoningPreserve),
             VisionMode = StringValue("visionMode", defaults.VisionMode),
             VisionProjectorPath = StringValue("visionProjectorPath", defaults.VisionProjectorPath),
             VisionImageMinTokens = IntValue("visionImageMinTokens", defaults.VisionImageMinTokens),
@@ -132,6 +144,20 @@ public sealed partial class StateStore
             UiCulture = StringValue("uiCulture", defaults.UiCulture)
         };
 
+        var migratedRequiredApiKey = !BoolValue("requireApiKeyAuth", defaults.RequireApiKeyAuth)
+                                     || !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKey)
+                                     || !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKeyBackup);
+        if (migratedRequiredApiKey)
+        {
+            var apiKey = ApiSecurity.StrongBearerSecretOrNew(settings.ModelApiKey, settings.ModelApiKeyBackup);
+            settings = settings with
+            {
+                RequireApiKeyAuth = true,
+                ModelApiKey = apiKey,
+                ModelApiKeyBackup = apiKey
+            };
+        }
+
         var migratedLegacyLaunchDefaults = false;
         if (LooksLikeLegacyAppLaunchDefaults(values))
         {
@@ -171,7 +197,7 @@ public sealed partial class StateStore
         {
             await BackupCorruptSettingsAsync(corrupt);
         }
-        if (corrupt.Count > 0 || migratedLegacyLaunchDefaults)
+        if (corrupt.Count > 0 || migratedLegacyLaunchDefaults || migratedRequiredApiKey)
         {
             await SaveAppSettingsAsync(settings);
         }
@@ -188,6 +214,15 @@ public sealed partial class StateStore
             ("runtimeRoot", settings.RuntimeRoot),
             ("cacheRoot", settings.CacheRoot),
             ("themeMode", settings.ThemeMode),
+            ("showOverviewModelStatus", settings.ShowOverviewModelStatus),
+            ("showOverviewHardware", settings.ShowOverviewHardware),
+            ("showOverviewSlots", settings.ShowOverviewSlots),
+            ("showOverviewTokens", settings.ShowOverviewTokens),
+            ("showOverviewMtpTokens", settings.ShowOverviewMtpTokens),
+            ("showOverviewKvCache", settings.ShowOverviewKvCache),
+            ("showOverviewLiveRuntimeLog", settings.ShowOverviewLiveRuntimeLog),
+            ("showOverviewAllMetrics", settings.ShowOverviewAllMetrics),
+            ("showModelsHuggingFace", settings.ShowModelsHuggingFace),
             ("minimizeBehavior", settings.MinimizeBehavior),
             ("startWithWindows", settings.StartWithWindows),
             ("modelAccessMode", AppPreferenceService.ModelAccessMode(settings.ModelAccessMode)),
@@ -211,7 +246,10 @@ public sealed partial class StateStore
             ("deleteRuntimeSourceAfterSuccessfulBuild", settings.DeleteRuntimeSourceAfterSuccessfulBuild),
             ("reasoningMode", settings.ReasoningMode),
             ("reasoningFormat", settings.ReasoningFormat),
+            ("reasoningEffort", settings.ReasoningEffort),
             ("reasoningBudget", settings.ReasoningBudget),
+            ("reasoningBudgetMessage", settings.ReasoningBudgetMessage),
+            ("reasoningPreserve", settings.ReasoningPreserve),
             ("visionMode", settings.VisionMode),
             ("visionProjectorPath", settings.VisionProjectorPath),
             ("visionImageMinTokens", settings.VisionImageMinTokens),

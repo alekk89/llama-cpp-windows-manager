@@ -76,6 +76,6 @@ public partial class MainWindow
 
     private ModelFolderApplicationActions ModelFolderActions()
         => new(
-            OpenFolder,
+            path => _coreServices.App.ShellIntegration.OpenFolder(path),
             SetStatus);
 }

@@ -10,12 +10,14 @@ public static class GpuStatusService
         var parts = line.Split(',').Select(part => part.Trim()).ToArray();
         if (parts.Length < 6) return "";
         var index = parts[0];
+        var name = parts[1];
         var utilization = parts[2];
         var temperature = parts[3];
         var used = double.TryParse(parts[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var usedMb) ? usedMb / 1024 : 0;
         var total = double.TryParse(parts[5], NumberStyles.Float, CultureInfo.InvariantCulture, out var totalMb) ? totalMb / 1024 : 0;
         var memory = total > 0 ? $"{used:0.0}/{total:0.0} GiB" : $"{parts[4]}/{parts[5]} MiB";
-        return NormalizeMetricSeparators($"GPU {index}: {utilization}% | {temperature}C | {memory}");
+        var identity = string.IsNullOrWhiteSpace(name) ? $"GPU {index}" : $"GPU {index}: {name}";
+        return NormalizeMetricSeparators($"{identity} | {utilization}% | {temperature}C | {memory}");
     }
 
     public static string NormalizeMetricSeparators(string text)

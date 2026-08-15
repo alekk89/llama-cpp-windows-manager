@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -67,6 +68,27 @@ public static class PageSectionFactory
         return section;
     }
 
+    public static Grid ContentSection(string title, UIElement content, string description = "")
+    {
+        var section = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+        section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        section.RowDefinitions.Add(new RowDefinition());
+        section.Children.Add(SectionHeader(title, description));
+        var frame = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Margin = new Thickness(0, 7, 0, 8),
+            Padding = new Thickness(6, 5, 6, 6),
+            Child = content
+        };
+        frame.SetResourceReference(Border.BackgroundProperty, "SurfaceRaised");
+        frame.SetResourceReference(Border.BorderBrushProperty, "PanelBorder");
+        Grid.SetRow(frame, 1);
+        section.Children.Add(frame);
+        return section;
+    }
+
     private static Grid SectionHeader(string title, string description = "")
     {
         var header = new Grid { Margin = new Thickness(1, 2, 0, 4) };
@@ -79,6 +101,7 @@ public static class PageSectionFactory
             Margin = new Thickness(0, 0, 0, string.IsNullOrWhiteSpace(description) ? 0 : 3)
         };
         titleBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextMain");
+        AutomationProperties.SetHeadingLevel(titleBlock, AutomationHeadingLevel.Level2);
         copy.Children.Add(titleBlock);
         if (!string.IsNullOrWhiteSpace(description))
         {
@@ -125,7 +148,7 @@ public static class PageSectionFactory
             VerticalAlignment = VerticalAlignment.Stretch,
             ResizeDirection = GridResizeDirection.Rows,
             ResizeBehavior = GridResizeBehavior.PreviousAndNext,
-            ShowsPreview = false,
+            ShowsPreview = true,
             Background = (WpfBrush)WpfApplication.Current.Resources["PanelBorderStrong"],
             Margin = new Thickness(0, 3, 0, 3)
         };
@@ -142,7 +165,7 @@ public static class PageSectionFactory
             VerticalAlignment = VerticalAlignment.Stretch,
             ResizeDirection = GridResizeDirection.Columns,
             ResizeBehavior = GridResizeBehavior.PreviousAndNext,
-            ShowsPreview = false,
+            ShowsPreview = true,
             Background = (WpfBrush)WpfApplication.Current.Resources["PanelBorderStrong"],
             Margin = new Thickness(2, 6, 2, 6)
         };
@@ -174,40 +197,6 @@ public static class PageSectionFactory
             column.ElementStyle = textStyle;
     }
 
-    public static void ApplyRuntimeJobsRowStyle(DataGrid grid)
-    {
-        var baseStyle = WpfApplication.Current.Resources[typeof(DataGridRow)] as Style;
-        var style = baseStyle is null
-            ? new Style(typeof(DataGridRow))
-            : new Style(typeof(DataGridRow), baseStyle);
-
-        var statusForeground = (WpfBrush)WpfApplication.Current.Resources["TextMain"];
-        var statuses = new (string Status, string BackgroundResource)[]
-        {
-            ("Queued", "StatusQueued"),
-            ("Running", "StatusRunning"),
-            ("Failed", "StatusFailed"),
-            ("Cancelled", "StatusCancelled"),
-            ("Interrupted", "StatusCancelled")
-        };
-        foreach (var (status, backgroundResource) in statuses)
-            style.Triggers.Add(RuntimeJobStatusTrigger(
-                status,
-                (WpfBrush)WpfApplication.Current.Resources[backgroundResource],
-                statusForeground));
-        grid.RowStyle = style;
-
-        var textStyle = new Style(typeof(TextBlock), (Style)WpfApplication.Current.Resources["GridCellText"]);
-        foreach (var (status, _) in statuses)
-        {
-            var trigger = new DataTrigger { Binding = new WpfBinding("C1"), Value = status };
-            trigger.Setters.Add(new Setter(TextBlock.ForegroundProperty, statusForeground));
-            textStyle.Triggers.Add(trigger);
-        }
-        foreach (var column in grid.Columns.OfType<DataGridTextColumn>())
-            column.ElementStyle = textStyle;
-    }
-
     public static void AddButtonColumn(
         DataGrid grid,
         string header,
@@ -221,6 +210,7 @@ public static class PageSectionFactory
     {
         var factory = new FrameworkElementFactory(typeof(WpfButton));
         factory.SetBinding(ContentControl.ContentProperty, new WpfBinding(contentBinding));
+        factory.SetBinding(AutomationProperties.NameProperty, new WpfBinding(contentBinding));
         factory.SetBinding(UIElement.IsEnabledProperty, new WpfBinding(enabledBinding));
         factory.SetBinding(FrameworkElement.TagProperty, new WpfBinding("."));
         if (!string.IsNullOrWhiteSpace(visualRole))
@@ -228,12 +218,16 @@ public static class PageSectionFactory
         if (!string.IsNullOrWhiteSpace(tooltipBinding))
         {
             factory.SetBinding(FrameworkElement.ToolTipProperty, new WpfBinding(tooltipBinding));
+            factory.SetBinding(AutomationProperties.HelpTextProperty, new WpfBinding(tooltipBinding));
         }
         else
         {
             var toolTip = tooltipProvider?.Invoke(header) ?? "";
             if (!string.IsNullOrWhiteSpace(toolTip))
+            {
                 factory.SetValue(FrameworkElement.ToolTipProperty, toolTip);
+                factory.SetValue(AutomationProperties.HelpTextProperty, toolTip);
+            }
         }
         factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
         factory.SetValue(FrameworkElement.MinHeightProperty, 22.0);
@@ -264,11 +258,4 @@ public static class PageSectionFactory
         });
     }
 
-    private static DataTrigger RuntimeJobStatusTrigger(string status, WpfBrush background, WpfBrush foreground)
-    {
-        var trigger = new DataTrigger { Binding = new WpfBinding("C1"), Value = status };
-        trigger.Setters.Add(new Setter(WpfControl.BackgroundProperty, background));
-        trigger.Setters.Add(new Setter(WpfControl.ForegroundProperty, foreground));
-        return trigger;
-    }
 }

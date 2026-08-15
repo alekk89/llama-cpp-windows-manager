@@ -8,7 +8,8 @@ public sealed partial class RuntimeDeletionPlanner
         IEnumerable<RuntimeSourceEntry> allSources)
     {
         var runtimes = (await _stateStore.ListRuntimesAsync())
-            .Where(runtime => string.Equals(RuntimeMetadataService.ManagedPresetId(runtime), preset.Id, StringComparison.OrdinalIgnoreCase))
+            .Where(runtime => RuntimeMetadataService.IsManagedSourceBuild(runtime)
+                && string.Equals(RuntimeMetadataService.ManagedPresetId(runtime), preset.Id, StringComparison.OrdinalIgnoreCase))
             .GroupBy(runtime => RuntimeMetadataService.Folder(runtime), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(runtime => runtime.UpdatedAt).First())
             .ToList();

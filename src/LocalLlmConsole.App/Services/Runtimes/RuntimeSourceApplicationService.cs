@@ -20,7 +20,7 @@ public sealed record RuntimeSourceApplicationActions(
 public sealed class RuntimeSourceApplicationService
 {
     private const string DownloadDisabledMessage =
-        "This runtime source is already downloaded or built. Run Check to look for a newer remote commit, or delete the local source/build if you want to download from scratch.";
+        "Check the source repository first. Download is enabled only after a successful check finds source that is not already downloaded or built.";
 
     private readonly StateStore _stateStore;
     private readonly RuntimeCatalogDataService _catalogData;
@@ -86,16 +86,20 @@ public sealed class RuntimeSourceApplicationService
         var sourcesTask = _catalogData.LoadSourcesAsync(settings.RuntimeRoot);
         var runtimesTask = _stateStore.ListRuntimesAsync();
         await Task.WhenAll(sourcesTask, runtimesTask);
-        var local = RuntimeSourceRepositoryService.LatestLocalVersion(
+        var sources = await sourcesTask;
+        var runtimes = await runtimesTask;
+        var localState = RuntimeCatalogDataService.BuildPresetLocalState(
             preset,
-            await sourcesTask,
-            await runtimesTask);
-        if (string.IsNullOrWhiteSpace(local.Commit))
+            runtimes,
+            sources,
+            sessionState.RuntimeUpdateStates);
+        var local = RuntimeSourceRepositoryService.LatestLocalVersion(preset, sources, runtimes);
+        if (localState.LocalCount > 0 && string.IsNullOrWhiteSpace(local.Commit))
         {
             ApplyUnknownLocalVersion(row);
             if (row is not null)
                 actions.RefreshRuntimeBuildGrid();
-            actions.SetStatus("Local runtime version is unknown. Delete the local source/build before downloading again.");
+            actions.SetStatus("Local runtime version is unknown. Delete the local source/build before checking again.");
             return RuntimeSourceApplicationOutcome.UnknownLocalVersion;
         }
 

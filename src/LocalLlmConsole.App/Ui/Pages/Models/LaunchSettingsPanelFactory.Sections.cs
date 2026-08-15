@@ -27,10 +27,11 @@ public static partial class LaunchSettingsPanelFactory
             {
                 var control = CreateSchemaEditor(definition, request, editors);
                 var label = Loc.T(definition.LabelKey);
+                var tooltip = Loc.T(CurrentTooltipKey(definition));
                 if (definition.Advanced)
-                    builder.AddAdvancedLaunchSetting(grid, label, control);
+                    builder.AddAdvancedLaunchSetting(grid, label, control, tooltip);
                 else
-                    builder.AddLaunchSetting(grid, label, control);
+                    builder.AddLaunchSetting(grid, label, control, tooltip);
             }
 
             var advancedSection = sectionGroup.Any(definition => definition.AdvancedSection);
@@ -45,6 +46,17 @@ public static partial class LaunchSettingsPanelFactory
         panel.Children.Add(runtimeOptions.Root);
         return new LaunchSettingsFormControls(editors, runtimeOptions);
     }
+
+    private static string CurrentTooltipKey(LaunchSettingUiDefinition definition)
+        => definition.LabelKey switch
+        {
+            "Launch.Field.Vision" => "Tooltip.Current.Vision",
+            "Launch.Field.VisionHead" => "Tooltip.Current.VisionHead",
+            "Launch.Field.SpecType" => "Tooltip.Current.SpecType",
+            "Launch.Field.DraftModel" => "Tooltip.Current.DraftModel",
+            "Launch.Field.MtpHead" => "Tooltip.Current.MtpHead",
+            _ => definition.LabelKey.Replace("Launch.Field.", "Tooltip.Field.", StringComparison.Ordinal)
+        };
 
     private static FrameworkElement CreateSchemaEditor(
         LaunchSettingUiDefinition definition,

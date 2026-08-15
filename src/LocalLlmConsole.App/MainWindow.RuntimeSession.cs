@@ -27,7 +27,7 @@ public partial class MainWindow
                 async (settings, token) => await _coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync(settings, token),
                 async (settings, token) => await _coreServices.Runtime.RuntimeEndpointProbe.IsRespondingAsync(settings, token),
                 (model, settings) => StartModelLoadingTimer(model.Id, model.Name, settings),
-                StartRuntimeReadinessMonitor,
+                (model, settings) => StartRuntimeReadinessMonitor(model, settings),
                 settings => _activeRuntimeSettings = settings,
                 SetStatus,
                 StartRuntimeDashboardRefreshTimer,

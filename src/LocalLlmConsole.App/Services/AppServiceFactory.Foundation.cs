@@ -171,7 +171,7 @@ public sealed partial class AppServiceFactory
     public SettingsPageDefinitionService CreateSettingsPageDefinitionService()
         => new();
 
-    public HelpSectionService CreateHelpSectionService()
+    public HelpCatalogService CreateHelpCatalogService()
         => new();
 
     public HelpNavigationApplicationService CreateHelpNavigationApplicationService()

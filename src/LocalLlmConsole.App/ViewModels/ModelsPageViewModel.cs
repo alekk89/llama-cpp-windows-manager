@@ -12,7 +12,9 @@ public sealed class ModelsPageViewModel
     public void ReplaceModels(
         IEnumerable<ModelRecord> models,
         Func<ModelRecord, bool> isModelActive,
-        IEnumerable<NamedModelLaunchProfile>? namedProfiles = null)
+        IEnumerable<NamedModelLaunchProfile>? namedProfiles = null,
+        IReadOnlyDictionary<string, string>? modelSizeLabels = null,
+        IReadOnlyDictionary<string, ModelGroupRecord>? launchProfileGroups = null)
     {
         var allModels = models.ToArray();
         Rows.Clear();
@@ -24,7 +26,7 @@ public sealed class ModelsPageViewModel
             {
                 Name = model.Name,
                 Quant = ModelCatalogService.InferQuant(model.ModelPath),
-                Size = ModelSizeLabel(model.ModelPath),
+                Size = modelSizeLabels?.GetValueOrDefault(model.Id) ?? "",
                 CanDelete = !isModelActive(model),
                 DeleteToolTip = isModelActive(model)
                     ? "Unload this model before deleting it from disk."
@@ -45,13 +47,20 @@ public sealed class ModelsPageViewModel
             if (model is null) continue;
             var active = isModelActive(model);
             var hasAlternative = profileCounts.GetValueOrDefault(profile.ModelId) > 1;
+            var groupName = launchProfileGroups?.GetValueOrDefault(profile.Id)?.Name ?? "";
             _allVariantRows.Add(new ModelGridRow
             {
                 Name = profile.Name,
                 Quant = "Profile",
-                Size = ModelSizeLabel(model.ModelPath),
+                Size = modelSizeLabels?.GetValueOrDefault(model.Id) ?? "",
                 BaseModel = model.Name,
                 Port = profile.Settings.Port.ToString(CultureInfo.InvariantCulture),
+                Group = groupName,
+                GroupAction = string.IsNullOrWhiteSpace(groupName) ? "Add" : "",
+                GroupToolTip = string.IsNullOrWhiteSpace(groupName)
+                    ? "Add this launch profile to a model group."
+                    : $"Click {groupName} to change or remove this group assignment.",
+                CanAssignGroup = string.IsNullOrWhiteSpace(groupName),
                 DeleteAction = hasAlternative ? "Remove" : "",
                 DeleteToolTip = !hasAlternative
                     ? "Every model needs at least one launch profile. Add another profile before removing this one."
@@ -93,17 +102,4 @@ public sealed class ModelsPageViewModel
             StringComparison.OrdinalIgnoreCase))?.Model.Id;
     }
 
-    private static string ModelSizeLabel(string modelPath)
-    {
-        try
-        {
-            return File.Exists(modelPath)
-                ? DisplayFormatService.Bytes(new FileInfo(modelPath).Length)
-                : "";
-        }
-        catch
-        {
-            return "";
-        }
-    }
 }

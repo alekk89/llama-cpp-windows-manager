@@ -39,33 +39,38 @@ public sealed class HuggingFacePageViewModel
 
     public void ReplaceDownloadHistory(IEnumerable<JobRecord> jobs)
     {
-        DownloadHistoryRows.Clear();
-        foreach (var job in jobs.Where(job => string.Equals(job.Kind, "huggingface-download", StringComparison.OrdinalIgnoreCase)))
-        {
-            var payload = HuggingFaceService.ParseDownloadPayload(job.PayloadJson);
-            DownloadHistoryRows.Add(new UiRow
+        var rows = jobs
+            .Where(job => string.Equals(job.Kind, "huggingface-download", StringComparison.OrdinalIgnoreCase))
+            .Select(job =>
             {
-                C1 = job.Status.ToString(),
-                C2 = payload is null ? job.Id : $"{payload.File.Name} - {payload.File.Repo}",
-                C3 = HuggingFaceInstallStateService.FormatDownloadProgress(payload),
-                C4 = payload?.TotalBytes > 0 ? DisplayFormatService.Bytes(payload.TotalBytes) : "",
-                C5 = job.UpdatedAt.ToLocalTime().ToString("g"),
-                C6 = payload?.Destination ?? "",
-                C7 = HuggingFaceInstallStateService.DownloadStartLabel(job.Status),
-                C8 = "Pause",
-                C9 = "Stop",
-                C10 = "Delete",
-                T1 = "Resume or restart this model download.",
-                T2 = "Pause this active model download.",
-                T3 = "Stop this model download and keep resumable partial data.",
-                T4 = "Delete this download history entry and any incomplete partial file.",
-                B1 = HuggingFaceInstallStateService.CanStartDownload(job.Status),
-                B2 = HuggingFaceInstallStateService.CanPauseDownload(job.Status),
-                B3 = HuggingFaceInstallStateService.CanStopDownload(job.Status),
-                B4 = true,
-                Data = JsonSerializer.SerializeToNode(job) as JsonObject ?? new JsonObject()
+                var payload = HuggingFaceService.ParseDownloadPayload(job.PayloadJson);
+                return new UiRow
+                {
+                    C1 = job.Status.ToString(),
+                    C2 = payload is null ? job.Id : $"{payload.File.Name} - {payload.File.Repo}",
+                    C3 = HuggingFaceInstallStateService.FormatDownloadProgress(payload),
+                    C4 = payload?.TotalBytes > 0 ? DisplayFormatService.Bytes(payload.TotalBytes) : "",
+                    C5 = job.UpdatedAt.ToLocalTime().ToString("g"),
+                    C6 = payload?.Destination ?? "",
+                    C7 = HuggingFaceInstallStateService.DownloadStartLabel(job.Status),
+                    C8 = "Pause",
+                    C9 = "Stop",
+                    C10 = "Delete",
+                    T1 = "Resume or restart this model download.",
+                    T2 = "Pause this active model download.",
+                    T3 = "Stop this model download and keep resumable partial data.",
+                    T4 = "Delete this download history entry and any incomplete partial file.",
+                    B1 = HuggingFaceInstallStateService.CanStartDownload(job.Status),
+                    B2 = HuggingFaceInstallStateService.CanPauseDownload(job.Status),
+                    B3 = HuggingFaceInstallStateService.CanStopDownload(job.Status),
+                    B4 = true,
+                    Data = JsonSerializer.SerializeToNode(job) as JsonObject ?? new JsonObject()
+                };
             });
-        }
+        UiRowCollectionUpdater.Reconcile(
+            DownloadHistoryRows,
+            rows,
+            row => row.Data["Id"]?.ToString() ?? "");
     }
 
     private static string SearchSignals(HuggingFaceFile file)

@@ -49,13 +49,14 @@ public sealed class ModelRuntimeCommandDecisionService
         ModelRecord? model,
         bool modelLoaded,
         bool modelActive,
-        bool appReady)
+        bool appReady,
+        bool selectedProfileLoaded)
     {
         if (model is null)
             return Status("Choose a model first.");
-        if (modelActive)
+        if (modelActive && selectedProfileLoaded)
             return Status("Selected model is already active.");
-        if (modelLoaded)
+        if (modelLoaded && selectedProfileLoaded)
             return new ModelRuntimeLoadCommand(ModelRuntimeLoadCommandKind.SwitchLoaded);
         if (!appReady)
             return Status("App is still starting.");

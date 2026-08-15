@@ -5,17 +5,12 @@ namespace LocalLlmConsole;
 public sealed record RuntimesPageRowActionControllerActions(
     Func<object, RuntimeRecord?> RuntimeFromRowButton,
     Func<object, RuntimeSourceEntry?> RuntimeSourceFromRowButton,
-    Func<object, RuntimeBuildPreset?> RuntimeBuildPresetFromRowButton,
     Func<object, RuntimePackagePreset?> RuntimePackagePresetFromRowButton,
     Func<object, JobRecord?> JobFromRowButton,
-    Func<RuntimeBuildPresetRow, Task> AddCustomRuntimeRepositoryFromRowAsync,
-    Func<RuntimeBuildPreset, Task> DownloadRuntimeSourceAsync,
+    Func<RuntimePackagePresetRow, Task> RunRuntimeSourceRowActionAsync,
     Func<RuntimePackagePreset, Task> InstallRuntimePackageAsync,
     Func<RuntimePackagePreset, RuntimePackagePresetRow?, Task> CheckRuntimePackageUpdateAsync,
-    Func<RuntimePackagePreset, Task> DeleteRuntimePackageBuildsAsync,
-    Func<RuntimeBuildPreset, RuntimeBuildPresetRow?, Task> CheckRuntimePresetUpdateAsync,
-    Func<RuntimeBuildPreset, Task> DeleteAllRuntimePresetBuildsAsync,
-    Func<RuntimeSourceEntry, Task> BuildRuntimeSourceAsync,
+    Func<RuntimePackagePresetRow, Task> DeleteRuntimeDownloadRowAsync,
     Func<RuntimeSourceEntry, Task> DeleteRuntimeSourceAsync,
     Func<RuntimeRecord, Task> DeleteRuntimeBuildAsync,
     Func<JobRecord, Task> CancelRuntimeBuildJobAsync,
@@ -33,18 +28,12 @@ public sealed class RuntimesPageRowActionController
         _actions = actions;
     }
 
-    public async void DownloadRuntimePresetRow_Click(object sender, RoutedEventArgs e)
+    public async void RuntimeSourceRow_Click(object sender, RoutedEventArgs e)
     {
         await _actions.RunEventAsync(async () =>
         {
-            if ((sender as FrameworkElement)?.Tag is RuntimeBuildPresetRow { IsCustomAdd: true } row)
-            {
-                await _actions.AddCustomRuntimeRepositoryFromRowAsync(row);
-                return;
-            }
-
-            var preset = _actions.RuntimeBuildPresetFromRowButton(sender);
-            if (preset is not null) await _actions.DownloadRuntimeSourceAsync(preset);
+            if ((sender as FrameworkElement)?.Tag is RuntimePackagePresetRow row)
+                await _actions.RunRuntimeSourceRowActionAsync(row);
         });
     }
 
@@ -62,27 +51,11 @@ public sealed class RuntimesPageRowActionController
     }
 
     public async void DeleteRuntimePackageRow_Click(object sender, RoutedEventArgs e)
-        => await RunRuntimePackageActionAsync(sender, preset => _actions.DeleteRuntimePackageBuildsAsync(preset));
-
-    public async void CheckRuntimePresetUpdateRow_Click(object sender, RoutedEventArgs e)
     {
         await _actions.RunEventAsync(async () =>
         {
-            var row = (sender as FrameworkElement)?.Tag as RuntimeBuildPresetRow;
-            var preset = _actions.RuntimeBuildPresetFromRowButton(sender);
-            if (preset is not null) await _actions.CheckRuntimePresetUpdateAsync(preset, row);
-        });
-    }
-
-    public async void DeleteRuntimePresetRow_Click(object sender, RoutedEventArgs e)
-        => await RunRuntimeBuildPresetActionAsync(sender, preset => _actions.DeleteAllRuntimePresetBuildsAsync(preset));
-
-    public async void BuildRuntimeRow_Click(object sender, RoutedEventArgs e)
-    {
-        await _actions.RunEventAsync(async () =>
-        {
-            var source = _actions.RuntimeSourceFromRowButton(sender);
-            if (source is not null) await _actions.BuildRuntimeSourceAsync(source);
+            if ((sender as FrameworkElement)?.Tag is RuntimePackagePresetRow row)
+                await _actions.DeleteRuntimeDownloadRowAsync(row);
         });
     }
 
@@ -116,15 +89,6 @@ public sealed class RuntimesPageRowActionController
 
     public async void ClearRuntimeJobRow_Click(object sender, RoutedEventArgs e)
         => await RunRuntimeJobActionAsync(sender, job => _actions.ClearRuntimeBuildJobAsync(job));
-
-    private async Task RunRuntimeBuildPresetActionAsync(object sender, Func<RuntimeBuildPreset, Task> action)
-    {
-        await _actions.RunEventAsync(async () =>
-        {
-            var preset = _actions.RuntimeBuildPresetFromRowButton(sender);
-            if (preset is not null) await action(preset);
-        });
-    }
 
     private async Task RunRuntimePackageActionAsync(object sender, Func<RuntimePackagePreset, Task> action)
     {

@@ -29,6 +29,12 @@ public sealed record LocalControlProfileWriteRequest(
     JsonObject? Settings = null,
     bool Replace = false);
 
+public sealed record LocalControlModelGroupWriteRequest(
+    string Name = "",
+    string RetentionMode = "Inherit",
+    int IdleMinutes = ModelGroupService.DefaultIdleMinutes,
+    string EvictionPriority = "Normal");
+
 public sealed record LocalControlDownloadRequest(
     string Query = "",
     string Repo = "",
@@ -57,7 +63,9 @@ public sealed record LocalControlDependencies(
     RuntimeEndpointProbeService RuntimeEndpointProbe,
     LogPageWorkflowService LogWorkflow,
     LocalControlActions Actions,
-    ControlApiAuditLogService? AuditLog = null);
+    ControlApiAuditLogService? AuditLog = null,
+    ModelGroupService? ModelGroups = null,
+    EndpointInspectionService? EndpointInspection = null);
 
 public sealed record LocalControlDiscoveryDocument(
     int Version,

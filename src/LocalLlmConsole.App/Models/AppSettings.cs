@@ -78,7 +78,19 @@ public sealed record AppSettings(
     string UiCulture = "en",
     string GpuMode = "auto",
     string GpuDevices = "",
-    string GpuSplit = "")
+    string GpuSplit = "",
+    string ReasoningEffort = "default",
+    string ReasoningBudgetMessage = "",
+    string ReasoningPreserve = "auto",
+    bool ShowOverviewModelStatus = true,
+    bool ShowOverviewHardware = true,
+    bool ShowOverviewSlots = true,
+    bool ShowOverviewTokens = true,
+    bool ShowOverviewMtpTokens = true,
+    bool ShowOverviewKvCache = true,
+    bool ShowOverviewLiveRuntimeLog = true,
+    bool ShowOverviewAllMetrics = false,
+    bool ShowModelsHuggingFace = false)
 {
     public const int DefaultContextSize = 131_072;
     public const int DefaultGpuLayers = 999;

@@ -13,15 +13,15 @@ public partial class MainWindow
             () =>
             {
                 UpdateLaunchControlVisibility();
-                UpdateLaunchSaveButtonState();
                 ScheduleRuntimeLaunchOptionDiscovery();
+                UpdateLaunchSaveButtonState();
             },
             showAdvanced =>
             {
                 _coreServices.Ui.AdvancedSections.SetLaunchSettings(showAdvanced);
                 UpdateLaunchControlVisibility();
             },
-            UpdateLaunchControlVisibility,
+            ScheduleLaunchSettingsInputRefresh,
             SaveLaunchSettingsForSelectedModelAsync,
             SaveLaunchDefaultsFromControlsAsync,
             ResetLaunchSettingsToDefaults,

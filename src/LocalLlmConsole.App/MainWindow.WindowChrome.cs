@@ -16,6 +16,8 @@ public partial class MainWindow
 {
     private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (IsTitleBarButtonSource(e.OriginalSource as DependencyObject)) return;
+
         if (e.ClickCount == 2)
         {
             ToggleWindowState();
@@ -31,6 +33,15 @@ public partial class MainWindow
         {
             // DragMove can throw if Windows has already ended the mouse operation.
         }
+    }
+
+    private static bool IsTitleBarButtonSource(DependencyObject? source)
+    {
+        for (var current = source; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is System.Windows.Controls.Button) return true;
+        }
+        return false;
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
@@ -94,6 +105,35 @@ public partial class MainWindow
         var bottomRight = source.CompositionTarget.TransformFromDevice.Transform(new System.Windows.Point(workingArea.Right, workingArea.Bottom));
         MaxWidth = Math.Max(MinWidth, bottomRight.X - topLeft.X);
         MaxHeight = Math.Max(MinHeight, bottomRight.Y - topLeft.Y);
+    }
+
+    private void ConstrainInitialWindowToWorkArea()
+    {
+        if (WindowState == WindowState.Maximized) return;
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var workingArea = Forms.Screen.FromHandle(handle).WorkingArea;
+        var source = PresentationSource.FromVisual(this);
+        var topLeft = source?.CompositionTarget is null
+            ? SystemParameters.WorkArea.TopLeft
+            : source.CompositionTarget.TransformFromDevice.Transform(new System.Windows.Point(workingArea.Left, workingArea.Top));
+        var bottomRight = source?.CompositionTarget is null
+            ? SystemParameters.WorkArea.BottomRight
+            : source.CompositionTarget.TransformFromDevice.Transform(new System.Windows.Point(workingArea.Right, workingArea.Bottom));
+        var layout = WindowWorkAreaSizingService.Fit(
+            Width,
+            Height,
+            MinWidth,
+            MinHeight,
+            topLeft.X,
+            topLeft.Y,
+            bottomRight.X - topLeft.X,
+            bottomRight.Y - topLeft.Y);
+        MinWidth = layout.MinimumWidth;
+        MinHeight = layout.MinimumHeight;
+        Width = layout.Width;
+        Height = layout.Height;
+        Left = layout.Left;
+        Top = layout.Top;
     }
 
     private void MaximizeButton_Click(object sender, RoutedEventArgs e) => ToggleWindowState();

@@ -15,7 +15,11 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private void ShowOverview()
+        => ShowOverview(refresh: true);
+
+    private void ShowOverview(bool refresh)
     {
+        _pageControllers.Overview.CancelPendingSelections();
         SetPage("Overview", Loc.T("PageSubtitle.Overview"));
         var overview = OverviewPageFactory.Create(new OverviewPageRequest(
             _viewModel,
@@ -23,13 +27,17 @@ public partial class MainWindow
             SetRuntimeMetricsGridColumnSizing));
 
         _overviewPage.Apply(overview);
+        _overviewPage.ApplyUiPreferences(_settings);
         _runtimeDashboardPage.Apply(overview);
 
         PageHost.Content = overview.Root;
-        RunBackground(RefreshOverviewAsync, "Overview refresh failed");
-        RunBackground(RefreshOverviewModelSelectorAsync, "Overview model refresh failed");
-        RunBackground(RefreshRuntimeMetricsAsync, "Runtime metrics refresh failed");
-        StartRuntimeDashboardRefreshTimer();
+        if (refresh)
+        {
+            RunBackground(RefreshOverviewAsync, "Overview refresh failed");
+            RunBackground(RefreshOverviewModelSelectorAsync, "Overview model refresh failed");
+            RunBackground(RefreshRuntimeMetricsAsync, "Runtime metrics refresh failed");
+            StartRuntimeDashboardRefreshTimer();
+        }
     }
 
     private void ShowModels()
@@ -43,6 +51,7 @@ public partial class MainWindow
             _pageControllers.Models.Build()));
 
         _modelsPage.Apply(modelsPage);
+        _modelsPage.ApplyUiPreferences(_settings);
         ConfigureHfSearchGrid();
         PageHost.Content = modelsPage.Root;
         RunBackground(RefreshModelsAsync, "Models refresh failed");
@@ -54,7 +63,6 @@ public partial class MainWindow
         var runtimesPage = RuntimesPageFactory.Create(new RuntimesPageRequest(
             _viewModel,
             _settings.RuntimeRoot,
-            _coreServices.Ui.AdvancedSections.ShowRuntimes,
             _settings.CudaPackagePreference,
             _pageControllers.Runtimes.Build()));
 
@@ -73,12 +81,6 @@ public partial class MainWindow
             await RefreshModelsAsync();
             await RefreshOverviewAsync();
         });
-    }
-
-    private void ToggleAdvancedRuntimes()
-    {
-        _coreServices.Ui.AdvancedSections.ToggleRuntimes();
-        ShowRuntimes();
     }
 
     private void RefreshCurrentPage()

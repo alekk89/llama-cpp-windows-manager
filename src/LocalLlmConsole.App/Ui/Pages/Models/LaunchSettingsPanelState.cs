@@ -69,7 +69,7 @@ public sealed class LaunchSettingsPanelState
         SaveModelLaunchSettingsButton.Content = content;
         SaveModelLaunchSettingsButton.IsEnabled = enabled;
         SaveModelLaunchSettingsButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        SaveModelLaunchSettingsButton.ToolTip = "Save changes to the selected named launch profile.";
+        SaveModelLaunchSettingsButton.ToolTip = Loc.T("Launch.SaveProfileTooltip");
     }
 
     public void SetSaveAsNewModelName(string name)
@@ -92,7 +92,7 @@ public sealed class LaunchSettingsPanelState
         ApplyLaunchSettingVisibility(plan, search);
         ApplyLaunchSectionVisibility(plan, search);
         ApplyLaunchSettingEnabled(plan.EnabledSettings);
-        FormControls.RuntimeOptions?.ApplyFilter(LaunchSettingsSearchBox?.Text);
+        FormControls.RuntimeOptions?.ApplyVisibility(plan.ShowAdvancedSections, LaunchSettingsSearchBox?.Text);
 
         if (FormControls.GpuLayersBox is not null)
             FormControls.GpuLayersBox.IsEnabled = plan.GpuLayersAvailable;

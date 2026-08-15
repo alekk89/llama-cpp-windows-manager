@@ -134,6 +134,26 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Fact]
+    public void SessionsInspectTargetsTheAuthenticatedManagerInspectionRoute()
+    {
+        var request = LocalLlmConsole.ControlCli.Program.BuildRequestForTests("sessions", "inspect", "session-qwen");
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/v1/sessions/session-qwen/inspect", request.Path);
+        Assert.Null(request.Body);
+    }
+
+    [Fact]
+    public void GatewayInspectTargetsTheAuthenticatedManagerInspectionRoute()
+    {
+        var request = LocalLlmConsole.ControlCli.Program.BuildRequestForTests("gateway", "inspect");
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/v1/gateway/inspect", request.Path);
+        Assert.Null(request.Body);
+    }
+
+    [Fact]
     public async Task RawRequestCannotBypassCurrentModelStopProtection()
     {
         var root = CreateTempRoot();

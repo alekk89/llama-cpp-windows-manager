@@ -90,9 +90,6 @@ public sealed class WslPageState
         DeleteSyclOneApiButton = controls.DeleteSyclOneApiButton;
     }
 
-    public void RefreshDistroGrid()
-        => DistroGrid?.Items.Refresh();
-
     public void ApplyActionState(WslEnvironmentReport report, bool hasUbuntu, WslToolSnapshot tools)
     {
         ArgumentNullException.ThrowIfNull(report);

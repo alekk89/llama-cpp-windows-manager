@@ -56,11 +56,11 @@ public partial class MainWindow
                 _settings.ModelApiKey,
                 _viewModel.Logs.Rows.Count > 0));
             if (!string.Equals(path, SelectedLogPath(), StringComparison.OrdinalIgnoreCase)) return;
-            _logsPage.SetPreviewText(preview, scrollToEnd: !string.IsNullOrWhiteSpace(path));
+            _logsPage.SetPreviewText(preview, path, scrollToEnd: !string.IsNullOrWhiteSpace(path));
         }
         catch (Exception ex)
         {
-            _logsPage.SetPreviewText($"Could not read log file.{Environment.NewLine}{Environment.NewLine}{ex.Message}");
+            _logsPage.SetPreviewText($"Could not read log file.{Environment.NewLine}{Environment.NewLine}{ex.Message}", path);
         }
     }
 

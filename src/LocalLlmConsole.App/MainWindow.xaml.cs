@@ -17,11 +17,12 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        AppVersionText.Text = AppVersionLabel;
-        ApplyStaticButtonToolTips();
-        StateChanged += Window_StateChanged;
-        _workspaceRoot = WorkspaceRootResolver.Resolve();
         Loc.LoadLanguage("en");
+        AppVersionText.Text = AppVersionLabel;
+        ApplyNavigationToggleState(collapsed: false);
+        StateChanged += Window_StateChanged;
+        SourceInitialized += (_, _) => ConstrainInitialWindowToWorkArea();
+        _workspaceRoot = WorkspaceRootResolver.Resolve();
         ApplyLocalizedXamlStrings();
         _serviceFactory = new AppServiceFactory(_workspaceRoot);
         _infrastructureServices = _serviceFactory.CreateMainWindowInfrastructureServices();
@@ -65,7 +66,7 @@ public partial class MainWindow : Window
                         settings =>
                         {
                             _settings = settings;
-                            ApplyTheme(settings.ThemeMode);
+                            ApplicationThemeService.Apply(settings.ThemeMode);
                             Loc.LoadLanguage(settings.UiCulture);
                             ApplyLocalizedXamlStrings();
                             PopulateLanguageSelector();
@@ -74,7 +75,7 @@ public partial class MainWindow : Window
                     service => _service = service,
                     SetStatus));
             RunBackground(SeedSuggestedLaunchProfilesInBackgroundAsync, "Launch profile seeding follow-up failed");
-            ShowOverview();
+            ShowOverview(refresh: false);
             await RefreshAllAsync();
             await RecoverActiveRuntimeSessionAsync();
             await StartModelGatewaySafelyAsync();
@@ -90,6 +91,24 @@ public partial class MainWindow : Window
         _modelServices = services.Models;
         _gatewayServices = services.Gateway;
         _runtimeServices = services.Runtime;
+        _controlRuntimeOperations = new ControlRuntimeOperationApplicationService(
+            new ControlRuntimeOperationDependencies(
+                services.App.StateStore,
+                _coreServices.Runtime.RuntimeCatalogData,
+                services.Runtime.CustomRuntimeRepositories,
+                services.Runtime.RuntimeBuildDeletionApplication,
+                services.Runtime.RuntimePackageApplication,
+                services.Runtime.RuntimeSourceApplication,
+                services.Runtime.RuntimeBuildApplication,
+                services.Runtime.RuntimeBuildJobApplication,
+                _runtimeCatalogState),
+            new ControlRuntimeOperationActions(
+                () => _settings,
+                MaxLogBytes,
+                ControlRunBusyAsync,
+                RefreshRuntimesAsync,
+                SetStatus,
+                message => Dispatcher.InvokeAsync(() => SetStatus(message)).Task));
     }
 
     private async Task SeedSuggestedLaunchProfilesInBackgroundAsync()

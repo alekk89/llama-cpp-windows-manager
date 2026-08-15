@@ -58,6 +58,9 @@ public sealed partial class AppServiceFactory
     public DebouncedAsyncAction CreateLaunchSettingsRefreshAction()
         => new(TimeSpan.FromMilliseconds(120));
 
+    public DebouncedAsyncAction CreateSettingsAutoApplyAction()
+        => new(TimeSpan.FromMilliseconds(300));
+
     public ModelRuntimeStatusController CreateModelRuntimeStatusController(
         ModelRuntimeStatusTracker tracker,
         IUiTimerFactory timerFactory)
@@ -70,6 +73,12 @@ public sealed partial class AppServiceFactory
         => new(new VramAdmissionService());
 
     public ModelRuntimeCommandDecisionService CreateModelRuntimeCommandDecisionService()
+        => new();
+
+    public OverviewModelGroupLoadPlanningService CreateOverviewModelGroupLoadPlanningService()
+        => new();
+
+    public OverviewModelGroupLoadApplicationService CreateOverviewModelGroupLoadApplicationService()
         => new();
 
     public LaunchRuntimeSelectionService CreateLaunchRuntimeSelectionService()

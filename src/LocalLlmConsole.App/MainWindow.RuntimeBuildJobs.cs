@@ -14,11 +14,14 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
-    private async Task BuildRuntimeSourceAsync(RuntimeSourceEntry source)
+    private async Task BuildRuntimeSourceAsync(RuntimeSourceEntry source, bool deleteSourceAfterBuild = false)
     {
         var buildApplication = RuntimeServices.RuntimeBuildApplication;
         if (buildApplication is null) return;
-        await buildApplication.BuildSourceAsync(source, _settings, MaxLogBytes(), RuntimeBuildApplicationActions());
+        var settings = deleteSourceAfterBuild
+            ? _settings with { DeleteRuntimeSourceAfterSuccessfulBuild = true }
+            : _settings;
+        await buildApplication.BuildSourceAsync(source, settings, MaxLogBytes(), RuntimeBuildApplicationActions());
     }
 
     private async Task DeleteRuntimeSourceAsync(RuntimeSourceEntry source)
@@ -51,10 +54,13 @@ public partial class MainWindow
     {
         var buildApplication = RuntimeServices.RuntimeBuildApplication;
         if (buildApplication is null) return;
+        var settings = source is null
+            ? _settings
+            : _settings with { DeleteRuntimeSourceAfterSuccessfulBuild = true };
         await buildApplication.BuildAsync(
             new RuntimeBuildApplicationRequest(
                 preset,
-                _settings,
+                settings,
                 update,
                 source,
                 MaxLogBytes()),

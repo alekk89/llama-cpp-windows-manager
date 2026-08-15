@@ -1,10 +1,10 @@
 # Release Hardening Audit
 
-Audit date: 2026-08-13
+Audit date: 2026-08-15
 
 ## Executive Summary
 
-Overall release posture: **v2.1.0 passes the repository's automated build,
+Overall release posture: **v2.2.0 passes the repository's automated build,
 test, coverage, vulnerability, portable-publish, sidecar-bootstrap, and
 installer gates. Public artifacts must still come from the protected signed
 release workflow, and clean-machine plus hardware-matrix validation remains a
@@ -20,6 +20,9 @@ The core release blockers from the full audit have been addressed in code:
 - Job IDs use GUIDs.
 - Hugging Face downloads are bounded to the models folder, block duplicate destinations, reject unsafe local filenames and partial-file links, preflight disk space, and require expected-size or SHA-256 verification before model registration.
 - Model serving now requires a strong API key even in local-only mode, and the persisted key is protected with current-user Windows data protection.
+- Control-surface settings mutation is isolated behind validation that rejects
+  auth disablement, protected-field replacement, invalid ranges, and gateway
+  ports already occupied by running models.
 - Auto-load gateway request bodies are bounded and oversized payloads return a
   `413 request_too_large` response before proxying.
 - Runtime source IDs loaded from custom JSON are sanitized, and recursive runtime deletes are path-bounded.
@@ -36,10 +39,13 @@ The core release blockers from the full audit have been addressed in code:
 - Runtime package downloads verify expected sizes and SHA-256 metadata or
   companion checksum files before installation.
 - The Windows and WSL setup workflows now cover CPU, CUDA, Vulkan, and Intel
-  Arc SYCL prerequisites before advanced source builds start.
+  Arc SYCL prerequisites before source builds start.
 - Per-model launch settings now include vision image token allowances and map them to llama.cpp server flags.
 - Per-model ports and loaded model sessions allow more than one model endpoint
   to stay available when hardware capacity allows it.
+- Model-group edits replace definitions and profile assignments in one SQLite
+  transaction. Group launch pre-stops every replaced session to support
+  cross-port swaps and restores original profiles if a later target fails.
 - The auto-load gateway provides one shared OpenAI-compatible endpoint, routes
   by requested model id, starts models on their saved direct ports, and exposes
   policy controls for keeping loaded sessions or switching to one active model.
@@ -48,15 +54,53 @@ The core release blockers from the full audit have been addressed in code:
 - Per-model launch profiles now support saved variants, auto-detected,
   embedded/model-bundled, or explicit vision head/projector choices, vision
   image token allowances and separate MTP head choices for compatible runtimes.
+- Embedded positive NextN/MTP metadata now prevents an unrelated external draft
+  model from being injected, and automatic companion selection rejects
+  incompatible model families, versions, and parameter sizes.
 - The shared gateway publishes one client-neutral route per saved launch profile
   and never edits third-party harness configuration.
 - Fresh installer setups offer Start with Windows by default, with a matching
   current-user startup preference in Settings.
-- Settings are grouped by category, and Overview preserves completed model load
-  duration as a separate Loading Time row after a model becomes ready.
+- Settings use compact two-column category grids with readable editors, narrow
+  dropdowns, row-local actions, and automatic persistence. The **UI** category
+  controls all six Overview status cards, the live runtime log, raw llama.cpp
+  metrics, and the Models Hugging Face section. Hidden areas reflow without
+  blank rows or splitters while underlying services remain active.
+- Overview preserves completed model load duration as a separate Loading Time
+  row after a model becomes ready.
+- Per-monitor-v2 DPI handling constrains the initial window to the monitor work
+  area, and the Overview selector bar plus metric cards reflow at narrow widths.
+  Metric cards remain in a readable two-column layout at the default window
+  width and switch to three columns only when 1140 px of page content is
+  available; the loaded-session Runtime column receives additional space.
+- Nineteen language packs meet the production coverage floor; Arabic and Hindi
+  are disclosed as partial previews, and Arabic/Persian apply right-to-left flow
+  to the shell and owned dialogs. Model Groups, Endpoint Inspection, their
+  validation messages, and their live status messages are localized in all 21
+  packs with placeholder parity tests.
+- Custom window controls, status announcements, section headings, and grid row
+  actions now expose WPF automation metadata verified by an STA smoke test.
+- In-app Help is now a compact searchable task catalog with six focused
+  categories, progressively disclosed articles, API/authentication guidance,
+  contextual page actions, keyboard search, accessible result announcements,
+  and a complete 21-pack resource contract. Eleven packs include translated
+  Help articles; the other nine non-English packs fall back to English for the
+  new Help content instead of exposing resource keys.
+- Loaded model endpoints can be inspected through `llwmctl sessions inspect`;
+  the Manager applies its stored serving credential internally and returns only
+  the normalized health/capability report.
+- Portable/installer outputs ship the project license, full Apache-2.0 terms,
+  third-party notices, and .NET license/notices. Executable-only sidecar
+  bootstrap restores the same compliance files.
+- The protected signed-release workflow pins GitHub actions to immutable commit
+  SHAs and installs a pinned Inno Setup version before certificate import.
 - The local app service now keeps request handlers observed and tolerates
   bounded transient listener errors instead of silently faulting the listener
   loop.
+- MainWindow shell ownership is guarded: runtime control workflows, theme
+  resources, visual traversal, and accessibility helpers have dedicated owners,
+  redundant shell UI factories were removed, and no MainWindow partial may
+  exceed 300 nonblank lines.
 
 ## Remaining External Hardening Work
 
@@ -80,10 +124,10 @@ The core release blockers from the full audit have been addressed in code:
 - Area: Distribution
 - Status: Update UI, staged installer, checksum verification, signed-app
   signature continuity, and rollback-safe app/CLI replacement are implemented;
-  the public repository and v2.1.0 asset naming are confirmed.
+  the public repository and v2.2.0 asset naming are confirmed.
 - Required result: Latest GitHub release contains
   `LlamaCppWindowsManager-win-x64.zip`, the standalone
-  `LlamaCppWindowsManager.exe` required by v1.x/v2.0 updaters, matching SHA-256
+  `LlamaCppWindowsManager.exe` required by v1.x/v2.0/v2.1 updaters, matching SHA-256
   companion assets, and release notes suitable for the completion popup.
 
 ### WSL and hardware matrix
@@ -120,16 +164,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -SkipPublish
 ```
 
-The latest local architecture/release pass on 2026-08-13 ran
-`test-release-gate.ps1 -IncludePublish -IncludeInstaller`, which wraps the
-release build, release-hardening suite, formatting verification,
-`git diff --check`, vulnerability/deprecation/direct-package currency audit,
-publish smoke, and installer artifact checks. Service/unit tests passed
-(`458/458`) and the WPF smoke test
-passed (`1/1`) with no skips. The v2 portable zip contains the Manager, control
-CLI, agent guides, control API reference, and
-checksum companions; the updater and installer remove the obsolete pre-rename
-executable during migration. The local verification artifacts were unsigned.
+The latest source architecture/release pass on 2026-08-15 ran
+`test-release-gate.ps1 -IncludePublish -IncludeInstaller`, which wraps the Release build,
+release-hardening suite, coverage enforcement, formatting verification,
+`git diff --check`, direct-package vulnerability/deprecation/currency checks,
+the portable packaging gate, and the installer gate. Service/unit tests passed (`548/548`) and the
+WPF smoke test passed (`1/1`) with no skips. The build completed with zero
+warnings; Services coverage was 80.9% and Models + ViewModels coverage was
+97.4%. The portable publish, embedded operator/control sidecar, and installer
+checks passed. The resulting local artifacts are intentionally unsigned.
 
 ## Post-v1.1.2 Hardening
 
@@ -163,7 +206,9 @@ low-risk items that were safe to take immediately:
   summaries for AMD/Intel/Vulkan systems.
 - Overview Model Status now separates Loading/Loaded Model from Loading Time and
   keeps the completed load duration visible after startup.
-- Settings now renders preferences in category sections for easier navigation.
+- Settings now renders polished two-column category grids, integrates actions
+  only into their owning value rows, persists edits automatically, and provides
+  per-surface Overview and Models visibility in a dedicated **UI** category.
 
 Verification for this hardening pass:
 
@@ -193,7 +238,7 @@ checks passed locally.
 
 ## Release Decision
 
-v2.1.0 is acceptable for release after the protected workflow produces signed
+v2.2.0 is acceptable for release after the protected workflow produces signed
 portable and installer artifacts and the manual clean-machine checklist is
 completed. Local unsigned artifacts are suitable only for testing and must
 remain labelled unsigned.

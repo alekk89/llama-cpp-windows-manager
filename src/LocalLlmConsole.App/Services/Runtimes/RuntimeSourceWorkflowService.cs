@@ -76,8 +76,11 @@ public sealed class RuntimeSourceWorkflowService
         {
             await UpdateJobAsync(request, job, JobStatus.Running, "Checking remote repository...");
             var remoteCommit = await _sources.RemoteCommitAsync(request.Preset, request.CancellationToken);
-            var hasUpdate = !RuntimeMetadataService.CommitsMatch(request.LocalVersion.Commit, remoteCommit);
-            var message = hasUpdate
+            var hasLocalVersion = !string.IsNullOrWhiteSpace(request.LocalVersion.Commit);
+            var hasUpdate = !hasLocalVersion || !RuntimeMetadataService.CommitsMatch(request.LocalVersion.Commit, remoteCommit);
+            var message = !hasLocalVersion
+                ? $"Source available at {RuntimeMetadataService.DisplayCommit(remoteCommit)}. Use Download, then Build."
+                : hasUpdate
                 ? $"Update available: {RuntimeMetadataService.DisplayCommit(request.LocalVersion.Commit)} -> {RuntimeMetadataService.DisplayCommit(remoteCommit)}. Use Download, then build the downloaded source."
                 : $"Already up to date at {RuntimeMetadataService.DisplayCommit(request.LocalVersion.Commit)}.";
             var state = new RuntimeUpdateState(hasUpdate, request.LocalVersion.Commit, remoteCommit, request.CheckedAt ?? DateTimeOffset.UtcNow);

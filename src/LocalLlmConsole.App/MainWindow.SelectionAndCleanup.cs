@@ -120,7 +120,6 @@ public partial class MainWindow
             row.C6 = isInstalled ? "Installed" : "Download";
             row.B1 = !isInstalled;
         }
-        _modelsPage.RefreshHuggingFaceGrid();
     }
 
     private async Task CleanupActiveWslBuildsAsync()

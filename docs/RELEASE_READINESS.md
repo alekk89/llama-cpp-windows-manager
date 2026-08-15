@@ -1,6 +1,6 @@
 # Release Readiness Checklist
 
-Last updated: 2026-08-13
+Last updated: 2026-08-15
 
 ## Automated Gate
 
@@ -44,12 +44,19 @@ companions, and be described as unsigned.
 ## Release Gate
 
 - Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.2.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
   points at an unsigned published executable.
 - Confirm the portable zip contains `LlamaCppWindowsManager.exe` and does not contain the removed `LlamaCppConsole.exe` alias.
+- Confirm the portable zip and installer contain `LICENSE`,
+  `THIRD-PARTY-NOTICES.md`, `licenses\Apache-2.0.txt`, and the bundled .NET
+  license/notices. Run executable-only `--bootstrap-agent-sidecars-only`
+  verification and confirm all compliance notices are restored beside the app.
+- Confirm the protected signing workflow pins third-party actions to immutable
+  commit SHAs and installs the exact Inno Setup version before importing the
+  code-signing certificate.
 - Confirm fresh installer default path is `D:\LlamaCppWindowsManager` when `D:` exists, `%LocalAppData%\Programs\LlamaCppWindowsManager` when it does not, and that the setup wizard still allows the user to change the install folder.
 - Confirm the installer detects an existing install and reuses its install directory on update or repair.
 - Confirm the final installer page can launch `LlamaCppWindowsManager.exe`.
@@ -60,12 +67,17 @@ companions, and be described as unsigned.
 - Launch the published app on a clean Windows user profile with no repository checkout.
 - Confirm only one app instance can run in the same user session.
 - Confirm Runtime Downloads can check the upstream official llama.cpp release feed and list the official prebuilt packages for CUDA Windows, CUDA WSL, Vulkan Windows, Vulkan WSL, Intel Arc SYCL Windows, Intel Arc SYCL WSL, CPU Windows, and CPU WSL.
+- Confirm Runtimes has no advanced-view toggle or Runtime Jobs section, and each Runtime Downloads row places a compact **Build from source** action—sized consistently with the other row actions—immediately left of **Install**. Confirm job supervision and control remain available through Logs and `llwmctl`.
+- Confirm **Saved Launch Profiles** has no redundant **Open Folder** column; **Model Files** retains the folder action for the actual GGUF.
+- Confirm a source row progresses **Check** -> **Download** -> **Build**, direct download is blocked before a successful source check, and a successful table build deletes its downloaded source and resets the action to **Check**.
+- Confirm **Installed Local Builds** and **Runtime Downloads** each share one header row with their right-aligned Type and Platform filters, with no redundant descriptive sentence below either title. Confirm Type filters select AMD/Vulkan, Intel/SYCL, or NVIDIA/CUDA and Platform filters select Windows or Linux/WSL on both inventories. Confirm CPU rows remain under All and filtering never hides Add custom source repository.
 - Confirm Runtime Downloads can check the Atomic TurboQuant binary feed, install the Windows CUDA package when published, and show the WSL CUDA row as not published until a matching Linux/WSL asset exists.
 - Confirm runtime package downloads fail closed when the downloaded byte count
   does not match release metadata or when no SHA-256 metadata/companion checksum
   is available for a required package asset.
 - Confirm installing a prebuilt runtime does not require Git, CMake, Visual Studio Build Tools, WSL build tools, or source checkout.
 - Confirm installed prebuilt runtimes are registered, can be selected per model, and show update/delete state on the Runtime Downloads page.
+- Confirm changing the runtime on the Models launch form immediately clears the previous runtime's discovered controls, names the runtime being scanned, and renders only the newly selected executable's safe options in grouped two-column sections without dropping unmatched custom parameters. Confirm discovered editors match the curated 28px control sizing and compact field proportions, readable labels replace raw flags, exact `--flag-name` searches still work, and unknown text/choice defaults remain visually blank. Confirm advertised positive/negative switch pairs cycle Default/Enabled/Disabled and emit the matching alias, unpaired switches expose only their advertised direction, and search-filtered runtime options reflow without blank half-rows.
 - Confirm official prebuilt CUDA downloads include the matching runtime DLL/archive companion when upstream publishes one.
 - Confirm source-built official runtimes can be reconciled with matching prebuilt runtimes by local runtime fingerprint.
 - Confirm WSL is installed and the configured Ubuntu distro exists when a WSL runtime or WSL source build is selected, or missing prerequisites are reported clearly.
@@ -92,9 +104,25 @@ companions, and be described as unsigned.
 - Confirm the Overview Loaded Model Sessions grid shows an auto-load gateway
   router row with endpoint, policy, LAN exposure, and current direct-session
   count.
+- Double-click a running model row and click its direct endpoint link. Confirm
+  both open the themed endpoint report populated from `/health`, `/v1/models`,
+  `/props`, and `/slots`, including context, output limit, reasoning/template
+  capability, sampling defaults, and current slot state without generating text.
+- Inspect the gateway row and endpoint link. Confirm the report shows advertised
+  profile model IDs, running sessions, policy, and exposure, and explains that
+  context/reasoning/output defaults belong to each routed model. Confirm a runtime
+  without `/props` or `/slots` still shows available data plus a compact warning.
+- Confirm Overview places Model, Launch profile, and Load on one row; Model and
+  Launch profile retain fixed practical widths at non-maximized window sizes.
+  When a model is running, selecting its active profile hides Load, while
+  selecting a different profile shows Load and replaces the model session with
+  that exact saved profile.
 - Confirm the Overview Model Status card shows Loading Model / Loaded Model and
   Loading Time as separate rows, and that Loading Time remains at the completed
   duration after the model becomes ready.
+- At the default window size, confirm Overview uses two metric-card columns with
+  no clipped card content and the loaded-session Runtime column remains readable;
+  maximize the window and confirm the cards reflow to three columns.
 - Confirm Overview token monitors use two compact rows in the form
   `0.0 t/s (Gen) | 0.0 t/s (Avg) | 0 t (Total)`, with matching Prompt and
   Accepted rows, live rates falling back to `0.0 t/s` when idle, and average or
@@ -111,14 +139,96 @@ companions, and be described as unsigned.
 - Confirm the Settings API key Generate action creates a new model API key.
 - Confirm the gateway `/v1/models` response lists every saved launch profile and
   requesting another profile for a running model restarts it with that profile.
-- Confirm Settings is separated into named category sections rather than one
-  large flat settings grid.
+- Confirm Settings is separated into named category sections arranged in two
+  equal-width columns rather than one large full-width settings grid. Confirm
+  Network and UI remain in opposite columns and narrow values/actions do not
+  force a page-level horizontal scrollbar.
+- Confirm Settings uses readable 28px editors inside compact rows, narrow
+  right-aligned dropdowns, no Save Settings button, and a visible automatic-apply
+  hint. Confirm Network has no blanket Action column and API-key Show, Copy, and
+  Generate controls appear only inside the API-key value row.
+- Confirm Settings includes a **UI** category with
+  independent switches for Model status, Hardware, Slots, Tokens, Speculative
+  tokens, KV cache, Live Runtime Log, All llama.cpp Metrics, and the Models
+  Hugging Face section. Confirm these choices read **Show/Hide**, each switch applies automatically, hidden rows
+  leave no blank splitter/space, card layout reflows, and choices persist after
+  restart.
+- Confirm a workspace without stored UI visibility keys defaults the six status
+  cards and live log to `Show`, and raw metrics and Hugging Face to `Hide`. Use
+  `llwmctl settings set` followed by `llwmctl settings get` to verify the same
+  nine fields can be changed and read back through the live Manager without
+  restarting it.
+- Confirm the compact title-bar menu icon collapses the full navigation sidebar,
+  expands the current page without navigating away, and restores the sidebar on
+  the next activation.
 - Confirm Settings shows cache size at the top and Clear removes cache contents only when downloads/builds are idle.
-- Confirm local-only model serving launches with an API key and client requests include that key.
+- Confirm Help opens with six compact categories and collapsed task articles,
+  category selection filters without leaving stale search text, and article
+  actions navigate to the correct app page.
+- Confirm Help search updates immediately across every category, ranks useful
+  matches for API key, 401, GGUF, CUDA, memory, port, and download queries,
+  exposes a useful empty state, and can be cleared with the button or Escape.
+- Confirm Ctrl+F focuses Help search and that the search field, category actions,
+  result announcement, expanders, and navigation buttons expose automation names.
+- Switch Help to one of Arabic, Bulgarian, Czech, German, Spanish, Persian,
+  French, Hindi, Indonesian, Italian, or Japanese and confirm its
+  category text, complete article content, actions, search state, and search
+  results are translated and searchable. Other language packs currently use
+  English fallbacks for the newly rebuilt Help articles.
+- Confirm **Saved Launch Profiles** shows a compact Group column, ungrouped rows
+  expose an unclipped inline **Add** button, grouped rows expose their group name
+  with **Change group…** and **Remove from group**, and **Groups…** opens a compact
+  table matching the Runtimes grids. The **New group** dialog captures name, keep-live policy, idle
+  timeout, and eviction priority, **Edit** changes all four while preserving
+  membership, **Profiles…** supports multi-select launch-profile assignment and removal, and
+  right-click **Assign to group…** can assign a profile or return it to global policy.
+- Confirm Overview lists `Group · name (count)` choices after physical models.
+  A valid group starts all assigned profiles; duplicate-model, unavailable-runtime,
+  port-conflict, missing-GPU-telemetry, and aggregate-VRAM failures display an error
+  before any member starts. Confirm CPU-only groups work without VRAM telemetry.
+- Switch between Dark and Light without restarting on Models while the launch
+  settings form is visible. Confirm every panel changes theme, then inspect Overview,
+  Runtimes, and Settings for distinct sidebar, page, card, header, input, alternate-row,
+  border, hover, selection, disabled, success, warning, and danger surfaces.
+- Confirm launch-profile groups persist across restart; profiles of the same model
+  can use different policies, and deleting a group clears membership
+  without deleting GGUF files, model registrations, running sessions, or launch profiles.
+- Confirm pinned models are excluded from automatic idle unload, group idle timeout
+  overrides the global timeout, and simultaneous quiet candidates unload one at a
+  time in low/normal/high eviction-priority order. Confirm active slots are not
+  unloaded and priority does not change inference request ordering.
+- Confirm `llwmctl groups` CRUD/assign/unassign commands and the corresponding
+  `/api/v1/model-groups` and `/api/v1/models/{model}/profiles/{profile}/group`
+  routes update the running Manager and appear on launch profiles in normal model inventory results.
+- Confirm local-only model serving launches with an API key, direct
+  `/v1/chat/completions` rejects missing or invalid credentials, and the gateway
+  rejects unauthenticated `/v1/models` requests. Upstream direct health or model
+  catalog metadata may be public and is not an inference-authentication test.
+- Load a model and run `llwmctl sessions inspect <session>`; confirm health,
+  models, defaults, and slots are returned without the serving API key appearing
+  in the response or Control API log. Run `llwmctl gateway inspect` and confirm
+  the same authenticated behavior through the shared gateway.
 - Confirm the persisted model API key is protected at rest for the current Windows user.
 - Confirm ports outside `1..65535` are rejected on Settings save.
 - Confirm model serving cannot launch without a strong model API key in any
   local-only or LAN exposure mode.
+- Confirm control-API settings patches cannot disable API-key authentication,
+  replace protected secrets/workspace paths, use invalid ports, or enable the
+  gateway on a port occupied by a running model.
+- At 100%, 125%, 150%, and 200% display scale, confirm the initial window fits
+  the monitor work area and the Overview model/profile/load bar reflows without
+  clipping at narrow widths.
+- Confirm Arabic and Persian switch the shell and owned dialogs to right-to-left
+  flow. Confirm Arabic and Hindi are visibly labeled as partial previews, while
+  production language packs pass the localization coverage floor.
+- Open Model Groups and inspect a direct endpoint and the gateway in at least one
+  non-English language. Confirm titles, buttons, columns, validation messages,
+  report fields, and status messages are translated; repeat in Arabic or Persian
+  and confirm owned dialogs use right-to-left flow.
+- With Windows Narrator or Accessibility Insights, confirm custom title-bar
+  buttons and the language selector have accessible names, changing status is
+  announced politely, section titles are headings, and row-action buttons expose
+  both names and help text.
 - Confirm a LAN client can reach the selected OpenAI-compatible `/v1` serving
   surface only after Windows Firewall and WSL networking allow the configured
   gateway or direct model port.
@@ -138,10 +248,16 @@ companions, and be described as unsigned.
 - Confirm vision-capable model settings persist image min/max token allowances and launch `llama-server` with `--image-min-tokens` / `--image-max-tokens` when set.
 - Confirm per-model Vision head choices persist for auto-detect,
   embedded/model-bundled, and explicit external projectors; explicit projectors
-  launch with `--mmproj`, while embedded choices omit `--mmproj`.
+  launch with `--mmproj`, while embedded choices omit `--mmproj`. Confirm auto
+  discovery searches only the exact model folder and does not infer embedded
+  vision from a vision-capable language GGUF.
 - Confirm per-model MTP head choices persist separately from Vision head,
-  `Spec type = mtp` launches with `--mtp-head`, and draft-* speculative modes
-  continue to use the upstream `--model-draft` path.
+  `Spec type = atomic-mtp` launches legacy compatible forks with `--spec-type mtp --mtp-head`, an embedded positive
+  `*.nextn_predict_layers` value makes `draft-mtp` omit `--model-draft`, and an
+  explicitly selected external draft model still launches with
+  `--model-draft`. Confirm each draft type selects only its matching MTP,
+  DFlash, DSpark, Eagle3, or simple-draft category; parent/child folders and
+  incompatible family, version, or target-size helpers are not auto-selected.
 - Confirm `Spec type = draft-dspark` launches a DSpark GGUF with
   `--spec-type draft-dspark --model-draft <path> --spec-draft-n-max 7` on a
   llama.cpp b10164-or-newer runtime and reports draft acceptance metrics.
@@ -149,7 +265,7 @@ companions, and be described as unsigned.
   selected `layer`, `row`, or `tensor` split mode, and optional GPU device IDs
   and proportions emit `--device` and `--tensor-split`.
 - Confirm downloaded runtime source and build deletion cannot escape the configured runtimes folder.
-- Confirm successful builds from downloaded runtime sources delete the source folder when Settings > Runtime > Delete source after build is `Yes`, and preserve it when set to `No`.
+- Confirm Runtime Downloads table builds always delete the downloaded source after success. Confirm lower-level source-build operations delete the source when Settings > Runtime > Delete source after build is `Yes` and preserve it when set to `No`.
 - Confirm multiple models can be loaded at the same time on different saved model ports when hardware capacity allows it.
 - Confirm the auto-load gateway serves one shared `/v1` endpoint, launches the
   requested model on its saved direct port, and proxies requests to that direct
@@ -171,7 +287,7 @@ companions, and be described as unsigned.
 - Confirm manual Check For Updates shows a no-update popup when current, or an install confirmation when a newer release exists.
 - Confirm the GitHub release includes the portable ZIP and standalone
   `LlamaCppWindowsManager.exe`, each with its matching SHA-256 companion. The
-  standalone asset preserves in-app updates from v1.x and v2.0; a bad checksum
+  standalone asset preserves in-app updates from v1.x, v2.0, and v2.1; a bad checksum
   must prevent staging.
 - Confirm a signed installed app refuses an unsigned or differently signed staged update.
 - Confirm a completed staged update restarts `LlamaCppWindowsManager.exe` and shows the GitHub release notes.
@@ -179,25 +295,26 @@ companions, and be described as unsigned.
 
 ## Latest Local Verification
 
-Current local check on 2026-08-13:
+Current local check on 2026-08-15:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
 Result: .NET 10 Release app and CLI builds succeeded with zero warnings;
-service/unit tests passed (`458/458`) and the WPF smoke test passed (`1/1`) with
-no skips; service coverage was 80.4% and model/view-model coverage was 96.5%;
+service/unit tests passed (`548/548`) and the WPF smoke test passed (`1/1`) with
+no skips; service coverage was 80.9% and model/view-model coverage was 97.4%;
 formatting, diff whitespace, and the vulnerability, deprecation, and
-direct-package currency audit passed; and portable,
-embedded-sidecar, and installer artifact checks passed locally. The generated
-artifacts were unsigned test builds. The next release notes draft is tracked in
+direct-package currency audit passed. The portable publish and embedded
+operator/control sidecar packaging also succeeded, as did the installer gate.
+The current local portable and installer artifacts remain unsigned test builds.
+The next release notes draft is tracked in
 `docs/GITHUB_RELEASE_NEXT.md`.
 
 ## Manual Clean-Machine Test
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.1.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.2.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.

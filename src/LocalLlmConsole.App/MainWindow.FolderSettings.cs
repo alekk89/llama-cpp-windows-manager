@@ -39,7 +39,7 @@ public partial class MainWindow
 
     private FolderSettingsApplicationActions FolderSettingsActions()
         => new(
-            PickFolder,
+            initial => _coreServices.App.FileSystemDialogs.PickFolder(initial),
             RunAsync,
             PersistSettingsAsync,
             ScanModelsRootAsync,

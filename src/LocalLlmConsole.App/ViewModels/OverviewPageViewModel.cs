@@ -21,28 +21,92 @@ public sealed record GatewayRoutingOverviewStatus(
 
 public sealed record OverviewLaunchProfileChoice(string Id, string Name);
 
+public enum OverviewModelChoiceKind
+{
+    Model,
+    Group
+}
+
+public sealed record OverviewModelChoice(
+    string Id,
+    string Name,
+    OverviewModelChoiceKind Kind,
+    ModelRecord? Model = null,
+    ModelGroupRecord? Group = null,
+    int LaunchProfileCount = 0,
+    IReadOnlyList<string>? LaunchProfileIds = null)
+{
+    public string DisplayName => Kind == OverviewModelChoiceKind.Group
+        ? $"Group · {Name} ({LaunchProfileCount})"
+        : Name;
+}
+
 public sealed class OverviewPageViewModel
 {
-    public ObservableCollection<ModelRecord> ModelChoices { get; } = new();
+    public ObservableCollection<OverviewModelChoice> ModelChoices { get; } = new();
     public ObservableCollection<OverviewLaunchProfileChoice> LaunchProfileChoices { get; } = new();
     public ObservableCollection<UiRow> SessionRows { get; } = new();
 
     public void ReplaceModels(IEnumerable<ModelRecord> models)
+        => ReplaceModels(models, [], new Dictionary<string, ModelGroupAssignment>(), []);
+
+    public void ReplaceModels(
+        IEnumerable<ModelRecord> models,
+        IEnumerable<ModelGroupRecord> groups,
+        IReadOnlyDictionary<string, ModelGroupAssignment> assignments,
+        IEnumerable<NamedModelLaunchProfile> profiles)
     {
+        var modelChoices = models
+            .Where(model => !ModelAliasService.IsLaunchAlias(model))
+            .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(model => new OverviewModelChoice(model.Id, model.Name, OverviewModelChoiceKind.Model, Model: model));
+        var assignedProfileIds = profiles.Select(profile => profile.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var profilesByGroup = assignments.Values
+            .Where(assignment => assignedProfileIds.Contains(assignment.LaunchProfileId))
+            .GroupBy(assignment => assignment.GroupId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(assignment => assignment.LaunchProfileId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+        var groupChoices = groups
+            .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new OverviewModelChoice(
+                group.Id,
+                group.Name,
+                OverviewModelChoiceKind.Group,
+                Group: group,
+                LaunchProfileCount: profilesByGroup.GetValueOrDefault(group.Id)?.Length ?? 0,
+                LaunchProfileIds: profilesByGroup.GetValueOrDefault(group.Id) ?? []));
+        var ordered = modelChoices.Concat(groupChoices)
+            .ToArray();
+        if (ModelChoices.SequenceEqual(ordered)) return;
+
         ModelChoices.Clear();
-        foreach (var model in models
-                     .Where(model => !ModelAliasService.IsLaunchAlias(model))
-                     .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var model in ordered)
             ModelChoices.Add(model);
+    }
+
+    public void ReplaceGroupLaunchProfileSummary(ModelGroupRecord group, int launchProfileCount)
+    {
+        var label = launchProfileCount == 1 ? "1 launch profile" : $"{launchProfileCount} launch profiles";
+        var choices = new[] { new OverviewLaunchProfileChoice(group.Id, label) };
+        if (LaunchProfileChoices.SequenceEqual(choices)) return;
+        LaunchProfileChoices.Clear();
+        LaunchProfileChoices.Add(choices[0]);
     }
 
     public void ReplaceLaunchProfiles(IEnumerable<NamedModelLaunchProfile> profiles)
     {
+        var choices = profiles
+            .OrderByDescending(profile => profile.IsDefault)
+            .ThenBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(profile => new OverviewLaunchProfileChoice(profile.Id, profile.Name))
+            .ToArray();
+        if (LaunchProfileChoices.SequenceEqual(choices)) return;
+
         LaunchProfileChoices.Clear();
-        foreach (var profile in profiles
-                     .OrderByDescending(profile => profile.IsDefault)
-                     .ThenBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase))
-            LaunchProfileChoices.Add(new OverviewLaunchProfileChoice(profile.Id, profile.Name));
+        foreach (var choice in choices)
+            LaunchProfileChoices.Add(choice);
     }
 
     public void ReplaceSessions(IEnumerable<LoadedModelSessionSnapshot> sessions, string gatewayEndpoint = "")
@@ -79,12 +143,15 @@ public sealed class OverviewPageViewModel
                 C2 = string.IsNullOrWhiteSpace(session.LaunchProfileName) ? "Unknown" : session.LaunchProfileName,
                 C3 = session.ModelSize,
                 C4 = SessionStatusLabel(session),
-                C5 = EndpointLabel(session, gateway),
+                C5 = session.Endpoint,
+                T1 = session.Endpoint,
+                T2 = "",
                 C6 = session.RuntimeName,
                 C7 = $"{session.Backend} {session.Mode}",
                 C8 = session.IsRunning && session.Status != LoadedModelSessionStatus.Stopping ? "Unload" : "",
                 B1 = session.IsRunning && session.Status != LoadedModelSessionStatus.Stopping,
-                Data = JsonSerializer.SerializeToNode(new { session.SessionId, session.ModelId }) as JsonObject ?? new JsonObject()
+                B2 = session.IsRunning && session.Status is LoadedModelSessionStatus.Running or LoadedModelSessionStatus.Warm or LoadedModelSessionStatus.Unreachable,
+                Data = JsonSerializer.SerializeToNode(new { Kind = "Session", session.SessionId, session.ModelId }) as JsonObject ?? new JsonObject()
             };
         }
     }
@@ -96,12 +163,13 @@ public sealed class OverviewPageViewModel
             C2 = "—",
             C3 = "Shared router",
             C4 = string.IsNullOrWhiteSpace(gateway.State) ? (gateway.Enabled ? "Enabled" : "Off") : gateway.State,
-            C5 = gateway.Enabled
-                ? $"Shared: {gateway.Endpoint}{Environment.NewLine}Routes by model id to {gateway.RunningSessions.ToString(CultureInfo.InvariantCulture)} loaded model endpoint(s)."
-                : "Gateway disabled",
+            C5 = gateway.Enabled ? gateway.Endpoint : "Gateway disabled",
+            T1 = gateway.Enabled ? gateway.Endpoint : "Gateway disabled",
+            T2 = "",
             C6 = string.IsNullOrWhiteSpace(gateway.Policy) ? "" : gateway.Policy,
             C7 = string.IsNullOrWhiteSpace(gateway.Exposure) ? "" : gateway.Exposure,
             B1 = false,
+            B2 = gateway.Enabled,
             Data = JsonSerializer.SerializeToNode(new { Kind = "Gateway" }) as JsonObject ?? new JsonObject()
         };
 
@@ -149,10 +217,4 @@ public sealed class OverviewPageViewModel
         _ => string.IsNullOrWhiteSpace(session.StatusReason) ? "Unloaded" : $"Unloaded — {session.StatusReason}"
     };
 
-    private static string EndpointLabel(LoadedModelSessionSnapshot session, GatewayRoutingOverviewStatus gateway)
-    {
-        if (!gateway.Visible || !gateway.Enabled)
-            return $"Direct: {session.Endpoint}";
-        return $"Direct: {session.Endpoint}{Environment.NewLine}Also available via gateway: {gateway.Endpoint}";
-    }
 }

@@ -29,7 +29,10 @@ public static class ThemedMessageBox
             ShowInTaskbar = owner is null,
             MinWidth = 360,
             MaxWidth = 620,
-            MaxHeight = DialogMaxHeight(owner)
+            MaxHeight = DialogMaxHeight(owner),
+            FlowDirection = owner?.FlowDirection ?? (Loc.IsRightToLeft(Loc.CurrentLanguage)
+                ? System.Windows.FlowDirection.RightToLeft
+                : System.Windows.FlowDirection.LeftToRight)
         };
 
         var root = new Border
@@ -195,11 +198,11 @@ public static class ThemedMessageBox
 
     private static string DialogButtonToolTip(MessageBoxResult value) => value switch
     {
-        MessageBoxResult.OK => "Confirm and close this dialog.",
-        MessageBoxResult.Yes => "Confirm this action.",
-        MessageBoxResult.No => "Cancel this action.",
-        MessageBoxResult.Cancel => "Close without applying this action.",
-        _ => "Close this dialog."
+        MessageBoxResult.OK => Loc.T("Dialog.Accessibility.Ok"),
+        MessageBoxResult.Yes => Loc.T("Dialog.Accessibility.Yes"),
+        MessageBoxResult.No => Loc.T("Dialog.Accessibility.No"),
+        MessageBoxResult.Cancel => Loc.T("Runtimes.CustomRepo.CancelTooltip"),
+        _ => Loc.T("Dialog.Accessibility.Close")
     };
 
     private static MessageBoxResult DefaultResult(MessageBoxButton buttons) => buttons switch
@@ -219,9 +222,9 @@ public static class ThemedMessageBox
 
     private static IEnumerable<(string Label, MessageBoxResult Result, bool IsDefault)> ButtonSpecs(MessageBoxButton buttons) => buttons switch
     {
-        MessageBoxButton.OKCancel => [("OK", MessageBoxResult.OK, false), ("Cancel", MessageBoxResult.Cancel, true)],
-        MessageBoxButton.YesNo => [("Yes", MessageBoxResult.Yes, false), ("No", MessageBoxResult.No, true)],
-        MessageBoxButton.YesNoCancel => [("Yes", MessageBoxResult.Yes, false), ("No", MessageBoxResult.No, false), ("Cancel", MessageBoxResult.Cancel, true)],
+        MessageBoxButton.OKCancel => [("OK", MessageBoxResult.OK, false), (Loc.T("Runtimes.ActionBtn.Cancel"), MessageBoxResult.Cancel, true)],
+        MessageBoxButton.YesNo => [(Loc.T("Pref.Yes"), MessageBoxResult.Yes, false), (Loc.T("Pref.No"), MessageBoxResult.No, true)],
+        MessageBoxButton.YesNoCancel => [(Loc.T("Pref.Yes"), MessageBoxResult.Yes, false), (Loc.T("Pref.No"), MessageBoxResult.No, false), (Loc.T("Runtimes.ActionBtn.Cancel"), MessageBoxResult.Cancel, true)],
         _ => [("OK", MessageBoxResult.OK, true)]
     };
 }

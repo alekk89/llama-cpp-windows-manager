@@ -7,6 +7,18 @@ public sealed class ApiSecurity
 
     public static string GenerateHexToken(int byteCount) => RandomNumberGenerator.GetHexString(byteCount).ToLowerInvariant();
 
+    public static string StrongBearerSecretOrNew(params string?[] candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            var secret = (candidate ?? "").Trim();
+            if (IsStrongBearerSecret(secret))
+                return secret;
+        }
+
+        return GenerateHexToken(32);
+    }
+
     public static bool IsStrongBearerSecret(string? value)
     {
         var secret = (value ?? "").Trim();

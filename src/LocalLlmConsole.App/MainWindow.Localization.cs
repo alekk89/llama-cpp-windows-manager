@@ -51,6 +51,14 @@ public partial class MainWindow
 
     private void ApplyLocalizedXamlStrings()
     {
+        FlowDirection = Localization.Loc.IsRightToLeft(Localization.Loc.CurrentLanguage)
+            ? System.Windows.FlowDirection.RightToLeft
+            : System.Windows.FlowDirection.LeftToRight;
+        ApplyStaticButtonToolTips();
+        System.Windows.Automation.AutomationProperties.SetName(LanguageCombo, Localization.Loc.T("Status.Language"));
+        System.Windows.Automation.AutomationProperties.SetHelpText(LanguageCombo, Localization.Loc.T("Status.Language"));
+        System.Windows.Automation.AutomationProperties.SetName(AppStatusText, Localization.Loc.T("Status.CurrentActionLabel"));
+
         // Navigation buttons
         OverviewNavButton.Content = Localization.Loc.T("Nav.Overview");
         ModelsNavButton.Content = Localization.Loc.T("Nav.Models");
@@ -69,5 +77,14 @@ public partial class MainWindow
 
         // Title bar
         Title = $"{Localization.Loc.T("App.Title")} {AppVersionText.Text}";
+
+        if (_trayIcon?.ContextMenuStrip is { Items.Count: >= 3 } trayMenu)
+        {
+            trayMenu.RightToLeft = Localization.Loc.IsRightToLeft(Localization.Loc.CurrentLanguage)
+                ? Forms.RightToLeft.Yes
+                : Forms.RightToLeft.No;
+            trayMenu.Items[0].Text = Localization.Loc.T("Tray.ShowWindow");
+            trayMenu.Items[2].Text = Localization.Loc.T("Tray.Exit");
+        }
     }
 }

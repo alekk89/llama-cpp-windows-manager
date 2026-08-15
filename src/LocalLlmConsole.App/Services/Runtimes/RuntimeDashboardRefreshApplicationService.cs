@@ -126,7 +126,7 @@ public sealed class RuntimeDashboardRefreshApplicationService
                 actions.SetGpuMetric(await actions.CachedGpuSummaryAsync());
             }
 
-            _metricsApplication.Apply(
+            await _metricsApplication.ApplyAsync(
                 new RuntimeDashboardMetricsApplicationRequest(
                     request.RenderOverview,
                     selectedSession,

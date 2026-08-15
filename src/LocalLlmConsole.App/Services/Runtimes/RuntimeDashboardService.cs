@@ -146,6 +146,15 @@ public static class RuntimeDashboardService
         double? promptTotal)
         => $"{TokenActivityLine("Gen", liveGeneratedRate, averageGeneratedRate, generatedTotal)}\n{TokenActivityLine("Prompt", livePromptRate, averagePromptRate, promptTotal)}";
 
+    public static string TokenAverageAndTotalSummaryLabel(
+        double? averageGeneratedRate,
+        double? averagePromptRate,
+        double? generatedTotal,
+        double? promptTotal,
+        double? cachedPromptTotal = null)
+        => $"Generated: {TokenRateLabel(averageGeneratedRate)} | Total generated: {TokenCountLabel(generatedTotal)}\n"
+           + $"Prompt: {TokenRateLabel(averagePromptRate)} | Total prompt: {TokenCountLabel(promptTotal)} | Cache hit: {TokenCountLabel(cachedPromptTotal)}";
+
     public static double? CounterRate(double? current, double? previous, DateTimeOffset now, DateTimeOffset? previousPollAt, double minElapsedSeconds)
     {
         if (current is null || previous is null || previousPollAt is null || current < previous) return null;
@@ -278,9 +287,16 @@ public static class RuntimeDashboardService
            ?? RuntimeMetrics.Sum(samples, ["tokens", "generated"], ["seconds", "duration", "per"])
            ?? RuntimeMetrics.Sum(samples, ["tokens", "decoded"], ["seconds", "duration", "per"]);
 
-    public static double? PromptTokenCounter(IReadOnlyList<PrometheusSample> samples)
-        => RuntimeMetrics.Sum(samples, ["prompt", "tokens", "total"], ["seconds", "duration"])
-           ?? RuntimeMetrics.Sum(samples, ["prompt", "tokens"], ["seconds", "duration", "per"]);
+    public static double? PromptTokensProcessedCounter(IReadOnlyList<PrometheusSample> samples)
+        => RuntimeMetrics.Sum(samples, ["prompt", "tokens", "total"], ["seconds", "duration", "cached", "cache"])
+           ?? RuntimeMetrics.Sum(samples, ["prompt", "tokens"], ["seconds", "duration", "per", "cached", "cache"]);
+
+    public static double? PromptCachedTokenCounter(IReadOnlyList<PrometheusSample> samples)
+        => RuntimeMetrics.Sum(samples, ["prompt", "tokens", "cached", "total"], ["seconds", "duration"])
+           ?? RuntimeMetrics.Sum(samples, ["prompt", "tokens", "cache", "total"], ["seconds", "duration"]);
+
+    public static double? PromptActivityTokenCounter(IReadOnlyList<PrometheusSample> samples)
+        => SumNullable(PromptTokensProcessedCounter(samples), PromptCachedTokenCounter(samples));
 
     public static double? MtpGeneratedTokenCounter(IReadOnlyList<PrometheusSample> samples)
         => RuntimeMetrics.Sum(samples, ["mtp", "tokens", "generated", "total"], ["seconds", "duration", "accepted", "acc", "rejected"])

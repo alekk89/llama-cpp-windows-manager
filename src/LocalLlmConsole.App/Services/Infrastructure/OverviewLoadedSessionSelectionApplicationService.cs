@@ -22,20 +22,24 @@ public sealed class OverviewLoadedSessionSelectionApplicationService
 {
     public async Task<OverviewLoadedSessionSelectionOutcome> SelectAsync(
         string? modelId,
-        OverviewLoadedSessionSelectionApplicationActions actions)
+        OverviewLoadedSessionSelectionApplicationActions actions,
+        CancellationToken cancellationToken = default)
     {
         Validate(actions);
 
         if (string.IsNullOrWhiteSpace(modelId))
             return OverviewLoadedSessionSelectionOutcome.Ignored;
+        cancellationToken.ThrowIfCancellationRequested();
 
         var model = actions.FindModel(modelId);
         if (model is null)
         {
             await actions.RefreshOverviewModelSelectorAsync();
+            cancellationToken.ThrowIfCancellationRequested();
             model = actions.FindModel(modelId);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         actions.SelectModelId(modelId);
 
         var selection = actions.SelectRuntimeModel(modelId);
@@ -46,8 +50,11 @@ public sealed class OverviewLoadedSessionSelectionApplicationService
         }
 
         actions.SetActiveRuntimeSettings(selection.ActiveSettings);
+        cancellationToken.ThrowIfCancellationRequested();
         await actions.SaveActiveRuntimeSessionsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
         await actions.RefreshRuntimeMetricsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
         actions.UpdateOverviewModelActions();
         actions.SetStatus(model is null ? "Selected loaded model session." : $"Selected loaded model {model.Name}.");
         return OverviewLoadedSessionSelectionOutcome.Selected;

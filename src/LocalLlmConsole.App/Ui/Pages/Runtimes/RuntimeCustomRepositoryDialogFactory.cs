@@ -36,7 +36,8 @@ public static class RuntimeCustomRepositoryDialogFactory
             Background = System.Windows.Media.Brushes.Transparent,
             AllowsTransparency = true,
             ShowInTaskbar = false,
-            MinWidth = 540
+            MinWidth = 540,
+            FlowDirection = request.Owner.FlowDirection
         };
 
         var layout = new Grid();

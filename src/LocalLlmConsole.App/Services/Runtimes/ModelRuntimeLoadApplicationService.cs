@@ -22,7 +22,8 @@ public sealed record OverviewModelRuntimeLoadApplicationRequest(
     ModelRecord? Model,
     bool ModelLoaded,
     bool ModelActive,
-    bool AppReady);
+    bool AppReady,
+    bool SelectedProfileLoaded);
 
 public sealed record ModelRuntimeLoadApplicationActions(
     Func<string, Func<Task>, Task> RunBusyAsync,
@@ -122,7 +123,8 @@ public sealed class ModelRuntimeLoadApplicationService
             request.Model,
             request.ModelLoaded,
             request.ModelActive,
-            request.AppReady);
+            request.AppReady,
+            request.SelectedProfileLoaded);
         if (await ApplyCommandAsync(command, request.Model, actions))
             return command.Kind == ModelRuntimeLoadCommandKind.SwitchLoaded
                 ? ModelRuntimeLoadApplicationOutcome.SwitchedLoaded
@@ -138,6 +140,8 @@ public sealed class ModelRuntimeLoadApplicationService
             return ModelRuntimeLoadApplicationOutcome.MissingRuntime;
         }
 
+        if (request.ModelLoaded)
+            await actions.StopModelRuntimeAsync(model);
         await actions.StartModelRuntimeAsync(runtime, model, profile.ApplyTo(actions.ReadLaunchSettings()));
         return ModelRuntimeLoadApplicationOutcome.Started;
     }

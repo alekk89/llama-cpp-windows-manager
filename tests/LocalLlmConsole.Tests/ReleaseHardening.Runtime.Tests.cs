@@ -366,6 +366,7 @@ public sealed partial class ReleaseHardeningTests
         {
             Host = "0.0.0.0",
             AllowNetworkAccess = true,
+            RequireApiKeyAuth = false,
             ApiKey = ""
         };
 
@@ -421,6 +422,68 @@ public sealed partial class ReleaseHardeningTests
         Assert.DoesNotContain("--cache-ram", args);
         Assert.DoesNotContain("--ctx-checkpoints", args);
         Assert.DoesNotContain("--checkpoint-min-step", args);
+        Assert.DoesNotContain("--reasoning-effort", args);
+        Assert.DoesNotContain("--reasoning-budget-message", args);
+        Assert.DoesNotContain("--reasoning-preserve", args);
+        Assert.DoesNotContain("--no-reasoning-preserve", args);
+    }
+
+    [Fact]
+    public void RuntimeAdapterBuildsCurrentReasoningControls()
+    {
+        const string budgetMessage = "Conclude the reasoning and provide the final answer.";
+        var args = RuntimeAdapter.BuildArgs(ValidLaunchRequest() with
+        {
+            ReasoningEffort = "high",
+            ReasoningBudget = 16_384,
+            ReasoningBudgetMessage = budgetMessage,
+            ReasoningPreserve = "on"
+        });
+
+        Assert.Equal("high", args[args.ToList().IndexOf("--reasoning-effort") + 1]);
+        Assert.Equal("16384", args[args.ToList().IndexOf("--reasoning-budget") + 1]);
+        Assert.Equal(budgetMessage, args[args.ToList().IndexOf("--reasoning-budget-message") + 1]);
+        Assert.Contains("--reasoning-preserve", args);
+
+        var noPreserve = RuntimeAdapter.BuildArgs(ValidLaunchRequest() with { ReasoningPreserve = "off" });
+        Assert.Contains("--no-reasoning-preserve", noPreserve);
+    }
+
+    [Fact]
+    public void ReasoningControlsRoundTripThroughSavedLaunchProfiles()
+    {
+        var defaults = AppSettings.CreateDefault(CreateTempRoot());
+        var edited = defaults with
+        {
+            ReasoningEffort = "xhigh",
+            ReasoningBudget = 16_384,
+            ReasoningBudgetMessage = "Finish reasoning now.",
+            ReasoningPreserve = "off"
+        };
+
+        var profile = ModelLaunchSettings.FromAppSettings(edited, "runtime-current");
+        var restored = profile.ApplyTo(defaults);
+
+        Assert.Equal("xhigh", profile.ReasoningEffort);
+        Assert.Equal(16_384, restored.ReasoningBudget);
+        Assert.Equal("Finish reasoning now.", restored.ReasoningBudgetMessage);
+        Assert.Equal("off", restored.ReasoningPreserve);
+    }
+
+    [Fact]
+    public void RuntimeAdapterRejectsInvalidReasoningControls()
+    {
+        var result = RuntimeAdapter.Validate(ValidLaunchRequest() with
+        {
+            ReasoningEffort = "ultra",
+            ReasoningBudgetMessage = new string('x', 4097),
+            ReasoningPreserve = "sometimes"
+        });
+
+        Assert.False(result.Ok);
+        Assert.Contains(result.Errors, error => error.Contains("effort", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Errors, error => error.Contains("4096", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Errors, error => error.Contains("Preserve", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -689,6 +752,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("--rope-scale", args);
         Assert.Contains("--rope-freq-base", args);
         Assert.Contains("--rope-freq-scale", args);
+
+        var embeddedMtpArgs = RuntimeAdapter.BuildArgs(request with { SpecDraftModelPath = "" });
+        Assert.Contains("draft-mtp", embeddedMtpArgs);
+        Assert.DoesNotContain("--model-draft", embeddedMtpArgs);
 
         var dflashArgs = RuntimeAdapter.BuildArgs(request with
         {

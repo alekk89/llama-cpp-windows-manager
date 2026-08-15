@@ -1,11 +1,14 @@
 namespace LocalLlmConsole;
 
 public sealed record OverviewPageActionControllerActions(
-    Func<Task> SelectModelSessionAsync,
+    Func<CancellationToken, Task> SelectModelSessionAsync,
     Func<Task> SelectLaunchProfileAsync,
     Action UpdateModelActions,
     Func<Task> LoadSelectedModelAsync,
-    Func<Task> SelectLoadedSessionRowAsync,
+    Func<CancellationToken, Task> SelectLoadedSessionRowAsync,
+    Func<Task> InspectSelectedEndpointAsync,
+    Func<object, UiRow?> EndpointRowFromLink,
+    Func<UiRow, Task> InspectEndpointRowAsync,
     Func<object, string> SessionIdFromRowButton,
     Func<string, Task> UnloadLoadedSessionAsync,
     Func<Func<Task>, Task> RunEventAsync);
@@ -13,6 +16,8 @@ public sealed record OverviewPageActionControllerActions(
 public sealed class OverviewPageActionController
 {
     private readonly OverviewPageActionControllerActions _actions;
+    private CancellationTokenSource? _modelSelection;
+    private CancellationTokenSource? _loadedSessionSelection;
 
     public OverviewPageActionController(OverviewPageActionControllerActions actions)
     {
@@ -24,13 +29,55 @@ public sealed class OverviewPageActionController
             SelectModelSessionAsync,
             _actions.SelectLaunchProfileAsync,
             _actions.LoadSelectedModelAsync,
-            async () => await _actions.RunEventAsync(_actions.SelectLoadedSessionRowAsync),
+            SelectLoadedSessionRowAsync,
+            InspectSelectedEndpointAsync,
+            InspectEndpointRow_Click,
             UnloadLoadedSessionRow_Click);
+
+    public void CancelPendingSelections()
+    {
+        Interlocked.Exchange(ref _modelSelection, null)?.Cancel();
+        Interlocked.Exchange(ref _loadedSessionSelection, null)?.Cancel();
+    }
 
     private async Task SelectModelSessionAsync()
     {
-        await _actions.SelectModelSessionAsync();
-        _actions.UpdateModelActions();
+        var current = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _modelSelection, current);
+        previous?.Cancel();
+        try
+        {
+            await _actions.RunEventAsync(() => _actions.SelectModelSessionAsync(current.Token));
+            if (!current.IsCancellationRequested)
+                _actions.UpdateModelActions();
+        }
+        catch (OperationCanceledException) when (current.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _modelSelection, null, current);
+            current.Dispose();
+        }
+    }
+
+    private async Task SelectLoadedSessionRowAsync()
+    {
+        var current = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _loadedSessionSelection, current);
+        previous?.Cancel();
+        try
+        {
+            await _actions.RunEventAsync(() => _actions.SelectLoadedSessionRowAsync(current.Token));
+        }
+        catch (OperationCanceledException) when (current.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _loadedSessionSelection, null, current);
+            current.Dispose();
+        }
     }
 
     private async void UnloadLoadedSessionRow_Click(object sender, System.Windows.RoutedEventArgs e)
@@ -40,6 +87,19 @@ public sealed class OverviewPageActionController
             var sessionId = _actions.SessionIdFromRowButton(sender);
             if (!string.IsNullOrWhiteSpace(sessionId))
                 await _actions.UnloadLoadedSessionAsync(sessionId);
+        });
+    }
+
+    private Task InspectSelectedEndpointAsync()
+        => _actions.RunEventAsync(_actions.InspectSelectedEndpointAsync);
+
+    private async void InspectEndpointRow_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await _actions.RunEventAsync(async () =>
+        {
+            if (_actions.EndpointRowFromLink(sender) is { } row)
+                await _actions.InspectEndpointRowAsync(row);
         });
     }
 }

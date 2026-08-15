@@ -23,13 +23,10 @@ public static class RuntimeAdapter
             errors.Add("Runtime host must default to localhost. Enable LAN model access before exposing a model on the network.");
         else if (!IsLocalHost(host) && !IsBindableHost(host))
             errors.Add("Runtime host must be a valid host name or IP address.");
-        if (request.RequireApiKeyAuth)
-        {
-            if (string.IsNullOrWhiteSpace(request.ApiKey))
-                errors.Add("Model serving requires a model API key, including local-only mode.");
-            else if (!ApiSecurity.IsStrongBearerSecret(request.ApiKey))
-                errors.Add("Model API key must be at least 32 non-whitespace characters.");
-        }
+        if (string.IsNullOrWhiteSpace(request.ApiKey))
+            errors.Add("Model serving requires a model API key, including local-only mode.");
+        else if (!ApiSecurity.IsStrongBearerSecret(request.ApiKey))
+            errors.Add("Model API key must be at least 32 non-whitespace characters.");
         if (string.IsNullOrWhiteSpace(request.ExecutablePath))
             errors.Add("llama-server executable path is required.");
         if (string.IsNullOrWhiteSpace(request.ModelPath))
@@ -136,6 +133,14 @@ public static class RuntimeAdapter
             errors.Add("Reasoning mode must be auto, on, or off.");
         if (!IsOneOf(request.ReasoningFormat, "auto", "none", "deepseek", "deepseek-legacy"))
             errors.Add("Reasoning format must be auto, none, deepseek, or deepseek-legacy.");
+        if (!IsOneOf(request.ReasoningEffort, "default", "minimal", "low", "medium", "high", "xhigh", "max"))
+            errors.Add("Reasoning effort must be default, minimal, low, medium, high, xhigh, or max.");
+        if ((request.ReasoningBudgetMessage ?? "").Length > 4096)
+            errors.Add("Reasoning budget message cannot exceed 4096 characters.");
+        if ((request.ReasoningBudgetMessage ?? "").Contains('\0'))
+            errors.Add("Reasoning budget message cannot contain a null character.");
+        if (!IsOneOf(request.ReasoningPreserve, "auto", "on", "off"))
+            errors.Add("Preserve reasoning must be auto, on, or off.");
         if (!IsOneOf(request.VisionMode, "auto", "on", "off"))
             errors.Add("Vision mode must be auto, on, or off.");
         if (request.VisionMode == "on" && !request.VisionProjectorEmbedded && string.IsNullOrWhiteSpace(request.VisionProjectorPath))
@@ -281,8 +286,16 @@ public static class RuntimeAdapter
             args.AddRange(["--reasoning", request.ReasoningMode]);
         if (request.ReasoningFormat != "auto")
             args.AddRange(["--reasoning-format", request.ReasoningFormat]);
+        if (request.ReasoningEffort != "default")
+            args.AddRange(["--reasoning-effort", request.ReasoningEffort]);
         if (request.ReasoningBudget >= 0)
             args.AddRange(["--reasoning-budget", request.ReasoningBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+        if (!string.IsNullOrWhiteSpace(request.ReasoningBudgetMessage))
+            args.AddRange(["--reasoning-budget-message", request.ReasoningBudgetMessage]);
+        if (request.ReasoningPreserve == "on")
+            args.Add("--reasoning-preserve");
+        else if (request.ReasoningPreserve == "off")
+            args.Add("--no-reasoning-preserve");
         if (request.VisionMode == "off")
             args.Add("--no-mmproj");
         else if (!request.VisionProjectorEmbedded && !string.IsNullOrWhiteSpace(request.VisionProjectorPath))

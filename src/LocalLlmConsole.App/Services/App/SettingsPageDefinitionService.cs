@@ -23,11 +23,29 @@ public sealed class SettingsPageDefinitionService
             ToolTip: Loc.T("Tooltip.Setting.GatewayPort")),
         new(Loc.T("Settings.Group.Network"), Loc.T("Setting.GatewayPolicy"), "autoLoadGatewayPolicy", AppPreferenceService.GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy), "choice", AppPreferenceService.GatewaySwapPolicyOptions(),
             ToolTip: Loc.T("Tooltip.Setting.GatewayPolicy")),
-        new(Loc.T("Settings.Group.Network"), Loc.T("Setting.ApiKeyAuth"), "requireApiKeyAuth", AppPreferenceService.YesNoLabel(settings.RequireApiKeyAuth), "choice", AppPreferenceService.YesNoOptions(),
-            ToolTip: Loc.T("Tooltip.Setting.ApiKeyAuth")),
         new(Loc.T("Settings.Group.Network"), Loc.T("Setting.ApiKey"), "modelApiKey", settings.ModelApiKey, "secret", Action: Loc.T("Action.Generate"),
             ToolTip: Loc.T("Tooltip.Setting.ApiKey")),
+        UiVisibility(Loc.T("Overview.Metric.ModelStatus"), "showOverviewModelStatus", settings.ShowOverviewModelStatus),
+        UiVisibility(Loc.T("Overview.Metric.Hardware"), "showOverviewHardware", settings.ShowOverviewHardware),
+        UiVisibility(Loc.T("Overview.Metric.Slots"), "showOverviewSlots", settings.ShowOverviewSlots),
+        UiVisibility(Loc.T("Overview.Metric.Tokens"), "showOverviewTokens", settings.ShowOverviewTokens),
+        UiVisibility(Loc.T("Overview.Metric.MtpTokens"), "showOverviewMtpTokens", settings.ShowOverviewMtpTokens),
+        UiVisibility(Loc.T("Overview.Metric.KvCache"), "showOverviewKvCache", settings.ShowOverviewKvCache),
+        UiVisibility(Loc.T("Overview.LiveRuntimeLogTitle"), "showOverviewLiveRuntimeLog", settings.ShowOverviewLiveRuntimeLog),
+        UiVisibility(Loc.T("Overview.RuntimeMetricsTitle"), "showOverviewAllMetrics", settings.ShowOverviewAllMetrics),
+        new(Loc.T("Settings.Group.UI"), Loc.T("Setting.ShowModelsHuggingFace"), "showModelsHuggingFace", AppPreferenceService.ShowHideLabel(settings.ShowModelsHuggingFace), "choice", AppPreferenceService.ShowHideOptions(),
+            ToolTip: Loc.T("Tooltip.Setting.ShowModelsHuggingFace")),
         new(Loc.T("Settings.Group.Logs"), Loc.T("Setting.MaxLogFileSizeMb"), "maxLogFileSizeMb", settings.MaxLogFileSizeMb.ToString(CultureInfo.InvariantCulture),
             ToolTip: Loc.T("Tooltip.Setting.MaxLogFileSizeMb"))
     ];
+
+    private static SettingRowDefinition UiVisibility(string label, string key, bool visible)
+        => new(
+            Loc.T("Settings.Group.UI"),
+            label,
+            key,
+            AppPreferenceService.ShowHideLabel(visible),
+            "choice",
+            AppPreferenceService.ShowHideOptions(),
+            ToolTip: Loc.T("Tooltip.Setting.ShowOverviewSection", label));
 }

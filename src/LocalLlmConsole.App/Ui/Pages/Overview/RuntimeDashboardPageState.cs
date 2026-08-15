@@ -50,4 +50,7 @@ public sealed class RuntimeDashboardPageState
         RuntimeMetricsGrid = controls.RuntimeMetricsGrid;
         ModelProgress = null;
     }
+
+    public void SetRuntimeLogText(string text, bool followTail)
+        => TextBoxTailPresenter.SetText(RuntimeLogBox, text, followTail);
 }

@@ -57,7 +57,10 @@ public static class LaunchSettingUiSchema
 
         Choice(nameof(AppSettings.ReasoningMode), "ChatCapabilities", "Reasoning", LaunchSettingMetadataService.AutoOnOffOptions),
         Choice(nameof(AppSettings.ReasoningFormat), "ChatCapabilities", "ReasonFormat", LaunchSettingMetadataService.ReasoningFormatOptions),
+        Choice(nameof(AppSettings.ReasoningEffort), "ChatCapabilities", "ReasoningEffort", LaunchSettingMetadataService.ReasoningEffortOptions),
         Text(nameof(AppSettings.ReasoningBudget), "ChatCapabilities", "ReasonBudget"),
+        Text(nameof(AppSettings.ReasoningBudgetMessage), "ChatCapabilities", "ReasonBudgetMessage", advanced: true),
+        Choice(nameof(AppSettings.ReasoningPreserve), "ChatCapabilities", "ReasonPreserve", LaunchSettingMetadataService.AutoOnOffOptions, advanced: true),
         Choice(nameof(AppSettings.JinjaMode), "ChatCapabilities", "JinjaChat", LaunchSettingMetadataService.AutoOnOffOptions),
         Choice(nameof(AppSettings.VisionMode), "ChatCapabilities", "Vision", LaunchSettingMetadataService.AutoOnOffOptions),
         Picker(nameof(AppSettings.VisionProjectorPath), "ChatCapabilities", "VisionHead", LaunchSettingEditorKind.VisionProjector),

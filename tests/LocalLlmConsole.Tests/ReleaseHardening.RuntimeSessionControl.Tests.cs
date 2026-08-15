@@ -56,20 +56,31 @@ public sealed partial class ReleaseHardeningTests
                 model,
                 ModelLoaded: true,
                 ModelActive: false,
-                AppReady: true),
+                AppReady: true,
+                SelectedProfileLoaded: true),
+            Actions());
+        var overviewProfileReplacement = await service.LoadOverviewAsync(
+            new OverviewModelRuntimeLoadApplicationRequest(
+                model,
+                ModelLoaded: true,
+                ModelActive: true,
+                AppReady: true,
+                SelectedProfileLoaded: false),
             Actions());
         var missingOverviewRuntime = await service.LoadOverviewAsync(
             new OverviewModelRuntimeLoadApplicationRequest(
                 model,
                 ModelLoaded: false,
                 ModelActive: false,
-                AppReady: true),
+                AppReady: true,
+                SelectedProfileLoaded: false),
             Actions(listedRuntimes: [runtime], draft: ModelLaunchSettings.FromAppSettings(settings, "missing-runtime")));
 
         Assert.Equal(ModelRuntimeLoadApplicationOutcome.Status, missingSelection);
         Assert.Equal(ModelRuntimeLoadApplicationOutcome.RenderedLaunchSettings, renderedAndStarted);
         Assert.Equal(ModelRuntimeLoadApplicationOutcome.Started, restarted);
         Assert.Equal(ModelRuntimeLoadApplicationOutcome.SwitchedLoaded, overviewSwitched);
+        Assert.Equal(ModelRuntimeLoadApplicationOutcome.Started, overviewProfileReplacement);
         Assert.Equal(ModelRuntimeLoadApplicationOutcome.MissingRuntime, missingOverviewRuntime);
         Assert.Equal([
             "busy:Preparing model load...",
@@ -86,6 +97,12 @@ public sealed partial class ReleaseHardeningTests
             "start:runtime:model:8084",
             "busy:Preparing model load...",
             "switch:model",
+            "busy:Preparing model load...",
+            "draft:model",
+            "list",
+            "stop:model",
+            "read",
+            "start:runtime:model:8084",
             "busy:Preparing model load...",
             "draft:model",
             "list",

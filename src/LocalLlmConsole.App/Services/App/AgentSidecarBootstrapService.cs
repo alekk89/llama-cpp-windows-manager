@@ -26,7 +26,12 @@ public sealed class AgentSidecarBootstrapService
         "llwmctl.exe",
         "AGENTS.md",
         "agent.md",
-        "docs/CONTROL_API.md"
+        "docs/CONTROL_API.md",
+        "LICENSE",
+        "THIRD-PARTY-NOTICES.md",
+        "licenses/Apache-2.0.txt",
+        "licenses/dotnet/LICENSE.txt",
+        "licenses/dotnet/ThirdPartyNotices.txt"
     ];
 
     private static readonly HashSet<string> AllowedPaths = new(RequiredPaths, StringComparer.OrdinalIgnoreCase);

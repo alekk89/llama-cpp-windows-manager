@@ -21,6 +21,7 @@ public sealed partial class ReleaseHardeningTests
         using var sessions = CreateLoadedModelSessionManager();
         var catalog = factory.CreateModelCatalogService(store);
         var profiles = factory.CreateModelLaunchProfileService(store, sessions);
+        var modelGroups = factory.CreateModelGroupService(store);
         var runtimes = factory.CreateRuntimeRegistryService(store);
         var jobs = factory.CreateJobEngine(store);
         using var http = new HttpClient(new StaticJsonHandler("[]"));
@@ -49,13 +50,16 @@ public sealed partial class ReleaseHardeningTests
                 (_, _) => Task.CompletedTask,
                 _ => { refreshes++; return Task.CompletedTask; },
                 (name, body, _) => { operations++; return Task.FromResult<object>(new { name, body }); }),
-            auditLog));
+            auditLog,
+            modelGroups,
+            new EndpointInspectionService(http)));
 
         static LocalControlRequest Request(string method, string path, JsonObject? body = null, IReadOnlyDictionary<string, string>? query = null)
             => new(method, path, query ?? new Dictionary<string, string>(), body, new Dictionary<string, string>());
 
-        foreach (var path in new[] { "/api/v1/status", "/api/v1/capabilities", "/api/v1/self", "/api/v1/models", "/api/v1/runtimes", "/api/v1/sessions", "/api/v1/settings", "/api/v1/logs", "/api/v1/metrics", "/api/v1/jobs", "/api/v1/operations" })
+        foreach (var path in new[] { "/api/v1/status", "/api/v1/capabilities", "/api/v1/self", "/api/v1/models", "/api/v1/model-groups", "/api/v1/runtimes", "/api/v1/sessions", "/api/v1/settings", "/api/v1/logs", "/api/v1/metrics", "/api/v1/jobs", "/api/v1/operations" })
             Assert.Equal(200, (await api.HandleAsync(Request("GET", path))).StatusCode);
+        Assert.Equal(200, (await api.HandleAsync(Request("GET", "/api/v1/gateway/inspect"))).StatusCode);
 
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/unknown"))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("POST", "/api/v1/operations"))).StatusCode);
@@ -70,12 +74,16 @@ public sealed partial class ReleaseHardeningTests
         var patched = await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject
         {
             ["contextSize"] = 65536,
-            ["temperature"] = 0.7,
-            ["requireApiKeyAuth"] = false
+            ["temperature"] = 0.7
         }));
         Assert.Equal(200, patched.StatusCode);
         Assert.Equal(65536, settings.ContextSize);
-        Assert.False(settings.RequireApiKeyAuth);
+        Assert.True(settings.RequireApiKeyAuth);
+        Assert.Equal(400, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject
+        {
+            ["requireApiKeyAuth"] = false
+        }))).StatusCode);
+        Assert.True(settings.RequireApiKeyAuth);
         Assert.Equal(400, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject { ["port"] = 70000 }))).StatusCode);
         Assert.Equal(400, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject { ["workspaceRoot"] = "blocked" }))).StatusCode);
 
@@ -94,7 +102,33 @@ public sealed partial class ReleaseHardeningTests
         File.WriteAllBytes(modelPath, [0x47, 0x47, 0x55, 0x46, 0x03, 0x00, 0x00, 0x00]);
         var model = new ModelRecord("api-model", "API Model", modelPath, OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
         await store.UpsertModelAsync(model);
-        await profiles.EnsureDefaultAsync(model, settings);
+        var defaultProfile = await profiles.EnsureDefaultAsync(model, settings);
+        var createdGroupResponse = await api.HandleAsync(Request("POST", "/api/v1/model-groups", new JsonObject
+        {
+            ["name"] = "API batch",
+            ["retentionMode"] = "idle-timeout",
+            ["idleMinutes"] = 9,
+            ["evictionPriority"] = "low"
+        }));
+        Assert.Equal(201, createdGroupResponse.StatusCode);
+        var createdGroupJson = JsonSerializer.SerializeToNode(createdGroupResponse.Body)!.AsObject();
+        var createdGroupId = createdGroupJson["group"]!["id"]!.GetValue<string>();
+        Assert.Equal("IdleTimeout", createdGroupJson["group"]!["retentionMode"]!.GetValue<string>());
+        Assert.Equal("Low", createdGroupJson["group"]!["evictionPriority"]!.GetValue<string>());
+        var defaultGroupRoute = $"/api/v1/models/api-model/profiles/{Uri.EscapeDataString(defaultProfile.Id)}/group";
+        Assert.Equal(200, (await api.HandleAsync(Request("PUT", defaultGroupRoute, new JsonObject
+        {
+            ["group"] = createdGroupId
+        }))).StatusCode);
+        var assignedProfileResponse = await api.HandleAsync(Request("GET", defaultGroupRoute));
+        Assert.Equal(200, assignedProfileResponse.StatusCode);
+        var assignedProfileJson = JsonSerializer.SerializeToNode(assignedProfileResponse.Body)!.AsObject();
+        Assert.Equal(createdGroupId, assignedProfileJson["profile"]!["group"]!["id"]!.GetValue<string>());
+        Assert.Equal(9, assignedProfileJson["profile"]!["effectivePolicy"]!["idleMinutes"]!.GetValue<int>());
+        Assert.Equal(200, (await api.HandleAsync(Request("PATCH", $"/api/v1/model-groups/{Uri.EscapeDataString(createdGroupId)}", new JsonObject
+        {
+            ["evictionPriority"] = "high"
+        }))).StatusCode);
         Assert.Equal(200, (await api.HandleAsync(Request("GET", "/api/v1/models/api-model"))).StatusCode);
         Assert.Equal(200, (await api.HandleAsync(Request("GET", "/api/v1/models/api-model/companions"))).StatusCode);
         Assert.Equal(200, (await api.HandleAsync(Request("GET", "/api/v1/models/api-model/profiles"))).StatusCode);
@@ -112,6 +146,28 @@ public sealed partial class ReleaseHardeningTests
             ["settings"] = new JsonObject { ["contextSize"] = 65536 }
         }))).StatusCode);
         Assert.Equal(400, (await api.HandleAsync(Request("POST", "/api/v1/models/api-model/load", new JsonObject()))).StatusCode);
+        var inspectionRuntime = new RuntimeRecord(
+            "runtime-inspection",
+            "Inspection Runtime",
+            RuntimeMode.Native,
+            RuntimeBackend.Cpu,
+            Path.Combine(root, "llama-server.exe"),
+            "{}",
+            DateTimeOffset.UtcNow);
+        sessions.AttachExisting(
+            inspectionRuntime,
+            model,
+            settings with { Port = 8099 },
+            Path.Combine(root, "inspection.log"),
+            LlamaRuntimeState.Loaded,
+            "",
+            "session-api-model",
+            DateTimeOffset.UtcNow);
+        var inspection = await api.HandleAsync(Request("GET", "/api/v1/sessions/session-api-model/inspect"));
+        Assert.True(inspection.StatusCode == 200, JsonSerializer.Serialize(inspection.Body));
+        var inspectionJson = JsonSerializer.SerializeToNode(inspection.Body)!.AsObject();
+        Assert.Equal((int)EndpointInspectionKind.DirectModel, inspectionJson["report"]!["kind"]!.GetValue<int>());
+        Assert.DoesNotContain(settings.ModelApiKey, JsonSerializer.Serialize(inspection.Body), StringComparison.Ordinal);
         Assert.Equal(200, (await api.HandleAsync(Request("POST", "/api/v1/models/api-model/unload"))).StatusCode);
         Assert.Equal(200, (await api.HandleAsync(Request("DELETE", "/api/v1/models/api-model/profiles/profile%3Aapi-model%3Atest"))).StatusCode);
         Assert.Equal(400, (await api.HandleAsync(Request("DELETE", "/api/v1/models/api-model"))).StatusCode);
@@ -157,6 +213,15 @@ public sealed partial class ReleaseHardeningTests
             ["startWithWindows"] = "Yes",
             ["autoUnloadIdleMinutes"] = "99999",
             ["deleteRuntimeSourceAfterSuccessfulBuild"] = "Yes",
+            ["showOverviewModelStatus"] = "Hide",
+            ["showOverviewHardware"] = "Hide",
+            ["showOverviewSlots"] = "Hide",
+            ["showOverviewTokens"] = "Hide",
+            ["showOverviewMtpTokens"] = "Hide",
+            ["showOverviewKvCache"] = "Hide",
+            ["showOverviewLiveRuntimeLog"] = "Hide",
+            ["showOverviewAllMetrics"] = "Hide",
+            ["showModelsHuggingFace"] = "Hide",
             ["maxLogFileSizeMb"] = "99999"
         };
         var updated = service.Build(new AppSettingsUpdateRequest(current, root, "dark", values, new HashSet<int>()));
@@ -164,6 +229,15 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("both", updated.Settings.ModelAccessMode);
         Assert.Equal(10080, updated.Settings.AutoUnloadIdleMinutes);
         Assert.Equal(4096, updated.Settings.MaxLogFileSizeMb);
+        Assert.False(updated.Settings.ShowOverviewModelStatus);
+        Assert.False(updated.Settings.ShowOverviewHardware);
+        Assert.False(updated.Settings.ShowOverviewSlots);
+        Assert.False(updated.Settings.ShowOverviewTokens);
+        Assert.False(updated.Settings.ShowOverviewMtpTokens);
+        Assert.False(updated.Settings.ShowOverviewKvCache);
+        Assert.False(updated.Settings.ShowOverviewLiveRuntimeLog);
+        Assert.False(updated.Settings.ShowOverviewAllMetrics);
+        Assert.False(updated.Settings.ShowModelsHuggingFace);
 
         foreach (var invalid in new[]
         {
@@ -184,9 +258,9 @@ public sealed partial class ReleaseHardeningTests
         {
             ["requireApiKeyAuth"] = "No"
         }, new HashSet<int>()));
-        Assert.True(disabled.Success);
-        Assert.Empty(disabled.Settings.ModelApiKey);
-        Assert.Equal(current.ModelApiKey, disabled.Settings.ModelApiKeyBackup);
+        Assert.False(disabled.Success);
+        Assert.True(disabled.Settings.RequireApiKeyAuth);
+        Assert.Equal(current.ModelApiKey, disabled.Settings.ModelApiKey);
 
         var database = Path.Combine(root, "state", "settings.db");
         await using var store = new StateStore(database);
@@ -195,9 +269,23 @@ public sealed partial class ReleaseHardeningTests
         var saved = await workflow.SaveEditedAsync(new AppSettingsSaveWorkflowRequest(current, "dark", values, new HashSet<int>()), TestContext.Current.CancellationToken);
         Assert.True(saved.Success);
         Assert.True(Directory.Exists(saved.Settings.ModelsRoot));
-        var cleared = await workflow.EnsureModelApiKeyAsync(saved.Settings, saved.Settings with { RequireApiKeyAuth = false }, TestContext.Current.CancellationToken);
-        Assert.Empty(cleared.Settings.ModelApiKey);
-        var generated = await workflow.EnsureModelApiKeyAsync(cleared.PersistedSettings, cleared.Settings with { RequireApiKeyAuth = true, ModelApiKey = "", ModelApiKeyBackup = "" }, TestContext.Current.CancellationToken);
+        var reloaded = await store.GetAppSettingsAsync(root);
+        Assert.False(reloaded.ShowOverviewModelStatus);
+        Assert.False(reloaded.ShowOverviewHardware);
+        Assert.False(reloaded.ShowOverviewSlots);
+        Assert.False(reloaded.ShowOverviewTokens);
+        Assert.False(reloaded.ShowOverviewMtpTokens);
+        Assert.False(reloaded.ShowOverviewKvCache);
+        Assert.False(reloaded.ShowOverviewLiveRuntimeLog);
+        Assert.False(reloaded.ShowOverviewAllMetrics);
+        Assert.False(reloaded.ShowModelsHuggingFace);
+        var enforced = await workflow.EnsureModelApiKeyAsync(saved.Settings, saved.Settings with { RequireApiKeyAuth = false }, TestContext.Current.CancellationToken);
+        Assert.True(enforced.Settings.RequireApiKeyAuth);
+        Assert.True(ApiSecurity.IsStrongBearerSecret(enforced.Settings.ModelApiKey));
+        var generated = await workflow.EnsureModelApiKeyAsync(
+            enforced.PersistedSettings with { ModelApiKey = "", ModelApiKeyBackup = "" },
+            enforced.Settings with { ModelApiKey = "", ModelApiKeyBackup = "" },
+            TestContext.Current.CancellationToken);
         Assert.True(generated.GeneratedApiKey);
         var trimmed = await workflow.EnsureModelApiKeyAsync(generated.PersistedSettings, generated.Settings with { ModelApiKey = $"  {new string('b', 32)}  " }, TestContext.Current.CancellationToken);
         Assert.False(trimmed.GeneratedApiKey);
@@ -212,11 +300,16 @@ public sealed partial class ReleaseHardeningTests
         var applied = false;
         var refreshed = false;
         var status = "";
+        var gatewayRestarts = 0;
         var actions = new AppSettingsSaveApplicationActions(
             _ => applied = true,
             _ => { },
             () => { },
-            () => Task.FromResult(false),
+            () =>
+            {
+                gatewayRestarts++;
+                return Task.FromResult(false);
+            },
             () => true,
             () => refreshed = true,
             value => status = value);
@@ -226,7 +319,26 @@ public sealed partial class ReleaseHardeningTests
         Assert.True(applied);
         Assert.True(refreshed);
         Assert.Contains("Gateway did not start", status, StringComparison.Ordinal);
+        Assert.Equal(1, gatewayRestarts);
         Assert.NotNull(startupCommand);
+        var uiOnlyValues = new Dictionary<string, string>
+        {
+            ["showModelsHuggingFace"] = "Show"
+        };
+        var uiOnlyBuilt = service.Build(new AppSettingsUpdateRequest(current, root, "dark", uiOnlyValues, new HashSet<int>()));
+        Assert.True(uiOnlyBuilt.Success);
+        Assert.Equal(current.AutoLoadGatewayEnabled, uiOnlyBuilt.Settings.AutoLoadGatewayEnabled);
+        Assert.Equal(current.AutoLoadGatewayPort, uiOnlyBuilt.Settings.AutoLoadGatewayPort);
+        Assert.Equal(current.AutoLoadGatewayPolicy, uiOnlyBuilt.Settings.AutoLoadGatewayPolicy);
+        Assert.Equal(current.ModelAccessMode, uiOnlyBuilt.Settings.ModelAccessMode);
+        Assert.Equal(current.RequireApiKeyAuth, uiOnlyBuilt.Settings.RequireApiKeyAuth);
+        Assert.Equal(current.ModelApiKey, uiOnlyBuilt.Settings.ModelApiKey);
+        var uiOnlyOutcome = await application.SaveEditedAndApplyAsync(
+            new AppSettingsSaveApplicationRequest(current, "dark", uiOnlyValues, []),
+            actions,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(AppSettingsSaveApplicationOutcome.Saved, uiOnlyOutcome);
+        Assert.Equal(1, gatewayRestarts);
         var failedOutcome = await application.SaveEditedAndApplyAsync(
             applicationRequest with { Values = new Dictionary<string, string> { ["autoLoadGatewayPort"] = "bad" } },
             actions,
@@ -237,9 +349,9 @@ public sealed partial class ReleaseHardeningTests
         foreach (var target in new[] { "overview", "loaded-sessions", "models", "runtime-download", "runtime-jobs", "windows-tools", "wsl-tools", "model-download", "launch-settings", "overview-load", "settings", "gateway-settings", "logs", "lifetime", "updates" })
             Assert.True(help.Plan(target).ShouldNavigate);
         Assert.False(help.Plan("unknown").ShouldNavigate);
-        var sections = new HelpSectionService();
-        Assert.Equal(HelpSectionService.FirstSteps, sections.DefinitionFor("unknown").Key);
-        Assert.Equal("models", sections.Select("models").Key);
+        var helpCatalog = new HelpCatalogService();
+        Assert.Equal(HelpCatalogService.FirstSteps, helpCatalog.DefinitionFor("unknown").Key);
+        Assert.Equal("models", helpCatalog.Select("models").Key);
 
         var jobs = new JobEngine(store, Path.Combine(root, "logs"));
         var port = FreeCoveragePort();
@@ -363,6 +475,10 @@ public sealed partial class ReleaseHardeningTests
             Path.Combine(root, "job.log"), now, now);
         hf.ReplaceDownloadHistory([job, job with { Id = "other", Kind = "runtime-build" }]);
         Assert.Single(hf.DownloadHistoryRows);
+        var downloadRow = hf.DownloadHistoryRows[0];
+        hf.ReplaceDownloadHistory([job with { Status = JobStatus.Paused, UpdatedAt = now.AddSeconds(1) }]);
+        Assert.Same(downloadRow, hf.DownloadHistoryRows[0]);
+        Assert.Equal(JobStatus.Paused.ToString(), downloadRow.C1);
 
         var logRoot = Path.Combine(root, "logs");
         Directory.CreateDirectory(logRoot);

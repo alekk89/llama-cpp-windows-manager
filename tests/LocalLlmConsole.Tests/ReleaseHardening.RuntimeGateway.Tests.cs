@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using LocalLlmConsole.Localization;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
@@ -141,7 +142,7 @@ public sealed partial class ReleaseHardeningTests
     {
         var formatted = GpuStatusService.FormatNvidiaSmiCsvLine("0, NVIDIA RTX, 76, 62, 12288, 24576");
 
-        Assert.Equal("GPU 0: 76% | 62C | 12.0/24.0 GiB", formatted);
+        Assert.Equal("GPU 0: NVIDIA RTX | 76% | 62C | 12.0/24.0 GiB", formatted);
         Assert.Equal("GPU 0: 76% | 62C | 12.0/24.0 GiB", GpuStatusService.NormalizeMetricSeparators("GPU 0: 76%|62C|12.0/24.0 GiB"));
     }
 
@@ -216,7 +217,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.NotNull(memory);
         Assert.Equal(9, memory.FreeGiB);
         Assert.Equal(48, memory.TotalGiB);
-        Assert.Equal("GPU 0: 76% | 62C | 12.0/24.0 GiB", summary);
+        Assert.Equal("GPU 0: NVIDIA RTX | 76% | 62C | 12.0/24.0 GiB", summary);
         Assert.Equal("GPU 0: AMD Radeon RX 7900 XTX | 53.4% | 8.0/24.0 GiB", windows);
         Assert.Equal("CPU: 57.2C", cpu);
         Assert.Equal("Telemetry: 57.2 °C thermal", cpuSummary);
@@ -452,7 +453,7 @@ public sealed partial class ReleaseHardeningTests
         using var upstreamHandler = new GatewayProxyHandler();
         var proxy = new ModelGatewayUpstreamProxy(new HttpClient(upstreamHandler));
         await using var gateway = new ModelGatewayService(
-            new ModelGatewayOptions(true, "local", port, apiKey, true, ModelGatewaySwapPolicy.KeepLoaded),
+            new ModelGatewayOptions(true, "local", port, apiKey, false, ModelGatewaySwapPolicy.KeepLoaded),
             runtime,
             proxy);
         await gateway.StartAsync(TestContext.Current.CancellationToken);
@@ -523,6 +524,7 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void GatewayActivityStatusTrackerOwnsGatewayStatusText()
     {
+        Loc.LoadLanguage("en");
         var tracker = new GatewayActivityStatusTracker();
         var settings = AppSettings.CreateDefault(CreateTempRoot()) with
         {
@@ -547,7 +549,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("disabled", disabled.Line, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(GatewayStatusVisualKind.Normal, disabled.VisualKind);
         Assert.Contains("listening at http://127.0.0.1:8082", listening.Line, StringComparison.Ordinal);
-        Assert.Contains("Pref.SingleActiveModel", listening.Line, StringComparison.Ordinal);
+        Assert.Contains(Loc.T("Pref.SingleActiveModel"), listening.Line, StringComparison.Ordinal);
         Assert.Equal(GatewayStatusVisualKind.Activity, activity.VisualKind);
         Assert.Contains("switching to Qwen", activity.Line, StringComparison.Ordinal);
         Assert.Contains("loading Qwen", loading.Line, StringComparison.Ordinal);

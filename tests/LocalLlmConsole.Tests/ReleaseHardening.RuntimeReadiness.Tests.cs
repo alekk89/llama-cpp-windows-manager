@@ -233,7 +233,7 @@ public sealed partial class ReleaseHardeningTests
 
         Assert.Contains("_coreServices.Runtime.RuntimeReadinessMonitorApplication.RunAsync(", source, StringComparison.Ordinal);
         Assert.Contains("new RuntimeReadinessMonitorApplicationRequest(", source, StringComparison.Ordinal);
-        Assert.Contains("RuntimeReadinessMonitorActions(model.Id, model.Name)", source, StringComparison.Ordinal);
+        Assert.Contains("RuntimeReadinessMonitorActions(model.Id, model.Name, selectLoadedOverviewModel)", source, StringComparison.Ordinal);
         Assert.Contains("new RuntimeReadinessCompletionActions(", source, StringComparison.Ordinal);
         Assert.Contains("_workflow.RunAsync(new RuntimeReadinessMonitorWorkflowRequest(", monitorApplication, StringComparison.Ordinal);
         Assert.Contains("_completionApplication.ApplyAsync(result.CompletionPlan", monitorApplication, StringComparison.Ordinal);
@@ -458,10 +458,11 @@ public sealed partial class ReleaseHardeningTests
         var switchLoaded = service.PlanSelectedLoad(model, restart: false, modelLoaded: true, modelActive: false, launchSettingsLoaded: true);
         var renderSettings = service.PlanSelectedLoad(model, restart: false, modelLoaded: false, modelActive: false, launchSettingsLoaded: false);
         var continueSelected = service.PlanSelectedLoad(model, restart: true, modelLoaded: true, modelActive: false, launchSettingsLoaded: true);
-        var missingOverview = service.PlanOverviewLoad(null, modelLoaded: false, modelActive: false, appReady: true);
-        var loadedOverview = service.PlanOverviewLoad(model, modelLoaded: true, modelActive: false, appReady: true);
-        var startingOverview = service.PlanOverviewLoad(model, modelLoaded: false, modelActive: false, appReady: false);
-        var continueOverview = service.PlanOverviewLoad(model, modelLoaded: false, modelActive: false, appReady: true);
+        var missingOverview = service.PlanOverviewLoad(null, modelLoaded: false, modelActive: false, appReady: true, selectedProfileLoaded: false);
+        var loadedOverview = service.PlanOverviewLoad(model, modelLoaded: true, modelActive: false, appReady: true, selectedProfileLoaded: true);
+        var replacementOverview = service.PlanOverviewLoad(model, modelLoaded: true, modelActive: true, appReady: true, selectedProfileLoaded: false);
+        var startingOverview = service.PlanOverviewLoad(model, modelLoaded: false, modelActive: false, appReady: false, selectedProfileLoaded: false);
+        var continueOverview = service.PlanOverviewLoad(model, modelLoaded: false, modelActive: false, appReady: true, selectedProfileLoaded: false);
         var selectedUnloadMissing = service.PlanSelectedUnload(null, modelLoaded: false);
         var overviewUnloadMissing = service.PlanOverviewUnload(null, modelLoaded: false);
         var unloadLoaded = service.PlanSelectedUnload(model, modelLoaded: true);
@@ -478,6 +479,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(ModelRuntimeLoadCommandKind.Status, missingOverview.Kind);
         Assert.Equal("Choose a model first.", missingOverview.StatusMessage);
         Assert.Equal(ModelRuntimeLoadCommandKind.SwitchLoaded, loadedOverview.Kind);
+        Assert.Equal(ModelRuntimeLoadCommandKind.Continue, replacementOverview.Kind);
         Assert.Equal(ModelRuntimeLoadCommandKind.Status, startingOverview.Kind);
         Assert.Equal("App is still starting.", startingOverview.StatusMessage);
         Assert.Equal(ModelRuntimeLoadCommandKind.Continue, continueOverview.Kind);

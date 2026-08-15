@@ -14,13 +14,14 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
-    private async Task StartModelRuntimeAsync(
+    private async Task<bool> StartModelRuntimeAsync(
         RuntimeRecord runtime,
         ModelRecord model,
         AppSettings launchSettings,
         bool interactivePrompts = true,
         string launchProfileId = "",
-        string launchProfileName = "")
+        string launchProfileName = "",
+        bool selectLoadedOverviewModel = true)
     {
         var result = await _coreServices.Models.ModelRuntimeLaunchApplication.LaunchAsync(
             new ModelRuntimeLaunchApplicationRequest(
@@ -41,7 +42,7 @@ public partial class MainWindow
                 () => StopModelLoadingTimer(),
                 settings => _activeRuntimeSettings = settings,
                 SaveActiveRuntimeSessionsAsync,
-                StartRuntimeReadinessMonitor,
+                (loadingModel, settings) => StartRuntimeReadinessMonitor(loadingModel, settings, selectLoadedOverviewModel),
                 StartRuntimeDashboardRefreshTimer,
                 UpdateModelLoadingStatus,
                 RefreshOverviewAsync,
@@ -68,6 +69,7 @@ public partial class MainWindow
                     session.ProcessId,
                     port = session.LaunchSettings.Port
                 });
+        return result.Launched;
     }
 
     private void StartModelLoadingTimer(string modelId, string modelName, AppSettings launchSettings)
@@ -115,14 +117,14 @@ public partial class MainWindow
     {
         if (!plan.ShouldRender) return;
 
-        SetMetricText(_runtimeDashboardPage.ModelMetric, plan.MetricText);
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.ModelMetric, plan.MetricText);
         if (plan.UpdateProgress)
             UpdateRuntimeModelProgress();
         if (!string.IsNullOrWhiteSpace(plan.StatusText))
             SetStatus(plan.StatusText);
     }
 
-    private void StartRuntimeReadinessMonitor(ModelRecord model, AppSettings launchSettings)
+    private void StartRuntimeReadinessMonitor(ModelRecord model, AppSettings launchSettings, bool selectLoadedOverviewModel = true)
     {
         var cts = _coreServices.Ui.RuntimeReadinessMonitors.Start(model.Id);
         RunBackground(
@@ -134,7 +136,7 @@ public partial class MainWindow
                     _coreServices.Models.ModelRuntimeStatus.IsLoadingModel(model.Id),
                     _viewModel.CurrentPage == "Overview",
                     cts),
-                RuntimeReadinessMonitorActions(model.Id, model.Name)),
+                RuntimeReadinessMonitorActions(model.Id, model.Name, selectLoadedOverviewModel)),
             "Runtime readiness monitor failed");
     }
 
@@ -148,14 +150,17 @@ public partial class MainWindow
         _coreServices.Ui.RuntimeReadinessMonitors.Stop(modelId);
     }
 
-    private RuntimeReadinessMonitorApplicationActions RuntimeReadinessMonitorActions(string modelId, string modelName)
+    private RuntimeReadinessMonitorApplicationActions RuntimeReadinessMonitorActions(
+        string modelId,
+        string modelName,
+        bool selectLoadedOverviewModel = true)
         => new(
             id => _sessions.SessionForModel(id),
             (settings, token) => _coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync(settings, token),
             id => _sessions.MarkModelLoadedIfRunning(id),
             new RuntimeReadinessCompletionActions(
                 showLoadedDuration => StopModelLoadingTimer(showLoadedDuration, modelName),
-                () => SelectOverviewLoadedModelAsync(modelId),
+                () => selectLoadedOverviewModel ? SelectOverviewLoadedModelAsync(modelId) : Task.CompletedTask,
                 SaveActiveRuntimeSessionsAsync,
                 SetStatus,
                 UpdateRuntimeModelProgress,

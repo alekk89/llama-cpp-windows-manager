@@ -61,13 +61,12 @@ public partial class MainWindow
         var hasUbuntu = report.Distros.Any(distro => distro.IsUbuntu);
         _wslPage.ApplyActionState(report, hasUbuntu, tools);
 
-        SetMetricText(_wslPage.StatusMetric, report.Status);
-        SetMetricText(_wslPage.SelectedMetric, WslEnvironmentService.SelectedDistroSummary(report, _settings.WslDistro));
-        SetMetricText(_wslPage.InfoMetric, WslEnvironmentService.InstalledDistroSummary(report));
-        SetMetricText(_wslPage.ToolsMetric, WslEnvironmentService.ToolSummary(tools));
+        MetricCardFactory.SetMetricText(_wslPage.StatusMetric, report.Status);
+        MetricCardFactory.SetMetricText(_wslPage.SelectedMetric, WslEnvironmentService.SelectedDistroSummary(report, _settings.WslDistro));
+        MetricCardFactory.SetMetricText(_wslPage.InfoMetric, WslEnvironmentService.InstalledDistroSummary(report));
+        MetricCardFactory.SetMetricText(_wslPage.ToolsMetric, WslEnvironmentService.ToolSummary(tools));
 
         _viewModel.WslLinux.ReplaceDistroRows(report, _settings.WslDistro);
-        _wslPage.RefreshDistroGrid();
         ApplyPendingHelpFocus();
     }
 }

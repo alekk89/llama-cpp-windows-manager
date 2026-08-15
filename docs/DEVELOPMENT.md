@@ -1,5 +1,7 @@
 # Development Guide
 
+Last reviewed: 2026-08-15
+
 This repo is a Windows-first .NET 10 WPF app. The app should stay easy to run
 from source, but end users should receive the published portable app or
 installer from `dist`.
@@ -30,6 +32,13 @@ are separate actions that require the user's authorization. Public trusted
 releases must use the protected signed-release workflow; never label an
 unsigned local artifact as signed or trusted.
 
+Before committing, inspect `git status --short` and make sure every intended
+source, test, manifest, license, and documentation file is tracked. Local builds
+compile SDK-globbed untracked `.cs` files, but CI and reviewers cannot see them;
+a green local test run is therefore not sufficient while required files still
+appear with `??`. Generated `dist`, `bin`, `obj`, workspaces, databases, logs,
+models, runtimes, credentials, and signing material must remain untracked.
+
 Treat code from external branches and pull requests as untrusted until it has
 been reviewed. Do not execute an untrusted contribution on a machine containing
 production Manager data, signing certificates, or release credentials. If a
@@ -57,7 +66,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-vulnerabilities.p
 The coverage gate collects instrumented Debug binaries (public Release binaries intentionally omit PDBs), rejects skipped tests, and requires at least 80% service line
 coverage and 95% model/view-model line coverage. WPF composition is additionally
 exercised on an STA thread because global coverage is distorted by generated
-markup and code-behind.
+markup and code-behind. Tests use the .NET 10 Microsoft Testing Platform runner
+selected in `global.json`; project-specific commands therefore use `dotnet test
+--project <path>`, while a solution-wide run uses `dotnet test --solution
+LocalLlmConsole.sln`.
 
 To include packaging on a machine with publish/installer prerequisites, run:
 
@@ -70,7 +82,7 @@ Use `-RequireCleanTree` on `test-release-gate.ps1`, `publish-app.ps1`, or
 clean Git worktree.
 
 If `dotnet` is not on `PATH`, set `LLAMA_CPP_WINDOWS_MANAGER_DOTNET` to a .NET
-8 SDK `dotnet.exe`.
+10 SDK `dotnet.exe`.
 
 ## Module Layout
 
@@ -142,6 +154,15 @@ Use these rules when touching `MainWindow`:
 - Page-specific row/event routing belongs in page controllers. Models, Hugging
   Face download history, Runtimes, Windows, WSL, Overview, Logs,
   Lifetime, and Settings pages already follow this pattern.
+- Runtime control-API dispatch and workflow composition belong in
+  `ControlRuntimeOperationApplicationService`; theme resource mutation belongs
+  in `ApplicationThemeService`; shared visual-tree and accessibility helpers
+  belong under `Ui/Common`.
+- Keep each `MainWindow*.cs` shell adapter at or below 300 nonblank lines. The
+  architecture test enforces this limit and rejects reintroduced UI factories,
+  theme policy, or runtime control workflows in the window.
+- Keep `ModelGroupDialogFactory` split by dialog responsibility; each partial is
+  limited to 300 nonblank lines by the architecture test.
 - Empty placeholder partials should be deleted.
 
 ## Test Guidance
@@ -157,6 +178,27 @@ Useful test groups:
 - `ReleaseHardening.HuggingFace.Tests.cs`: search/download/safety behavior.
 - `ReleaseHardening.Ui.Tests.cs`: view model and UI composition invariants.
 
+### Adding an app-level UI preference
+
+Overview visibility is app state, not a model launch option. A new persistent
+UI preference requires all of the following:
+
+1. Add a backward-compatible defaulted property to `AppSettings`.
+2. Add its Settings row in `SettingsPageDefinitionService` and parse it in
+   `AppSettingsUpdateService`.
+3. Add both read and write mappings in `StateStore.Settings`; the record property
+   alone does not persist an individual SQLite settings key.
+4. Apply it through the relevant page state so automatic Settings persistence
+   updates the already-running page without requiring a restart.
+5. Keep hidden telemetry presentation-only unless the product requirement
+   explicitly changes collection behavior.
+6. Add update-service, SQLite save/reload, WPF visibility/reflow, localization,
+   control-schema, Help, and release-readiness coverage.
+
+The six Overview status-card switches and live runtime log are default-`true`.
+The dense raw metrics table and Models Hugging Face section are default-`false`.
+Choose defaults deliberately when adding future optional surfaces.
+
 ## Documentation Guidance
 
 When behavior changes, update both the repo docs and in-app Help in the same
@@ -169,8 +211,10 @@ pass:
 - `docs/RELEASE_READINESS.md` for manual validation steps and latest verified
   command results.
 - `docs/GITHUB_RELEASE_NEXT.md` for unreleased user-visible changes.
-- `src/LocalLlmConsole.App/Ui/Pages/Help/HelpContentFactory.cs` for user-facing
-  Help text shown in the app.
+- `AGENTS.md`, `agent.md`, and `docs/CONTROL_API.md` when an automation-facing
+  field or operation changes; these are embedded release sidecars.
+- `Services/App/HelpCatalogService.cs` for concise Help topics and search terms,
+  plus `Ui/Pages/Help/*` for Help search, presentation, and navigation behavior.
 
 Prefer describing current behavior over refactor history. Historical release
 notes should stay historically accurate and point to the next-release notes for

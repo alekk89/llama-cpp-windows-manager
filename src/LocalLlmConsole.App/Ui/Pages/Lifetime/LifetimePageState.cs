@@ -13,6 +13,4 @@ public sealed class LifetimePageState
         MetricsGrid = controls.MetricsGrid;
     }
 
-    public void RefreshMetricsGrid()
-        => MetricsGrid?.Items.Refresh();
 }

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LocalLlmConsole"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="llama.cpp Windows Manager v2.1.0" MinWidth="1180" MinHeight="760" Width="1320" Height="840"
+        Title="llama.cpp Windows Manager v2.2.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" ResizeMode="CanResize"
         Background="{DynamicResource AppBack}"
@@ -30,30 +30,23 @@
               MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
       <Grid Margin="16,0,8,0">
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <Border Width="26"
-                  Height="26"
-                  Margin="0,0,10,0"
-                  Background="{DynamicResource AccentSoft}"
-                  BorderBrush="{DynamicResource AccentStrong}"
-                  BorderThickness="1"
-                  CornerRadius="6">
-            <Grid Width="14" Height="14">
-              <StackPanel VerticalAlignment="Center">
-                <Grid Height="4">
-                  <Border Width="8" Height="1.5" Background="{DynamicResource Accent}" CornerRadius="0.75" HorizontalAlignment="Left"/>
-                  <Ellipse Width="2" Height="2" Fill="{DynamicResource Accent}" HorizontalAlignment="Right"/>
-                </Grid>
-                <Grid Height="4">
-                  <Border Width="8" Height="1.5" Background="{DynamicResource Accent}" CornerRadius="0.75" HorizontalAlignment="Left"/>
-                  <Ellipse Width="2" Height="2" Fill="{DynamicResource Accent}" HorizontalAlignment="Right"/>
-                </Grid>
-                <Grid Height="4">
-                  <Border Width="8" Height="1.5" Background="{DynamicResource Accent}" CornerRadius="0.75" HorizontalAlignment="Left"/>
-                  <Ellipse Width="2" Height="2" Fill="{DynamicResource Accent}" HorizontalAlignment="Right"/>
-                </Grid>
-              </StackPanel>
-            </Grid>
-          </Border>
+          <Button x:Name="NavigationToggleButton"
+                  Style="{StaticResource TitleBarButton}"
+                  Width="28"
+                  Height="28"
+                  MinHeight="28"
+                  Margin="0,0,7,0"
+                  Padding="0"
+                  AutomationProperties.Name="Collapse navigation menu"
+                  shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                  Click="NavigationToggleButton_Click">
+            <TextBlock Text="&#xE700;"
+                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                       FontSize="13"
+                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+          </Button>
           <TextBlock Text="llama.cpp Windows Manager"
                      Foreground="{DynamicResource TextMain}"
                      FontSize="13.5"
@@ -65,7 +58,7 @@
                   CornerRadius="4"
                   VerticalAlignment="Center">
             <TextBlock x:Name="AppVersionText"
-                       Text="v2.1.0"
+                       Text="v2.2.0"
                        Foreground="{DynamicResource TextMuted}"
                        FontSize="10.5"
                        FontWeight="SemiBold"/>
@@ -105,12 +98,13 @@
       </Border>
       <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="244"/>
+        <ColumnDefinition x:Name="SidebarColumn" Width="244"/>
         <ColumnDefinition Width="0"/>
         <ColumnDefinition Width="*"/>
       </Grid.ColumnDefinitions>
       <!-- Sidebar navigation -->
-      <Border Grid.Column="0"
+      <Border x:Name="SidebarNavigation"
+              Grid.Column="0"
               Style="{StaticResource SidebarShell}">
         <Grid>
           <Grid.RowDefinitions>
@@ -164,6 +158,7 @@
               <TextBlock x:Name="AppStatusText"
                          Foreground="{DynamicResource TextMain}"
                          FontWeight="SemiBold"
+                         AutomationProperties.LiveSetting="Polite"
                          TextWrapping="Wrap"/>
             </StackPanel>
           </Border>

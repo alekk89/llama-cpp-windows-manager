@@ -22,39 +22,23 @@ public sealed class AppSettingsUpdateService
         string V(string key, string fallback) => values.TryGetValue(key, out var value) ? value : fallback;
 
         var accessMode = AppPreferenceService.ModelAccessMode(V("modelAccessMode", current.ModelAccessMode));
-        var requireAuth = AppPreferenceService.YesNoValue(
-            V("requireApiKeyAuth", AppPreferenceService.YesNoLabel(current.RequireApiKeyAuth)),
-            current.RequireApiKeyAuth);
+        if (values.TryGetValue("requireApiKeyAuth", out var requestedAuth)
+            && !AppPreferenceService.YesNoValue(requestedAuth, fallback: true))
+            return Fail(current, "API-key authentication is required for all model-serving endpoints.");
 
-        string apiKey;
-        string apiKeyBackup;
-        var generatedApiKey = false;
-        if (requireAuth)
-        {
-            apiKey = (V("modelApiKey", current.ModelApiKey) ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                // When re-enabling, restore the key we backed up when disabling
-                if (!string.IsNullOrWhiteSpace(current.ModelApiKeyBackup))
-                    apiKey = current.ModelApiKeyBackup.Trim();
+        var requestedApiKey = (V("modelApiKey", current.ModelApiKey) ?? "").Trim();
+        if (values.ContainsKey("modelApiKey")
+            && requestedApiKey.Length > 0
+            && !ApiSecurity.IsStrongBearerSecret(requestedApiKey))
+            return Fail(current, "Model API key must be at least 32 non-whitespace characters.");
 
-                if (string.IsNullOrWhiteSpace(apiKey))
-                {
-                    apiKey = ApiSecurity.GenerateHexToken(32);
-                    generatedApiKey = true;
-                }
-            }
-            if (!ApiSecurity.IsStrongBearerSecret(apiKey))
-                return Fail(current, "Model API key must be at least 32 non-whitespace characters.");
-            apiKeyBackup = apiKey;
-        }
-        else
-        {
-            apiKeyBackup = (current.ModelApiKey ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(apiKeyBackup) && !string.IsNullOrWhiteSpace(current.ModelApiKeyBackup))
-                apiKeyBackup = current.ModelApiKeyBackup.Trim();
-            apiKey = string.Empty;
-        }
+        var hadStrongApiKey = new[] { requestedApiKey, current.ModelApiKey, current.ModelApiKeyBackup }
+            .Any(ApiSecurity.IsStrongBearerSecret);
+        var apiKey = ApiSecurity.StrongBearerSecretOrNew(
+            requestedApiKey,
+            current.ModelApiKey,
+            current.ModelApiKeyBackup);
+        var generatedApiKey = !hadStrongApiKey;
 
         if (!AppPreferenceService.TryIntValue(V("autoLoadGatewayPort", current.AutoLoadGatewayPort.ToString(CultureInfo.InvariantCulture)), out var autoLoadGatewayPort))
             return Fail(current, "Gateway port must be a whole number.");
@@ -92,13 +76,25 @@ public sealed class AppSettingsUpdateService
             AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(
                 V("autoLoadGatewayPolicy", AppPreferenceService.GatewaySwapPolicyLabel(current.AutoLoadGatewayPolicy))),
             Host = AppPreferenceService.RuntimeHostForAccessMode(accessMode),
-            RequireApiKeyAuth = requireAuth,
+            RequireApiKeyAuth = true,
             ModelApiKey = apiKey,
-            ModelApiKeyBackup = apiKeyBackup,
+            ModelApiKeyBackup = apiKey,
+            ShowOverviewModelStatus = Visibility("showOverviewModelStatus", current.ShowOverviewModelStatus),
+            ShowOverviewHardware = Visibility("showOverviewHardware", current.ShowOverviewHardware),
+            ShowOverviewSlots = Visibility("showOverviewSlots", current.ShowOverviewSlots),
+            ShowOverviewTokens = Visibility("showOverviewTokens", current.ShowOverviewTokens),
+            ShowOverviewMtpTokens = Visibility("showOverviewMtpTokens", current.ShowOverviewMtpTokens),
+            ShowOverviewKvCache = Visibility("showOverviewKvCache", current.ShowOverviewKvCache),
+            ShowOverviewLiveRuntimeLog = Visibility("showOverviewLiveRuntimeLog", current.ShowOverviewLiveRuntimeLog),
+            ShowOverviewAllMetrics = Visibility("showOverviewAllMetrics", current.ShowOverviewAllMetrics),
+            ShowModelsHuggingFace = Visibility("showModelsHuggingFace", current.ShowModelsHuggingFace),
             MaxLogFileSizeMb = Math.Clamp(maxLogFileSizeMb, 1, 4096)
         };
 
         return new AppSettingsUpdateResult(true, updated, "", generatedApiKey);
+
+        bool Visibility(string key, bool fallback)
+            => AppPreferenceService.ShowHideValue(V(key, AppPreferenceService.ShowHideLabel(fallback)), fallback);
     }
 
     private static AppSettingsUpdateResult Fail(AppSettings current, string message)

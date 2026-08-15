@@ -3,7 +3,6 @@ using System.Windows;
 namespace LocalLlmConsole;
 
 public sealed record SettingsPageActionControllerActions(
-    Func<Task> SaveSettingsAsync,
     Action PreviewTheme,
     Func<object, EditableSettingRow?> RowFromSender,
     Func<EditableSettingRow?, Task> RunRowActionAsync,
@@ -22,7 +21,6 @@ public sealed class SettingsPageActionController
 
     public SettingsPageActions Build()
         => new(
-            async (_, _) => await _actions.SaveSettingsAsync(),
             (_, _) => _actions.PreviewTheme(),
             RevealSecretRow_Click,
             CopySecretRow_Click,

@@ -53,7 +53,10 @@ public sealed class LaunchSettingsControlStateService
             ["MTP head"] = true,
             ["Reasoning"] = true,
             ["Reason format"] = true,
+            ["Reasoning effort"] = true,
             ["Reason budget"] = true,
+            ["Budget message"] = true,
+            ["Preserve reasoning"] = true,
             ["Jinja chat"] = true
         };
 

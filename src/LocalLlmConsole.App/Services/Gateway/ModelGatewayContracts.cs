@@ -32,7 +32,7 @@ public sealed record ModelGatewayOptions(
             settings.ModelAccessMode,
             settings.AutoLoadGatewayPort,
             RuntimeEndpointService.ModelApiKeyForClient(settings),
-            settings.RequireApiKeyAuth,
+            RequireApiKeyAuth: true,
             AppPreferenceService.GatewaySwapPolicy(settings.AutoLoadGatewayPolicy) == "singleActive"
                 ? ModelGatewaySwapPolicy.SingleActive
                 : ModelGatewaySwapPolicy.KeepLoaded);

@@ -61,26 +61,42 @@ public partial class MainWindow
 
     private void ScheduleRuntimeLaunchOptionDiscovery()
     {
-        _runtimeLaunchOptionDiscoveryCancellation?.Cancel();
-        _runtimeLaunchOptionDiscoveryCancellation?.Dispose();
-        _runtimeLaunchOptionDiscoveryCancellation = new CancellationTokenSource();
-        var token = _runtimeLaunchOptionDiscoveryCancellation.Token;
-        RunBackground(() => RefreshRuntimeLaunchOptionsAsync(token), "Runtime launch-setting discovery failed");
-    }
-
-    private async Task RefreshRuntimeLaunchOptionsAsync(CancellationToken cancellationToken)
-    {
+        CancelRuntimeLaunchOptionDiscovery();
         var panel = _launchSettingsPanel.FormControls.RuntimeOptions;
         var runtime = _launchSettingsPanel.RuntimeCombo?.SelectedItem as RuntimeChoice;
-        if (panel is null || runtime is null) return;
+        if (panel is null) return;
+        if (runtime is null)
+        {
+            panel.SetNoRuntime();
+            return;
+        }
+
+        panel.SetLoading(runtime.DisplayName);
+        var cancellation = new CancellationTokenSource();
+        _runtimeLaunchOptionDiscoveryCancellation = cancellation;
+        var token = cancellation.Token;
+        RunBackground(() => RefreshRuntimeLaunchOptionsAsync(runtime, token), "Runtime launch-setting discovery failed");
+    }
+
+    private void CancelRuntimeLaunchOptionDiscovery()
+    {
+        var cancellation = Interlocked.Exchange(ref _runtimeLaunchOptionDiscoveryCancellation, null);
+        if (cancellation is null) return;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private async Task RefreshRuntimeLaunchOptionsAsync(RuntimeChoice runtime, CancellationToken cancellationToken)
+    {
+        var panel = _launchSettingsPanel.FormControls.RuntimeOptions;
+        if (panel is null) return;
         var runtimeId = runtime.Id;
-        panel.SetLoading();
         try
         {
             var options = await _runtimeLaunchOptionDiscovery.DiscoverAsync(runtime, _settings.WslDistro, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!string.Equals(runtimeId, SelectedLaunchRuntimeId(), StringComparison.OrdinalIgnoreCase)) return;
-            panel.SetOptions(options);
+            panel.SetOptions(options, runtime.DisplayName);
             UpdateRuntimeCommandPreview();
         }
         catch (Exception ex) when (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)

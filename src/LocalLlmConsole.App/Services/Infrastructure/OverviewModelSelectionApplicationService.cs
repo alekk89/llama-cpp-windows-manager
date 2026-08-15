@@ -24,7 +24,8 @@ public sealed class OverviewModelSelectionApplicationService
 {
     public async Task<OverviewModelSelectionOutcome> SelectAsync(
         OverviewModelSelectionApplicationRequest request,
-        OverviewModelSelectionApplicationActions actions)
+        OverviewModelSelectionApplicationActions actions,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         Validate(actions);
@@ -32,14 +33,17 @@ public sealed class OverviewModelSelectionApplicationService
         var model = request.Model;
         if (model is null)
             return OverviewModelSelectionOutcome.Ignored;
+        cancellationToken.ThrowIfCancellationRequested();
 
         var outcome = request.IsLoaded
-            ? await SelectLoadedModelAsync(model, request.IsActive, actions)
+            ? await SelectLoadedModelAsync(model, request.IsActive, actions, cancellationToken)
             : OverviewModelSelectionOutcome.NotLoaded;
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (!request.IsLoaded)
             actions.SetStatus($"{model.Name} is not loaded. Load it to expose an OpenAI-compatible endpoint.");
         await actions.RefreshRuntimeMetricsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
 
         return outcome;
     }
@@ -47,7 +51,8 @@ public sealed class OverviewModelSelectionApplicationService
     private static async Task<OverviewModelSelectionOutcome> SelectLoadedModelAsync(
         ModelRecord model,
         bool isActive,
-        OverviewModelSelectionApplicationActions actions)
+        OverviewModelSelectionApplicationActions actions,
+        CancellationToken cancellationToken)
     {
         if (isActive)
             return OverviewModelSelectionOutcome.ActiveLoaded;
@@ -60,7 +65,9 @@ public sealed class OverviewModelSelectionApplicationService
         }
 
         actions.SetActiveRuntimeSettings(selection.ActiveSettings);
+        cancellationToken.ThrowIfCancellationRequested();
         await actions.SaveActiveRuntimeSessionsAsync();
+        cancellationToken.ThrowIfCancellationRequested();
         return OverviewModelSelectionOutcome.SwitchedLoaded;
     }
 

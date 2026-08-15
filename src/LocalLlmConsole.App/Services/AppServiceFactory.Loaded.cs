@@ -25,6 +25,7 @@ public sealed partial class AppServiceFactory
         var jobs = CreateJobEngine(stateStore);
         var catalog = CreateModelCatalogService(stateStore);
         var modelCatalogRefreshApplication = CreateModelCatalogRefreshApplicationService(stateStore, catalog);
+        var modelGroups = CreateModelGroupService(stateStore);
         var launchProfiles = CreateModelLaunchProfileService(stateStore, request.Sessions);
         var launchVariants = CreateModelLaunchVariantWorkflowService(launchProfiles);
         var modelLaunchSettingsWorkflow = CreateModelLaunchSettingsWorkflowService(launchProfiles);
@@ -101,6 +102,7 @@ public sealed partial class AppServiceFactory
             new MainWindowLoadedModelServices(
                 catalog,
                 modelCatalogRefreshApplication,
+                modelGroups,
                 launchProfiles,
                 launchVariants,
                 modelLaunchSettingsWorkflow),

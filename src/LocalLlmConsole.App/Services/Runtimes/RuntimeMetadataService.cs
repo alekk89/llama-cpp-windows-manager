@@ -2,6 +2,32 @@ namespace LocalLlmConsole.Services;
 
 public static partial class RuntimeMetadataService
 {
+    public static bool IsManagedSourceBuild(RuntimeRecord runtime)
+    {
+        if (!string.IsNullOrWhiteSpace(ManagedPackageId(runtime))) return false;
+
+        try
+        {
+            var metadata = JsonNode.Parse(runtime.MetadataJson);
+            if (HasManagedSourceIdentity(metadata) || HasManagedSourceIdentity(metadata?["runtimeMetadata"]))
+                return true;
+        }
+        catch
+        {
+            // Try the runtime's stamped metadata file below.
+        }
+
+        try
+        {
+            var metadataPath = Path.Combine(Folder(runtime), "local-llm-runtime.json");
+            return File.Exists(metadataPath) && HasManagedSourceIdentity(JsonNode.Parse(File.ReadAllText(metadataPath)));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static string ManagedPackageId(RuntimeRecord runtime)
     {
         try
@@ -173,4 +199,7 @@ public static partial class RuntimeMetadataService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    private static bool HasManagedSourceIdentity(JsonNode? metadata)
+        => !string.IsNullOrWhiteSpace(metadata?["managedPresetId"]?.ToString());
 }

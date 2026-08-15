@@ -51,36 +51,37 @@ public sealed class AppSettingsWorkflowService
         AppSettings targetSettings,
         CancellationToken cancellationToken = default)
     {
-        // When auth is disabled, clear any previously stored key so it cannot
-        // be reused if authentication is re-enabled later.
-        if (!targetSettings.RequireApiKeyAuth)
+        var hadStrongApiKey = new[]
         {
-            if (!string.IsNullOrWhiteSpace(targetSettings.ModelApiKey))
-            {
-                var cleared = targetSettings with { ModelApiKey = "" };
-                var persistedCleared = await PersistAsync(persistedSettings with { ModelApiKey = "" }, cancellationToken);
-                return new AppSettingsEnsureApiKeyResult(cleared, persistedCleared, GeneratedApiKey: false);
-            }
-            return new AppSettingsEnsureApiKeyResult(targetSettings, persistedSettings, GeneratedApiKey: false);
-        }
-
-        var apiKey = RuntimeEndpointService.ModelApiKeyForClient(targetSettings);
-
-        if (!string.IsNullOrWhiteSpace(apiKey) && ApiSecurity.IsStrongBearerSecret(apiKey))
+            targetSettings.ModelApiKey,
+            targetSettings.ModelApiKeyBackup,
+            persistedSettings.ModelApiKey,
+            persistedSettings.ModelApiKeyBackup
+        }.Any(ApiSecurity.IsStrongBearerSecret);
+        var apiKey = ApiSecurity.StrongBearerSecretOrNew(
+            targetSettings.ModelApiKey,
+            targetSettings.ModelApiKeyBackup,
+            persistedSettings.ModelApiKey,
+            persistedSettings.ModelApiKeyBackup);
+        var normalizedTarget = targetSettings with
         {
-            var trimmedTarget = targetSettings with { ModelApiKey = apiKey };
-            return new AppSettingsEnsureApiKeyResult(
-                trimmedTarget,
-                persistedSettings with { ModelApiKey = RuntimeEndpointService.ModelApiKeyForClient(persistedSettings) },
-                GeneratedApiKey: false);
-        }
+            RequireApiKeyAuth = true,
+            ModelApiKey = apiKey,
+            ModelApiKeyBackup = apiKey
+        };
+        var normalizedPersisted = persistedSettings with
+        {
+            RequireApiKeyAuth = true,
+            ModelApiKey = apiKey,
+            ModelApiKeyBackup = apiKey
+        };
+        if (normalizedPersisted != persistedSettings)
+            normalizedPersisted = await PersistAsync(normalizedPersisted, cancellationToken);
 
-        apiKey = ApiSecurity.GenerateHexToken(32);
-        var updatedPersisted = await PersistAsync(persistedSettings with { ModelApiKey = apiKey }, cancellationToken);
         return new AppSettingsEnsureApiKeyResult(
-            targetSettings with { ModelApiKey = apiKey },
-            updatedPersisted,
-            GeneratedApiKey: true);
+            normalizedTarget,
+            normalizedPersisted,
+            GeneratedApiKey: !hadStrongApiKey);
     }
 
     public async Task<AppSettings> PersistAsync(AppSettings settings, CancellationToken cancellationToken = default)

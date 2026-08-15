@@ -13,7 +13,12 @@ public sealed partial class ReleaseHardeningTests
         ["llwmctl.exe"] = Encoding.UTF8.GetBytes("cli-binary"),
         ["AGENTS.md"] = Encoding.UTF8.GetBytes("# comprehensive agent instructions"),
         ["agent.md"] = Encoding.UTF8.GetBytes("# quick agent instructions"),
-        ["docs/CONTROL_API.md"] = Encoding.UTF8.GetBytes("# control API")
+        ["docs/CONTROL_API.md"] = Encoding.UTF8.GetBytes("# control API"),
+        ["LICENSE"] = Encoding.UTF8.GetBytes("project license"),
+        ["THIRD-PARTY-NOTICES.md"] = Encoding.UTF8.GetBytes("third-party notices"),
+        ["licenses/Apache-2.0.txt"] = Encoding.UTF8.GetBytes("Apache License 2.0"),
+        ["licenses/dotnet/LICENSE.txt"] = Encoding.UTF8.GetBytes(".NET license"),
+        ["licenses/dotnet/ThirdPartyNotices.txt"] = Encoding.UTF8.GetBytes(".NET notices")
     };
 
     [Fact]
@@ -153,12 +158,20 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("--bootstrap-agent-sidecars-only", startup, StringComparison.Ordinal);
         Assert.Contains("-p:AgentBootstrapBundlePath=$BundleZip", publish, StringComparison.Ordinal);
         Assert.Contains("docs/CONTROL_API.md", publish, StringComparison.Ordinal);
+        Assert.Contains("THIRD-PARTY-NOTICES.md", publish, StringComparison.Ordinal);
+        Assert.Contains("licenses/Apache-2.0.txt", publish, StringComparison.Ordinal);
         Assert.Contains("Assert-HashCompanion -Path $controlCli", releaseGate, StringComparison.Ordinal);
         Assert.Contains("-ExpectedEntry \"docs/CONTROL_API.md\"", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("-ExpectedEntry \"LICENSE\"", releaseGate, StringComparison.Ordinal);
         Assert.Contains("-IncludePublish -IncludeInstaller", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe", releaseWorkflow, StringComparison.Ordinal);
+        Assert.Contains("choco install innosetup --version=6.7.1", releaseWorkflow, StringComparison.Ordinal);
+        Assert.True(
+            releaseWorkflow.IndexOf("Install pinned Inno Setup", StringComparison.Ordinal)
+            < releaseWorkflow.IndexOf("Import code-signing certificate", StringComparison.Ordinal));
         Assert.Contains("\\AGENTS.md\"; DestDir: \"{app}\"", installer, StringComparison.Ordinal);
         Assert.Contains("\\docs\\CONTROL_API.md\"; DestDir: \"{app}\\docs\"", installer, StringComparison.Ordinal);
+        Assert.Contains("\\LICENSE\"; DestDir: \"{app}\"", installer, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -189,7 +202,7 @@ public sealed partial class ReleaseHardeningTests
         manifestFiles ??= archiveFiles;
         var manifest = new
         {
-            version = "2.1.0",
+            version = "2.2.0",
             files = manifestFiles.Select(file => new
             {
                 path = file.Key,

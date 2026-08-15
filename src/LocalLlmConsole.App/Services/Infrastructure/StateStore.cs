@@ -76,6 +76,23 @@ CREATE TABLE IF NOT EXISTS model_launch_profiles (
   FOREIGN KEY(model_id) REFERENCES models(id) ON DELETE CASCADE,
   UNIQUE(model_id, name)
 );
+CREATE TABLE IF NOT EXISTS model_groups (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  retention_mode TEXT NOT NULL CHECK (retention_mode IN ('Inherit','Pinned','IdleTimeout')),
+  idle_minutes INTEGER NOT NULL CHECK (idle_minutes BETWEEN 1 AND 10080),
+  eviction_priority TEXT NOT NULL CHECK (eviction_priority IN ('Low','Normal','High')),
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS launch_profile_group_assignments (
+  launch_profile_id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(launch_profile_id) REFERENCES model_launch_profiles(id) ON DELETE CASCADE,
+  FOREIGN KEY(group_id) REFERENCES model_groups(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS ix_launch_profile_group_assignments_group_id
+ON launch_profile_group_assignments(group_id);
 CREATE TABLE IF NOT EXISTS runtimes (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

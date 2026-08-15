@@ -140,6 +140,10 @@ function Assert-PublishArtifacts {
   $agentsGuide = Join-Path $publishDir "AGENTS.md"
   $quickGuide = Join-Path $publishDir "agent.md"
   $controlApiGuide = Join-Path $publishDir "docs\CONTROL_API.md"
+  $license = Join-Path $publishDir "LICENSE"
+  $thirdPartyNotices = Join-Path $publishDir "THIRD-PARTY-NOTICES.md"
+  $apacheLicense = Join-Path $publishDir "licenses\Apache-2.0.txt"
+  $dotnetNotices = Join-Path $publishDir "licenses\dotnet\ThirdPartyNotices.txt"
   $zipPath = Join-Path $RepoRoot "dist\LlamaCppWindowsManager-$Runtime.zip"
 
   if (-not (Test-Path -LiteralPath $publishDir -PathType Container)) {
@@ -151,6 +155,10 @@ function Assert-PublishArtifacts {
   Assert-FileExists -Path $agentsGuide -Label "Agent instruction sidecar"
   Assert-FileExists -Path $quickGuide -Label "Quick agent instruction sidecar"
   Assert-FileExists -Path $controlApiGuide -Label "Control API reference sidecar"
+  Assert-FileExists -Path $license -Label "Project license"
+  Assert-FileExists -Path $thirdPartyNotices -Label "Third-party notices"
+  Assert-FileExists -Path $apacheLicense -Label "Apache License 2.0"
+  Assert-FileExists -Path $dotnetNotices -Label ".NET third-party notices"
   Assert-HashCompanion -Path $zipPath
 
   $pdbs = @(Get-ChildItem -LiteralPath $publishDir -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue)
@@ -168,6 +176,10 @@ function Assert-PublishArtifacts {
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "AGENTS.md" -ZipPath $zipPath
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "agent.md" -ZipPath $zipPath
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "docs/CONTROL_API.md" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "LICENSE" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "THIRD-PARTY-NOTICES.md" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "licenses/Apache-2.0.txt" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "licenses/dotnet/ThirdPartyNotices.txt" -ZipPath $zipPath
     if ($entries -contains "LlamaCppConsole.exe") {
       throw "Release archive contains the removed legacy executable alias: $zipPath"
     }

@@ -82,7 +82,18 @@ public sealed partial class LlamaProcessSupervisor : IDisposable
         var visionProjectorPath = string.IsNullOrWhiteSpace(mmprojPath)
             ? null
             : runtime.Mode == RuntimeMode.Wsl ? ToWslPath(mmprojPath) : mmprojPath;
-        var draftModelPath = ResolveDraftModelPath(model.ModelPath, settings.SpecDraftModelPath, settings.SpeculativeType);
+        var speculativeType = LaunchSettingMetadataService.NormalizeSpeculativeType(settings.SpeculativeType);
+        var usesDraftModel = speculativeType.StartsWith("draft-", StringComparison.OrdinalIgnoreCase);
+        if (usesDraftModel
+            && !string.IsNullOrWhiteSpace(settings.SpecDraftModelPath)
+            && !File.Exists(Path.GetFullPath(settings.SpecDraftModelPath.Trim())))
+            throw new InvalidOperationException("Configured speculative draft/sidecar GGUF file was not found.");
+        var draftModelPath = ModelCatalogService.ResolveDraftModelPath(model.ModelPath, settings.SpecDraftModelPath, settings.SpeculativeType);
+        var usesEmbeddedDraftMtp = speculativeType.Equals("draft-mtp", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(settings.SpecDraftModelPath)
+            && ModelCatalogService.HasEmbeddedDraftMtp(model.ModelPath);
+        if (usesDraftModel && string.IsNullOrWhiteSpace(draftModelPath) && !usesEmbeddedDraftMtp)
+            throw new InvalidOperationException($"No matching {speculativeType} companion GGUF was found in the model folder. Select a compatible draft file explicitly or choose another speculative type.");
         var launchDraftModelPath = string.IsNullOrWhiteSpace(draftModelPath)
             ? null
             : runtime.Mode == RuntimeMode.Wsl ? ToWslPath(draftModelPath) : draftModelPath;

@@ -1,4 +1,5 @@
 using LocalLlmConsole.Models;
+using LocalLlmConsole.Localization;
 using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
 using System.Diagnostics;
@@ -77,7 +78,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(SettingsRowActionOutcome.ApiKeyGenerated, await service.RunActionAsync(apiKeyRow, RowActions()));
         Assert.Equal(generatedKey, apiKeyRow.Value);
         Assert.Contains("clear-cache", calls);
-        Assert.Contains("status:New model API key generated. Save settings to apply it.", calls);
+        Assert.Contains("status:New model API key generated; applying automatically.", calls);
 
         Assert.Equal(SettingsRowActionOutcome.FolderSelectionCanceled, await service.RunActionAsync(folderRow, RowActions()));
         Assert.Equal("old", folderRow.Value);
@@ -87,7 +88,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(SettingsRowActionOutcome.FolderSelected, await service.RunActionAsync(folderRow, RowActions()));
         Assert.Equal(Path.GetFullPath(selectedFolder), folderRow.Value);
         Assert.Contains("pick:old", calls);
-        Assert.Contains("status:Models folder selected. Save settings to apply it.", calls);
+        Assert.Contains("status:Models folder selected; applying automatically.", calls);
 
         var secretRow = new EditableSettingRow { Type = "secret", Value = "  secret-token  " };
 
@@ -1332,7 +1333,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("\"ContextExtension\", \"RopeScaling\"", launchUiSchema, StringComparison.Ordinal);
         Assert.Contains("\"Server\", \"ParallelSlots\"", launchUiSchema, StringComparison.Ordinal);
         Assert.Contains("LaunchSettingsSearchHost(request.LaunchSettingsSearchChanged, out searchBox)", launchPanelFactory, StringComparison.Ordinal);
-        Assert.Contains("FormControls.RuntimeOptions?.ApplyFilter(LaunchSettingsSearchBox?.Text)", launchPanelState, StringComparison.Ordinal);
+        Assert.Contains("FormControls.RuntimeOptions?.ApplyVisibility(plan.ShowAdvancedSections, LaunchSettingsSearchBox?.Text)", launchPanelState, StringComparison.Ordinal);
         Assert.Contains("AdvancedButtonText(showAdvanced)", launchPanelFactory, StringComparison.Ordinal);
         Assert.Contains("LaunchSettingEditorKind.VisionProjector", launchUiSchema, StringComparison.Ordinal);
         Assert.Contains("Picker.Vision.Embedded", launchPanelFactory, StringComparison.Ordinal);
@@ -1609,11 +1610,12 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void LaunchSettingMetadataOwnsTooltipsAndContextSuggestions()
     {
-        Assert.Contains("Tooltip.Field.ContextSize", LaunchSettingMetadataService.Tooltip("Context size"), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Tooltip.Field.Default", LaunchSettingMetadataService.Tooltip("Unknown setting"), StringComparison.Ordinal);
-        Assert.Contains("Tooltip.ContextSizeSuggestion", LaunchSettingMetadataService.ContextSizeTooltip("196k"), StringComparison.Ordinal);
-        Assert.DoesNotContain("Tooltip.ContextSizeSuggestion", LaunchSettingMetadataService.ContextSizeTooltip("200704"), StringComparison.Ordinal);
-        Assert.DoesNotContain("Tooltip.ContextSizeSuggestion", LaunchSettingMetadataService.ContextSizeTooltip("200_704"), StringComparison.Ordinal);
+        Loc.LoadLanguage("en");
+        Assert.Equal(Loc.T("Tooltip.Field.ContextSize"), LaunchSettingMetadataService.Tooltip("Context size"));
+        Assert.Equal(Loc.T("Tooltip.Field.Default"), LaunchSettingMetadataService.Tooltip("Unknown setting"));
+        Assert.Contains("Suggestion:", LaunchSettingMetadataService.ContextSizeTooltip("196k"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Suggestion:", LaunchSettingMetadataService.ContextSizeTooltip("200704"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Suggestion:", LaunchSettingMetadataService.ContextSizeTooltip("200_704"), StringComparison.Ordinal);
         Assert.Contains("q4_0", LaunchSettingMetadataService.CacheTypeOptions);
         Assert.Contains("atomic-mtp", LaunchSettingMetadataService.SpeculativeTypeOptions);
         Assert.DoesNotContain("mtp", LaunchSettingMetadataService.SpeculativeTypeOptions);
@@ -1621,11 +1623,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("draft-dspark", LaunchSettingMetadataService.SpeculativeTypeOptions);
         Assert.True(LaunchSettingMetadataService.IsAtomicMtpSpeculativeType("mtp"));
         Assert.Equal("mtp", LaunchSettingMetadataService.LlamaSpeculativeTypeArgument("atomic-mtp"));
-        Assert.Contains("Tooltip.Field.MtpHead", LaunchSettingMetadataService.Tooltip("MTP head"), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Tooltip.Field.CustomParams", LaunchSettingMetadataService.Tooltip("Custom params"), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Tooltip.Field.CustomParams", LaunchSettingMetadataService.Tooltip("Custom params"), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Tooltip.Field.ImageMin", LaunchSettingMetadataService.Tooltip("Image min"), StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Tooltip.Field.ImageMax", LaunchSettingMetadataService.Tooltip("Image max"), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Loc.T("Tooltip.Current.MtpHead"), LaunchSettingMetadataService.Tooltip("MTP head"));
+        Assert.Equal(Loc.T("Tooltip.Field.CustomParams"), LaunchSettingMetadataService.Tooltip("Custom params"));
+        Assert.Equal(Loc.T("Tooltip.Field.ImageMin"), LaunchSettingMetadataService.Tooltip("Image min"));
+        Assert.Equal(Loc.T("Tooltip.Field.ImageMax"), LaunchSettingMetadataService.Tooltip("Image max"));
         Assert.Equal("auto", LaunchSettingMetadataService.AutoOnOffOptions[0]);
         Assert.Equal("on", LaunchSettingMetadataService.OnOffOptions[0]);
     }

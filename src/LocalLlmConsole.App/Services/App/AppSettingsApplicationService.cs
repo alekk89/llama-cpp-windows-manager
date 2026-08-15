@@ -63,6 +63,7 @@ public sealed class AppSettingsApplicationService
         Validate(actions);
 
         var result = await SaveEditedAsync(request, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!result.Success)
         {
             actions.SetStatus(result.StatusMessage);
@@ -73,8 +74,10 @@ public sealed class AppSettingsApplicationService
         actions.ApplySettings(result.Settings);
         actions.ApplyTheme(result.Settings.ThemeMode);
         actions.ApplyLaunchSettingsToControls();
-        var gatewayStarted = await actions.RestartGatewayAsync();
-        var status = result.GeneratedApiKey ? "Settings saved. A model API key was generated." : "Settings saved.";
+        var gatewayStarted = true;
+        if (GatewaySettingsChanged(request.CurrentSettings, result.Settings))
+            gatewayStarted = await actions.RestartGatewayAsync();
+        var status = result.GeneratedApiKey ? "Settings applied. A model API key was generated." : "Settings applied.";
         if (!gatewayStarted)
             status = $"{status} Gateway did not start. Try saving again or run the app as Administrator.";
         if (!startupRegistration.Success)
@@ -87,6 +90,14 @@ public sealed class AppSettingsApplicationService
             ? AppSettingsSaveApplicationOutcome.SavedWithGeneratedApiKey
             : AppSettingsSaveApplicationOutcome.Saved;
     }
+
+    internal static bool GatewaySettingsChanged(AppSettings current, AppSettings updated)
+        => current.AutoLoadGatewayEnabled != updated.AutoLoadGatewayEnabled
+           || current.AutoLoadGatewayPort != updated.AutoLoadGatewayPort
+           || !string.Equals(current.AutoLoadGatewayPolicy, updated.AutoLoadGatewayPolicy, StringComparison.OrdinalIgnoreCase)
+           || !string.Equals(current.ModelAccessMode, updated.ModelAccessMode, StringComparison.OrdinalIgnoreCase)
+           || current.RequireApiKeyAuth != updated.RequireApiKeyAuth
+           || !string.Equals(current.ModelApiKey, updated.ModelApiKey, StringComparison.Ordinal);
 
     public Task<AppSettingsEnsureApiKeyResult> EnsureModelApiKeyAsync(
         AppSettings persistedSettings,

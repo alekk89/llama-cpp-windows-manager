@@ -1,5 +1,7 @@
 # Schema-driven launch settings
 
+Last reviewed: 2026-08-15
+
 ## Goal
 
 Render the existing polished launch form and additional runtime-supported settings through one extensible pipeline without making runtime help text the source of application policy.
@@ -17,11 +19,15 @@ The implementation deliberately separates four concerns:
 
 After a runtime is selected:
 
-1. `RuntimeLaunchOptionDiscoveryService` invokes that exact executable with `--help`.
-2. Native and WSL runtimes are handled separately; stdout and stderr are always combined.
-3. `RuntimeLaunchHelpParser` preserves every advertised alias and infers switch, choice, text, file, or directory semantics.
-4. `RuntimeLaunchOptionPolicy` removes application-managed, credential-bearing, network/security, and utility/action flags.
-5. `LaunchRuntimeOptionsPanel` renders the remaining options and emits the exact long alias advertised by the selected runtime.
+1. The previous runtime's structured values are first materialized back into `CustomParameters`, and its controls are cleared immediately so stale settings are never presented as belonging to the new runtime.
+2. `RuntimeLaunchOptionDiscoveryService` invokes that exact executable with `--help`.
+3. Native and WSL runtimes are handled separately; stdout and stderr are always combined.
+4. `RuntimeLaunchHelpParser` preserves every advertised alias and infers switch, choice, text, file, or directory semantics. It parses only the declaration column as aliases, joins wrapped descriptions, treats bracketed/explicit enumerations as choices, and keeps descriptive default/disabled/range text as a free-form value instead of inventing duplicate choices.
+5. `RuntimeLaunchOptionPolicy` removes application-managed, credential-bearing, network/security, utility/action, removed, deprecated, and model-replacement flags.
+6. `RuntimeLaunchOptionGroupingService` classifies the safe remainder into stable, ordered sections such as Performance & Memory, Context & Model Behavior, Generation & Sampling, Speculative & Draft, Vision & Multimodal, Server & Slots, and Diagnostics & Output. Unrecognized flags remain visible under Other Runtime Options.
+7. `LaunchRuntimeOptionsPanel` renders those groups only in Advanced mode, using the same 28px editors, compact label proportions, visual section language, and two-column field rhythm as the curated form. Raw flags are converted to readable display labels while the exact advertised long alias remains in the tooltip, search index, persistence, and emitted command. Options without an advertised default render a blank text/choice value instead of generic placeholder copy. Choice controls distinguish inheritance (`Inherit (runtime default: X)`) from explicitly setting the same raw value. Discovered positive/negative switch pairs become one tri-state Default/Enabled/Disabled control: Default emits nothing, while Enabled or Disabled emits only the corresponding alias actually advertised by the runtime. Unpaired switches expose only their supported direction. Search results reflow across the two columns so filtered groups do not retain empty cells.
+
+Discovery is generation-safe: each selector change captures the newly selected runtime, cancels the previous scan, and accepts a result only while that runtime is still selected. Loading and discovery errors remain available in Advanced mode; the successful form does not add a redundant discovered-setting count.
 
 Native discovery is cached by runtime identity, executable path, and file modification time. WSL discovery is repeated because a reliable remote executable timestamp is not available locally.
 
@@ -37,7 +43,7 @@ Additional structured values serialize into the existing `CustomParameters` prof
 
 On profile load, known tokens hydrate their structured runtime editors and unknown tokens remain in the raw fallback field. When the selected runtime changes, structured values are materialized before the old editor set is removed, so settings are not lost. Unsupported aliases remain raw rather than being silently rewritten.
 
-The command preview is read-only. Importing edited raw parameters is an explicit action; editing the preview never mutates settings.
+The Runtime Command panel remains visible in Basic and Advanced modes. Its generated portion is editable only as a staging surface: users append one or more flags and select **Apply added flags**. The app rejects changes to the generated prefix, validates the appended tokens against the application-owned argument policy, hydrates matching discovered controls, and preserves safe unknown tokens in **Custom params**.
 
 ## Launch parity
 
@@ -55,11 +61,21 @@ Custom arguments are validated before application-owned arguments such as metric
 
 Settings discovered at runtime require none of these steps unless they need richer validation or composite behavior than help metadata can express.
 
+App-shell preferences such as the `showOverview*` and `showModelsHuggingFace`
+fields do not belong in
+this launch schema or in `ModelLaunchSettings`: they do not affect
+`llama-server` arguments and must not create profile variants. Implement those
+through `SettingsPageDefinitionService`, `AppSettingsUpdateService`, explicit
+`StateStore.Settings` key mappings, and the owning WPF page state. See
+`docs/DEVELOPMENT.md` for the complete app-level UI preference checklist.
+
 ## Verification
 
 Tests cover:
 
 - exact alias preservation and choice inference;
+- deterministic runtime-option grouping with a lossless fallback;
+- readable runtime-option labels with exact raw-flag search and emission;
 - safe/app-managed filtering;
 - rejection of model, port, and credential overrides;
 - shared preview/launch argument generation;

@@ -59,7 +59,7 @@ public sealed class SettingsRowActionApplicationService
         if (string.Equals(row.Key, ModelApiKeyKey, StringComparison.Ordinal))
         {
             row.Value = _generateApiKey();
-            actions.SetStatus("New model API key generated. Save settings to apply it.");
+            actions.SetStatus("New model API key generated; applying automatically.");
             return SettingsRowActionOutcome.ApiKeyGenerated;
         }
 
@@ -71,7 +71,7 @@ public sealed class SettingsRowActionApplicationService
             return SettingsRowActionOutcome.FolderSelectionCanceled;
 
         row.Value = Path.GetFullPath(folder);
-        actions.SetStatus($"{row.Label} folder selected. Save settings to apply it.");
+        actions.SetStatus($"{row.Label} folder selected; applying automatically.");
         return SettingsRowActionOutcome.FolderSelected;
     }
 

@@ -14,26 +14,47 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
-    private async Task SaveSettingsAsync()
+    private void ScheduleSettingsApply()
+    {
+        var themeMode = _settingsPage.SelectedThemeValue;
+        var values = _viewModel.Settings.Rows.ToDictionary(
+            row => row.Key,
+            row => row.Value,
+            StringComparer.OrdinalIgnoreCase);
+        _coreServices.Ui.SettingsAutoApply.Schedule(
+            cancellationToken => SaveSettingsAsync(themeMode, values, cancellationToken),
+            action => RunBackground(action, "Automatic settings apply failed"));
+    }
+
+    private async Task SaveSettingsAsync(
+        string themeMode,
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken)
     {
         var settingsApplication = AppServices.SettingsApplication;
         Require(settingsApplication);
         await settingsApplication!.SaveEditedAndApplyAsync(new AppSettingsSaveApplicationRequest(
             _settings,
-            _settingsPage.SelectedThemeValue,
-            _viewModel.Settings.Rows.ToDictionary(row => row.Key, row => row.Value, StringComparer.OrdinalIgnoreCase),
+            themeMode,
+            values,
             _sessions.Snapshots()),
-            SettingsSaveActions());
+            SettingsSaveActions(),
+            cancellationToken);
     }
 
     private AppSettingsSaveApplicationActions SettingsSaveActions()
         => new(
-            settings => _settings = settings,
-            ApplyTheme,
+            settings =>
+            {
+                _settings = settings;
+                _overviewPage.ApplyUiPreferences(settings);
+                _modelsPage.ApplyUiPreferences(settings);
+            },
+            ApplicationThemeService.Apply,
             () => ApplyLaunchSettingsToControls(),
             RestartModelGatewayAsync,
-            () => _viewModel.CurrentPage == "Settings",
-            ShowSettings,
+            () => false,
+            () => { },
             SetStatus);
 
     private async Task<AppSettings> EnsureModelApiKeyAsync(AppSettings settings)
@@ -41,8 +62,7 @@ public partial class MainWindow
         var settingsApplication = AppServices.SettingsApplication;
         Require(settingsApplication);
         var result = await settingsApplication!.EnsureModelApiKeyAsync(_settings, settings);
-        if (result.GeneratedApiKey)
-            _settings = result.PersistedSettings;
+        _settings = result.PersistedSettings;
         return result.Settings;
     }
 }

@@ -37,7 +37,9 @@ public partial class MainWindow
                 ExecuteControlOperationAsync),
             new ControlApiAuditLogService(
                 Path.Combine(_workspaceRoot, "logs"),
-                () => _settings.MaxLogFileSizeMb)));
+                () => _settings.MaxLogFileSizeMb),
+            ModelServices.ModelGroups,
+            _coreServices.Runtime.EndpointInspection));
         _controlApi = api;
         return _serviceFactory.CreateLocalAppService(
             stateStore,
@@ -56,7 +58,7 @@ public partial class MainWindow
         var persisted = await AppServices.SettingsApplication.PersistAsync(settings, cancellationToken);
         _settings = persisted;
         _serviceFactory.CreateWindowsStartupRegistrationService().Apply(persisted.StartWithWindows);
-        ApplyTheme(persisted.ThemeMode);
+        ApplicationThemeService.Apply(persisted.ThemeMode);
         if (!string.Equals(previousCulture, persisted.UiCulture, StringComparison.OrdinalIgnoreCase))
         {
             Loc.LoadLanguage(persisted.UiCulture);

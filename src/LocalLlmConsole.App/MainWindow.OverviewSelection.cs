@@ -23,11 +23,13 @@ public partial class MainWindow
 
     private async Task RefreshOverviewModelChoicesAsync(IReadOnlyList<ModelRecord> models)
     {
-        var selectedId = SelectedOverviewModel()?.Id;
+        var selectedId = SelectedOverviewChoice()?.Id;
         if (string.IsNullOrWhiteSpace(selectedId))
             selectedId = _sessions.SelectedSnapshot()?.ModelId;
 
-        _viewModel.Overview.ReplaceModels(models);
+        var groupSnapshot = await ModelServices.ModelGroups.SnapshotAsync();
+        var profiles = await AppServices.StateStore.ListNamedModelLaunchProfilesAsync();
+        _viewModel.Overview.ReplaceModels(models, groupSnapshot.Groups, groupSnapshot.Assignments, profiles);
         _overviewPage.SelectModelChoice(selectedId, _viewModel.Overview.ModelChoices);
 
         await RefreshOverviewLaunchProfilesAsync();
@@ -36,14 +38,28 @@ public partial class MainWindow
     }
 
     private async Task RefreshOverviewLaunchProfilesAsync()
+        => await RefreshOverviewLaunchProfilesAsync(SelectedOverviewModel(), CancellationToken.None);
+
+    private async Task RefreshOverviewLaunchProfilesAsync(ModelRecord? model, CancellationToken cancellationToken)
     {
+        if (SelectedOverviewChoice() is { Kind: OverviewModelChoiceKind.Group, Group: { } group } groupChoice)
+        {
+            _viewModel.Overview.ReplaceGroupLaunchProfileSummary(group, groupChoice.LaunchProfileCount);
+            _overviewPage.SelectLaunchProfile(group.Id);
+            _overviewPage.SetLaunchProfileEnabled(false);
+            return;
+        }
+
+        _overviewPage.SetLaunchProfileEnabled(true);
         var selectedProfileId = _overviewPage.SelectedLaunchProfileId;
-        var model = SelectedOverviewModel();
         IReadOnlyList<NamedModelLaunchProfile> profiles = model is null || ModelServices.LaunchProfiles is null
             ? []
             : await ModelServices.LaunchProfiles.ListNamedAsync(model);
+        cancellationToken.ThrowIfCancellationRequested();
         if (model is not null && ModelServices.LaunchProfiles is not null && profiles.Count == 0)
             profiles = [await ModelServices.LaunchProfiles.EnsureDefaultAsync(model, _settings)];
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!SameModel(model, SelectedOverviewModel())) return;
         _viewModel.Overview.ReplaceLaunchProfiles(profiles);
         _overviewPage.SelectLaunchProfile(selectedProfileId);
     }
@@ -62,19 +78,84 @@ public partial class MainWindow
         return _overviewPage.SelectedModel(_viewModel.Overview.ModelChoices);
     }
 
+    private OverviewModelChoice? SelectedOverviewChoice()
+        => _overviewPage.SelectedChoice(_viewModel.Overview.ModelChoices);
+
+    private ModelGroupRecord? SelectedOverviewGroup()
+        => SelectedOverviewChoice()?.Group;
+
     private void UpdateOverviewModelActions()
     {
         var model = SelectedOverviewModel();
-        var hasSelection = model is not null;
-        var hasProfileSelection = !string.IsNullOrWhiteSpace(SelectedOverviewLaunchProfileId());
-        var selectedModelLoaded = IsModelLoaded(model);
-        _overviewPage.SetModelActionsEnabled(hasSelection, hasProfileSelection, selectedModelLoaded);
+        var groupChoice = SelectedOverviewChoice() is { Kind: OverviewModelChoiceKind.Group } choice ? choice : null;
+        var hasSelection = model is not null || groupChoice is not null;
+        var hasProfileSelection = groupChoice is not null
+            ? groupChoice.LaunchProfileCount > 0
+            : !string.IsNullOrWhiteSpace(SelectedOverviewLaunchProfileId());
+        var selectedProfileLoaded = groupChoice is not null
+            ? IsOverviewSelectedGroupLoaded(groupChoice)
+            : IsOverviewSelectedProfileLoaded(model);
+        _overviewPage.SetModelActionsEnabled(hasSelection, hasProfileSelection, selectedProfileLoaded);
+    }
+
+    private bool IsOverviewSelectedGroupLoaded(OverviewModelChoice groupChoice)
+    {
+        var profileIds = groupChoice.LaunchProfileIds ?? [];
+        return profileIds.Count > 0 && profileIds.All(profileId => _sessions.Snapshots().Any(session =>
+            session.IsRunning && session.LaunchProfileId.Equals(profileId, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private bool IsOverviewSelectedProfileLoaded(ModelRecord? model)
+    {
+        if (model is null || _sessions.SessionForModel(model.Id) is not { IsRunning: true } session)
+            return false;
+        return string.Equals(
+            session.LaunchProfileId,
+            SelectedOverviewLaunchProfileId(),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static string LoadedSessionIdFromRowButton(object sender)
         => (sender as FrameworkElement)?.Tag is UiRow row
             ? row.Data["SessionId"]?.ToString() ?? ""
             : "";
+
+    private static UiRow? EndpointRowFromLink(object sender)
+        => sender is System.Windows.Documents.Hyperlink { Tag: UiRow row } ? row : null;
+
+    private Task InspectSelectedOverviewEndpointAsync()
+        => _overviewPage.SelectedLoadedSessionRow is { } row
+            ? InspectOverviewEndpointRowAsync(row)
+            : Task.CompletedTask;
+
+    private async Task InspectOverviewEndpointRowAsync(UiRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        EndpointInspectionReport report;
+        if (string.Equals(row.Data["Kind"]?.ToString(), "Gateway", StringComparison.OrdinalIgnoreCase))
+        {
+            report = await _coreServices.Runtime.EndpointInspection.InspectGatewayAsync(
+                _settings,
+                AppPreferenceService.GatewaySwapPolicyLabel(_settings.AutoLoadGatewayPolicy),
+                AppPreferenceService.ModelAccessModeLabel(_settings.ModelAccessMode));
+        }
+        else
+        {
+            var sessionId = row.Data["SessionId"]?.ToString() ?? "";
+            var session = _sessions.OverviewSnapshots().FirstOrDefault(item => string.Equals(
+                item.SessionId,
+                sessionId,
+                StringComparison.OrdinalIgnoreCase));
+            if (session is null)
+            {
+                SetStatus("The selected endpoint session is no longer available.");
+                return;
+            }
+            report = await _coreServices.Runtime.EndpointInspection.InspectDirectAsync(session);
+        }
+
+        EndpointInspectionDialogFactory.Show(this, report);
+    }
 
     private async Task UnloadLoadedSessionAsync(string sessionId)
     {
@@ -96,18 +177,21 @@ public partial class MainWindow
             ModelRuntimeUnloadActions());
     }
 
-    private async Task SelectOverviewModelSessionAsync()
+    private async Task SelectOverviewModelSessionAsync(CancellationToken cancellationToken)
     {
         if (_coreServices.Ui.SelectionReentrancy.IsLoadedSessionSelectionChanging) return;
 
         var model = SelectedOverviewModel();
-        await RefreshOverviewLaunchProfilesAsync();
+        await RefreshOverviewLaunchProfilesAsync(model, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!SameModel(model, SelectedOverviewModel())) return;
         await _coreServices.Runtime.OverviewModelSelectionApplication.SelectAsync(
             new OverviewModelSelectionApplicationRequest(
                 model,
                 IsModelLoaded(model),
                 IsModelActive(model)),
-            OverviewModelSelectionActions());
+            OverviewModelSelectionActions(),
+            cancellationToken);
     }
 
     private OverviewModelSelectionApplicationActions OverviewModelSelectionActions()
@@ -118,26 +202,29 @@ public partial class MainWindow
             RefreshRuntimeMetricsAsync,
             SetStatus);
 
-    private async Task SelectLoadedSessionRowAsync()
+    private async Task SelectLoadedSessionRowAsync(CancellationToken cancellationToken)
     {
+        if (_coreServices.Ui.SelectionReentrancy.IsLoadedSessionSelectionChanging) return;
         if (_overviewPage.SelectedLoadedSessionRow is not { } row) return;
 
         var modelId = row.Data["ModelId"]?.ToString() ?? "";
         if (string.IsNullOrWhiteSpace(modelId)) return;
 
-        using var selectionScope = _coreServices.Ui.SelectionReentrancy.TryBeginLoadedSessionSelection();
-        if (selectionScope is null) return;
-
         await _coreServices.Runtime.OverviewLoadedSessionSelectionApplication.SelectAsync(
             modelId,
-            OverviewLoadedSessionSelectionActions());
+            OverviewLoadedSessionSelectionActions(),
+            cancellationToken);
     }
 
     private OverviewLoadedSessionSelectionApplicationActions OverviewLoadedSessionSelectionActions()
         => new(
             FindOverviewModelChoice,
             RefreshOverviewModelSelectorAsync,
-            _overviewPage.SelectModelId,
+            modelId =>
+            {
+                using var selectionScope = _coreServices.Ui.SelectionReentrancy.SuppressLoadedSessionSelection();
+                _overviewPage.SelectModelId(modelId);
+            },
             _coreServices.Runtime.RuntimeSessions.SelectModel,
             settings => _activeRuntimeSettings = settings,
             SaveActiveRuntimeSessionsAsync,
@@ -146,7 +233,12 @@ public partial class MainWindow
             SetStatus);
 
     private ModelRecord? FindOverviewModelChoice(string modelId)
-        => _viewModel.Overview.ModelChoices.FirstOrDefault(item => string.Equals(item.Id, modelId, StringComparison.OrdinalIgnoreCase));
+        => _viewModel.Overview.ModelChoices.FirstOrDefault(item =>
+            item.Kind == OverviewModelChoiceKind.Model
+            && string.Equals(item.Id, modelId, StringComparison.OrdinalIgnoreCase))?.Model;
+
+    private static bool SameModel(ModelRecord? left, ModelRecord? right)
+        => string.Equals(left?.Id ?? "", right?.Id ?? "", StringComparison.OrdinalIgnoreCase);
 
     private async Task<bool> SelectOverviewLoadedModelAsync(string modelId)
     {

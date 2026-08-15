@@ -11,6 +11,7 @@ public static class LaunchSettingMetadataService
     public static readonly IReadOnlyList<string> CacheTypeOptions = ["f16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1", "f32", "bf16"];
     public static readonly IReadOnlyList<string> SpeculativeTypeOptions = ["none", AtomicMtpSpeculativeType, "draft-mtp", "draft-simple", "draft-eagle3", "draft-dflash", "draft-dspark", "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-mod", "ngram-cache"];
     public static readonly IReadOnlyList<string> ReasoningFormatOptions = ["auto", "none", "deepseek", "deepseek-legacy"];
+    public static readonly IReadOnlyList<string> ReasoningEffortOptions = ["default", "minimal", "low", "medium", "high", "xhigh", "max"];
     public static readonly IReadOnlyList<string> RopeScalingOptions = ["auto", "none", "linear", "yarn"];
     public static readonly IReadOnlyList<string> GpuModeOptions = ["auto", "single", "layer", "row", "tensor"];
 
@@ -95,6 +96,41 @@ public static class LaunchSettingMetadataService
     public static string NormalizeGpuCsv(string value)
         => string.Join(',', (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
+    public static string RuntimeOptionLabel(string optionName)
+    {
+        var words = (optionName ?? "").Trim().TrimStart('-')
+            .Split(['-', '_'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0) return "Runtime option";
+
+        return string.Join(' ', words.Select(word => word.ToLowerInvariant() switch
+        {
+            "api" => "API",
+            "cpu" => "CPU",
+            "gpu" => "GPU",
+            "http" => "HTTP",
+            "https" => "HTTPS",
+            "id" => "ID",
+            "io" => "I/O",
+            "ip" => "IP",
+            "json" => "JSON",
+            "kv" => "KV",
+            "lora" => "LoRA",
+            "mmproj" => "MMProj",
+            "mtp" => "MTP",
+            "numa" => "NUMA",
+            "rpc" => "RPC",
+            "rope" => "RoPE",
+            "ssl" => "SSL",
+            "tcp" => "TCP",
+            "tls" => "TLS",
+            "url" => "URL",
+            "vram" => "VRAM",
+            "wsl" => "WSL",
+            _ when word.Length == 1 => word.ToUpperInvariant(),
+            _ => char.ToUpperInvariant(word[0]) + word[1..].ToLowerInvariant()
+        }));
+    }
+
     private static IReadOnlyList<string> CsvItems(string value, string label, List<string> errors)
     {
         var text = (value ?? "").Trim();
@@ -118,10 +154,13 @@ public static class LaunchSettingMetadataService
         "GPU split" => Loc.T("Tooltip.Field.GpuSplit"),
         "Reasoning" => Loc.T("Tooltip.Field.Reasoning"),
         "Reason format" => Loc.T("Tooltip.Field.ReasonFormat"),
+        "Reasoning effort" => Loc.T("Tooltip.Field.ReasoningEffort"),
         "Reason budget" => Loc.T("Tooltip.Field.ReasonBudget"),
+        "Budget message" => Loc.T("Tooltip.Field.ReasonBudgetMessage"),
+        "Preserve reasoning" => Loc.T("Tooltip.Field.ReasonPreserve"),
         "Jinja chat" => Loc.T("Tooltip.Field.JinjaChat"),
-        "Vision" => Loc.T("Tooltip.Field.Vision"),
-        "Vision head" => Loc.T("Tooltip.Field.VisionHead"),
+        "Vision" => Loc.T("Tooltip.Current.Vision"),
+        "Vision head" => Loc.T("Tooltip.Current.VisionHead"),
         "Image min" => Loc.T("Tooltip.Field.ImageMin"),
         "Image max" => Loc.T("Tooltip.Field.ImageMax"),
         "Flash attention" => Loc.T("Tooltip.Field.FlashAttention"),
@@ -153,9 +192,9 @@ public static class LaunchSettingMetadataService
         "RoPE scale" => Loc.T("Tooltip.Field.RopeScale"),
         "RoPE base" => Loc.T("Tooltip.Field.RopeBase"),
         "RoPE freq" => Loc.T("Tooltip.Field.RopeFreq"),
-        "Spec type" => Loc.T("Tooltip.Field.SpecType"),
-        "Draft model" => Loc.T("Tooltip.Field.DraftModel"),
-        "MTP head" => Loc.T("Tooltip.Field.MtpHead"),
+        "Spec type" => Loc.T("Tooltip.Current.SpecType"),
+        "Draft model" => Loc.T("Tooltip.Current.DraftModel"),
+        "MTP head" => Loc.T("Tooltip.Current.MtpHead"),
         "Draft GPU" => Loc.T("Tooltip.Field.DraftGpu"),
         "Draft K cache" => Loc.T("Tooltip.Field.DraftKCache"),
         "Draft V cache" => Loc.T("Tooltip.Field.DraftVCache"),

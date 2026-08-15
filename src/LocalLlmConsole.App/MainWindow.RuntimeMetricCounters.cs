@@ -41,15 +41,26 @@ public partial class MainWindow
 
     private async Task ApplyIdleUnloadPoliciesAsync(IReadOnlyList<RuntimeMetricPollResult> pollResults)
     {
+        var now = DateTimeOffset.UtcNow;
+        var groupSnapshot = await ModelServices.ModelGroups.PolicySnapshotAsync(now);
         await _coreServices.Runtime.RuntimeTelemetryApplication.ApplyIdleUnloadPoliciesAsync(
             pollResults,
             _settings.AutoUnloadIdleMinutes,
-            DateTimeOffset.UtcNow,
-            RuntimeIdleUnloadActions());
+            now,
+            RuntimeIdleUnloadActions(groupSnapshot));
     }
 
+    private RuntimeIdleUnloadApplicationActions RuntimeIdleUnloadActions(ModelGroupSnapshot? groupSnapshot = null)
+        => new(
+            FindModelByIdAsync,
+            StopModelRuntimeAsync,
+            SetStatus,
+            groupSnapshot is null
+                ? null
+                : (launchProfileId, globalIdleMinutes) => ModelGroupService.EffectivePolicy(groupSnapshot, launchProfileId, globalIdleMinutes));
+
     private RuntimeIdleUnloadApplicationActions RuntimeIdleUnloadActions()
-        => new(FindModelByIdAsync, StopModelRuntimeAsync, SetStatus);
+        => RuntimeIdleUnloadActions(groupSnapshot: null);
 
     private void ResetIdleCounters()
     {

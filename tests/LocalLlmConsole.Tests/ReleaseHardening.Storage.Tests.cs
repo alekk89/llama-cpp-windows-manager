@@ -198,6 +198,7 @@ DELETE FROM migrations WHERE id = 2;
     public async Task StateStorePersistsLanModelAccessSettings()
     {
         var root = CreateTempRoot();
+        var apiKey = new string('k', 32);
         await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
         await store.InitializeAsync();
 
@@ -205,7 +206,8 @@ DELETE FROM migrations WHERE id = 2;
         {
             ModelAccessMode = "lan",
             Host = "0.0.0.0",
-            ModelApiKey = "test-key"
+            ModelApiKey = apiKey,
+            ModelApiKeyBackup = apiKey
         };
 
         await store.SaveAppSettingsAsync(settings);
@@ -213,7 +215,7 @@ DELETE FROM migrations WHERE id = 2;
 
         Assert.Equal("both", loaded.ModelAccessMode);
         Assert.Equal("0.0.0.0", loaded.Host);
-        Assert.Equal("test-key", loaded.ModelApiKey);
+        Assert.Equal(apiKey, loaded.ModelApiKey);
     }
 
 

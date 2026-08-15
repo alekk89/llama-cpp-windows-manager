@@ -86,6 +86,7 @@ public sealed class RuntimeCatalogDataService
         string presetId)
         => runtimes
             .Where(runtime => RuntimeAvailabilityService.IsAvailable(runtime)
+                && RuntimeMetadataService.IsManagedSourceBuild(runtime)
                 && string.Equals(RuntimeMetadataService.ManagedPresetId(runtime), presetId, StringComparison.OrdinalIgnoreCase))
             .GroupBy(runtime => RuntimeMetadataService.Folder(runtime), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(runtime => runtime.UpdatedAt).First())
@@ -98,6 +99,8 @@ public sealed class RuntimeCatalogDataService
         string localCommit)
     {
         if (!updateStates.TryGetValue(presetId, out var state)) return null;
+        if (string.IsNullOrWhiteSpace(state.LocalCommit) && string.IsNullOrWhiteSpace(localCommit))
+            return state;
         return RuntimeMetadataService.CommitsMatch(state.LocalCommit, localCommit) ? state : null;
     }
 

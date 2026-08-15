@@ -39,6 +39,8 @@ public sealed partial class AppServiceFactory
         var trayWindowState = CreateTrayWindowStateController();
         var runtimeReadinessMonitors = CreateRuntimeReadinessMonitorRegistry();
         var launchSettingsRefresh = CreateLaunchSettingsRefreshAction();
+        var launchSettingsInputRefresh = CreateLaunchSettingsRefreshAction();
+        var settingsAutoApply = CreateSettingsAutoApplyAction();
         var settingsUpdates = CreateAppSettingsUpdateService();
         var appUpdateWorkflow = CreateAppUpdateWorkflowService(request.AppUpdates);
         var appUpdateApplication = CreateAppUpdateApplicationService();
@@ -55,7 +57,7 @@ public sealed partial class AppServiceFactory
         var shutdownApplication = CreateAppShutdownApplicationService(shutdownDecisions, shutdownState);
         var shutdownCleanupApplication = CreateAppShutdownCleanupApplicationService();
         var settingsPageDefinitions = CreateSettingsPageDefinitionService();
-        var helpSections = CreateHelpSectionService();
+        var helpCatalog = CreateHelpCatalogService();
         var helpNavigation = CreateHelpNavigationApplicationService();
         var runtimeCatalogData = CreateRuntimeCatalogDataService();
         var activeSessions = CreateActiveRuntimeSessionStore();
@@ -101,6 +103,7 @@ public sealed partial class AppServiceFactory
         var modelRuntimeStartFollowup = CreateModelRuntimeStartFollowupService();
         var modelRuntimeStartFollowupApplication = CreateModelRuntimeStartFollowupApplicationService();
         var runtimeEndpointProbe = CreateRuntimeEndpointProbeService(request.RuntimeProbeClient);
+        var endpointInspection = CreateEndpointInspectionService(request.RuntimeProbeClient);
         var runtimeMetricPoller = CreateRuntimeMetricPollerService(request.MetricsClient);
         var runtimeTelemetryApplication = CreateRuntimeTelemetryApplicationService(runtimeMetricPoller);
         var runtimeDashboardSelection = CreateRuntimeDashboardSelectionService();
@@ -124,6 +127,8 @@ public sealed partial class AppServiceFactory
         var modelRuntimeStatusRender = CreateModelRuntimeStatusRenderService();
         var runtimeLaunchAdmission = CreateRuntimeLaunchAdmissionService();
         var modelRuntimeCommands = CreateModelRuntimeCommandDecisionService();
+        var overviewModelGroupLoadPlanning = CreateOverviewModelGroupLoadPlanningService();
+        var overviewModelGroupLoadApplication = CreateOverviewModelGroupLoadApplicationService();
         var launchRuntimeSelection = CreateLaunchRuntimeSelectionService();
         var modelRuntimeLoadApplication = CreateModelRuntimeLoadApplicationService(
             modelRuntimeCommands,
@@ -177,7 +182,9 @@ public sealed partial class AppServiceFactory
                 uiBusyState,
                 trayWindowState,
                 runtimeReadinessMonitors,
-                launchSettingsRefresh),
+                launchSettingsRefresh,
+                launchSettingsInputRefresh,
+                settingsAutoApply),
             new MainWindowCoreAppServices(
                 stateStoreInitialization,
                 backgroundTasks,
@@ -203,7 +210,7 @@ public sealed partial class AppServiceFactory
                 shutdownApplication,
                 shutdownCleanupApplication,
                 settingsPageDefinitions,
-                helpSections,
+                helpCatalog,
                 helpNavigation,
                 localAppStartup),
             new MainWindowCoreHuggingFaceServices(
@@ -228,6 +235,7 @@ public sealed partial class AppServiceFactory
                 runtimeReadinessMonitorApplication,
                 runtimeSessionApplication,
                 runtimeEndpointProbe,
+                endpointInspection,
                 runtimeTelemetryApplication,
                 runtimeDashboardSelection,
                 runtimeDashboardMetricsApplication,
@@ -245,6 +253,8 @@ public sealed partial class AppServiceFactory
                 modelRuntimeStatus,
                 modelRuntimeStatusRender,
                 modelRuntimeCommands,
+                overviewModelGroupLoadPlanning,
+                overviewModelGroupLoadApplication,
                 modelRuntimeLoadApplication,
                 modelRuntimeUnloadApplication,
                 launchRuntimeSelection,

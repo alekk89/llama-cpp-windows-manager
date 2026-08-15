@@ -51,6 +51,10 @@ public sealed class ForegroundTaskApplicationService
         {
             await action();
         }
+        catch (OperationCanceledException)
+        {
+            // Superseded interactive work is expected when the user changes selection quickly.
+        }
         catch (Exception ex)
         {
             await ReportErrorAsync(ex, actions);

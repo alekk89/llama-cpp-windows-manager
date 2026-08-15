@@ -110,7 +110,7 @@ public static partial class LaunchSettingsPanelFactory
     {
         var trimmed = (value ?? "").Trim();
         return string.IsNullOrWhiteSpace(trimmed)
-            ? Loc.T("Tooltip.DraftModelDefault")
+            ? Loc.T("Tooltip.Current.DraftAuto")
             : $"{Loc.T("Tooltip.DraftModelPath")} {trimmed}{Environment.NewLine}{Loc.T("Tooltip.DraftModelClickChange")}";
     }
 

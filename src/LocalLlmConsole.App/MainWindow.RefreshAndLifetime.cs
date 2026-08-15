@@ -31,8 +31,14 @@ public partial class MainWindow
         var selectedId = SelectedModel()?.Id;
         var selectedProfileId = SelectedModelLaunchProfileId();
         var result = await modelRefresh.RefreshAsync(ModelCatalogRefreshActions());
+        var groupSnapshot = await ModelServices.ModelGroups.SnapshotAsync();
+        var groupsByProfile = groupSnapshot.Assignments.Values
+            .Select(assignment => (assignment.LaunchProfileId, Group: groupSnapshot.Groups.FirstOrDefault(group =>
+                group.Id.Equals(assignment.GroupId, StringComparison.OrdinalIgnoreCase))))
+            .Where(pair => pair.Group is not null)
+            .ToDictionary(pair => pair.LaunchProfileId, pair => pair.Group!, StringComparer.OrdinalIgnoreCase);
 
-        _viewModel.Models.ReplaceModels(result.Models, IsModelLoaded, result.NamedLaunchProfiles);
+        _viewModel.Models.ReplaceModels(result.Models, IsModelLoaded, result.NamedLaunchProfiles, result.ModelSizeLabels, groupsByProfile);
         var profileModelId = _viewModel.Models.ModelIdForLaunchProfile(selectedProfileId);
         _viewModel.Models.ShowLaunchProfilesForModel(
             profileModelId ?? selectedId ?? _viewModel.Models.Rows.FirstOrDefault()?.Model.Id);
@@ -75,7 +81,6 @@ public partial class MainWindow
         if (lifetimeMetrics is null) return;
         var rows = await lifetimeMetrics.ListAsync();
         _viewModel.LifetimeMetrics.ReplaceRows(rows);
-        _lifetimePage.RefreshMetricsGrid();
     }
 
     private async Task ResetLifetimeMetricAsync(UiRow? row)

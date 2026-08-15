@@ -52,7 +52,7 @@ public static partial class LaunchSettingsPanelFactory
         });
         var hint = new TextBlock
         {
-            Text = "Search launch settings...",
+            Text = Loc.T("Launch.Search.Placeholder"),
             Foreground = (WpfBrush)WpfApplication.Current.Resources["TextMain"],
             FontFamily = new WpfFontFamily("Segoe UI"),
             FontSize = 12,

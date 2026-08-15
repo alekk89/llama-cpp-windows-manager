@@ -1,5 +1,7 @@
 # Signing Windows Releases
 
+Last reviewed: 2026-08-15
+
 Trusted Windows releases should be Authenticode-signed and timestamped before
 upload. Unsigned community releases should be described as unsigned wherever
 they are linked. The release scripts support signing with a certificate already
@@ -15,6 +17,14 @@ When `build-installer.ps1 -SkipPublish -RequireSigned` reuses an existing
 publish folder, the script verifies that the published executable is already
 signed before compiling and signing the installer.
 
+The Manager executable embeds `llwmctl.exe`, `AGENTS.md`, `agent.md`,
+`docs/CONTROL_API.md`, `LICENSE`, and third-party/.NET notices, then restores
+verified sidecar copies at startup. Any
+change to those operator documents therefore requires a fresh publish before
+signing; copying edited Markdown beside an already signed executable does not
+update the embedded release contract and the next bootstrap can restore the
+embedded version.
+
 Optional trusted signed builds use `.github/workflows/release.yml` through a
 manual dispatch. Configure the protected `release` environment with
 `WINDOWS_SIGNING_PFX_BASE64` and `WINDOWS_SIGNING_PFX_PASSWORD`. The workflow
@@ -25,6 +35,11 @@ so repositories without signing secrets can publish accurately labelled
 unsigned releases without a failing status check. Ordinary pull-request CI
 continues to use an unsigned packaging smoke test because untrusted PRs must
 never receive signing credentials.
+
+The workflow pins GitHub actions by commit and installs a fixed Inno Setup
+version before importing the signing certificate. Keep all package/tool setup
+before certificate import so third-party installer code never runs while the
+private key is available to the job.
 
 ## Free Options
 

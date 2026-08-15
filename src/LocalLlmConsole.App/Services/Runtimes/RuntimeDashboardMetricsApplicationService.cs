@@ -25,9 +25,8 @@ public sealed record RuntimeDashboardMetricsApplicationRequest(
     string RuntimeKey);
 
 public sealed record RuntimeDashboardMetricsApplicationActions(
-    Action<RuntimeSlotSnapshot?> RefreshRuntimeLogTail,
+    Func<RuntimeSlotSnapshot?, Task<RuntimeMtpTokenSnapshot?>> RefreshRuntimeLogTailAsync,
     Action<RuntimeMetricRowsRenderPlan> ApplyMetricRows,
-    Func<RuntimeMtpTokenSnapshot?> ReadMtpTokenStats,
     Action<RuntimeMetricSummaryPresentation> ApplyMetricSummary);
 
 public sealed class RuntimeDashboardMetricsApplicationService
@@ -46,7 +45,7 @@ public sealed class RuntimeDashboardMetricsApplicationService
         _rowsRender = rowsRender ?? throw new ArgumentNullException(nameof(rowsRender));
     }
 
-    public RuntimeDashboardRenderDecisionKind Apply(
+    public async Task<RuntimeDashboardRenderDecisionKind> ApplyAsync(
         RuntimeDashboardMetricsApplicationRequest request,
         RuntimeDashboardMetricsApplicationActions actions)
     {
@@ -65,40 +64,48 @@ public sealed class RuntimeDashboardMetricsApplicationService
             _telemetry.ResetMetricCounters();
             if (request.RenderOverview)
             {
-                actions.RefreshRuntimeLogTail(null);
+                await actions.RefreshRuntimeLogTailAsync(null);
                 actions.ApplyMetricRows(_rowsRender.FromSamples([]));
                 actions.ApplyMetricSummary(RuntimeMetricSummaryPresentation.NoRuntime);
             }
             return decision.Kind;
         }
 
-        if (request.RenderOverview)
-            actions.RefreshRuntimeLogTail(decision.SlotSnapshot);
+        var mtpTokenStats = request.RenderOverview
+            ? await actions.RefreshRuntimeLogTailAsync(decision.SlotSnapshot)
+            : null;
 
         if (decision.Kind == RuntimeDashboardRenderDecisionKind.MetricsDisabled)
         {
             _telemetry.ResetMetricCounters();
+            var summary = BuildSummary(request.RuntimeKey, [], request.MetricsSettings, decision.SlotSnapshot, mtpTokenStats);
             if (request.RenderOverview)
+            {
                 actions.ApplyMetricRows(_rowsRender.FromSamples([]));
-            actions.ApplyMetricSummary(BuildSummary(request.RuntimeKey, [], request.MetricsSettings, decision.SlotSnapshot, actions.ReadMtpTokenStats()));
+                actions.ApplyMetricSummary(summary);
+            }
             return decision.Kind;
         }
 
         if (decision.Kind == RuntimeDashboardRenderDecisionKind.FreshMetrics)
         {
+            var summary = BuildSummary(request.RuntimeKey, decision.Samples, request.MetricsSettings, decision.SlotSnapshot, mtpTokenStats);
             if (request.RenderOverview)
+            {
                 actions.ApplyMetricRows(_rowsRender.FromSamples(decision.Samples));
-            actions.ApplyMetricSummary(BuildSummary(request.RuntimeKey, decision.Samples, request.MetricsSettings, decision.SlotSnapshot, actions.ReadMtpTokenStats()));
+                actions.ApplyMetricSummary(summary);
+            }
             return decision.Kind;
         }
 
+        var unavailableSummary = BuildSummary(request.RuntimeKey, [], request.MetricsSettings, decision.SlotSnapshot, mtpTokenStats);
         if (request.RenderOverview)
         {
             actions.ApplyMetricRows(_rowsRender.Unavailable(
                 decision.Error,
                 _telemetry.LastKnownSamples(request.RuntimeKey)));
+            actions.ApplyMetricSummary(unavailableSummary);
         }
-        actions.ApplyMetricSummary(BuildSummary(request.RuntimeKey, [], request.MetricsSettings, decision.SlotSnapshot, actions.ReadMtpTokenStats()));
         return decision.Kind;
     }
 
@@ -122,9 +129,8 @@ public sealed class RuntimeDashboardMetricsApplicationService
     private static void Validate(RuntimeDashboardMetricsApplicationActions actions)
     {
         ArgumentNullException.ThrowIfNull(actions);
-        ArgumentNullException.ThrowIfNull(actions.RefreshRuntimeLogTail);
+        ArgumentNullException.ThrowIfNull(actions.RefreshRuntimeLogTailAsync);
         ArgumentNullException.ThrowIfNull(actions.ApplyMetricRows);
-        ArgumentNullException.ThrowIfNull(actions.ReadMtpTokenStats);
         ArgumentNullException.ThrowIfNull(actions.ApplyMetricSummary);
     }
 }

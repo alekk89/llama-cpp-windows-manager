@@ -19,7 +19,6 @@ public enum HelpNavigationFocusTarget
     None,
     LoadedSessionsGrid,
     ModelsGrid,
-    RuntimeJobsGrid,
     HuggingFaceQueryBox,
     ModelCombo,
     LogsGrid
@@ -50,9 +49,8 @@ public sealed class HelpNavigationApplicationService
             "runtime-download" => Runtimes(
                 HelpNavigationFocusTarget.None,
                 "Help: in Runtime Downloads, choose the official Windows or WSL package for CUDA, CPU, Vulkan, or Intel Arc SYCL, then click Install."),
-            "runtime-jobs" => Runtimes(
-                HelpNavigationFocusTarget.RuntimeJobsGrid,
-                "Help: Runtime Jobs shows downloads, builds, and job logs."),
+            "runtime-jobs" => Logs(
+                "Help: Logs shows runtime download, source build, and setup job output."),
             "windows-tools" => Windows(
                 "Help: Windows tools are advanced setup actions for native builds and toolchains."),
             "wsl-tools" => WslLinux(

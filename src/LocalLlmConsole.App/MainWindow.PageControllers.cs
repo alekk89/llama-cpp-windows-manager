@@ -52,7 +52,10 @@ public partial class MainWindow
             new ModelsPageActionControllerActions(
                 ScanModelsFolderAsync,
                 async () => await ChooseModelsFolderAsync(scanAfter: true),
-                () => OpenFolder(_settings.ModelsRoot),
+                () => _coreServices.App.ShellIntegration.OpenFolder(_settings.ModelsRoot),
+                ManageModelGroupsAsync,
+                AssignLaunchProfileGroupAsync,
+                RemoveLaunchProfileGroupAsync,
                 SelectModelGridRow,
                 modelRows,
                 SearchHuggingFaceAsync,
@@ -64,7 +67,7 @@ public partial class MainWindow
             new LogsPageActionControllerActions(
                 RefreshLogsAsync,
                 OpenSelectedLogFile,
-                () => OpenFolder(Path.Combine(_workspaceRoot, "logs")),
+                () => _coreServices.App.ShellIntegration.OpenFolder(Path.Combine(_workspaceRoot, "logs")),
                 DeleteSelectedLogAsync,
                 DeleteAllLogsAsync,
                 OpenLogPath,
@@ -82,7 +85,6 @@ public partial class MainWindow
     private SettingsPageActionController CreateSettingsPageActionController()
         => new(
             new SettingsPageActionControllerActions(
-                SaveSettingsAsync,
                 PreviewSettingsTheme,
                 SettingRowFromSender,
                 RunSettingsRowActionAsync,
@@ -105,17 +107,12 @@ public partial class MainWindow
             new RuntimesPageRowActionControllerActions(
                 RuntimeFromRowButton,
                 RuntimeSourceFromRowButton,
-                RuntimeBuildPresetFromRowButton,
                 RuntimePackagePresetFromRowButton,
                 JobFromRowButton,
-                AddCustomRuntimeRepositoryFromRowAsync,
-                DownloadRuntimeSourceAsync,
+                RunRuntimeSourceRowActionAsync,
                 InstallRuntimePackageAsync,
                 CheckRuntimePackageUpdateAsync,
-                DeleteRuntimePackageBuildsAsync,
-                CheckRuntimePresetUpdateAsync,
-                DeleteAllRuntimePresetBuildsAsync,
-                BuildRuntimeSourceAsync,
+                DeleteRuntimeDownloadRowAsync,
                 DeleteRuntimeSourceAsync,
                 DeleteRuntimeBuildAsync,
                 CancelRuntimeBuildJobAsync,
@@ -129,12 +126,10 @@ public partial class MainWindow
             new RuntimesPageActionControllerActions(
                 async () => await ChooseRuntimeFolderAsync(scanAfter: true),
                 async () => await RunEventAsync(ChangeRuntimeCudaPackagePreferenceAsync),
-                ToggleAdvancedRuntimes,
                 RuntimeGrid_PreviewMouseLeftButtonDown,
                 runtimeRows,
                 SetRuntimeGridColumnSizing,
-                SetRuntimeBuildGridColumnSizing,
-                SetRuntimeJobsGridColumnSizing));
+                SetRuntimeBuildGridColumnSizing));
 
     private OverviewPageActionController CreateOverviewPageActionController()
         => new(
@@ -144,6 +139,9 @@ public partial class MainWindow
                 UpdateOverviewModelActions,
                 LoadOverviewSelectedModelAsync,
                 SelectLoadedSessionRowAsync,
+                InspectSelectedOverviewEndpointAsync,
+                EndpointRowFromLink,
+                InspectOverviewEndpointRowAsync,
                 LoadedSessionIdFromRowButton,
                 UnloadLoadedSessionAsync,
                 RunEventAsync));

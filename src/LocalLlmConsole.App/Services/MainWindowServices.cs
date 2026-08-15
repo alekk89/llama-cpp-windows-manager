@@ -54,7 +54,9 @@ public sealed record MainWindowCoreUiServices(
     UiBusyStateController UiBusyState,
     TrayWindowStateController TrayWindowState,
     RuntimeReadinessMonitorRegistry RuntimeReadinessMonitors,
-    DebouncedAsyncAction LaunchSettingsRefresh);
+    DebouncedAsyncAction LaunchSettingsRefresh,
+    DebouncedAsyncAction LaunchSettingsInputRefresh,
+    DebouncedAsyncAction SettingsAutoApply);
 
 public sealed record MainWindowCoreAppServices(
     StateStoreInitializationService StateStoreInitialization,
@@ -81,7 +83,7 @@ public sealed record MainWindowCoreAppServices(
     AppShutdownApplicationService ShutdownApplication,
     AppShutdownCleanupApplicationService ShutdownCleanupApplication,
     SettingsPageDefinitionService SettingsPageDefinitions,
-    HelpSectionService HelpSections,
+    HelpCatalogService HelpCatalog,
     HelpNavigationApplicationService HelpNavigation,
     LocalAppServiceStartupService LocalAppStartup);
 
@@ -108,6 +110,7 @@ public sealed record MainWindowCoreRuntimeServices(
     RuntimeReadinessMonitorApplicationService RuntimeReadinessMonitorApplication,
     RuntimeSessionApplicationService RuntimeSessionApplication,
     RuntimeEndpointProbeService RuntimeEndpointProbe,
+    EndpointInspectionService EndpointInspection,
     RuntimeTelemetryApplicationService RuntimeTelemetryApplication,
     RuntimeDashboardSelectionService RuntimeDashboardSelection,
     RuntimeDashboardMetricsApplicationService RuntimeDashboardMetricsApplication,
@@ -126,6 +129,8 @@ public sealed record MainWindowCoreModelServices(
     ModelRuntimeStatusController ModelRuntimeStatus,
     ModelRuntimeStatusRenderService ModelRuntimeStatusRender,
     ModelRuntimeCommandDecisionService ModelRuntimeCommands,
+    OverviewModelGroupLoadPlanningService OverviewModelGroupLoadPlanning,
+    OverviewModelGroupLoadApplicationService OverviewModelGroupLoadApplication,
     ModelRuntimeLoadApplicationService ModelRuntimeLoadApplication,
     ModelRuntimeUnloadApplicationService ModelRuntimeUnloadApplication,
     LaunchRuntimeSelectionService LaunchRuntimeSelection,
@@ -180,6 +185,7 @@ public sealed record MainWindowLoadedAppServices(
 public sealed record MainWindowLoadedModelServices(
     ModelCatalogService Catalog,
     ModelCatalogRefreshApplicationService ModelCatalogRefreshApplication,
+    ModelGroupService ModelGroups,
     ModelLaunchProfileService LaunchProfiles,
     ModelLaunchVariantWorkflowService LaunchVariants,
     ModelLaunchSettingsWorkflowService ModelLaunchSettingsWorkflow);

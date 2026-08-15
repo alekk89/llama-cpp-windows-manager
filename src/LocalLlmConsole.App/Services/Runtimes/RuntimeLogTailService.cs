@@ -10,20 +10,39 @@ public sealed record RuntimeLogTailResult(
     string Text,
     bool HasActiveLog);
 
+public sealed record RuntimeLogTailCapture(
+    string LogPath,
+    bool Exists,
+    string RawTail,
+    RuntimeMtpTokenSnapshot? MtpTokenStats,
+    string Error);
+
 public sealed class RuntimeLogTailService
 {
-    public RuntimeMtpTokenSnapshot? MtpTokenStats(string logPath, int maxCharacters = 16000)
+    public Task<RuntimeLogTailCapture> CaptureAsync(
+        string logPath,
+        int maxCharacters = 16000,
+        CancellationToken cancellationToken = default)
+        => Task.Run(() => Capture(logPath, maxCharacters), cancellationToken);
+
+    public RuntimeLogTailCapture Capture(string logPath, int maxCharacters = 16000)
     {
         if (string.IsNullOrWhiteSpace(logPath) || !File.Exists(logPath))
-            return null;
+            return new RuntimeLogTailCapture(logPath, Exists: false, "", null, "");
 
         try
         {
-            return RuntimeDashboardService.ParseMtpTokenStats(LogFileService.Tail(logPath, maxCharacters));
+            var rawTail = LogFileService.Tail(logPath, maxCharacters);
+            return new RuntimeLogTailCapture(
+                logPath,
+                Exists: true,
+                rawTail,
+                RuntimeDashboardService.ParseMtpTokenStats(rawTail),
+                "");
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            return new RuntimeLogTailCapture(logPath, Exists: true, "", null, ex.Message);
         }
     }
 
@@ -31,7 +50,15 @@ public sealed class RuntimeLogTailService
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(request.LogPath) || !File.Exists(request.LogPath))
+        return Build(request, Capture(request.LogPath, request.MaxCharacters));
+    }
+
+    public RuntimeLogTailResult Build(RuntimeLogTailRequest request, RuntimeLogTailCapture capture)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(capture);
+
+        if (!capture.Exists)
         {
             return new RuntimeLogTailResult(
                 request.IsRuntimeRunning
@@ -42,12 +69,13 @@ public sealed class RuntimeLogTailService
 
         try
         {
+            if (!string.IsNullOrWhiteSpace(capture.Error))
+                throw new IOException(capture.Error);
             var heading = request.IsRuntimeRunning
                 ? $"Live log: {request.LogPath}"
                 : $"Last runtime log: {request.LogPath}";
             var slotStatus = SlotStatus(request.SlotSnapshot);
-            var rawTail = LogFileService.Tail(request.LogPath, request.MaxCharacters);
-            var logTail = LogFileService.CollapseIdleSlotNoise(rawTail);
+            var logTail = LogFileService.CollapseIdleSlotNoise(capture.RawTail);
             var text = string.IsNullOrWhiteSpace(slotStatus)
                 ? $"{heading}{Environment.NewLine}{Environment.NewLine}{logTail}"
                 : $"{heading}{Environment.NewLine}{slotStatus}{Environment.NewLine}{Environment.NewLine}{logTail}";

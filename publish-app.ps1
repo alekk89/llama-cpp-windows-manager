@@ -98,6 +98,9 @@ if (-not $Dotnet) {
 if (-not (Test-Path -LiteralPath $Dotnet)) {
   throw "Configured dotnet path was not found: $Dotnet"
 }
+$DotnetRoot = Split-Path -Parent ([System.IO.Path]::GetFullPath($Dotnet))
+$DotnetLicense = Join-Path $DotnetRoot "LICENSE.txt"
+$DotnetNotices = Join-Path $DotnetRoot "ThirdPartyNotices.txt"
 
 $Info = & $Dotnet --info
 if ($Info -match "No SDKs were found") {
@@ -150,18 +153,23 @@ if ($RequireSigned -and $PublishedCliSignature.Status -ne "Valid") {
   throw "Published control CLI is not signed. Pass -CertificateThumbprint or sign $CliExe before release."
 }
 
-New-Item -ItemType Directory -Path (Join-Path $BundleStageDir "docs") -Force | Out-Null
 $BundleFiles = @(
   @{ Path = "llwmctl.exe"; Source = $CliExe },
   @{ Path = "AGENTS.md"; Source = (Join-Path $AppDir "AGENTS.md") },
   @{ Path = "agent.md"; Source = (Join-Path $AppDir "agent.md") },
-  @{ Path = "docs/CONTROL_API.md"; Source = (Join-Path $AppDir "docs\CONTROL_API.md") }
+  @{ Path = "docs/CONTROL_API.md"; Source = (Join-Path $AppDir "docs\CONTROL_API.md") },
+  @{ Path = "LICENSE"; Source = (Join-Path $AppDir "LICENSE") },
+  @{ Path = "THIRD-PARTY-NOTICES.md"; Source = (Join-Path $AppDir "THIRD-PARTY-NOTICES.md") },
+  @{ Path = "licenses/Apache-2.0.txt"; Source = (Join-Path $AppDir "licenses\Apache-2.0.txt") },
+  @{ Path = "licenses/dotnet/LICENSE.txt"; Source = $DotnetLicense },
+  @{ Path = "licenses/dotnet/ThirdPartyNotices.txt"; Source = $DotnetNotices }
 )
 foreach ($BundleFile in $BundleFiles) {
   if (-not (Test-Path -LiteralPath $BundleFile.Source -PathType Leaf)) {
     throw "Agent-sidecar source file was not found: $($BundleFile.Source)"
   }
   $BundleTarget = Join-Path $BundleStageDir ($BundleFile.Path -replace '/', '\')
+  New-Item -ItemType Directory -Path (Split-Path -Parent $BundleTarget) -Force | Out-Null
   Copy-Item -LiteralPath $BundleFile.Source -Destination $BundleTarget -Force
 }
 
@@ -201,11 +209,12 @@ $publishArgs = @(
 & $Dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 
-Copy-Item -LiteralPath $CliExe -Destination (Join-Path $PublishDir "llwmctl.exe") -Force
-Copy-Item -LiteralPath (Join-Path $BundleStageDir "AGENTS.md") -Destination (Join-Path $PublishDir "AGENTS.md") -Force
-Copy-Item -LiteralPath (Join-Path $BundleStageDir "agent.md") -Destination (Join-Path $PublishDir "agent.md") -Force
-New-Item -ItemType Directory -Path (Join-Path $PublishDir "docs") -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $BundleStageDir "docs\CONTROL_API.md") -Destination (Join-Path $PublishDir "docs\CONTROL_API.md") -Force
+foreach ($BundleFile in $BundleFiles) {
+  $BundleSource = Join-Path $BundleStageDir ($BundleFile.Path -replace '/', '\')
+  $PublishTarget = Join-Path $PublishDir ($BundleFile.Path -replace '/', '\')
+  New-Item -ItemType Directory -Path (Split-Path -Parent $PublishTarget) -Force | Out-Null
+  Copy-Item -LiteralPath $BundleSource -Destination $PublishTarget -Force
+}
 
 Get-ChildItem -Path $PublishDir -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue |
   Remove-Item -Force

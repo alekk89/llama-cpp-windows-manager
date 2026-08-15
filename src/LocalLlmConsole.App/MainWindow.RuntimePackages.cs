@@ -14,6 +14,19 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
+    private async Task DeleteRuntimeDownloadRowAsync(RuntimePackagePresetRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        if (row.DeleteKind == RuntimeDownloadDeleteKind.Source && row.SourcePreset is not null)
+        {
+            await DeleteAllRuntimePresetBuildsAsync(row.SourcePreset);
+            return;
+        }
+
+        if (row.DeleteKind == RuntimeDownloadDeleteKind.Package && row.Preset is not null)
+            await DeleteRuntimePackageBuildsAsync(row.Preset);
+    }
+
     private async Task InstallRuntimePackageAsync(RuntimePackagePreset preset)
     {
         var packageApplication = RuntimeServices.RuntimePackageApplication;

@@ -16,20 +16,17 @@ public partial class MainWindow
 {
     private void ApplyRuntimeMetricRows(RuntimeMetricRowsRenderPlan plan)
     {
-        _viewModel.RuntimeMetrics.ReplaceSamples(plan.Samples);
-        if (plan.LeadingRow is not null)
-            _viewModel.RuntimeMetrics.Rows.Insert(0, plan.LeadingRow);
-        _runtimeDashboardPage.RuntimeMetricsGrid?.Items.Refresh();
+        _viewModel.RuntimeMetrics.ReplaceSamples(plan.Samples, plan.LeadingRow);
     }
 
     private void ApplyRuntimeMetricSummary(RuntimeMetricSummaryPresentation summary)
     {
-        ClearLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown);
+        MetricCardFactory.ClearLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown);
 
-        SetMetricText(_runtimeDashboardPage.TokensMetric, summary.Tokens);
-        SetMetricText(_runtimeDashboardPage.MtpTokensMetric, summary.MtpTokens);
-        SetMetricText(_runtimeDashboardPage.SlotsMetric, summary.Slots);
-        SetMetricText(_runtimeDashboardPage.KvCacheMetric, summary.KvCache);
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.TokensMetric, summary.Tokens);
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.MtpTokensMetric, summary.MtpTokens);
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.SlotsMetric, summary.Slots);
+        MetricCardFactory.SetMetricText(_runtimeDashboardPage.KvCacheMetric, summary.KvCache);
         _runtimeDashboardPage.TokensGraph?.Push(
             summary.GraphSample.RuntimeKey,
             summary.GraphSample.GenerationRate,
@@ -76,24 +73,16 @@ public partial class MainWindow
         return await _coreServices.Ui.RuntimeGpuSummaryApplication.SummaryAsync(active, DateTimeOffset.UtcNow);
     }
 
-    private void RefreshRuntimeLogTail(RuntimeSlotSnapshot? slotSnapshot = null)
+    private async Task<RuntimeMtpTokenSnapshot?> RefreshRuntimeLogTailAsync(RuntimeSlotSnapshot? slotSnapshot = null)
     {
-        if (_runtimeDashboardPage.RuntimeLogBox is null) return;
+        if (_runtimeDashboardPage.RuntimeLogBox is null) return null;
 
-        var tail = _coreServices.Runtime.RuntimeLogTail.Build(new RuntimeLogTailRequest(_llama.LogPath, _llama.IsRunning, slotSnapshot));
-        _runtimeDashboardPage.RuntimeLogBox.Text = tail.Text;
-        if (tail.HasActiveLog)
-        {
-            _runtimeDashboardPage.RuntimeLogBox.CaretIndex = _runtimeDashboardPage.RuntimeLogBox.Text.Length;
-            _runtimeDashboardPage.RuntimeLogBox.ScrollToEnd();
-        }
-    }
-
-    private RuntimeMtpTokenSnapshot? ReadMtpTokenStatsFromRuntimeLog()
-    {
         var selectedLogPath = _sessions.SelectedSnapshot()?.LogPath;
-        return _coreServices.Runtime.RuntimeLogTail.MtpTokenStats(
-            string.IsNullOrWhiteSpace(selectedLogPath) ? _llama.LogPath : selectedLogPath);
+        var logPath = string.IsNullOrWhiteSpace(selectedLogPath) ? _llama.LogPath : selectedLogPath;
+        var capture = await _coreServices.Runtime.RuntimeLogTail.CaptureAsync(logPath);
+        var tail = _coreServices.Runtime.RuntimeLogTail.Build(new RuntimeLogTailRequest(logPath, _llama.IsRunning, slotSnapshot), capture);
+        _runtimeDashboardPage.SetRuntimeLogText(tail.Text, tail.HasActiveLog);
+        return capture.MtpTokenStats;
     }
 
     private void ResetMetricCounters()
