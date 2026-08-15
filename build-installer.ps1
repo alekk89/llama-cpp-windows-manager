@@ -18,7 +18,8 @@ function Assert-CleanGitTree {
     [string] $Path
   )
 
-  $git = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
+  $git = Get-Command git -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
   if (-not $git) {
     throw "Git was not found. Install Git or omit -RequireCleanTree."
   }

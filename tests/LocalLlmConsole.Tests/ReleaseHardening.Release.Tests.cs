@@ -196,6 +196,7 @@ public sealed partial class ReleaseHardeningTests
         {
             Assert.Contains("[switch] $RequireCleanTree", script, StringComparison.Ordinal);
             Assert.Contains("function Assert-CleanGitTree", script, StringComparison.Ordinal);
+            Assert.Contains("Select-Object -First 1", script, StringComparison.Ordinal);
             Assert.Contains("status --porcelain --untracked-files=all", script, StringComparison.Ordinal);
             Assert.Contains("Release requires a clean Git worktree", script, StringComparison.Ordinal);
         }
