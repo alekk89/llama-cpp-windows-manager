@@ -13,28 +13,22 @@ endpoints on native Windows or Ubuntu/WSL.
 
 ![llama.cpp Windows Manager product tour](docs/images/llama-cpp-windows-manager-demo.gif)
 
-## Highlights
+## Why use llama.cpp Windows Manager?
 
-- Install prebuilt CPU, CUDA, Vulkan, and Intel Arc SYCL runtimes, or build a
-  selected upstream/fork source configuration.
-- Download GGUF files from Hugging Face or register models already on disk.
-- Run multiple supervised `llama-server` sessions with saved per-model profiles,
-  ports, runtime choices, and advanced launch settings.
-- Use direct OpenAI-compatible `/v1` endpoints or one shared auto-load gateway
-  that exposes saved profiles as models.
-- Group profiles for pinned, inherited, or idle-timeout retention with
-  configurable eviction priority and transactional multi-model loading.
-- Configure vision projectors, embedded or external MTP/draft helpers,
-  speculative decoding, reasoning options, multi-GPU splits, and runtime-specific
-  flags.
-- Inspect live slots, token speed, cache hits, GPU usage, Prometheus metrics,
-  session logs, downloads, and runtime jobs.
-- Search the compact in-app Help centre for setup, API, model, runtime, and
-  troubleshooting guidance, then jump directly to the relevant page.
-- Control the running Manager through its authenticated, loopback-only control
-  API using `llwmctl`, scripts, or automation tools.
-- Use 19 production languages; Arabic and Hindi are available as preview
-  translations with English fallback.
+* **Control `llama.cpp` without managing commands and processes by hand.**
+* **Run multiple models simultaneously**, each with saved settings, a dedicated
+  port, and its own `/v1` endpoint.
+* **Choose a runtime for each launch profile:** native Windows or WSL, using CPU,
+  CUDA, Vulkan, or Intel Arc SYCL.
+* **Connect OpenAI compatible coding and chat clients** through direct model
+  endpoints or one shared gateway.
+* **Automate and monitor advanced workflows** with model groups, transactional
+  loading, idle unloading, live metrics, logs, and the authenticated `llwmctl`
+  control API.
+
+> Choose a chat focused tool when simplicity is the priority. Choose llama.cpp
+> Windows Manager when you need deeper control, multiple managed models, and
+> dependable local endpoints.
 
 ## Install
 
