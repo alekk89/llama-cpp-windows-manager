@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$AppDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$AppDir = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $AppDir "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj"
 $CliProject = Join-Path $AppDir "src\LocalLlmConsole.ControlCli\LocalLlmConsole.ControlCli.csproj"
 $BundledDotnet = Join-Path (Split-Path -Parent $AppDir) ".dotnet-sdk-10\dotnet.exe"

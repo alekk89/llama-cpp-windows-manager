@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $MyInvocation.MyCommand.Definition))
+$RepoRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 
 function Remove-RepoPath {
   param(

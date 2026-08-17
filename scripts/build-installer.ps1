@@ -119,13 +119,13 @@ function Assert-SignedIfRequired([string] $PathToCheck, [bool] $RequireValidSign
   }
 }
 
-$AppDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$AppDir = Split-Path -Parent $PSScriptRoot
 if ($RequireCleanTree) {
   Assert-CleanGitTree -Path $AppDir
 }
 
 $Project = Join-Path $AppDir "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj"
-$PublishScript = Join-Path $AppDir "publish-app.ps1"
+$PublishScript = Join-Path $PSScriptRoot "publish-app.ps1"
 $InstallerScript = Join-Path $AppDir "installer\LlamaCppWindowsManager.iss"
 $DistRoot = [System.IO.Path]::GetFullPath((Join-Path $AppDir "dist"))
 $PublishDir = [System.IO.Path]::GetFullPath((Join-Path $DistRoot "LlamaCppWindowsManager-$Runtime"))

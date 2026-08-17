@@ -156,16 +156,16 @@ The core release blockers from the full audit have been addressed in code:
 Current passing checks:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-app.ps1 -Restore
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-app.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-vulnerabilities.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -SkipPublish
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-app.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-vulnerabilities.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1 -SkipPublish
 ```
 
 The latest source architecture/release pass on 2026-08-15 ran
-`test-release-gate.ps1 -IncludePublish -IncludeInstaller`, which wraps the Release build,
+`scripts/test-release-gate.ps1 -IncludePublish -IncludeInstaller`, which wraps the Release build,
 release-hardening suite, coverage enforcement, formatting verification,
 `git diff --check`, direct-package vulnerability/deprecation/currency checks,
 the portable packaging gate, and the installer gate. Service/unit tests passed (`548/548`) and the
@@ -213,7 +213,7 @@ low-risk items that were safe to take immediately:
 Verification for this hardening pass:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
 Result on 2026-06-01: release-hardening tests passed (`432/432`), formatting was

@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$AppDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$AppDir = Split-Path -Parent $PSScriptRoot
 $PublishedExe = Join-Path $AppDir "dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe"
 $BuildExe = Join-Path $AppDir "src\LocalLlmConsole.App\bin\Release\net10.0-windows\win-x64\LlamaCppWindowsManager.exe"
 $PowerShellExe = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -16,12 +16,12 @@ if (-not (Test-Path -LiteralPath $PowerShellExe)) {
 }
 
 if (-not (Test-Path -LiteralPath $PublishedExe) -and $PublishIfMissing) {
-  & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AppDir "publish-app.ps1")
+  & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "publish-app.ps1")
 }
 
 $Exe = if (Test-Path -LiteralPath $PublishedExe) { $PublishedExe } elseif (Test-Path -LiteralPath $BuildExe) { $BuildExe } else { "" }
 if ([string]::IsNullOrWhiteSpace($Exe)) {
-  throw "llama.cpp Windows Manager executable not found. Run .\publish-app.ps1 after installing the .NET 10 SDK."
+  throw "llama.cpp Windows Manager executable not found. Run .\scripts\publish-app.ps1 after installing the .NET 10 SDK."
 }
 
 Start-Process -FilePath $Exe -WorkingDirectory $AppDir | Out-Null

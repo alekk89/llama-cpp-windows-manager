@@ -8,12 +8,12 @@ they are linked. The release scripts support signing with a certificate already
 available in the Windows certificate store:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
 ```
 
-When `build-installer.ps1 -SkipPublish -RequireSigned` reuses an existing
+When `scripts/build-installer.ps1 -SkipPublish -RequireSigned` reuses an existing
 publish folder, the script verifies that the published executable is already
 signed before compiling and signing the installer.
 

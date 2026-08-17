@@ -149,8 +149,8 @@ public sealed partial class ReleaseHardeningTests
     {
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
         var startup = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "App.xaml.cs"));
-        var publish = File.ReadAllText(FindRepositoryFile("publish-app.ps1"));
-        var releaseGate = File.ReadAllText(FindRepositoryFile("test-release-gate.ps1"));
+        var publish = File.ReadAllText(FindRepositoryFile("scripts", "publish-app.ps1"));
+        var releaseGate = File.ReadAllText(FindRepositoryFile("scripts", "test-release-gate.ps1"));
         var releaseWorkflow = File.ReadAllText(FindRepositoryFile(".github", "workflows", "release.yml"));
         var installer = File.ReadAllText(FindRepositoryFile("installer", "LlamaCppWindowsManager.iss"));
 

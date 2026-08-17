@@ -153,16 +153,16 @@ SDK selected by `global.json`. Inno Setup 6 is required only for installer
 builds.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-app.ps1 -Restore
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1
 ```
 
 Add `-IncludePublish` to validate the portable package and
 `-IncludeInstaller` on a machine configured with Inno Setup. Generated `bin`,
 `obj`, `TestResults`, `dist`, logs, local workspaces, databases, and model files
-are ignored by Git. Use `clean-repo.ps1` to remove generated output.
+are ignored by Git. Use `scripts/clean-repo.ps1` to remove generated output.
 
-Create the installer directly with `build-installer.ps1` after configuring
+Create the installer directly with `scripts/build-installer.ps1` after configuring
 Inno Setup and, for trusted releases, the signing certificate.
 
 Architecture and contribution details are in

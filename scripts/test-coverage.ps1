@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 $TestProjects = @(
   (Join-Path $RepoRoot "tests\LocalLlmConsole.Tests\LocalLlmConsole.Tests.csproj"),
   (Join-Path $RepoRoot "tests\LocalLlmConsole.UiTests\LocalLlmConsole.UiTests.csproj")

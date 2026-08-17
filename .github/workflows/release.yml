@@ -60,7 +60,7 @@ jobs:
       - name: Run signed release gate
         shell: pwsh
         run: >-
-          .\test-release-gate.ps1 -Configuration Release -Runtime win-x64
+          .\scripts\test-release-gate.ps1 -Configuration Release -Runtime win-x64
           -IncludePublish -IncludeInstaller -InnoSetupPath "${{ steps.inno.outputs.path }}"
           -CertificateThumbprint "${{ steps.signing.outputs.thumbprint }}"
           -RequireSigned

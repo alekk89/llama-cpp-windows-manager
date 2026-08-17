@@ -17,7 +17,7 @@ models, or llama.cpp runtimes.
 git clone https://github.com/alekk89/llama-cpp-windows-manager.git
 Set-Location llama-cpp-windows-manager
 Get-Content AGENTS.md
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-app.ps1 -Restore
 ```
 
 Before launching a source build, check whether the single-instance production
@@ -50,17 +50,17 @@ request only after that GitHub mutation has been requested.
 Run these before opening a release PR or after any architecture-level change:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1
 ```
 
 That wrapper runs the same gate as the individual commands below:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-app.ps1 -Restore
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-coverage.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-coverage.ps1
 dotnet format LocalLlmConsole.sln --verify-no-changes --no-restore --verbosity minimal
 git diff --check
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-vulnerabilities.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-vulnerabilities.ps1
 ```
 
 The coverage gate collects instrumented Debug binaries (public Release binaries intentionally omit PDBs), rejects skipped tests, and requires at least 80% service line
@@ -74,11 +74,11 @@ LocalLlmConsole.sln`.
 To include packaging on a machine with publish/installer prerequisites, run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
-Use `-RequireCleanTree` on `test-release-gate.ps1`, `publish-app.ps1`, or
-`build-installer.ps1` when producing release artifacts that must come from a
+Use `-RequireCleanTree` on `scripts/test-release-gate.ps1`,
+`scripts/publish-app.ps1`, or `scripts/build-installer.ps1` when producing release artifacts that must come from a
 clean Git worktree.
 
 If `dotnet` is not on `PATH`, set `LLAMA_CPP_WINDOWS_MANAGER_DOTNET` to a .NET

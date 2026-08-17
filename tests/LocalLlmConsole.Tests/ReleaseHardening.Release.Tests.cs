@@ -64,9 +64,9 @@ public sealed partial class ReleaseHardeningTests
     public void ReleaseDocsAndScriptsUseLaunchBranding()
     {
         var readme = File.ReadAllText(FindRepositoryFile("README.md"));
-        var buildScript = File.ReadAllText(FindRepositoryFile("build-app.ps1"));
-        var publishScript = File.ReadAllText(FindRepositoryFile("publish-app.ps1"));
-        var startScript = File.ReadAllText(FindRepositoryFile("start-app.ps1"));
+        var buildScript = File.ReadAllText(FindRepositoryFile("scripts", "build-app.ps1"));
+        var publishScript = File.ReadAllText(FindRepositoryFile("scripts", "publish-app.ps1"));
+        var startScript = File.ReadAllText(FindRepositoryFile("scripts", "start-app.ps1"));
         var architecture = File.ReadAllText(FindRepositoryFile("docs", "ARCHITECTURE.md"));
         var license = File.ReadAllText(FindRepositoryFile("LICENSE"));
         var publicDocs = string.Join(
@@ -110,22 +110,22 @@ public sealed partial class ReleaseHardeningTests
         var editorConfig = File.ReadAllText(FindRepositoryFile(".editorconfig"));
         var gitAttributes = File.ReadAllText(FindRepositoryFile(".gitattributes"));
         var solution = File.ReadAllText(FindRepositoryFile("LocalLlmConsole.sln"));
-        var releaseGate = File.ReadAllText(FindRepositoryFile("test-release-gate.ps1"));
+        var releaseGate = File.ReadAllText(FindRepositoryFile("scripts", "test-release-gate.ps1"));
         var development = File.ReadAllText(FindRepositoryFile("docs", "DEVELOPMENT.md"));
 
         Assert.Contains("windows-latest", workflow, StringComparison.Ordinal);
         Assert.Contains("actions/checkout@v7", workflow, StringComparison.Ordinal);
         Assert.Contains("actions/setup-dotnet@v6", workflow, StringComparison.Ordinal);
-        Assert.Contains(".\\build-app.ps1 -Restore", workflow, StringComparison.Ordinal);
-        Assert.Contains(".\\test-coverage.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains(".\\scripts\\build-app.ps1 -Restore", workflow, StringComparison.Ordinal);
+        Assert.Contains(".\\scripts\\test-coverage.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("dotnet format LocalLlmConsole.sln --verify-no-changes --verbosity minimal", workflow, StringComparison.Ordinal);
         Assert.Contains("git diff --check", workflow, StringComparison.Ordinal);
-        Assert.Contains(".\\test-vulnerabilities.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains(".\\scripts\\test-vulnerabilities.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("checksum was not produced", workflow, StringComparison.Ordinal);
-        Assert.Contains("package --vulnerable --include-transitive --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
-        Assert.Contains("package --outdated --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
-        Assert.Contains("package --deprecated --include-transitive --format json", File.ReadAllText(FindRepositoryFile("test-vulnerabilities.ps1")), StringComparison.Ordinal);
-        Assert.Contains(".\\publish-app.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("package --vulnerable --include-transitive --format json", File.ReadAllText(FindRepositoryFile("scripts", "test-vulnerabilities.ps1")), StringComparison.Ordinal);
+        Assert.Contains("package --outdated --format json", File.ReadAllText(FindRepositoryFile("scripts", "test-vulnerabilities.ps1")), StringComparison.Ordinal);
+        Assert.Contains("package --deprecated --include-transitive --format json", File.ReadAllText(FindRepositoryFile("scripts", "test-vulnerabilities.ps1")), StringComparison.Ordinal);
+        Assert.Contains(".\\scripts\\publish-app.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("\"version\": \"10.0.400\"", globalJson, StringComparison.Ordinal);
         Assert.Contains("\"runner\": \"Microsoft.Testing.Platform\"", globalJson, StringComparison.Ordinal);
         Assert.Contains("TreatWarningsAsErrors", File.ReadAllText(FindRepositoryFile("Directory.Build.props")), StringComparison.Ordinal);
@@ -139,10 +139,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("LocalLlmConsole.UiTests.csproj", solution, StringComparison.Ordinal);
         Assert.Contains("build-app.ps1", releaseGate, StringComparison.Ordinal);
         Assert.Contains("test-coverage.ps1", releaseGate, StringComparison.Ordinal);
-        Assert.Contains("MinimumServiceLineCoverage = 80.0", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
-        Assert.Contains("MinimumModelLineCoverage = 95.0", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
-        Assert.Contains("Skipped or not-executed tests are not allowed", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
-        Assert.Contains("LocalLlmConsole.App/", File.ReadAllText(FindRepositoryFile("test-coverage.ps1")), StringComparison.Ordinal);
+        Assert.Contains("MinimumServiceLineCoverage = 80.0", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
+        Assert.Contains("MinimumModelLineCoverage = 95.0", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
+        Assert.Contains("Skipped or not-executed tests are not allowed", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
+        Assert.Contains("LocalLlmConsole.App/", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("dotnet format", releaseGate, StringComparison.Ordinal);
         Assert.Contains("git -C $RepoRoot diff --check", releaseGate, StringComparison.Ordinal);
         Assert.Contains("test-vulnerabilities.ps1", releaseGate, StringComparison.Ordinal);
@@ -164,14 +164,40 @@ public sealed partial class ReleaseHardeningTests
         Assert.Matches(@"actions/checkout@[0-9a-f]{40}\s+# v7", releaseWorkflow);
         Assert.Matches(@"actions/setup-dotnet@[0-9a-f]{40}\s+# v6", releaseWorkflow);
         Assert.Matches(@"actions/upload-artifact@[0-9a-f]{40}\s+# v7", releaseWorkflow);
-        Assert.Contains(".\\test-release-gate.ps1", development, StringComparison.Ordinal);
+        Assert.Contains(".\\scripts\\test-release-gate.ps1", development, StringComparison.Ordinal);
         Assert.Contains("-IncludePublish -IncludeInstaller", development, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RepositoryKeepsAutomationScriptsOutOfRoot()
+    {
+        var repositoryRoot = Path.GetDirectoryName(FindRepositoryFile("README.md"))!;
+        var rootScripts = Directory.EnumerateFiles(repositoryRoot, "*.ps1", SearchOption.TopDirectoryOnly);
+        var automationScripts = Directory.EnumerateFiles(Path.Combine(repositoryRoot, "scripts"), "*.ps1", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(rootScripts);
+        Assert.Equal(
+            [
+                "build-app.ps1",
+                "build-installer.ps1",
+                "clean-repo.ps1",
+                "publish-app.ps1",
+                "start-app.ps1",
+                "test-app.ps1",
+                "test-coverage.ps1",
+                "test-release-gate.ps1",
+                "test-vulnerabilities.ps1"
+            ],
+            automationScripts);
     }
 
     [Fact]
     public void BuildInstallerRequiresSignedPublishedExecutableForSignedInstaller()
     {
-        var buildInstaller = File.ReadAllText(FindRepositoryFile("build-installer.ps1"));
+        var buildInstaller = File.ReadAllText(FindRepositoryFile("scripts", "build-installer.ps1"));
 
         Assert.Contains("[string] $TimestampServer = \"https://timestamp.digicert.com\"", buildInstaller, StringComparison.Ordinal);
         Assert.DoesNotContain("http://timestamp.digicert.com", buildInstaller, StringComparison.Ordinal);
@@ -186,9 +212,9 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void ReleaseScriptsCanRequireCleanGitTree()
     {
-        var releaseGate = File.ReadAllText(FindRepositoryFile("test-release-gate.ps1"));
-        var publishScript = File.ReadAllText(FindRepositoryFile("publish-app.ps1"));
-        var buildInstaller = File.ReadAllText(FindRepositoryFile("build-installer.ps1"));
+        var releaseGate = File.ReadAllText(FindRepositoryFile("scripts", "test-release-gate.ps1"));
+        var publishScript = File.ReadAllText(FindRepositoryFile("scripts", "publish-app.ps1"));
+        var buildInstaller = File.ReadAllText(FindRepositoryFile("scripts", "build-installer.ps1"));
         var development = File.ReadAllText(FindRepositoryFile("docs", "DEVELOPMENT.md"));
         var releaseReadiness = File.ReadAllText(FindRepositoryFile("docs", "RELEASE_READINESS.md"));
 
@@ -215,7 +241,7 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void PublishScriptUsesSafeDistCleanup()
     {
-        var publishScript = File.ReadAllText(FindRepositoryFile("publish-app.ps1"));
+        var publishScript = File.ReadAllText(FindRepositoryFile("scripts", "publish-app.ps1"));
 
         Assert.Contains("$publishArgs = @(", publishScript, StringComparison.Ordinal);
         Assert.Contains("& $Dotnet @publishArgs", publishScript, StringComparison.Ordinal);
@@ -234,7 +260,7 @@ public sealed partial class ReleaseHardeningTests
     public void InstallerKeepsUserDataUnlessExplicitlyRequested()
     {
         var installer = File.ReadAllText(FindRepositoryFile("installer", "LlamaCppWindowsManager.iss"));
-        var buildInstaller = File.ReadAllText(FindRepositoryFile("build-installer.ps1"));
+        var buildInstaller = File.ReadAllText(FindRepositoryFile("scripts", "build-installer.ps1"));
         var installerDocs = File.ReadAllText(FindRepositoryFile("docs", "INSTALLER.md"));
         var readme = File.ReadAllText(FindRepositoryFile("README.md"));
         var releaseReadiness = File.ReadAllText(FindRepositoryFile("docs", "RELEASE_READINESS.md"));

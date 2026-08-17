@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Resolve-Dotnet {
-  $appDir = $PSScriptRoot
+  $appDir = Split-Path -Parent $PSScriptRoot
   $bundledDotnet = Join-Path (Split-Path -Parent $appDir) ".dotnet-sdk-10\dotnet.exe"
   if ($env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET) {
     return $env:LLAMA_CPP_WINDOWS_MANAGER_DOTNET
@@ -92,7 +92,7 @@ function Count-Properties($node, [string] $propertyName) {
   return $count
 }
 
-$appDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$appDir = Split-Path -Parent $PSScriptRoot
 $projects = @(
   (Join-Path $appDir "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj"),
   (Join-Path $appDir "src\LocalLlmConsole.ControlCli\LocalLlmConsole.ControlCli.csproj"),

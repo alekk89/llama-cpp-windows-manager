@@ -24,11 +24,11 @@ jobs:
 
       - name: Restore and build
         shell: pwsh
-        run: .\build-app.ps1 -Restore
+        run: .\scripts\build-app.ps1 -Restore
 
       - name: Test and enforce coverage
         shell: pwsh
-        run: .\test-coverage.ps1
+        run: .\scripts\test-coverage.ps1
 
       - name: Verify formatting
         shell: pwsh
@@ -40,11 +40,11 @@ jobs:
 
       - name: Package security and currency audit
         shell: pwsh
-        run: .\test-vulnerabilities.ps1
+        run: .\scripts\test-vulnerabilities.ps1
 
       - name: Publish smoke
         shell: pwsh
-        run: .\publish-app.ps1
+        run: .\scripts\publish-app.ps1
 
       - name: Verify publish contents
         shell: pwsh

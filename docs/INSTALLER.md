@@ -17,13 +17,13 @@ The legacy `LLAMA_CPP_CONSOLE_INNO_SETUP` variable is still accepted.
 Then run:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1
 ```
 
 For a public build, sign the app and installer:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
 ```
 
 The setup executable is written to:

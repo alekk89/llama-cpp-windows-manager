@@ -66,7 +66,7 @@ function Remove-DistPath {
   }
 }
 
-$AppDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$AppDir = Split-Path -Parent $PSScriptRoot
 if ($RequireCleanTree) {
   Assert-CleanGitTree -Path $AppDir
 }

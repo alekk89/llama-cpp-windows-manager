@@ -7,31 +7,31 @@ Last updated: 2026-08-15
 Run from a clean checkout with the .NET 10 SDK selected by `global.json` on `PATH`, or set `LLAMA_CPP_WINDOWS_MANAGER_DOTNET` to an explicit SDK `dotnet.exe`. The legacy `LLAMA_CPP_CONSOLE_DOTNET` and `LOCAL_LLM_CONSOLE_DOTNET` variables are still accepted.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-app.ps1 -Restore
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-coverage.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-vulnerabilities.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-coverage.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-vulnerabilities.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1
 ```
 
 The same source-level gate can be run through the local wrapper, with packaging
 included when the machine has Inno Setup and any required signing certificate:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
-Add `-RequireCleanTree` to `test-release-gate.ps1`, `publish-app.ps1`, or
-`build-installer.ps1` when packaging release artifacts; the scripts fail if
+Add `-RequireCleanTree` to `scripts/test-release-gate.ps1`,
+`scripts/publish-app.ps1`, or `scripts/build-installer.ps1` when packaging release artifacts; the scripts fail if
 `git status --porcelain --untracked-files=all` reports any tracked or untracked
 worktree changes.
 
 Trusted signed release builds use:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\publish-app.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-installer.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1 -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
 ```
 
 Trusted signed GitHub release builds may run `.github/workflows/release.yml`
@@ -298,7 +298,7 @@ companions, and be described as unsigned.
 Current local check on 2026-08-15:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
 Result: .NET 10 Release app and CLI builds succeeded with zero warnings;

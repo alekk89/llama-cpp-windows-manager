@@ -14,7 +14,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 
 function Resolve-Dotnet {
   $bundledDotnet = Join-Path (Split-Path -Parent $RepoRoot) ".dotnet-sdk-10\dotnet.exe"
@@ -233,7 +233,7 @@ $buildArgs = @(
   "-ExecutionPolicy",
   "Bypass",
   "-File",
-  (Join-Path $RepoRoot "build-app.ps1"),
+  (Join-Path $PSScriptRoot "build-app.ps1"),
   "-Configuration",
   $Configuration
 )
@@ -248,7 +248,7 @@ Invoke-GateStep "Build app" {
 Invoke-GateStep "Run tests and enforce coverage" {
   # Release binaries deliberately omit PDBs. Coverage is collected from the same
   # source in Debug while the separate build step enforces Release compilation.
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "test-coverage.ps1") -Configuration Debug
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "test-coverage.ps1") -Configuration Debug
 }
 
 Invoke-GateStep "Verify formatting" {
@@ -260,7 +260,7 @@ Invoke-GateStep "Check diff whitespace" {
 }
 
 Invoke-GateStep "Audit package vulnerabilities" {
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "test-vulnerabilities.ps1") -Configuration $Configuration
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "test-vulnerabilities.ps1") -Configuration $Configuration
 }
 
 if ($IncludePublish) {
@@ -269,7 +269,7 @@ if ($IncludePublish) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    (Join-Path $RepoRoot "publish-app.ps1"),
+    (Join-Path $PSScriptRoot "publish-app.ps1"),
     "-Runtime",
     $Runtime,
     "-Configuration",
@@ -300,7 +300,7 @@ if ($IncludeInstaller) {
     "-ExecutionPolicy",
     "Bypass",
     "-File",
-    (Join-Path $RepoRoot "build-installer.ps1"),
+    (Join-Path $PSScriptRoot "build-installer.ps1"),
     "-Runtime",
     $Runtime,
     "-Configuration",

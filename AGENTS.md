@@ -225,8 +225,8 @@ boundaries. Run tests proportional to the change and the full gate for control,
 architecture, packaging, or release work:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-app.ps1 -Restore
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-release-gate.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1
 ```
 
 Before launching a source build, check `llwmctl status`; it cannot run beside a
