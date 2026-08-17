@@ -11,6 +11,12 @@ endpoints on native Windows or Ubuntu/WSL.
 · [Read the documentation](docs/DEVELOPMENT.md)
 · [Automate with `llwmctl`](docs/CONTROL_API.md)
 
+<p align="center">
+  <a href="https://buymeacoffee.com/alekkson">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" width="217">
+  </a>
+</p>
+
 ![llama.cpp Windows Manager product tour](docs/images/llama-cpp-windows-manager-demo.gif)
 
 ## Why use llama.cpp Windows Manager?
