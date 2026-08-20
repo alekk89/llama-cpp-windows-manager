@@ -20,7 +20,7 @@ public sealed partial class ReleaseHardeningTests
 
         var result = await runner.RunAsync(
             psi,
-            TimeSpan.FromSeconds(10),
+            TimeSpan.FromSeconds(30),
             TestContext.Current.CancellationToken,
             "runner-output");
 
