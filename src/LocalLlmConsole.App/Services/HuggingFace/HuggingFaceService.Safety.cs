@@ -12,7 +12,7 @@ public sealed partial class HuggingFaceService
         if (!File.Exists(partial)) throw new FileNotFoundException("The partial download file is missing.", partial);
         RejectUnsafeExistingFile(partial, "partial download");
         var expectedBytes = ExpectedBytes(file, total);
-        var verificationError = VerifyDownloadedFile(partial, file, expectedBytes);
+        var verificationError = await VerifyDownloadedFileAsync(partial, file, expectedBytes, cancellationToken);
         if (!string.IsNullOrWhiteSpace(verificationError))
             throw new InvalidOperationException(verificationError);
 
@@ -23,9 +23,8 @@ public sealed partial class HuggingFaceService
         }
         File.Move(partial, destination);
         var finalBytes = new FileInfo(destination).Length;
-        verificationError = VerifyDownloadedFile(destination, file, expectedBytes);
-        if (!string.IsNullOrWhiteSpace(verificationError))
-            throw new InvalidOperationException(verificationError);
+        if (expectedBytes > 0 && finalBytes != expectedBytes)
+            throw new InvalidOperationException($"Downloaded file size mismatch after finalization. Expected {expectedBytes:N0} bytes, found {finalBytes:N0} bytes.");
 
         await CompleteVerifiedPrimaryModelAsync(job, settings, file, destination, expectedBytes > 0 ? expectedBytes : finalBytes, DateTimeOffset.UtcNow, recovered: false, cancellationToken);
     }
@@ -125,7 +124,11 @@ public sealed partial class HuggingFaceService
     private static long ExpectedBytes(HuggingFaceFile file, long total)
         => total > 0 ? total : file.SizeBytes;
 
-    private static string VerifyDownloadedFile(string path, HuggingFaceFile file, long expectedBytes)
+    private static async Task<string> VerifyDownloadedFileAsync(
+        string path,
+        HuggingFaceFile file,
+        long expectedBytes,
+        CancellationToken cancellationToken)
     {
         var expectedSha256 = NormalizeSha256(file.Sha256);
         if (expectedBytes <= 0 && string.IsNullOrWhiteSpace(expectedSha256))
@@ -140,7 +143,7 @@ public sealed partial class HuggingFaceService
 
         if (!string.IsNullOrWhiteSpace(expectedSha256))
         {
-            var actual = ComputeSha256(path);
+            var actual = await ComputeSha256Async(path, cancellationToken);
             if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expectedSha256), Convert.FromHexString(actual)))
                 return $"Downloaded file checksum mismatch. Expected SHA-256 {expectedSha256}, found {actual}.";
         }
@@ -148,11 +151,8 @@ public sealed partial class HuggingFaceService
         return "";
     }
 
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
-    }
+    private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
+        => await FileSystemSafetyService.Sha256Async(path, cancellationToken);
 
     private static string NormalizeSha256(string value)
     {

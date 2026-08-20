@@ -28,17 +28,28 @@ public static class ModelGatewayResponseWriter
             @object = "list",
             data = models
                 .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(model => new
+                .Select(model =>
                 {
-                    id = model.Id,
-                    @object = "model",
-                    created = model.Profile.UpdatedAt.ToUnixTimeSeconds(),
-                    owned_by = "local-llm-console",
-                    name = model.Name,
-                    model_id = model.Model.Id,
-                    profile_id = model.Profile.Id,
-                    profile_name = model.Profile.Name,
-                    is_default_profile = model.Profile.IsDefault
+                    var metadata = ModelGatewayMetadataService.Inspect(model.Model);
+                    return new
+                    {
+                        id = model.Id,
+                        @object = "model",
+                        created = model.Profile.UpdatedAt.ToUnixTimeSeconds(),
+                        owned_by = "local-llm-console",
+                        name = model.Name,
+                        model_id = model.Model.Id,
+                        profile_id = model.Profile.Id,
+                        profile_name = model.Profile.Name,
+                        is_default_profile = model.Profile.IsDefault,
+                        context_length = model.Profile.Settings.ContextSize,
+                        meta = new
+                        {
+                            n_ctx_train = metadata.TrainingContext,
+                            n_params = metadata.ParameterCount,
+                            size = metadata.SizeBytes
+                        }
+                    };
                 })
                 .ToArray()
         };

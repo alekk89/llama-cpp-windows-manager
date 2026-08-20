@@ -2,6 +2,70 @@ namespace LocalLlmConsole.Tests;
 
 public sealed partial class ReleaseHardeningTests
 {
+    [Fact]
+    public void ViewModelsDoNotOwnIoBoundaries()
+    {
+        var viewModelRoot = Path.Combine(
+            Path.GetDirectoryName(FindRepositoryFile("LocalLlmConsole.sln"))!,
+            "src",
+            "LocalLlmConsole.App",
+            "ViewModels");
+        var sources = Directory.GetFiles(viewModelRoot, "*.cs", SearchOption.AllDirectories)
+            .Select(path => new { Path = path, Source = File.ReadAllText(path) })
+            .ToArray();
+
+        foreach (var source in sources)
+        {
+            Assert.DoesNotContain("File.Exists(", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("File.Open", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("File.Read", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("File.Write", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Directory.Exists(", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Directory.Enumerate", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Directory.Get", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Directory.Create", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Process.Start(", source.Source, StringComparison.Ordinal);
+            Assert.DoesNotContain("new HttpClient", source.Source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void RuntimeSessionStopAwaitsVerifiedProcessTermination()
+    {
+        var sessions = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Runtimes", "LoadedModelSessionManager.cs"));
+        var supervisor = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Runtimes", "LlamaProcessSupervisor.Lifecycle.cs"));
+        var nativeStop = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Runtimes", "NativeRuntimeStopService.cs"));
+        var wslStop = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Environment", "WslRuntimeStopService.cs"));
+
+        Assert.Contains("await session.Supervisor.StopVerifiedAsync(cancellationToken)", sessions, StringComparison.Ordinal);
+        Assert.Contains("public async Task<StopVerification> StopVerifiedAsync", supervisor, StringComparison.Ordinal);
+        Assert.Contains("WaitForExitAsync", nativeStop, StringComparison.Ordinal);
+        Assert.DoesNotContain(".WaitForExit(", nativeStop, StringComparison.Ordinal);
+        Assert.DoesNotContain("public void Stop(", wslStop, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowLaunchAndOverviewFilesAreThinControllerAdapters()
+    {
+        var launchAdapter = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "MainWindow.LaunchSettings.cs"));
+        var overviewAdapter = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "MainWindow.OverviewSelection.cs"));
+
+        Assert.Contains("_launchSettingsController", launchAdapter, StringComparison.Ordinal);
+        Assert.Contains("_overviewSelection", overviewAdapter, StringComparison.Ordinal);
+        Assert.DoesNotContain("ModelLaunchSettingsWorkflowService", launchAdapter, StringComparison.Ordinal);
+        Assert.DoesNotContain("EndpointInspectionDialogFactory", overviewAdapter, StringComparison.Ordinal);
+        Assert.True(File.ReadLines(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "MainWindow.LaunchSettings.cs")).Count() < 80);
+        Assert.True(File.ReadLines(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "MainWindow.OverviewSelection.cs")).Count() < 80);
+    }
+
 
 
     [Fact]
@@ -242,9 +306,36 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Fact]
+    public void LargeFilesystemWorkStaysOutsideSynchronousUiContinuations()
+    {
+        var repositoryRoot = Path.GetDirectoryName(FindRepositoryFile("LocalLlmConsole.sln"))!;
+        var services = Path.Combine(repositoryRoot, "src", "LocalLlmConsole.App", "Services");
+        var fileSafety = File.ReadAllText(Path.Combine(services, "Infrastructure", "FileSystemSafetyService.cs"));
+        var downloads = File.ReadAllText(Path.Combine(services, "HuggingFace", "HuggingFaceService.Downloads.cs"));
+        var install = File.ReadAllText(Path.Combine(services, "Runtimes", "RuntimePackageInstallService.cs"));
+        var buildExecution = File.ReadAllText(Path.Combine(services, "Runtimes", "RuntimeBuildExecutionService.cs"));
+        var sourceRepository = File.ReadAllText(Path.Combine(services, "Runtimes", "RuntimeSourceRepositoryService.cs"));
+        var deletion = File.ReadAllText(Path.Combine(services, "Runtimes", "RuntimeDeletionExecutorService.cs"));
+        var catalog = File.ReadAllText(Path.Combine(services, "Runtimes", "RuntimeCatalogApplicationService.cs"));
+        var diagnostics = File.ReadAllText(Path.Combine(services, "App", "DiagnosticsBundleService.cs"));
+        var update = File.ReadAllText(Path.Combine(services, "App", "AppUpdateService.cs"));
+
+        Assert.Contains("SHA256.HashDataAsync", fileSafety, StringComparison.Ordinal);
+        Assert.Contains("Task.Run(() => RunDownloadWorkerAsync", downloads, StringComparison.Ordinal);
+        Assert.Contains("RuntimePackageInstallFileService.ExtractArchive", install, StringComparison.Ordinal);
+        Assert.Contains("await Task.Run", install, StringComparison.Ordinal);
+        Assert.Contains("DeleteSafeRuntimeFolderAsync", buildExecution, StringComparison.Ordinal);
+        Assert.Contains("DeleteSafeRuntimeFolderAsync", sourceRepository, StringComparison.Ordinal);
+        Assert.Contains("DeleteRuntimeFilesAsync", deletion, StringComparison.Ordinal);
+        Assert.Contains("var rows = await Task.Run", catalog, StringComparison.Ordinal);
+        Assert.Contains("return await Task.Run", diagnostics, StringComparison.Ordinal);
+        Assert.Contains("var stagedFiles = await Task.Run", update, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LocalControlApiDelegatesSettingsMutationAndValidation()
     {
-        var api = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Control", "LocalControlApi.cs"));
+        var api = ReadLocalControlApiSources();
         var mutations = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Control", "ControlAppSettingsMutationService.cs"));
 
         Assert.Contains("_settingsMutations.Patch", api, StringComparison.Ordinal);
@@ -255,4 +346,98 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("RequireApiKeyAuth = true", mutations, StringComparison.Ordinal);
         Assert.Contains("Gateway port", mutations, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ControlApiAndApplicationResourcesRemainDecomposedByResponsibility()
+    {
+        var controlRoot = Path.GetDirectoryName(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Control", "LocalControlApi.cs"))!;
+        var controlHost = File.ReadAllText(Path.Combine(controlRoot, "LocalControlApi.cs"));
+        var appXaml = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "App.xaml"));
+
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlModelEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlProfileEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlModelGroupEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlRuntimeEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlSessionEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlSettingsEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlLogEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlJobEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlOperationEndpoints.cs")));
+        Assert.True(File.Exists(Path.Combine(controlRoot, "ControlEndpointHandler.cs")));
+        Assert.True(File.ReadLines(Path.Combine(controlRoot, "LocalControlApi.cs")).Count() < 250);
+        Assert.DoesNotContain("partial class LocalControlApi", controlHost, StringComparison.Ordinal);
+        Assert.Contains("_models.ModelsAsync", controlHost, StringComparison.Ordinal);
+        Assert.Contains("_sessions.SessionsAsync", controlHost, StringComparison.Ordinal);
+        Assert.Contains("_operations.HandleAsync", controlHost, StringComparison.Ordinal);
+        Assert.Contains("Themes/Palette.xaml", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Themes/Foundation.xaml", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Themes/Inputs.xaml", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Themes/DataAndSurfaces.xaml", appXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Style", appXaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CoreProjectOwnsPortableModelsAndApplicationPolicy()
+    {
+        var repositoryRoot = Path.GetDirectoryName(FindRepositoryFile("LocalLlmConsole.sln"))!;
+        var coreRoot = Path.Combine(repositoryRoot, "src", "LocalLlmConsole.Core");
+        var coreProject = File.ReadAllText(Path.Combine(coreRoot, "LocalLlmConsole.Core.csproj"));
+        var appProject = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
+        var forbiddenReferences = new[]
+        {
+            "System.Windows",
+            "System.Windows.Forms",
+            "Microsoft.Win32",
+            "System.Management",
+            "Microsoft.Data.Sqlite",
+            "LocalLlmConsole.Localization"
+        };
+
+        Assert.Contains("<TargetFramework>net10.0</TargetFramework>", coreProject, StringComparison.Ordinal);
+        Assert.DoesNotContain("-windows", coreProject, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<UseWPF>", coreProject, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<UseWindowsForms>", coreProject, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<ProjectReference", coreProject, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("LocalLlmConsole.Core.csproj", appProject, StringComparison.Ordinal);
+
+        var portabilityViolations = Directory
+            .EnumerateFiles(coreRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(segment => segment is "bin" or "obj"))
+            .SelectMany(path => forbiddenReferences
+                .Where(reference => File.ReadAllText(path).Contains(reference, StringComparison.Ordinal))
+                .Select(reference => $"{Path.GetRelativePath(coreRoot, path)}: {reference}"))
+            .ToArray();
+        Assert.Empty(portabilityViolations);
+
+        var appModelsRoot = Path.Combine(repositoryRoot, "src", "LocalLlmConsole.App", "Models");
+        var appModelSources = Directory.Exists(appModelsRoot)
+            ? Directory.EnumerateFiles(appModelsRoot, "*.cs", SearchOption.TopDirectoryOnly)
+            : Enumerable.Empty<string>();
+        Assert.Empty(appModelSources);
+        Assert.NotEmpty(Directory.EnumerateFiles(Path.Combine(coreRoot, "Models"), "*.cs", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
+    public void ProductionAndTestSourceFilesRemainReviewableInSize()
+    {
+        var repositoryRoot = Path.GetDirectoryName(FindRepositoryFile("LocalLlmConsole.sln"))!;
+        var oversizedProduction = OversizedSources(Path.Combine(repositoryRoot, "src"), 425);
+        var oversizedTests = OversizedSources(Path.Combine(repositoryRoot, "tests"), 675);
+
+        Assert.Empty(oversizedProduction);
+        Assert.Empty(oversizedTests);
+    }
+
+    private static string[] OversizedSources(string root, int maximumLines)
+        => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(segment => segment is "bin" or "obj"))
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(root, path),
+                Lines = File.ReadLines(path).Count()
+            })
+            .Where(file => file.Lines > maximumLines)
+            .Select(file => $"{file.Path}: {file.Lines} lines (maximum {maximumLines})")
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 }

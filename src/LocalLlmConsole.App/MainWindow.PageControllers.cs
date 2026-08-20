@@ -56,6 +56,8 @@ public partial class MainWindow
                 ManageModelGroupsAsync,
                 AssignLaunchProfileGroupAsync,
                 RemoveLaunchProfileGroupAsync,
+                LoadLaunchProfileAsync,
+                BeginNewLaunchProfile,
                 SelectModelGridRow,
                 modelRows,
                 SearchHuggingFaceAsync,
@@ -68,6 +70,7 @@ public partial class MainWindow
                 RefreshLogsAsync,
                 OpenSelectedLogFile,
                 () => _coreServices.App.ShellIntegration.OpenFolder(Path.Combine(_workspaceRoot, "logs")),
+                CreateDiagnosticsBundleAsync,
                 DeleteSelectedLogAsync,
                 DeleteAllLogsAsync,
                 OpenLogPath,
@@ -80,6 +83,12 @@ public partial class MainWindow
         => new(
             new LifetimePageActionControllerActions(
                 ResetLifetimeMetricAsync,
+                ResetVisibleLifetimeMetricAsync,
+                LifetimeRangeChangedAsync,
+                LifetimeFiltersChangedAsync,
+                LifetimeFiltersChangedAsync,
+                ClearLifetimeDateSelectionAsync,
+                () => _lifetimePage.IsApplying,
                 RunEventAsync));
 
     private SettingsPageActionController CreateSettingsPageActionController()
@@ -115,6 +124,7 @@ public partial class MainWindow
                 DeleteRuntimeDownloadRowAsync,
                 DeleteRuntimeSourceAsync,
                 DeleteRuntimeBuildAsync,
+                VerifyRuntimeInstallationAsync,
                 CancelRuntimeBuildJobAsync,
                 RetryRuntimeBuildJobAsync,
                 ClearRuntimeBuildJobAsync,

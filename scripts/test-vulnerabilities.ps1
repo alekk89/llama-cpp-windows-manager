@@ -95,6 +95,7 @@ function Count-Properties($node, [string] $propertyName) {
 $appDir = Split-Path -Parent $PSScriptRoot
 $projects = @(
   (Join-Path $appDir "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj"),
+  (Join-Path $appDir "src\LocalLlmConsole.Core\LocalLlmConsole.Core.csproj"),
   (Join-Path $appDir "src\LocalLlmConsole.ControlCli\LocalLlmConsole.ControlCli.csproj"),
   (Join-Path $appDir "tests\LocalLlmConsole.Tests\LocalLlmConsole.Tests.csproj"),
   (Join-Path $appDir "tests\LocalLlmConsole.UiTests\LocalLlmConsole.UiTests.csproj")

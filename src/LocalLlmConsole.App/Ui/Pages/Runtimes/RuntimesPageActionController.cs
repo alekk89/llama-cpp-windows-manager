@@ -25,6 +25,7 @@ public sealed class RuntimesPageActionController
             _actions.ChooseRuntimeFolderAsync,
             _actions.ChangeCudaPackagePreferenceAsync,
             _actions.RuntimeGridPreviewMouseLeftButtonDown,
+            _actions.RowActions.VerifyRuntimeRow_Click,
             _actions.RowActions.DeleteRuntimeRow_Click,
             _actions.RowActions.RuntimeSourceRow_Click,
             _actions.RowActions.InstallRuntimePackageRow_Click,

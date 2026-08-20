@@ -13,6 +13,7 @@ public sealed record RuntimesPageRowActionControllerActions(
     Func<RuntimePackagePresetRow, Task> DeleteRuntimeDownloadRowAsync,
     Func<RuntimeSourceEntry, Task> DeleteRuntimeSourceAsync,
     Func<RuntimeRecord, Task> DeleteRuntimeBuildAsync,
+    Func<RuntimeRecord, Task> VerifyRuntimeInstallationAsync,
     Func<JobRecord, Task> CancelRuntimeBuildJobAsync,
     Func<JobRecord, Task> RetryRuntimeBuildJobAsync,
     Func<JobRecord, Task> ClearRuntimeBuildJobAsync,
@@ -72,6 +73,15 @@ public sealed class RuntimesPageRowActionController
 
             var runtime = _actions.RuntimeFromRowButton(sender);
             if (runtime is not null) await _actions.DeleteRuntimeBuildAsync(runtime);
+        });
+    }
+
+    public async void VerifyRuntimeRow_Click(object sender, RoutedEventArgs e)
+    {
+        await _actions.RunEventAsync(async () =>
+        {
+            var runtime = _actions.RuntimeFromRowButton(sender);
+            if (runtime is not null) await _actions.VerifyRuntimeInstallationAsync(runtime);
         });
     }
 

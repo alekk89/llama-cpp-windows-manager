@@ -6,37 +6,37 @@ public sealed partial class LlamaProcessSupervisor
 
     public void Stop()
     {
-        var result = StopVerified();
+        var result = StopVerifiedAsync().GetAwaiter().GetResult();
         if (!result.VerifiedStopped)
             Trace.TraceWarning($"Could not verify llama runtime shutdown: {result.Error}");
     }
 
-    public StopVerification StopVerified()
+    public async Task<StopVerification> StopVerifiedAsync(CancellationToken cancellationToken = default)
     {
         var verified = true;
         var error = "";
         if (_lastRuntimeMode == RuntimeMode.Native)
         {
-            var result = _nativeRuntimeStop.Stop(_process);
+            var result = await _nativeRuntimeStop.StopAsync(_process, cancellationToken);
             verified = result.Exited;
             if (!verified)
                 error = "The native runtime process remained alive after both stop attempts.";
         }
         else
         {
-            verified = StopHostProcess();
+            verified = await StopHostProcessAsync(cancellationToken);
             if (!verified)
                 error = "The WSL host process remained alive after the stop attempt.";
         }
 
         if (_lastSettings is not null && _lastRuntimeMode == RuntimeMode.Wsl)
         {
-            var wslResult = _wslRuntimeStop.StopAsync(new WslRuntimeStopRequest(
+            var wslResult = await _wslRuntimeStop.StopAsync(new WslRuntimeStopRequest(
                 _lastSettings,
                 _lastRuntimeExecutablePath,
                 _lastWslProcessMarker,
                 LogPath,
-                BoundedLogFile.MegabytesToBytes(_lastSettings.MaxLogFileSizeMb))).GetAwaiter().GetResult();
+                BoundedLogFile.MegabytesToBytes(_lastSettings.MaxLogFileSizeMb)), cancellationToken);
             verified &= wslResult.VerifiedStopped;
             if (!wslResult.VerifiedStopped)
                 error = string.IsNullOrWhiteSpace(wslResult.Error)
@@ -69,14 +69,22 @@ public sealed partial class LlamaProcessSupervisor
         return new StopVerification(true, "");
     }
 
-    private bool StopHostProcess()
+    private async Task<bool> StopHostProcessAsync(CancellationToken cancellationToken)
     {
         try
         {
             if (_process is { HasExited: false })
             {
                 _process.Kill(entireProcessTree: true);
-                _process.WaitForExit(3000);
+                try
+                {
+                    await _process.WaitForExitAsync(cancellationToken)
+                        .WaitAsync(TimeSpan.FromSeconds(3), cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                    // The verification below reports whether termination actually completed.
+                }
             }
             return _process is null || _process.HasExited;
         }
@@ -88,5 +96,20 @@ public sealed partial class LlamaProcessSupervisor
         }
     }
 
-    public void Dispose() => Stop();
+    public async ValueTask DisposeAsync()
+    {
+        var result = await StopVerifiedAsync();
+        if (!result.VerifiedStopped)
+            Trace.TraceWarning($"Could not verify llama runtime shutdown: {result.Error}");
+        GC.SuppressFinalize(this);
+    }
+
+    public void Dispose()
+    {
+        if (_process is null && _lastSettings is null && _log is null && _jobObject is null)
+            return;
+
+        Stop();
+        GC.SuppressFinalize(this);
+    }
 }

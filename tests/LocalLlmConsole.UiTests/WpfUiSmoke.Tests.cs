@@ -10,7 +10,7 @@ using LocalLlmConsole.ViewModels;
 
 namespace LocalLlmConsole.UiTests;
 
-public sealed class WpfUiSmokeTests
+public sealed partial class WpfUiSmokeTests
 {
     [Fact]
     public async Task CoreWpfSurfacesComposeResizeFilterAndExposeSessionUnloadOnStaThread()
@@ -48,7 +48,7 @@ public sealed class WpfUiSmokeTests
                 var statusY = statusCard.TranslatePoint(new Point(0, 0), windowContent).Y;
                 Assert.True(statusY > helpY + helpButton.ActualHeight, $"Help bottom {helpY + helpButton.ActualHeight}, status top {statusY}.");
                 Assert.True(statusY + statusCard.ActualHeight <= 680, $"Status bottom {statusY + statusCard.ActualHeight}.");
-                Assert.Equal("v2.2.0", appVersionText.Text);
+                Assert.Equal("v2.3.0", appVersionText.Text);
                 Assert.Equal(28, navigationToggle.Width);
                 var navigationToggleGlyph = Assert.IsType<TextBlock>(navigationToggle.Content);
                 Assert.Equal("\uE700", navigationToggleGlyph.Text);
@@ -79,6 +79,8 @@ public sealed class WpfUiSmokeTests
                 LocalLlmConsole.Localization.Loc.LoadLanguage("ar");
                 applyLocalizedStrings.Invoke(window, null);
                 Assert.Equal(FlowDirection.RightToLeft, window.FlowDirection);
+                var copiedEndpointValue = "";
+                const string endpointApiKey = "endpoint-report-test-api-key-1234567890";
                 var endpointDialog = LocalLlmConsole.EndpointInspectionDialogFactory.Create(
                     window,
                     new EndpointInspectionReport(
@@ -87,18 +89,49 @@ public sealed class WpfUiSmokeTests
                         "http://127.0.0.1:8082/v1",
                         "Ready",
                         DateTimeOffset.UtcNow,
-                        [],
+                        [new EndpointInspectionModel("route-id", "Route", "manager", "default", null, 32768, null, 7_000_000_000, 4_000_000_000)],
                         null,
                         [],
                         [],
                         "Keep loaded",
                         "Loopback",
-                        []));
+                        []),
+                    endpointApiKey,
+                    value => copiedEndpointValue = value);
+                var endpointDialogContent = Assert.IsAssignableFrom<FrameworkElement>(endpointDialog.Content);
+                endpointDialogContent.Measure(new Size(760, 560));
+                endpointDialogContent.Arrange(new Rect(0, 0, 760, 560));
+                endpointDialogContent.UpdateLayout();
+                var endpointDialogRoot = Assert.IsAssignableFrom<DependencyObject>(endpointDialogContent);
                 Assert.Equal(FlowDirection.RightToLeft, endpointDialog.FlowDirection);
                 Assert.Contains("فحص", endpointDialog.Title, StringComparison.Ordinal);
                 Assert.Contains(
-                    VisualDescendants<TextBlock>(Assert.IsAssignableFrom<DependencyObject>(endpointDialog.Content)),
+                    VisualDescendants<TextBlock>(endpointDialogRoot),
                     text => text.Text.Contains("تقرير", StringComparison.Ordinal));
+                var selectableEndpoint = Assert.Single(
+                    VisualDescendants<TextBox>(endpointDialogRoot),
+                    textBox => textBox.Text == "http://127.0.0.1:8082/v1");
+                Assert.True(selectableEndpoint.IsReadOnly);
+                Assert.False(selectableEndpoint.IsReadOnlyCaretVisible);
+                Assert.Null(selectableEndpoint.FocusVisualStyle);
+                Assert.Equal(new Thickness(0), selectableEndpoint.BorderThickness);
+                Assert.Equal(System.Windows.Media.Brushes.Transparent, selectableEndpoint.Background);
+                Assert.Equal(0, selectableEndpoint.MinHeight);
+                var endpointTable = Assert.Single(VisualDescendants<DataGrid>(endpointDialogRoot));
+                Assert.Equal(DataGridSelectionMode.Extended, endpointTable.SelectionMode);
+                Assert.Equal(DataGridSelectionUnit.CellOrRowHeader, endpointTable.SelectionUnit);
+                Assert.Equal(DataGridClipboardCopyMode.IncludeHeader, endpointTable.ClipboardCopyMode);
+                var copyButtons = VisualDescendants<Button>(endpointDialogRoot)
+                    .Where(button => AutomationProperties.GetAutomationId(button).StartsWith("EndpointCopy", StringComparison.Ordinal))
+                    .ToDictionary(AutomationProperties.GetAutomationId, StringComparer.Ordinal);
+                copyButtons["EndpointCopyEndpointButton"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal("http://127.0.0.1:8082/v1", copiedEndpointValue);
+                copyButtons["EndpointCopyReportButton"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Contains("http://127.0.0.1:8082/v1", copiedEndpointValue, StringComparison.Ordinal);
+                Assert.Contains("route-id", copiedEndpointValue, StringComparison.Ordinal);
+                Assert.DoesNotContain(endpointApiKey, copiedEndpointValue, StringComparison.Ordinal);
+                copyButtons["EndpointCopyApiKeyButton"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(endpointApiKey, copiedEndpointValue);
                 endpointDialog.Close();
                 LocalLlmConsole.Localization.Loc.LoadLanguage("en");
                 applyLocalizedStrings.Invoke(window, null);
@@ -119,121 +152,7 @@ public sealed class WpfUiSmokeTests
                 cancelRuntimeDiscovery.Invoke(window, null);
                 Assert.Null(runtimeDiscoveryCancellationField.GetValue(window));
 
-                var settings = AppSettings.CreateDefault(Path.Combine(Path.GetTempPath(), "wpf-smoke"));
-                var panelState = new LocalLlmConsole.LaunchSettingsPanelState();
-                var controlPlan = new LaunchSettingsControlStateService().Build(new LaunchSettingsControlStateRequest(
-                    ShowAdvancedSections: true,
-                    RuntimeBackend.Cpu,
-                    VisionLaunchSettingsAvailable: true,
-                    SpeculativeType: "none"));
-                var panel = LocalLlmConsole.LaunchSettingsPanelFactory.Create(new LocalLlmConsole.LaunchSettingsPanelRequest(
-                    settings,
-                    [new RuntimeChoice("cpu", "Official CPU", RuntimeBackend.Cpu, RuntimeMode.Native, "llama-server.exe")],
-                    ShowAdvancedLaunchSettings: true,
-                    RuntimeSelectionChanged: () => { },
-                    AdvancedSettingsChanged: _ => { },
-                    LaunchSettingsSearchChanged: () => panelState.ApplyControlState(controlPlan),
-                    SaveForModelAsync: () => Task.CompletedTask,
-                    SaveDefaultsAsync: () => Task.CompletedTask,
-                    ResetDefaults: () => { },
-                    SaveAsNewAsync: () => Task.CompletedTask,
-                    ChooseVisionProjectorAsync: () => Task.CompletedTask,
-                    ChooseDraftModelAsync: () => Task.CompletedTask,
-                    ChooseMtpHeadAsync: () => Task.CompletedTask,
-                    SaveAsNewNameChanged: () => { },
-                    ChooseAdditionalFile: _ => null,
-                    ChooseAdditionalDirectory: _ => null));
-                panelState.Apply(panel);
-                panel.FormControls.RuntimeOptions!.SetOptions([
-                    new RuntimeLaunchOptionDefinition("--cpu-mask", ["--cpu-mask"], "MASK", "CPU affinity mask", RuntimeLaunchOptionValueKind.Text, []),
-                    new RuntimeLaunchOptionDefinition("--numa", ["--numa"], "TYPE", "NUMA strategy", RuntimeLaunchOptionValueKind.Choice, ["distribute", "isolate"], "distribute"),
-                    new RuntimeLaunchOptionDefinition("--log-colors", ["--log-colors"], "", "colorize runtime logs", RuntimeLaunchOptionValueKind.Switch, []),
-                    new RuntimeLaunchOptionDefinition("--no-log-colors", ["--no-log-colors"], "", "disable colored runtime logs", RuntimeLaunchOptionValueKind.Switch, [])
-                ]);
-                panelState.ApplyControlState(controlPlan);
-
-                Assert.Equal(28, panel.LaunchSettingsSearchBox.Height);
-                Assert.True(panel.RuntimeCombo.MinHeight >= 28);
-                Assert.All(
-                    panelState.LaunchSettingElements.SelectMany(pair => pair.Value),
-                    element =>
-                    {
-                        var tooltip = element.ToolTip?.ToString();
-                        Assert.False(string.IsNullOrWhiteSpace(tooltip));
-                        Assert.DoesNotContain("Tooltip.", tooltip, StringComparison.Ordinal);
-                    });
-                Assert.Contains("model's folder", panel.FormControls.VisionProjectorButton!.ToolTip?.ToString(), StringComparison.OrdinalIgnoreCase);
-                Assert.Contains("nextn_predict_layers", panel.FormControls.SpecDraftModelButton!.ToolTip?.ToString(), StringComparison.OrdinalIgnoreCase);
-                Assert.Contains("legacy --mtp-head", panel.FormControls.MtpHeadButton!.ToolTip?.ToString(), StringComparison.OrdinalIgnoreCase);
-                Assert.False(string.IsNullOrWhiteSpace(panel.FormControls.RuntimeOptions.ApplyCommandButton.ToolTip?.ToString()));
-                Assert.Equal(3, panel.FormControls.RuntimeOptions.OptionCount);
-                Assert.Contains("Performance & Memory", panel.FormControls.RuntimeOptions.GroupTitles);
-                Assert.Equal(Visibility.Visible, panel.FormControls.RuntimeOptions.AdditionalSettingsRoot.Visibility);
-                Assert.Equal(Visibility.Visible, panel.FormControls.RuntimeOptions.CommandRoot.Visibility);
-                Assert.False(panel.FormControls.RuntimeOptions.CommandTextBox.IsReadOnly);
-                Assert.DoesNotContain(
-                    VisualDescendants<TextBlock>(panel.FormControls.RuntimeOptions.Root),
-                    text => text.Text.Contains("additional settings exposed by", StringComparison.OrdinalIgnoreCase));
-                var cpuMaskLabel = Assert.Single(VisualDescendants<TextBlock>(panel.FormControls.RuntimeOptions.Root), text => text.Text == "CPU Mask");
-                var numaLabel = Assert.Single(VisualDescendants<TextBlock>(panel.FormControls.RuntimeOptions.Root), text => text.Text == "NUMA");
-                var cpuMaskRow = Assert.IsType<Grid>(cpuMaskLabel.Parent);
-                var numaRow = Assert.IsType<Grid>(numaLabel.Parent);
-                var numaCombo = Assert.Single(VisualDescendants<ComboBox>(numaRow));
-                Assert.Equal(["Inherit (runtime default: distribute)", "distribute", "isolate"], numaCombo.Items.Cast<string>().ToArray());
-                numaCombo.SelectedItem = "isolate";
-                Assert.Contains("--numa isolate", panel.FormControls.RuntimeOptions.BuildCustomParameters(), StringComparison.Ordinal);
-                numaCombo.SelectedIndex = 0;
-                Assert.DoesNotContain("--numa", panel.FormControls.RuntimeOptions.BuildCustomParameters(), StringComparison.Ordinal);
-                Assert.Equal(104, cpuMaskRow.ColumnDefinitions[0].Width.Value);
-                var cpuMaskEditor = cpuMaskRow.Children.Cast<FrameworkElement>().Single(element => Grid.GetColumn(element) == 1);
-                Assert.Equal(28, cpuMaskEditor.Height);
-                Assert.Equal(new Thickness(0, 0, 4, 1), cpuMaskEditor.Margin);
-                Assert.Contains("--cpu-mask", cpuMaskLabel.ToolTip?.ToString(), StringComparison.Ordinal);
-                var cpuMaskTextBox = Assert.Single(VisualDescendants<TextBox>(cpuMaskRow));
-                Assert.Empty(cpuMaskTextBox.Text);
-                Assert.DoesNotContain(VisualDescendants<TextBlock>(cpuMaskRow), text => text.Text == "Runtime default");
-                var runtimeSwitch = Assert.Single(VisualDescendants<Button>(panel.FormControls.RuntimeOptions.Root), button =>
-                    button.ToolTip?.ToString()?.Contains("--log-colors", StringComparison.Ordinal) == true);
-                Assert.Equal("Default", runtimeSwitch.Content);
-                runtimeSwitch.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Equal("Enabled", runtimeSwitch.Content);
-                runtimeSwitch.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Equal("Disabled", runtimeSwitch.Content);
-                runtimeSwitch.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Equal("Default", runtimeSwitch.Content);
-                Assert.Equal(0, Grid.GetColumn(cpuMaskRow));
-                Assert.Equal(2, Grid.GetColumn(numaRow));
-                Assert.Equal(Grid.GetRow(cpuMaskRow), Grid.GetRow(numaRow));
-                panel.LaunchSettingsSearchBox.Text = "context size";
-                Assert.All(panelState.LaunchSettingElements["Context size"], element => Assert.Equal(Visibility.Visible, element.Visibility));
-                Assert.All(panelState.LaunchSettingElements["Threads"], element => Assert.Equal(Visibility.Collapsed, element.Visibility));
-                panel.LaunchSettingsSearchBox.Text = "numa";
-                Assert.Equal(Visibility.Visible, panel.FormControls.RuntimeOptions.Root.Visibility);
-                Assert.Equal(0, Grid.GetColumn(numaRow));
-                panel.LaunchSettingsSearchBox.Text = "--cpu-mask";
-                Assert.Equal(Visibility.Visible, cpuMaskRow.Visibility);
-                panel.LaunchSettingsSearchBox.Text = "no-setting-can-match-this";
-                Assert.Equal(Visibility.Collapsed, panel.FormControls.RuntimeOptions.AdditionalSettingsRoot.Visibility);
-                Assert.Equal(Visibility.Visible, panel.FormControls.RuntimeOptions.CommandRoot.Visibility);
-                panel.LaunchSettingsSearchBox.Clear();
-                var basicPlan = new LaunchSettingsControlStateService().Build(new LaunchSettingsControlStateRequest(
-                    ShowAdvancedSections: false,
-                    RuntimeBackend.Cpu,
-                    VisionLaunchSettingsAvailable: true,
-                    SpeculativeType: "none"));
-                panelState.ApplyControlState(basicPlan);
-                Assert.Equal(Visibility.Collapsed, panel.FormControls.RuntimeOptions.AdditionalSettingsRoot.Visibility);
-                Assert.Equal(Visibility.Visible, panel.FormControls.RuntimeOptions.CommandRoot.Visibility);
-                panel.FormControls.RuntimeOptions.UpdatePreview("llama-server --model model.gguf");
-                panel.FormControls.RuntimeOptions.CommandTextBox.Text += " --cpu-mask FF --future-runtime-option value";
-                panel.FormControls.RuntimeOptions.ApplyCommandButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Equal("FF", cpuMaskTextBox.Text);
-                Assert.Contains("--future-runtime-option", panel.FormControls.CustomParametersBox!.Text, StringComparison.Ordinal);
-                panel.FormControls.RuntimeOptions.SetLoading("Official CUDA");
-                Assert.Equal(0, panel.FormControls.RuntimeOptions.OptionCount);
-                Assert.Empty(panel.FormControls.RuntimeOptions.GroupTitles);
-                Assert.Contains("Official CUDA", panel.FormControls.RuntimeOptions.StatusText, StringComparison.Ordinal);
-
+                var settings = AssertLaunchSettingsSurface();
                 var viewModel = new MainWindowViewModel();
                 viewModel.Overview.ReplaceSessions([RunningSession(settings)]);
                 viewModel.Overview.ReplaceLaunchProfiles([
@@ -264,10 +183,18 @@ public sealed class WpfUiSmokeTests
                 Assert.InRange(overview.LoadButton.ActualHeight, 28, 36);
                 var overviewStateForLoad = new LocalLlmConsole.OverviewPageState();
                 overviewStateForLoad.Apply(overview);
-                overviewStateForLoad.SetModelActionsEnabled(hasSelection: true, hasProfileSelection: true, selectedProfileLoaded: true);
-                Assert.Equal(Visibility.Collapsed, overview.LoadButton.Visibility);
-                overviewStateForLoad.SetModelActionsEnabled(hasSelection: true, hasProfileSelection: true, selectedProfileLoaded: false);
+                overviewStateForLoad.SetModelActionsEnabled(hasSelection: true, hasProfileSelection: true, selectedProfileLoaded: true, selectedModelMissing: false);
                 Assert.Equal(Visibility.Visible, overview.LoadButton.Visibility);
+                Assert.Equal("Loaded", overview.LoadButton.Content);
+                Assert.False(overview.LoadButton.IsEnabled);
+                overviewStateForLoad.SetModelActionsEnabled(hasSelection: true, hasProfileSelection: true, selectedProfileLoaded: false, selectedModelMissing: false);
+                Assert.Equal(Visibility.Visible, overview.LoadButton.Visibility);
+                Assert.Equal("Load", overview.LoadButton.Content);
+                Assert.True(overview.LoadButton.IsEnabled);
+                overviewStateForLoad.SetModelActionsEnabled(hasSelection: true, hasProfileSelection: true, selectedProfileLoaded: false, selectedModelMissing: true);
+                Assert.False(overview.LoadButton.IsEnabled);
+                Assert.Equal("The model file is missing. Restore it or remove the catalog entry before loading.", overview.LoadButton.ToolTip);
+                Assert.True(ToolTipService.GetShowOnDisabled(overview.LoadButton));
                 var launchProfileText = VisualDescendants<TextBlock>(overview.LaunchProfileCombo)
                     .Select(text => text.Text)
                     .ToArray();
@@ -375,6 +302,8 @@ public sealed class WpfUiSmokeTests
                         () => Task.CompletedTask,
                         (_, _) => Task.CompletedTask,
                         (_, _) => Task.CompletedTask,
+                        (_, _) => Task.CompletedTask,
+                        () => { },
                         (_, _) => { },
                         (_, _) => { },
                         (_, _) => { },
@@ -405,15 +334,16 @@ public sealed class WpfUiSmokeTests
                 Assert.Contains(modelPage.ModelVariantsGrid.Columns, column => Equals(column.Header, "Group"));
                 Assert.Contains(modelPage.ModelsGrid.Columns, column => Equals(column.Header, "Open Folder"));
                 Assert.DoesNotContain(modelPage.ModelVariantsGrid.Columns, column => Equals(column.Header, "Open Folder"));
-                Assert.Equal("Assign to group…", Assert.IsType<MenuItem>(modelPage.ModelVariantsGrid.ContextMenu!.Items[0]).Header);
+                AssertContextMenu(modelPage.ModelsGrid, viewModel.Models.Rows[0], "Open Folder", "Save New Profile", "Delete");
+                AssertContextMenu(modelPage.ModelVariantsGrid, viewModel.Models.VariantRows[0], "Load", "Assign to group…", "Remove from group", "Remove");
                 Assert.Contains(VisualDescendants<Button>(modelPage.Root), button => Equals(button.Content, "Groups…"));
                 var inlineGroupButtons = VisualDescendants<Button>(modelPage.ModelVariantsGrid)
                     .Where(button => Equals(button.Content, "Add"))
                     .ToArray();
                 Assert.Single(inlineGroupButtons);
                 Assert.Equal(Visibility.Visible, inlineGroupButtons[0].Visibility);
-                Assert.Equal(22, inlineGroupButtons[0].Height);
-                Assert.Equal(new Thickness(7, 0, 7, 1), inlineGroupButtons[0].Padding);
+                AssertGridActionButtonMatches(inlineGroupButtons[0], modelPage.ModelVariantsGrid, "Remove");
+                var addGroupButtonWidth = inlineGroupButtons[0].ActualWidth;
                 modelPage.ModelVariantsGrid.ScrollIntoView(viewModel.Models.VariantRows[1]);
                 modelPage.ModelVariantsGrid.UpdateLayout();
                 var variantButtons = VisualDescendants<Button>(modelPage.ModelVariantsGrid).ToArray();
@@ -424,6 +354,7 @@ public sealed class WpfUiSmokeTests
                 Assert.True(groupNameButtons.Length == 1, string.Join(" | ", variantButtons.Select(button =>
                     $"{button.Content ?? "<null>"}:{button.Visibility}:{LocalLlmConsole.VisualRole.GetButtonRole(button)}:{(button.DataContext as ModelGridRow)?.Group}")));
                 var groupNameButton = groupNameButtons[0];
+                Assert.Equal(addGroupButtonWidth, groupNameButton.ActualWidth, precision: 1);
                 Assert.Equal(LocalLlmConsole.VisualRole.Quiet, LocalLlmConsole.VisualRole.GetButtonRole(groupNameButton));
                 Assert.Equal("Interactive", Assert.IsType<ModelGridRow>(groupNameButton.DataContext).Group);
                 Assert.Contains(VisualDescendants<TextBlock>(groupNameButton), text => text.Text == "Interactive");
@@ -570,6 +501,8 @@ public sealed class WpfUiSmokeTests
                 Assert.Single(metricDashboard.ColumnDefinitions);
                 Assert.All(metricCards, card => Assert.Equal(104, card.ActualHeight));
 
+                AssertLifetimeUsageSurface();
+
                 var persistedSettings = settings with { ModelApiKey = "persisted-key" };
                 var settingDefinitions = new SettingsPageDefinitionService().BuildRows(persistedSettings);
                 var settingsViewModel = new SettingsPageViewModel();
@@ -593,6 +526,7 @@ public sealed class WpfUiSmokeTests
                         ChooseRuntimeFolderAsync: () => Task.CompletedTask,
                         ChangeCudaPackagePreferenceAsync: () => Task.CompletedTask,
                         RuntimeGridPreviewMouseLeftButtonDown: (_, _) => { },
+                        VerifyRuntimeRowClick: noOp,
                         DeleteRuntimeRowClick: noOp,
                         RuntimeSourceRowClick: noOp,
                         InstallRuntimePackageRowClick: noOp,
@@ -637,124 +571,7 @@ public sealed class WpfUiSmokeTests
                 Assert.DoesNotContain(VisualDescendants<TextBlock>(runtimesControls.Root), text => Equals(text.Text, "Runtime Jobs"));
                 Assert.DoesNotContain(VisualDescendants<Button>(runtimesControls.Root), button => Equals(button.Content, "Show advanced") || Equals(button.Content, "Hide advanced"));
 
-                var settingsControls = LocalLlmConsole.SettingsPageFactory.Create(new LocalLlmConsole.SettingsPageRequest(
-                    settingsViewModel.Rows,
-                    persistedSettings.ThemeMode,
-                    new LocalLlmConsole.SettingsPageActions(
-                        (_, _) => { },
-                        (_, _) => { },
-                        (_, _) => { },
-                        (_, _) => { })));
-                var settingsState = new LocalLlmConsole.SettingsPageState();
-                var applyRequests = 0;
-                settingsState.Apply(
-                    settingsControls,
-                    settingsViewModel.Rows,
-                    () => applyRequests++);
-                Assert.Equal(36, settingsControls.SettingsGrid.RowHeight);
-                Assert.Equal(9, settingsViewModel.Rows.Count(row => row.Group == "UI"));
-                Assert.All(settingsViewModel.Rows.Where(row => row.Group == "UI"), row =>
-                {
-                    Assert.Contains(row.Value, new[] { "Show", "Hide" });
-                    Assert.Equal(new[] { "Show", "Hide" }, row.Options);
-                });
-                settingsControls.Root.Measure(new Size(900, 900));
-                settingsControls.Root.Arrange(new Rect(0, 0, 900, 900));
-                settingsControls.Root.UpdateLayout();
-                Assert.Equal(2, settingsControls.SettingsColumns.ColumnDefinitions.Count);
-                Assert.All(settingsControls.SettingsColumns.ColumnDefinitions, column => Assert.True(column.Width.IsStar));
-                var settingsColumnStacks = settingsControls.SettingsColumns.Children.OfType<StackPanel>().ToArray();
-                Assert.Equal(2, settingsColumnStacks.Length);
-                Assert.Equal(4, settingsColumnStacks[0].Children.Count);
-                Assert.Equal(3, settingsColumnStacks[1].Children.Count);
-                Assert.Equal(settingsControls.SettingsColumns.ColumnDefinitions[0].ActualWidth,
-                    settingsControls.SettingsColumns.ColumnDefinitions[1].ActualWidth, precision: 1);
-                var settingsGrids = VisualDescendants<DataGrid>(settingsControls.Root).ToArray();
-                var uiSettingsGrid = Assert.Single(settingsGrids, grid =>
-                    grid.ItemsSource.Cast<EditableSettingRow>().Any(row => row.Group == "UI"));
-                Assert.Equal(2, uiSettingsGrid.Columns.Count);
-                Assert.Contains(VisualDescendants<DataGrid>(settingsColumnStacks[1]), grid => ReferenceEquals(grid, uiSettingsGrid));
-                var networkSettingsGrid = Assert.Single(settingsGrids, grid =>
-                    grid.ItemsSource.Cast<EditableSettingRow>().Any(row => row.Key == "modelApiKey"));
-                Assert.Equal(2, networkSettingsGrid.Columns.Count);
-                var settingChoices = VisualDescendants<ComboBox>(settingsControls.Root)
-                    .Where(combo => combo.ItemsSource is not null)
-                    .ToArray();
-                Assert.NotEmpty(settingChoices);
-                Assert.All(settingChoices.Where(combo => combo != settingsControls.ThemeCombo), combo =>
-                {
-                    Assert.Equal(148, combo.Width);
-                    Assert.Equal(28, combo.Height);
-                    Assert.Equal(28, combo.MinHeight);
-                    Assert.Equal(HorizontalAlignment.Right, combo.HorizontalAlignment);
-                });
-                Assert.Contains(VisualDescendants<TextBox>(settingsControls.Root), textBox =>
-                    textBox.Height == 28
-                    && textBox.MinHeight == 28
-                    && textBox.Padding == new Thickness(8, 2, 8, 2)
-                    && textBox.VerticalContentAlignment == VerticalAlignment.Center);
-                var networkActions = VisualDescendants<Button>(networkSettingsGrid)
-                    .Select(button => button.Content?.ToString())
-                    .Where(content => !string.IsNullOrWhiteSpace(content))
-                    .ToArray();
-                Assert.Contains("Show", networkActions);
-                Assert.Contains("Copy", networkActions);
-                Assert.Contains("Generate", networkActions);
-                Assert.DoesNotContain(VisualDescendants<Button>(settingsControls.Root), button =>
-                    Equals(button.Content, LocalLlmConsole.Localization.Loc.T("Settings.SaveSettingsButton")));
-                Assert.Contains(VisualDescendants<TextBlock>(settingsControls.Root), text =>
-                    text.Text == LocalLlmConsole.Localization.Loc.T("Settings.AutoApplyHint"));
-
-                var helpCatalog = new HelpCatalogService();
-                var helpTarget = "";
-                var helpController = new LocalLlmConsole.HelpPageController(helpCatalog, target => helpTarget = target);
-                var helpPage = helpController.Create();
-                helpPage.Content.Measure(new Size(900, 680));
-                helpPage.Content.Arrange(new Rect(0, 0, 900, 680));
-                helpPage.Content.UpdateLayout();
-                Assert.Equal(LocalLlmConsole.Localization.Loc.T("Help.Search.AutomationName"), AutomationProperties.GetName(helpPage.Controls.SearchBox));
-                Assert.Equal(6, helpPage.Controls.SectionButtons.Count);
-                Assert.Equal(3, helpPage.Controls.ResultsHost.Children.Count);
-                Assert.All(
-                    helpPage.Controls.ResultsHost.Children.OfType<Border>(),
-                    card => Assert.False(Assert.IsType<Expander>(card.Child).IsExpanded));
-
-                helpPage.Controls.SearchBox.Text = "api key";
-                helpPage.Content.UpdateLayout();
-                Assert.Equal(Visibility.Visible, helpPage.Controls.ClearSearchButton.Visibility);
-                Assert.Contains("searching all topics", helpPage.Controls.ResultsSummary.Text, StringComparison.Ordinal);
-                var apiArticle = Assert.Single(
-                    VisualDescendants<Expander>(helpPage.Content),
-                    expander => AutomationProperties.GetName(expander) == LocalLlmConsole.Localization.Loc.T("Help.Article.network-and-key.Title"));
-                apiArticle.IsExpanded = true;
-                helpPage.Content.UpdateLayout();
-                var openSettings = Assert.Single(
-                    VisualDescendants<Button>(apiArticle),
-                    button => Equals(button.Content, LocalLlmConsole.Localization.Loc.T("Help.Article.network-and-key.Action.1")));
-                openSettings.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Equal("settings", helpTarget);
-
-                helpPage.Controls.SearchBox.Text = "phrase-that-does-not-exist";
-                Assert.Contains(
-                    VisualDescendants<TextBlock>(helpPage.Content),
-                    text => text.Text == LocalLlmConsole.Localization.Loc.T("Help.Search.NoMatchTitle"));
-                helpPage.Controls.ClearSearchButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Assert.Equal("", helpPage.Controls.SearchBox.Text);
-                helpPage.Controls.SectionButtons["models"].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                helpPage.Content.Measure(new Size(900, 680));
-                helpPage.Content.Arrange(new Rect(0, 0, 900, 680));
-                helpPage.Content.UpdateLayout();
-                Assert.Equal("models", helpCatalog.ActiveSection);
-                Assert.All(
-                    helpPage.Controls.ResultsHost.Children.OfType<Border>(),
-                    card => Assert.Contains(VisualDescendants<TextBlock>(card), text => text.Text == "MODELS"));
-
-                var idleRow = Assert.Single(settingsViewModel.Rows, row => row.Key == "autoUnloadIdleMinutes");
-                idleRow.Value = "15";
-                Assert.Equal(1, applyRequests);
-
-                settingsControls.ThemeCombo.SelectedItem = "dark";
-                Assert.Equal(2, applyRequests);
+                AssertSettingsAndHelpSurfaces(settingsViewModel, persistedSettings);
             }
             finally
             {
@@ -765,70 +582,4 @@ public sealed class WpfUiSmokeTests
         });
     }
 
-    private static LoadedModelSessionSnapshot RunningSession(AppSettings settings)
-        => new(
-            "session-1",
-            "model-1",
-            "Qwen",
-            "runtime-1",
-            "Official CPU",
-            RuntimeMode.Native,
-            RuntimeBackend.Cpu,
-            settings,
-            "runtime.log",
-            DateTimeOffset.UtcNow,
-            "",
-            123,
-            LoadedModelSessionStatus.Running,
-            IsRunning: true,
-            IsSelected: true,
-            LaunchProfileId: "default:model-1",
-            LaunchProfileName: "Default");
-
-    private static ModelRecord RunningModel()
-        => new(
-            "model-1",
-            "Qwen",
-            Path.Combine(Path.GetTempPath(), "qwen.gguf"),
-            OwnershipKind.External,
-            "{}",
-            DateTimeOffset.UtcNow);
-
-    private static IEnumerable<T> VisualDescendants<T>(DependencyObject root) where T : DependencyObject
-    {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
-        {
-            var child = VisualTreeHelper.GetChild(root, index);
-            if (child is T match) yield return match;
-            foreach (var descendant in VisualDescendants<T>(child)) yield return descendant;
-        }
-    }
-
-    private static Border MetricCard(Grid metric)
-        => Assert.IsType<Border>(Assert.IsType<StackPanel>(metric.Parent).Parent);
-
-    private static async Task RunStaAsync(Action action)
-    {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-                completion.SetResult();
-            }
-            catch (Exception ex)
-            {
-                completion.SetException(ex);
-            }
-            finally
-            {
-                Dispatcher.CurrentDispatcher.InvokeShutdown();
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        await completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        thread.Join(TimeSpan.FromSeconds(5));
-    }
 }

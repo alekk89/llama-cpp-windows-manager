@@ -2,10 +2,10 @@ namespace LocalLlmConsole.Services;
 
 public sealed class SettingsPageDefinitionService
 {
-    public IReadOnlyList<SettingRowDefinition> BuildRows(AppSettings settings) =>
+    public IReadOnlyList<SettingRowDefinition> BuildRows(AppSettings settings, long? cacheSizeBytes = null) =>
     [
         new(Loc.T("Settings.Group.Storage"), Loc.T("Setting.Cache"), "cache",
-            Loc.T("Setting.CacheValue", DisplayFormatService.BytesOrZero(CacheMaintenanceService.Size(settings.CacheRoot)), settings.CacheRoot), "readonly", Action: Loc.T("Action.Clear"),
+            CacheDisplayValue(settings.CacheRoot, cacheSizeBytes), "readonly", Action: Loc.T("Action.Clear"),
             ToolTip: Loc.T("Tooltip.Setting.Cache")),
         new(Loc.T("Settings.Group.Window"), Loc.T("Setting.MinimizeBehavior"), "minimizeBehavior", AppPreferenceService.MinimizeBehaviorLabel(settings.MinimizeBehavior), "choice", AppPreferenceService.MinimizeBehaviorOptions(),
             ToolTip: Loc.T("Tooltip.Setting.MinimizeBehavior")),
@@ -38,6 +38,12 @@ public sealed class SettingsPageDefinitionService
         new(Loc.T("Settings.Group.Logs"), Loc.T("Setting.MaxLogFileSizeMb"), "maxLogFileSizeMb", settings.MaxLogFileSizeMb.ToString(CultureInfo.InvariantCulture),
             ToolTip: Loc.T("Tooltip.Setting.MaxLogFileSizeMb"))
     ];
+
+    public string CacheDisplayValue(string cacheRoot, long? cacheSizeBytes)
+        => Loc.T(
+            "Setting.CacheValue",
+            cacheSizeBytes.HasValue ? DisplayFormatService.BytesOrZero(cacheSizeBytes.Value) : Loc.T("Status.Refreshing"),
+            cacheRoot);
 
     private static SettingRowDefinition UiVisibility(string label, string key, bool visible)
         => new(

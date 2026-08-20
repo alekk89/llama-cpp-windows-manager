@@ -100,6 +100,7 @@ public sealed partial class AppServiceFactory
         var runtimeSessionApplication = CreateRuntimeSessionApplicationService(
             runtimeSessionCommands,
             runtimeSessionFollowupApplication);
+        var jobRows = CreateJobRowProjectionService();
         var modelRuntimeStartFollowup = CreateModelRuntimeStartFollowupService();
         var modelRuntimeStartFollowupApplication = CreateModelRuntimeStartFollowupApplicationService();
         var runtimeEndpointProbe = CreateRuntimeEndpointProbeService(request.RuntimeProbeClient);
@@ -234,6 +235,7 @@ public sealed partial class AppServiceFactory
                 runtimeReadinessCompletionApplication,
                 runtimeReadinessMonitorApplication,
                 runtimeSessionApplication,
+                jobRows,
                 runtimeEndpointProbe,
                 endpointInspection,
                 runtimeTelemetryApplication,

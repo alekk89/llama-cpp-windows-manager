@@ -92,7 +92,8 @@ public sealed class RuntimeCatalogApplicationService
     }
 
     public async Task<RuntimeCatalogRefreshApplicationResult> RefreshAsync(
-        RuntimeCatalogRefreshApplicationRequest request)
+        RuntimeCatalogRefreshApplicationRequest request,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Settings);
@@ -101,19 +102,20 @@ public sealed class RuntimeCatalogApplicationService
         ArgumentNullException.ThrowIfNull(request.RuntimePackageUpdateStates);
 
         var runtimes = await _stateStore.ListRuntimesAsync();
-        if (await RuntimeEquivalenceService.ReconcileOfficialRuntimeEquivalenceAsync(_stateStore, runtimes))
+        if (await RuntimeEquivalenceService.ReconcileOfficialRuntimeEquivalenceAsync(_stateStore, runtimes, cancellationToken))
             runtimes = await _stateStore.ListRuntimesAsync();
 
-        var sources = await _data.LoadSourcesAsync(request.Settings.RuntimeRoot);
+        var sources = await _data.LoadSourcesAsync(request.Settings.RuntimeRoot, cancellationToken);
         var modelsByRuntime = await _deletion.ModelsByRuntimeAsync();
-        var rows = _view.BuildRows(_data.BuildViewRequest(new RuntimeCatalogDataRequest(
-            request.Settings.RuntimeRoot,
-            runtimes,
-            sources,
-            modelsByRuntime,
-            request.Sessions,
-            request.RuntimeUpdateStates,
-            request.RuntimePackageUpdateStates)));
+        var rows = await Task.Run(() => _view.BuildRows(_data.BuildViewRequest(new RuntimeCatalogDataRequest(
+                request.Settings.RuntimeRoot,
+                runtimes,
+                sources,
+                modelsByRuntime,
+                request.Sessions,
+                request.RuntimeUpdateStates,
+                request.RuntimePackageUpdateStates))),
+            cancellationToken);
         return new RuntimeCatalogRefreshApplicationResult(runtimes, rows);
     }
 

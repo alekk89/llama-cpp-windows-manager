@@ -21,7 +21,7 @@ public partial class MainWindow
         await RefreshRuntimesAsync();
         await RefreshJobsAsync();
         await RefreshOverviewAsync();
-        if (_viewModel.CurrentPage == "Lifetime") await RefreshLifetimeMetricsAsync();
+        if (_viewModel.CurrentPage == "Metrics") await RefreshLifetimeMetricsAsync();
         if (_viewModel.CurrentPage == "Windows") await RefreshWindowsAsync();
         if (_viewModel.CurrentPage == "WSL Linux") await RefreshWslLinuxAsync();
     }

@@ -7,6 +7,8 @@ public static class GgufMetadataReader
     private const uint MaxSupportedVersion = 3;
     private const ulong MaxMetadataBytes = 64UL * 1024UL * 1024UL;
     private const ulong MaxArrayElements = 100_000UL;
+    private const ulong MaxSummaryMetadataBytes = 1024UL * 1024UL * 1024UL;
+    private const ulong MaxSummaryArrayElements = 10_000_000UL;
 
     public static IReadOnlyDictionary<string, object?> TryRead(string path, int maxKeys = 512)
     {
@@ -37,6 +39,89 @@ public static class GgufMetadataReader
         }
 
         return values;
+    }
+
+    public static long? TryReadParameterCount(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: false);
+            if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "GGUF") return null;
+
+            var version = reader.ReadUInt32();
+            if (version is < MinSupportedVersion or > MaxSupportedVersion) return null;
+            var tensorCount = reader.ReadUInt64();
+            var metadataCount = reader.ReadUInt64();
+            if (tensorCount is 0 or > 1_000_000 || metadataCount > 100_000) return null;
+
+            var metadataStart = stream.Position;
+            for (ulong index = 0; index < metadataCount; index++)
+            {
+                if ((ulong)(stream.Position - metadataStart) > MaxSummaryMetadataBytes) return null;
+                _ = ReadString(reader);
+                if (!SkipValue(reader, (GgufValueType)reader.ReadUInt32())) return null;
+            }
+
+            ulong total = 0;
+            for (ulong index = 0; index < tensorCount; index++)
+            {
+                _ = ReadString(reader);
+                var dimensions = reader.ReadUInt32();
+                if (dimensions is 0 or > 8) return null;
+                ulong elements = 1;
+                for (var dimension = 0; dimension < dimensions; dimension++)
+                    elements = checked(elements * reader.ReadUInt64());
+                _ = reader.ReadUInt32();
+                _ = reader.ReadUInt64();
+                total = checked(total + elements);
+            }
+
+            return total is > 0 and <= long.MaxValue ? (long)total : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool SkipValue(BinaryReader reader, GgufValueType type)
+    {
+        if (type != GgufValueType.Array)
+        {
+            _ = ReadValue(reader, type);
+            return true;
+        }
+
+        var elementType = (GgufValueType)reader.ReadUInt32();
+        var length = reader.ReadUInt64();
+        if (length > MaxSummaryArrayElements) return false;
+        var fixedSize = FixedSize(elementType);
+        if (fixedSize > 0)
+        {
+            var bytes = checked(length * (ulong)fixedSize);
+            return SkipBytes(reader, bytes);
+        }
+        if (elementType != GgufValueType.String) return false;
+
+        ulong totalBytes = 0;
+        for (ulong index = 0; index < length; index++)
+        {
+            var stringLength = reader.ReadUInt64();
+            if (stringLength > 1024 * 1024) return false;
+            totalBytes = checked(totalBytes + stringLength);
+            if (totalBytes > MaxSummaryMetadataBytes || !SkipBytes(reader, stringLength)) return false;
+        }
+        return true;
+    }
+
+    private static bool SkipBytes(BinaryReader reader, ulong bytes)
+    {
+        if (bytes > MaxSummaryMetadataBytes
+            || bytes > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
+            return false;
+        reader.BaseStream.Seek(checked((long)bytes), SeekOrigin.Current);
+        return true;
     }
 
     private static object? ReadValue(BinaryReader reader, GgufValueType type) => type switch

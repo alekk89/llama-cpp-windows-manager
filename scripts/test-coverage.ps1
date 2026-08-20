@@ -70,14 +70,14 @@ function Measure-LineCoverage {
     [xml] $Coverage = Get-Content -LiteralPath $CoverageFile.FullName
     foreach ($class in $Coverage.coverage.packages.package.classes.class) {
       $file = ([string] $class.filename).Replace('\', '/')
-      foreach ($sourceMarker in @("/src/LocalLlmConsole.App/", "/src/LocalLlmConsole.ControlCli/")) {
+      foreach ($sourceMarker in @("/src/LocalLlmConsole.App/", "/src/LocalLlmConsole.Core/", "/src/LocalLlmConsole.ControlCli/")) {
         $markerIndex = $file.IndexOf($sourceMarker, [StringComparison]::OrdinalIgnoreCase)
         if ($markerIndex -ge 0) {
           $file = $file.Substring($markerIndex + $sourceMarker.Length)
           break
         }
       }
-      foreach ($projectPrefix in @("LocalLlmConsole.App/", "LocalLlmConsole.ControlCli/")) {
+      foreach ($projectPrefix in @("LocalLlmConsole.App/", "LocalLlmConsole.Core/", "LocalLlmConsole.ControlCli/")) {
         if ($file.StartsWith($projectPrefix, [StringComparison]::OrdinalIgnoreCase)) {
           $file = $file.Substring($projectPrefix.Length)
           break

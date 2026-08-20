@@ -13,14 +13,18 @@ using WpfWindow = System.Windows.Window;
 
 namespace LocalLlmConsole;
 
-public static class EndpointInspectionDialogFactory
+public static partial class EndpointInspectionDialogFactory
 {
     private sealed record DisplayRow(string C1, string C2, string C3, string C4, string C5 = "", string C6 = "");
 
-    public static void Show(WpfWindow owner, EndpointInspectionReport report)
-        => Create(owner, report).ShowDialog();
+    public static void Show(WpfWindow owner, EndpointInspectionReport report, string apiKey, Action<string> copyToClipboard)
+        => Create(owner, report, apiKey, copyToClipboard).ShowDialog();
 
-    public static WpfWindow Create(WpfWindow owner, EndpointInspectionReport report)
+    public static WpfWindow Create(
+        WpfWindow owner,
+        EndpointInspectionReport report,
+        string apiKey = "",
+        Action<string>? copyToClipboard = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(report);
@@ -28,10 +32,10 @@ public static class EndpointInspectionDialogFactory
         var dialog = new WpfWindow
         {
             Title = Loc.T("EndpointInspection.DialogTitle", report.Title),
-            Width = 790,
-            Height = 620,
-            MinWidth = 640,
-            MinHeight = 430,
+            Width = 760,
+            Height = 560,
+            MinWidth = 620,
+            MinHeight = 400,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = System.Windows.Media.Brushes.Transparent,
             AllowsTransparency = true,
@@ -54,8 +58,12 @@ public static class EndpointInspectionDialogFactory
         var header = Header(dialog, report);
         layout.Children.Add(header);
 
-        var body = new StackPanel { Margin = new Thickness(0, 8, 0, 8) };
-        body.Children.Add(ConnectionCard(report));
+        var body = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        body.Children.Add(EndpointInspectionCopyBarFactory.Create(
+            report,
+            apiKey,
+            copyToClipboard ?? System.Windows.Clipboard.SetText));
+        body.Children.Add(ConnectionCard(report, apiKey));
         body.Children.Add(ModelsCard(report));
         if (report.Defaults is not null)
             body.Children.Add(DefaultsCard(report.Defaults));
@@ -84,7 +92,7 @@ public static class EndpointInspectionDialogFactory
             BorderBrush = ResourceBrush("PanelBorderStrong"),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(14),
+            Padding = new Thickness(12),
             Child = layout
         };
         return dialog;
@@ -92,7 +100,7 @@ public static class EndpointInspectionDialogFactory
 
     private static Grid Header(WpfWindow dialog, EndpointInspectionReport report)
     {
-        var header = new Grid { Margin = new Thickness(1, 0, 0, 2) };
+        var header = new Grid { Margin = new Thickness(1, 0, 0, 1) };
         header.ColumnDefinitions.Add(new ColumnDefinition());
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var copy = new StackPanel();
@@ -101,16 +109,9 @@ public static class EndpointInspectionDialogFactory
             Text = report.Kind == EndpointInspectionKind.Gateway
                 ? Loc.T("EndpointInspection.GatewayReport")
                 : Loc.T("EndpointInspection.DirectReport"),
-            FontSize = 17,
+            FontSize = 16,
             FontWeight = FontWeights.SemiBold,
             Foreground = ResourceBrush("TextMain")
-        });
-        copy.Children.Add(new TextBlock
-        {
-            Text = Loc.T("EndpointInspection.Description"),
-            FontSize = 12.5,
-            Foreground = ResourceBrush("TextSoft"),
-            Margin = new Thickness(0, 3, 0, 0)
         });
         header.Children.Add(copy);
         var close = Button(Loc.T("Common.Close"));
@@ -127,11 +128,15 @@ public static class EndpointInspectionDialogFactory
         return header;
     }
 
-    private static WpfBorder ConnectionCard(EndpointInspectionReport report)
+    private static WpfBorder ConnectionCard(EndpointInspectionReport report, string apiKey)
     {
         var fields = FieldsGrid(
             (Loc.T("EndpointInspection.Endpoint"), report.Endpoint),
+            (Loc.T("EndpointInspection.Protocol"), Loc.T("EndpointInspection.ProtocolValue")),
             (Loc.T("EndpointInspection.Health"), report.Health),
+            (Loc.T("EndpointInspection.Authentication"), string.IsNullOrWhiteSpace(apiKey)
+                ? Loc.T("EndpointInspection.ApiKeyMissing")
+                : Loc.T("EndpointInspection.ApiKeyConfigured")),
             (Loc.T("EndpointInspection.Inspected"), report.InspectedAt.ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture)),
             (Loc.T("EndpointInspection.Sources"), report.Kind == EndpointInspectionKind.DirectModel
                 ? "/health · /v1/models · /props · /slots"
@@ -148,19 +153,27 @@ public static class EndpointInspectionDialogFactory
                     : Loc.T("EndpointInspection.EndpointModel"),
                 Muted(Loc.T("EndpointInspection.NoModels")));
 
-        var rows = report.Models.Select(model => new DisplayRow(
-            model.NameOrId(),
-            Empty(model.Profile),
-            Empty(model.Owner),
-            model.TrainingContext.HasValue ? Tokens(model.TrainingContext.Value) : "—",
-            model.ParameterCount.HasValue ? CompactCount(model.ParameterCount.Value) : "—",
-            model.SizeBytes.HasValue ? DisplayFormatService.Bytes(model.SizeBytes.Value) : "—"));
+        var rows = report.Models.Select(model =>
+        {
+            var context = report.Kind == EndpointInspectionKind.Gateway
+                ? model.ConfiguredContext
+                : model.TrainingContext;
+            return new DisplayRow(
+                model.NameOrId(),
+                Empty(model.Profile),
+                Empty(model.Owner),
+                context.HasValue ? Tokens(context.Value) : "—",
+                model.ParameterCount.HasValue ? CompactCount(model.ParameterCount.Value) : "—",
+                model.SizeBytes.HasValue ? DisplayFormatService.Bytes(model.SizeBytes.Value) : "—");
+        });
         var grid = Table(
             rows,
             (Loc.T("EndpointInspection.ModelIdName"), nameof(DisplayRow.C1), 1.85),
             (Loc.T("EndpointInspection.Profile"), nameof(DisplayRow.C2), .9),
             (Loc.T("EndpointInspection.Owner"), nameof(DisplayRow.C3), .8),
-            (Loc.T("EndpointInspection.TrainingContext"), nameof(DisplayRow.C4), .65),
+            (report.Kind == EndpointInspectionKind.Gateway
+                ? Loc.T("EndpointInspection.ContextSize")
+                : Loc.T("EndpointInspection.TrainingContext"), nameof(DisplayRow.C4), .65),
             (Loc.T("EndpointInspection.Parameters"), nameof(DisplayRow.C5), .65),
             (Loc.T("Models.Col.Size"), nameof(DisplayRow.C6), .6));
         return Card(
@@ -251,10 +264,10 @@ public static class EndpointInspectionDialogFactory
     private static Grid FieldsGrid(params (string Label, string Value)[] fields)
     {
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(126) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(126) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         for (var index = 0; index < fields.Length; index++)
         {
@@ -266,19 +279,13 @@ public static class EndpointInspectionDialogFactory
             {
                 Text = fields[index].Label,
                 Foreground = ResourceBrush("TextMuted"),
-                Margin = new Thickness(0, 3, 10, 4),
+                Margin = new Thickness(0, 1, 8, 2),
                 VerticalAlignment = VerticalAlignment.Top
             };
             Grid.SetRow(label, row);
             Grid.SetColumn(label, column);
             grid.Children.Add(label);
-            var value = new TextBlock
-            {
-                Text = fields[index].Value,
-                Foreground = ResourceBrush("TextMain"),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 3, 0, 4)
-            };
+            var value = SelectableText(fields[index].Value, "TextMain");
             Grid.SetRow(value, row);
             Grid.SetColumn(value, column + 1);
             grid.Children.Add(value);
@@ -295,9 +302,11 @@ public static class EndpointInspectionDialogFactory
         grid.IsReadOnly = true;
         grid.CanUserAddRows = false;
         grid.CanUserDeleteRows = false;
-        grid.SelectionMode = DataGridSelectionMode.Single;
-        grid.MaxHeight = 215;
-        grid.MinHeight = 42;
+        grid.SelectionMode = DataGridSelectionMode.Extended;
+        grid.SelectionUnit = DataGridSelectionUnit.CellOrRowHeader;
+        grid.ClipboardCopyMode = DataGridClipboardCopyMode.IncludeHeader;
+        grid.MaxHeight = 180;
+        grid.MinHeight = 36;
         grid.HeadersVisibility = DataGridHeadersVisibility.Column;
         return grid;
     }
@@ -308,10 +317,10 @@ public static class EndpointInspectionDialogFactory
         panel.Children.Add(new TextBlock
         {
             Text = title,
-            FontSize = 13.5,
+            FontSize = 13,
             FontWeight = FontWeights.SemiBold,
             Foreground = ResourceBrush("TextMain"),
-            Margin = new Thickness(0, 0, 0, 7)
+            Margin = new Thickness(0, 0, 0, 4)
         });
         panel.Children.Add(content);
         return new WpfBorder
@@ -320,91 +329,38 @@ public static class EndpointInspectionDialogFactory
             BorderBrush = ResourceBrush("PanelBorder"),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(11, 9, 11, 9),
-            Margin = new Thickness(0, 0, 0, 8),
+            Padding = new Thickness(9, 6, 9, 6),
+            Margin = new Thickness(0, 0, 0, 6),
             Child = panel
         };
     }
 
-    private static TextBlock Muted(string text) => new()
+    private static WpfTextBox Muted(string text)
+        => SelectableText(text, "TextSoft");
+
+    private static WpfTextBox SelectableText(string text, string foregroundKey) => new()
     {
         Text = text,
-        Foreground = ResourceBrush("TextSoft"),
-        TextWrapping = TextWrapping.Wrap
+        IsReadOnly = true,
+        Style = (Style)WpfApplication.Current.Resources["EndpointReportSelectableText"],
+        AcceptsReturn = true,
+        TextWrapping = TextWrapping.Wrap,
+        Margin = new Thickness(0, 1, 0, 2),
+        Foreground = ResourceBrush(foregroundKey),
+        VerticalContentAlignment = VerticalAlignment.Top
     };
 
     private static WpfButton Button(string text) => new()
     {
         Content = text,
         MinWidth = 74,
-        Height = 29,
-        MinHeight = 29,
-        Padding = new Thickness(10, 2, 10, 2),
+        Height = 27,
+        MinHeight = 27,
+        Padding = new Thickness(9, 1, 9, 1),
         Margin = new Thickness(6, 0, 0, 0)
     };
 
     private static WpfBrush ResourceBrush(string key)
         => (WpfBrush)WpfApplication.Current.Resources[key];
 
-    private static string Empty(string value, string? fallback = null)
-        => string.IsNullOrWhiteSpace(value) ? fallback ?? "—" : value;
-
-    private static string Number(int? value)
-        => value?.ToString("N0", CultureInfo.InvariantCulture) ?? Loc.T("EndpointInspection.NotReported");
-
-    private static string Number(double? value)
-        => value?.ToString("0.###", CultureInfo.InvariantCulture) ?? Loc.T("EndpointInspection.NotReported");
-
-    private static string Boolean(bool? value)
-        => value.HasValue
-            ? value.Value ? Loc.T("Pref.Yes") : Loc.T("Pref.No")
-            : Loc.T("EndpointInspection.NotReported");
-
-    private static string OutputLimit(int? value)
-        => value switch
-        {
-            null => Loc.T("EndpointInspection.NotReportedRequestControlled"),
-            < 0 => Loc.T("EndpointInspection.UnlimitedRequestControlled"),
-            _ => Tokens(value.Value)
-        };
-
-    private static string Tokens(long value)
-        => Loc.T("EndpointInspection.Tokens", value.ToString("N0", CultureInfo.InvariantCulture));
-
-    private static string CompactCount(long value)
-        => value >= 1_000_000_000
-            ? $"{value / 1_000_000_000d:0.##}B"
-            : value >= 1_000_000
-                ? $"{value / 1_000_000d:0.##}M"
-                : value.ToString("N0", CultureInfo.InvariantCulture);
-
-    private static string Sampling(EndpointInspectionSlot slot)
-        => $"T {Number(slot.Temperature)} · K {Number(slot.TopK)} · P {Number(slot.TopP)} · Min P {Number(slot.MinP)}";
-
-    private static string SlotState(EndpointInspectionSlot slot)
-    {
-        var state = slot.IsProcessing ? Loc.T("EndpointInspection.Processing") : Loc.T("EndpointInspection.Idle");
-        return string.IsNullOrWhiteSpace(slot.ReasoningFormat)
-            ? state
-            : Loc.T("EndpointInspection.StateReasoning", state, slot.ReasoningFormat);
-    }
-
-    private static string SlotOutput(EndpointInspectionSlot slot)
-    {
-        var parts = new List<string> { OutputLimit(slot.MaximumOutputTokens) };
-        if (slot.DecodedTokens is { } decoded)
-            parts.Add(Loc.T("EndpointInspection.Decoded", decoded.ToString("N0", CultureInfo.InvariantCulture)));
-        if (slot.RemainingTokens is >= 0 and { } remaining)
-            parts.Add(Loc.T("EndpointInspection.Remaining", remaining.ToString("N0", CultureInfo.InvariantCulture)));
-        return string.Join(" · ", parts);
-    }
-
-    private static string FriendlyCapability(string key)
-        => key.Replace("supports_", "", StringComparison.OrdinalIgnoreCase)
-            .Replace('_', ' ');
-
-    private static string NameOrId(this EndpointInspectionModel model)
-        => !string.IsNullOrWhiteSpace(model.Name)
-            ? $"{model.Name} ({model.Id})"
-            : Empty(model.Id);
 }

@@ -55,6 +55,12 @@ public static class RuntimeFileService
         FileSystemSafetyService.DeleteDirectoryTree(folder);
     }
 
+    public static Task DeleteSafeRuntimeFolderAsync(
+        string runtimeRoot,
+        string folder,
+        CancellationToken cancellationToken = default)
+        => Task.Run(() => DeleteSafeRuntimeFolder(runtimeRoot, folder), cancellationToken);
+
     public static void DeleteRuntimeFiles(string runtimeRoot, string folder)
     {
         if (!Directory.Exists(folder)) return;
@@ -62,6 +68,12 @@ public static class RuntimeFileService
             throw new InvalidOperationException("Refusing to delete a runtime folder that is not app-managed or contains symlinked directories/junctions.");
         FileSystemSafetyService.DeleteDirectoryTree(folder);
     }
+
+    public static Task DeleteRuntimeFilesAsync(
+        string runtimeRoot,
+        string folder,
+        CancellationToken cancellationToken = default)
+        => Task.Run(() => DeleteRuntimeFiles(runtimeRoot, folder), cancellationToken);
 
     private static bool HasManagedRuntimeMarker(string folder)
     {

@@ -132,6 +132,8 @@ precedence.
 llwmctl sessions inspect <session>
 llwmctl gateway inspect
 llwmctl sessions metrics <session>
+llwmctl metrics usage --range month
+llwmctl metrics usage --date 2026-08-18 --date 2026-08-20
 llwmctl sessions logs <session>
 llwmctl logs list
 llwmctl logs tail
@@ -140,8 +142,26 @@ llwmctl hf download --repo <owner/repo> --file <path.gguf>
 llwmctl jobs list
 ```
 
-Pause, resume, or cancel a model download with `jobs pause|resume|cancel
-<job-id>`.
+The shared gateway's `GET /v1/models` response lists saved profile routes and
+reports each route's configured context size as `context_length`. A value of `0`
+means the profile uses automatic context sizing; it is not the model's inferred
+training limit or current KV-cache availability. The optional `meta.n_ctx_train`,
+`meta.n_params`, and `meta.size` values describe the underlying GGUF and are
+shared by its profiles; unavailable values remain null rather than being guessed.
+
+`metrics` without an action returns live raw samples. `metrics usage --range
+month` returns the complete current calendar month, including empty future days;
+persisted daily tokens, cache reuse, active-processing throughput, and optional
+request counters can be filtered with `--model`, `--profile`, or `--runtime`.
+Missing cache, timing, or request statistics mean the runtime did not expose the
+optional counter and must not be interpreted as zero. Repeat `--date
+YYYY-MM-DD` to aggregate exact local dates; dates before daily tracking began
+remain unavailable and must not be inferred from legacy totals.
+
+Pause, resume, or cancel a Hugging Face model download with `jobs
+pause|resume|cancel <job-id>`. Generic job commands reject runtime-build,
+runtime-package, and unknown job kinds without changing their state; use the
+matching runtime operation for those jobs.
 
 Runtime source work must follow the staged operation flow: run
 `runtime-source.check`, then `runtime-source.download`, then
@@ -223,6 +243,11 @@ For repository changes, read `docs/DEVELOPMENT.md` and, for architectural work,
 `docs/ARCHITECTURE.md`. Preserve existing worktree changes and generated-data
 boundaries. Run tests proportional to the change and the full gate for control,
 architecture, packaging, or release work:
+
+`src/LocalLlmConsole.Core` is the platform-neutral model and policy assembly.
+The WPF app may reference Core, but Core must not reference the app or use WPF,
+Windows Forms, registry, SQLite, or app-localization APIs. Keep OS/process,
+storage, localization, and UI composition in `LocalLlmConsole.App`.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore

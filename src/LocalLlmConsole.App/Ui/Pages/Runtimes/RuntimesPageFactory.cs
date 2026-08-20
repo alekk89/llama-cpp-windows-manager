@@ -13,6 +13,7 @@ public sealed record RuntimesPageActions(
     Func<Task> ChooseRuntimeFolderAsync,
     Func<Task> ChangeCudaPackagePreferenceAsync,
     MouseButtonEventHandler RuntimeGridPreviewMouseLeftButtonDown,
+    RoutedEventHandler VerifyRuntimeRowClick,
     RoutedEventHandler DeleteRuntimeRowClick,
     RoutedEventHandler RuntimeSourceRowClick,
     RoutedEventHandler InstallRuntimePackageRowClick,
@@ -136,10 +137,22 @@ public static class RuntimesPageFactory
         grid.RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.VisibleWhenSelected;
         grid.RowDetailsTemplate = PageSectionFactory.RowDetailsTemplate(nameof(RuntimeCatalogRow.Details));
         grid.PreviewMouseLeftButtonDown += request.Actions.RuntimeGridPreviewMouseLeftButtonDown;
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.Col.Trust"), nameof(RuntimeCatalogRow.VerifyAction), nameof(RuntimeCatalogRow.CanVerify), request.Actions.VerifyRuntimeRowClick, .62, tooltipBinding: nameof(RuntimeCatalogRow.VerifyToolTip));
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.ActionButton"), nameof(RuntimeCatalogRow.DeleteAction), nameof(RuntimeCatalogRow.CanDelete), request.Actions.DeleteRuntimeRowClick, .65, tooltipBinding: nameof(RuntimeCatalogRow.DeleteToolTip), visualRole: VisualRole.Danger);
         PageSectionFactory.ApplyGridTextMargin(grid, new Thickness(6, 0, 6, 0));
         request.Actions.ConfigureRuntimeGridColumnSizing(grid);
         grid.ItemsSource = request.ViewModel.Runtimes.Rows;
+        DataGridRowContextMenu.Attach(
+            grid,
+            new(row => ((RuntimeCatalogRow)row).VerifyAction,
+                row => row is RuntimeCatalogRow { CanVerify: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.VerifyRuntimeRowClick, row),
+                ToolTip: row => ((RuntimeCatalogRow)row).VerifyToolTip),
+            new(row => ((RuntimeCatalogRow)row).DeleteAction,
+                row => row is RuntimeCatalogRow { CanDelete: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.DeleteRuntimeRowClick, row),
+                SeparatorBefore: true,
+                ToolTip: row => ((RuntimeCatalogRow)row).DeleteToolTip));
         return grid;
     }
 
@@ -158,6 +171,25 @@ public static class RuntimesPageFactory
         PageSectionFactory.ApplyGridTextMargin(grid, new Thickness(6, 0, 6, 0));
         request.Actions.ConfigureRuntimeBuildGridColumnSizing(grid);
         grid.ItemsSource = request.ViewModel.RuntimePackages.Rows;
+        DataGridRowContextMenu.Attach(
+            grid,
+            new(row => ((RuntimePackagePresetRow)row).BuildSourceAction,
+                row => row is RuntimePackagePresetRow { CanBuildSource: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.RuntimeSourceRowClick, row),
+                ToolTip: row => ((RuntimePackagePresetRow)row).BuildSourceToolTip),
+            new(row => ((RuntimePackagePresetRow)row).InstallAction,
+                row => row is RuntimePackagePresetRow { CanInstall: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.InstallRuntimePackageRowClick, row),
+                ToolTip: row => ((RuntimePackagePresetRow)row).InstallToolTip),
+            new(row => ((RuntimePackagePresetRow)row).CheckAction,
+                row => row is RuntimePackagePresetRow { CanCheck: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.CheckRuntimePackageUpdateRowClick, row),
+                ToolTip: row => ((RuntimePackagePresetRow)row).CheckToolTip),
+            new(row => ((RuntimePackagePresetRow)row).DeleteAction,
+                row => row is RuntimePackagePresetRow { CanDelete: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.DeleteRuntimePackageRowClick, row),
+                SeparatorBefore: true,
+                ToolTip: row => ((RuntimePackagePresetRow)row).DeleteToolTip));
         return grid;
     }
 

@@ -1,13 +1,5 @@
 namespace LocalLlmConsole.Services;
 
-public sealed record RuntimeMetricPollResult(
-    LoadedModelSessionSnapshot Session,
-    string RuntimeKey,
-    IReadOnlyList<PrometheusSample> Samples,
-    RuntimeSlotSnapshot? SlotSnapshot,
-    string Error,
-    bool EndpointResponded = true);
-
 public sealed class RuntimeMetricPollerService
 {
     private readonly HttpClient _http;
@@ -25,7 +17,7 @@ public sealed class RuntimeMetricPollerService
             : Task.WhenAll(sessions.Select(session => PollSessionAsync(session, cancellationToken)));
 
     public static string RuntimeKey(LoadedModelSessionSnapshot session)
-        => $"{session.ModelId}|{session.RuntimeId}|{session.LaunchSettings.Port}";
+        => RuntimeMetricIdentity.RuntimeKey(session);
 
     private async Task<RuntimeMetricPollResult> PollSessionAsync(
         LoadedModelSessionSnapshot session,

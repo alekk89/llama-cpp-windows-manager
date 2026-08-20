@@ -445,8 +445,9 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void ModelRuntimeCommandDecisionServiceOwnsLoadAndUnloadGates()
     {
-        var source = ReadMainWindowSources();
-        var serviceSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Runtimes", "ModelRuntimeCommandDecisionService.cs"));
+        var source = ReadMainWindowSources()
+            + File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewSelectionController.cs"));
+        var serviceSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.Core", "Services", "Runtimes", "ModelRuntimeCommandDecisionService.cs"));
         var loadApplicationSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Runtimes", "ModelRuntimeLoadApplicationService.cs"));
         var unloadApplicationSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Runtimes", "ModelRuntimeUnloadApplicationService.cs"));
         var service = new ModelRuntimeCommandDecisionService();
@@ -491,7 +492,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("_coreServices.Models.ModelRuntimeLoadApplication.LoadSelectedAsync(", source, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Models.ModelRuntimeLoadApplication.LoadOverviewAsync(", source, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Models.ModelRuntimeUnloadApplication.UnloadSelectedAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeUnloadApplication.UnloadOverviewAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("_models.ModelRuntimeUnloadApplication.UnloadOverviewAsync(", source, StringComparison.Ordinal);
         Assert.Contains("ModelRuntimeLoadActions(", source, StringComparison.Ordinal);
         Assert.Contains("ModelRuntimeUnloadActions()", source, StringComparison.Ordinal);
         Assert.Contains("_commands.PlanSelectedLoad(", loadApplicationSource, StringComparison.Ordinal);

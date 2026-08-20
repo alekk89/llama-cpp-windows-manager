@@ -143,6 +143,7 @@ function Assert-PublishArtifacts {
   $controlApiGuide = Join-Path $publishDir "docs\CONTROL_API.md"
   $license = Join-Path $publishDir "LICENSE"
   $thirdPartyNotices = Join-Path $publishDir "THIRD-PARTY-NOTICES.md"
+  $sbom = Join-Path $publishDir "sbom.spdx.json"
   $apacheLicense = Join-Path $publishDir "licenses\Apache-2.0.txt"
   $dotnetNotices = Join-Path $publishDir "licenses\dotnet\ThirdPartyNotices.txt"
   $zipPath = Join-Path $RepoRoot "dist\LlamaCppWindowsManager-$Runtime.zip"
@@ -158,6 +159,7 @@ function Assert-PublishArtifacts {
   Assert-FileExists -Path $controlApiGuide -Label "Control API reference sidecar"
   Assert-FileExists -Path $license -Label "Project license"
   Assert-FileExists -Path $thirdPartyNotices -Label "Third-party notices"
+  Assert-FileExists -Path $sbom -Label "SPDX software bill of materials"
   Assert-FileExists -Path $apacheLicense -Label "Apache License 2.0"
   Assert-FileExists -Path $dotnetNotices -Label ".NET third-party notices"
   Assert-HashCompanion -Path $zipPath
@@ -179,6 +181,7 @@ function Assert-PublishArtifacts {
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "docs/CONTROL_API.md" -ZipPath $zipPath
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "LICENSE" -ZipPath $zipPath
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "THIRD-PARTY-NOTICES.md" -ZipPath $zipPath
+    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "sbom.spdx.json" -ZipPath $zipPath
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "licenses/Apache-2.0.txt" -ZipPath $zipPath
     Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "licenses/dotnet/ThirdPartyNotices.txt" -ZipPath $zipPath
     if ($entries -contains "LlamaCppConsole.exe") {
@@ -238,7 +241,7 @@ $buildArgs = @(
   $Configuration
 )
 if (-not $SkipRestore) {
-  $buildArgs += "-Restore"
+  $buildArgs += @("-Restore", "-LockedRestore")
 }
 
 Invoke-GateStep "Build app" {

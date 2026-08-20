@@ -33,12 +33,12 @@ public static class ControlOperationCatalog
             P("file", "Inactive log file name.", required: true)
         ]),
         new("logs.delete-all", "Delete all inactive application/runtime logs.", true),
-        new("lifetime.list", "List persisted per-model lifetime token totals."),
-        new("lifetime.delete", "Delete lifetime token totals for one model.", true, Parameters:
+        new("lifetime.list", "List persisted per-model usage totals."),
+        new("lifetime.delete", "Delete usage metrics for one model.", true, Parameters:
         [
             P("model", "Model id or name.", required: true)
         ]),
-        new("lifetime.delete-all", "Delete all lifetime token totals.", true),
+        new("lifetime.delete-all", "Delete all persisted usage metrics.", true),
         new("downloads.delete", "Delete a model-download history job and eligible partial files.", true, Parameters:
         [
             P("job", "Download job id.", required: true)

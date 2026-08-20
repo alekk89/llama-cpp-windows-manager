@@ -28,7 +28,7 @@ public sealed record AppUpdateInstallPlan(
 
 public sealed record InstalledUpdateNotice(string Version, string ReleaseName, string ReleaseNotes, DateTimeOffset InstalledAt);
 
-public sealed class AppUpdateService
+public sealed partial class AppUpdateService
 {
     public const string RepositoryUrl = "https://github.com/alekk89/llama-cpp-windows-manager";
     public const string PortableExeName = "LlamaCppWindowsManager.exe";
@@ -104,14 +104,20 @@ public sealed class AppUpdateService
         var assetPath = Path.Combine(stageRoot, RegexSafeFileName(update.AssetName));
         await DownloadAssetAsync(update.AssetUrl, assetPath, cancellationToken);
         await AppUpdateAssetVerifier.VerifyChecksumAssetAsync(_http, update, assetPath, cancellationToken);
-        var stagedExe = PreparePortableExe(assetPath, stageRoot);
-        ValidateUpdateSignature(stagedExe, targetExe);
-        var stagedCli = FindStagedControlCli(stagedExe);
+        var stagedFiles = await Task.Run(() =>
+        {
+            var executable = PreparePortableExe(assetPath, stageRoot);
+            ValidateUpdateSignature(executable, targetExe);
+            var controlCli = FindStagedControlCli(executable);
+            if (!string.IsNullOrWhiteSpace(controlCli))
+                ValidateUpdateSignature(controlCli, targetExe);
+            return (Executable: executable, ControlCli: controlCli);
+        }, cancellationToken);
+        var stagedExe = stagedFiles.Executable;
+        var stagedCli = stagedFiles.ControlCli;
         var targetCli = string.IsNullOrWhiteSpace(stagedCli)
             ? ""
             : Path.Combine(Path.GetDirectoryName(targetExe) ?? AppContext.BaseDirectory, ControlCliExeName);
-        if (!string.IsNullOrWhiteSpace(stagedCli))
-            ValidateUpdateSignature(stagedCli, targetExe);
 
         var pendingNotice = Path.Combine(stageRoot, "installed-update.json");
         await File.WriteAllTextAsync(pendingNotice, JsonSerializer.Serialize(new InstalledUpdateNotice(
@@ -281,134 +287,4 @@ public sealed class AppUpdateService
     private static string PendingNoticePath(string workspaceRoot)
         => Path.Combine(workspaceRoot, "cache", "app-updates", "installed-update.json");
 
-    private static string UpdaterScript() => """
-param(
-  [int] $ParentPid,
-  [string] $SourceExe,
-  [string] $TargetExe,
-  [string] $ObsoleteExe,
-  [string] $SourceCli,
-  [string] $TargetCli,
-  [string] $NoticeSource,
-  [string] $NoticeTarget,
-  [string] $WorkingDirectory
-)
-$ErrorActionPreference = "Stop"
-
-function Remove-UpdateArtifact {
-  param([string] $Path)
-  if (-not $Path) { return }
-  for ($attempt = 0; $attempt -lt 50; $attempt++) {
-    if (-not (Test-Path -LiteralPath $Path)) { return }
-    try {
-      [System.IO.File]::SetAttributes($Path, [System.IO.FileAttributes]::Normal)
-      [System.IO.File]::Delete($Path)
-      if (-not (Test-Path -LiteralPath $Path)) { return }
-    } catch {
-      if ($attempt -eq 49) {
-        Write-Warning ("Could not remove update artifact '{0}': {1}" -f $Path, $_.Exception.Message)
-      }
-    }
-    if ($attempt -lt 49) { Start-Sleep -Milliseconds 100 }
-  }
-}
-
-function Get-UpdateFileSha256 {
-  param([string] $Path)
-  $stream = [System.IO.File]::OpenRead($Path)
-  try {
-    $sha256 = [System.Security.Cryptography.SHA256]::Create()
-    try {
-      return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
-    } finally {
-      $sha256.Dispose()
-    }
-  } finally {
-    $stream.Dispose()
-  }
-}
-
-function New-VerifiedStage {
-  param([string] $Source, [string] $Target)
-  if (-not $Source -or -not $Target -or -not (Test-Path -LiteralPath $Source -PathType Leaf)) { return $null }
-  $targetDirectory = Split-Path -Parent $Target
-  New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
-  $temporary = Join-Path $targetDirectory ("." + (Split-Path -Leaf $Target) + "." + [Guid]::NewGuid().ToString("N") + ".new")
-  try {
-    Copy-Item -LiteralPath $Source -Destination $temporary
-    $sourceHash = Get-UpdateFileSha256 -Path $Source
-    $stagedHash = Get-UpdateFileSha256 -Path $temporary
-    if ($sourceHash -ne $stagedHash) {
-      throw "Staged update verification failed for $Target"
-    }
-    return [pscustomobject]@{ Target = $Target; Temporary = $temporary; Backup = ""; HadOriginal = (Test-Path -LiteralPath $Target) }
-  } catch {
-    Remove-UpdateArtifact -Path $temporary
-    throw
-  }
-}
-
-function Commit-VerifiedStage {
-  param($Stage)
-  if ($null -eq $Stage) { return }
-  if ($Stage.HadOriginal) {
-    $Stage.Backup = Join-Path (Split-Path -Parent $Stage.Target) ("." + (Split-Path -Leaf $Stage.Target) + "." + [Guid]::NewGuid().ToString("N") + ".bak")
-    [System.IO.File]::Replace($Stage.Temporary, $Stage.Target, $Stage.Backup, $true)
-  } else {
-    [System.IO.File]::Move($Stage.Temporary, $Stage.Target)
-  }
-}
-
-function Restore-CommittedStage {
-  param($Stage)
-  if ($null -eq $Stage) { return }
-  if ($Stage.HadOriginal -and $Stage.Backup -and (Test-Path -LiteralPath $Stage.Backup)) {
-    if (Test-Path -LiteralPath $Stage.Target) {
-      $discard = $Stage.Target + "." + [Guid]::NewGuid().ToString("N") + ".rollback"
-      [System.IO.File]::Replace($Stage.Backup, $Stage.Target, $discard, $true)
-      Remove-UpdateArtifact -Path $discard
-    } else {
-      [System.IO.File]::Move($Stage.Backup, $Stage.Target)
-    }
-  } elseif (-not $Stage.HadOriginal -and (Test-Path -LiteralPath $Stage.Target)) {
-    Remove-Item -LiteralPath $Stage.Target -Force
-  }
-}
-
-try { Wait-Process -Id $ParentPid -Timeout 90 } catch {}
-Start-Sleep -Milliseconds 500
-$stages = @()
-$committed = @()
-try {
-  $appStage = New-VerifiedStage -Source $SourceExe -Target $TargetExe
-  if ($null -eq $appStage) { throw "The staged application executable is missing." }
-  $stages += $appStage
-  $cliStage = New-VerifiedStage -Source $SourceCli -Target $TargetCli
-  if ($null -ne $cliStage) { $stages += $cliStage }
-  foreach ($stage in $stages) {
-    Commit-VerifiedStage -Stage $stage
-    $committed += $stage
-  }
-} catch {
-  for ($index = $committed.Count - 1; $index -ge 0; $index--) {
-    try { Restore-CommittedStage -Stage $committed[$index] } catch {}
-  }
-  throw
-} finally {
-  foreach ($stage in $stages) {
-    Remove-UpdateArtifact -Path $stage.Temporary
-    Remove-UpdateArtifact -Path $stage.Backup
-  }
-}
-if ($ObsoleteExe -and
-    -not [string]::Equals($ObsoleteExe, $TargetExe, [System.StringComparison]::OrdinalIgnoreCase) -and
-    (Test-Path -LiteralPath $ObsoleteExe)) {
-  Remove-Item -LiteralPath $ObsoleteExe -Force
-}
-if (Test-Path -LiteralPath $NoticeSource) {
-  New-Item -ItemType Directory -Path (Split-Path -Parent $NoticeTarget) -Force | Out-Null
-  Copy-Item -LiteralPath $NoticeSource -Destination $NoticeTarget -Force
-}
-Start-Process -FilePath $TargetExe -WorkingDirectory $WorkingDirectory | Out-Null
-""";
 }

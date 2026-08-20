@@ -16,13 +16,14 @@ public partial class MainWindow
 {
     private void ShowLifetime()
     {
-        SetPage("Lifetime", "Persisted prompt and generated token totals.");
+        SetPage("Metrics", Loc.T("Lifetime.PageDescription"));
         var page = LifetimePageFactory.Create(new LifetimePageRequest(
             _viewModel.LifetimeMetrics.Rows,
+            _viewModel.LifetimeMetrics.Selection,
             _pageControllers.Lifetime.Build()));
         _lifetimePage.Apply(page.Controls);
         PageHost.Content = page.Content;
-        RunBackground(RefreshLifetimeMetricsAsync, "Lifetime metrics refresh failed");
+        RunBackground(RefreshLifetimeMetricsAsync, "Metrics refresh failed");
     }
 
     private async Task RefreshModelsAsync()
@@ -44,7 +45,7 @@ public partial class MainWindow
             profileModelId ?? selectedId ?? _viewModel.Models.Rows.FirstOrDefault()?.Model.Id);
         SelectModelAfterRefresh(selectedId, selectedProfileId);
         await RenderSelectedModelLaunchSettingsAsync();
-        await RefreshOverviewModelChoicesAsync(result.Models);
+        await RefreshOverviewModelChoicesAsync(result.Models, result.ModelSizeLabels);
     }
 
     private ModelCatalogRefreshApplicationActions ModelCatalogRefreshActions()
@@ -79,8 +80,47 @@ public partial class MainWindow
     {
         var lifetimeMetrics = AppServices.LifetimeMetricsApplication;
         if (lifetimeMetrics is null) return;
-        var rows = await lifetimeMetrics.ListAsync();
-        _viewModel.LifetimeMetrics.ReplaceRows(rows);
+        var selection = _lifetimePage.Selection;
+        _viewModel.LifetimeMetrics.SetSelection(selection);
+        var report = await lifetimeMetrics.GetReportAsync(selection.Query);
+        var presentation = _viewModel.LifetimeMetrics.ReplaceReport(report);
+        _lifetimePage.ApplyPresentation(presentation);
+    }
+
+    private async Task LifetimeFiltersChangedAsync()
+    {
+        if (_lifetimePage.IsApplying) return;
+        _viewModel.LifetimeMetrics.SetSelection(_lifetimePage.Selection);
+        await RefreshLifetimeMetricsAsync();
+    }
+
+    private async Task LifetimeRangeChangedAsync()
+    {
+        _lifetimePage.ClearDateSelection();
+        await LifetimeFiltersChangedAsync();
+    }
+
+    private async Task ClearLifetimeDateSelectionAsync()
+    {
+        _lifetimePage.ClearDateSelection();
+        await LifetimeFiltersChangedAsync();
+    }
+
+    private async Task ResetVisibleLifetimeMetricAsync()
+    {
+        var modelId = _lifetimePage.Selection.ModelId;
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            await ResetLifetimeMetricAsync(new UiRow
+            {
+                Data = new JsonObject { ["ModelId"] = "", ["ModelName"] = Loc.T("Lifetime.AllModels"), ["Kind"] = "total" }
+            });
+            return;
+        }
+
+        var row = _viewModel.LifetimeMetrics.Rows.FirstOrDefault(candidate =>
+            candidate.Data["ModelId"]?.ToString().Equals(modelId, StringComparison.OrdinalIgnoreCase) == true);
+        await ResetLifetimeMetricAsync(row);
     }
 
     private async Task ResetLifetimeMetricAsync(UiRow? row)

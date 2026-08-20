@@ -124,6 +124,39 @@ JOIN model_launch_profiles profile
 DROP TABLE IF EXISTS model_group_assignments;
 CREATE INDEX IF NOT EXISTS ix_launch_profile_group_assignments_group_id
 ON launch_profile_group_assignments(group_id);
+"""),
+        new(6, "hourly-token-usage-history", """
+ALTER TABLE token_usage ADD COLUMN cached_prompt_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE token_usage ADD COLUMN cache_counter_observed INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS token_usage_hourly (
+  bucket_start_utc TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  model_name TEXT NOT NULL,
+  launch_profile_id TEXT NOT NULL DEFAULT '',
+  launch_profile_name TEXT NOT NULL DEFAULT '',
+  runtime_id TEXT NOT NULL DEFAULT '',
+  runtime_name TEXT NOT NULL DEFAULT '',
+  runtime_mode TEXT NOT NULL,
+  runtime_backend TEXT NOT NULL,
+  prompt_tokens INTEGER NOT NULL DEFAULT 0 CHECK (prompt_tokens >= 0),
+  cached_prompt_tokens INTEGER NOT NULL DEFAULT 0 CHECK (cached_prompt_tokens >= 0),
+  generated_tokens INTEGER NOT NULL DEFAULT 0 CHECK (generated_tokens >= 0),
+  cache_counter_observed INTEGER NOT NULL DEFAULT 0 CHECK (cache_counter_observed IN (0, 1)),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (bucket_start_utc, model_id, launch_profile_id, runtime_id)
+);
+CREATE INDEX IF NOT EXISTS ix_token_usage_hourly_time
+ON token_usage_hourly(bucket_start_utc);
+CREATE INDEX IF NOT EXISTS ix_token_usage_hourly_model_time
+ON token_usage_hourly(model_id, bucket_start_utc);
+"""),
+        new(7, "usage-performance-aggregates", """
+ALTER TABLE token_usage_hourly ADD COLUMN prompt_seconds REAL NOT NULL DEFAULT 0 CHECK (prompt_seconds >= 0);
+ALTER TABLE token_usage_hourly ADD COLUMN generated_seconds REAL NOT NULL DEFAULT 0 CHECK (generated_seconds >= 0);
+ALTER TABLE token_usage_hourly ADD COLUMN timing_counter_observed INTEGER NOT NULL DEFAULT 0 CHECK (timing_counter_observed IN (0, 1));
+ALTER TABLE token_usage_hourly ADD COLUMN request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0);
+ALTER TABLE token_usage_hourly ADD COLUMN failed_request_count INTEGER NOT NULL DEFAULT 0 CHECK (failed_request_count >= 0);
+ALTER TABLE token_usage_hourly ADD COLUMN request_counter_observed INTEGER NOT NULL DEFAULT 0 CHECK (request_counter_observed IN (0, 1));
 """)
     ];
 

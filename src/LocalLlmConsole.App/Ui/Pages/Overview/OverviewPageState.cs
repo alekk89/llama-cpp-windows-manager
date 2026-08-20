@@ -141,13 +141,25 @@ public sealed class OverviewPageState
             ModelCombo.SelectedValue = modelId;
     }
 
-    public void SetModelActionsEnabled(bool hasSelection, bool hasProfileSelection, bool selectedProfileLoaded)
+    public void SetModelActionsEnabled(
+        bool hasSelection,
+        bool hasProfileSelection,
+        bool selectedProfileLoaded,
+        bool selectedModelMissing)
     {
         if (LoadButton is not null)
         {
             var canLoad = hasSelection && hasProfileSelection && !selectedProfileLoaded;
-            LoadButton.IsEnabled = canLoad;
-            LoadButton.Visibility = canLoad ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            LoadButton.IsEnabled = canLoad && !selectedModelMissing;
+            LoadButton.Visibility = hasSelection && hasProfileSelection || selectedModelMissing
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+            LoadButton.Content = selectedProfileLoaded
+                ? Loc.T("Overview.LoadedButton")
+                : Loc.T("Overview.LoadButton");
+            LoadButton.ToolTip = selectedModelMissing
+                ? Loc.T("Overview.MissingModelLoadTooltip")
+                : selectedProfileLoaded ? null : Loc.T("Tooltip.Load");
         }
     }
 

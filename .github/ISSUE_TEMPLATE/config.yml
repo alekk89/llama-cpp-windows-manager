@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: User guide
+    url: https://github.com/alekk89/llama-cpp-windows-manager/blob/main/docs/USER_GUIDE.md
+    about: Setup, runtime, model, profile, gateway, and troubleshooting guidance.
+  - name: Security report
+    url: https://github.com/alekk89/llama-cpp-windows-manager/security/advisories/new
+    about: Report a vulnerability privately.

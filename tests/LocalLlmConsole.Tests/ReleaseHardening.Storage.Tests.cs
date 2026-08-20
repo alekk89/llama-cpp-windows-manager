@@ -593,7 +593,7 @@ VALUES ($model_id, $settings_json, $updated_at);
 
 
     [Fact]
-    public void CacheMaintenanceServiceClearsOnlyWorkspaceCache()
+    public async Task CacheMaintenanceServiceClearsOnlyWorkspaceCache()
     {
         var root = CreateTempRoot();
         var cacheRoot = Path.Combine(root, "cache");
@@ -609,6 +609,7 @@ VALUES ($model_id, $settings_json, $updated_at);
             Assert.True(CacheMaintenanceService.IsSafeCacheRoot(root, cacheRoot));
             Assert.False(CacheMaintenanceService.IsSafeCacheRoot(root, external));
             Assert.Equal(10, CacheMaintenanceService.Size(cacheRoot));
+            Assert.Equal(10, await CacheMaintenanceService.SizeAsync(cacheRoot, TestContext.Current.CancellationToken));
 
             CacheMaintenanceService.ClearSafeCacheRoot(root, cacheRoot);
 

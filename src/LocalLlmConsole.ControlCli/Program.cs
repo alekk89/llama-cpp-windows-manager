@@ -1,18 +1,13 @@
-using System.Diagnostics;
+using static LocalLlmConsole.ControlCli.ControlCliArgumentValues;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace LocalLlmConsole.ControlCli;
 
-internal static class Program
+internal static partial class Program
 {
-    private const string ProtectedPrefix = "dpapi:v1:";
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("LocalLlmConsole:model-api-key:v1");
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     public static async Task<int> Main(string[] args)
     {
         try
@@ -20,13 +15,13 @@ internal static class Program
             var command = new Arguments(args);
             if (command.Positionals.Count == 0 || command.Has("help") || command.Positionals[0] is "help" or "--help" or "-h")
             {
-                Console.WriteLine(HelpText);
+                Console.WriteLine(ControlCliHelp.Text);
                 return 0;
             }
 
-            var connection = Discover(command);
+            var connection = ControlCliDiscovery.Discover(command);
             using var http = new HttpClient { BaseAddress = new Uri(connection.BaseUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(65) };
-            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Unprotect(connection.ProtectedToken));
+            http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ControlCliDiscovery.Unprotect(connection.ProtectedToken));
 
             var request = BuildRequest(command);
             await EnforceSelfSafetyAsync(http, command, request);
@@ -35,7 +30,7 @@ internal static class Program
                 message.Content = new StringContent(request.Body.ToJsonString(), Encoding.UTF8, "application/json");
             using var response = await http.SendAsync(message);
             var text = await response.Content.ReadAsStringAsync();
-            WriteResponse(text, command.Has("compact"));
+            ControlCliOutput.WriteResponse(text, command.Has("compact"));
             return response.IsSuccessStatusCode ? 0 : Math.Clamp((int)response.StatusCode, 1, 255);
         }
         catch (Exception ex)
@@ -62,7 +57,7 @@ internal static class Program
             "unload" => Post($"/api/v1/models/{Segment(ModelArg(args, 1))}/unload"),
             "sessions" or "session" => SessionRequest(action, args),
             "gateway" => GatewayRequest(action),
-            "metrics" => Get("/api/v1/metrics"),
+            "metrics" => MetricsRequest(action, args),
             "logs" or "log" => LogRequest(action, args),
             "settings" or "setting" => SettingsRequest(action, args),
             "runtimes" or "runtime" => RuntimeRequest(action, args),
@@ -401,225 +396,4 @@ internal static class Program
         return new ControlRequest(method, path, body);
     }
 
-    private static JsonObject SettingsPatch(Arguments args)
-    {
-        var patch = new JsonObject();
-        foreach (var assignment in args.Values("set"))
-        {
-            var split = assignment.IndexOf('=');
-            if (split <= 0) throw new InvalidOperationException($"Invalid --set '{assignment}'. Use --set name=value.");
-            var name = assignment[..split].Trim();
-            var value = assignment[(split + 1)..].Trim();
-            patch[name] = ParseValue(value);
-        }
-        if (args.Value("settings-file") is { Length: > 0 } file)
-        {
-            var fromFile = JsonNode.Parse(File.ReadAllText(file)) as JsonObject
-                ?? throw new InvalidOperationException("--settings-file must contain a JSON object.");
-            foreach (var (name, value) in fromFile) patch[name] = value?.DeepClone();
-        }
-        return patch;
-    }
-
-    private static JsonNode? ParseValue(string value)
-    {
-        if (string.Equals(value, "null", StringComparison.OrdinalIgnoreCase)) return null;
-        if (bool.TryParse(value, out var boolean)) return JsonValue.Create(boolean);
-        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer)) return JsonValue.Create(integer);
-        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) return JsonValue.Create(number);
-        if ((value.StartsWith('"') && value.EndsWith('"')) || value.StartsWith('{') || value.StartsWith('['))
-        {
-            try { return JsonNode.Parse(value); }
-            catch (JsonException) { }
-        }
-        return JsonValue.Create(value);
-    }
-
-    private static string SelfQuery(Arguments args)
-    {
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        Add("sessionId", args.Value("session") ?? Environment.GetEnvironmentVariable("LLWM_SESSION_ID"));
-        Add("model", args.Value("model")
-            ?? Environment.GetEnvironmentVariable("LLWM_MODEL_ID")
-            ?? Environment.GetEnvironmentVariable("OPENCODE_MODEL")
-            ?? Environment.GetEnvironmentVariable("OPENAI_MODEL")
-            ?? Environment.GetEnvironmentVariable("LLM_MODEL"));
-        Add("endpoint", args.Value("endpoint")
-            ?? Environment.GetEnvironmentVariable("LLWM_ENDPOINT")
-            ?? Environment.GetEnvironmentVariable("OPENAI_BASE_URL")
-            ?? Environment.GetEnvironmentVariable("OPENAI_API_BASE"));
-        Add("port", args.Value("port"));
-        Add("processId", args.Value("process-id"));
-        return values.Count == 0 ? "" : "?" + string.Join("&", values.Select(pair => $"{pair.Key}={Uri.EscapeDataString(pair.Value)}"));
-
-        void Add(string key, string? value)
-        {
-            if (!string.IsNullOrWhiteSpace(value)) values[key] = value.Trim();
-        }
-    }
-
-    private static DiscoveryDocument Discover(Arguments args)
-    {
-        var paths = new List<string>();
-        if (args.Value("connection") is { Length: > 0 } explicitPath) paths.Add(explicitPath);
-        if (args.Value("workspace") is { Length: > 0 } workspace) paths.Add(Path.Combine(workspace, "state", "control.json"));
-        foreach (var variable in new[] { "LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE", "LLAMA_CPP_CONSOLE_WORKSPACE", "LOCAL_LLM_CONSOLE_WORKSPACE" })
-        {
-            if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } root)
-                paths.Add(Path.Combine(root, "state", "control.json"));
-        }
-        paths.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "llama.cpp Windows Manager", "control.json"));
-        paths.Add(Path.Combine(AppContext.BaseDirectory, "data", "state", "control.json"));
-
-        foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            if (!File.Exists(path)) continue;
-            try
-            {
-                var document = JsonSerializer.Deserialize<DiscoveryDocument>(File.ReadAllText(path), JsonOptions);
-                if (document is null || string.IsNullOrWhiteSpace(document.BaseUrl) || string.IsNullOrWhiteSpace(document.ProtectedToken)) continue;
-                if (document.ProcessId > 0)
-                {
-                    try { _ = Process.GetProcessById(document.ProcessId); }
-                    catch { continue; }
-                }
-                return document;
-            }
-            catch { }
-        }
-        throw new InvalidOperationException("llama.cpp Windows Manager control endpoint was not found. Start the app, or pass --connection <control.json> / --workspace <path>.");
-    }
-
-    private static string Unprotect(string value)
-    {
-        if (!value.StartsWith(ProtectedPrefix, StringComparison.Ordinal)) return value;
-        var protectedBytes = Convert.FromBase64String(value[ProtectedPrefix.Length..]);
-        var bytes = ProtectedData.Unprotect(protectedBytes, Entropy, DataProtectionScope.CurrentUser);
-        return Encoding.UTF8.GetString(bytes);
-    }
-
-    private static void WriteResponse(string text, bool compact)
-    {
-        try
-        {
-            using var json = JsonDocument.Parse(text);
-            Console.WriteLine(JsonSerializer.Serialize(json.RootElement, new JsonSerializerOptions { WriteIndented = !compact }));
-        }
-        catch
-        {
-            Console.WriteLine(text);
-        }
-    }
-
-    private static string ModelArg(Arguments args, int positionalIndex)
-        => Required(args, "model", args.Positionals.ElementAtOrDefault(positionalIndex));
-
-    private static string Identifier(Arguments args, int positionalIndex)
-        => args.Positionals.ElementAtOrDefault(positionalIndex)
-            ?? throw new InvalidOperationException("A resource identifier is required.");
-
-    private static string? SettingArg(Arguments args, string name)
-    {
-        foreach (var assignment in args.Values("set").Reverse())
-        {
-            var split = assignment.IndexOf('=');
-            if (split > 0 && assignment[..split].Trim().Equals(name, StringComparison.OrdinalIgnoreCase))
-                return assignment[(split + 1)..].Trim();
-        }
-        return null;
-    }
-
-    private static string Required(Arguments args, string name, string? fallback = null)
-        => args.Value(name) is { Length: > 0 } value ? value
-            : !string.IsNullOrWhiteSpace(fallback) ? fallback
-            : throw new InvalidOperationException($"--{name} is required.");
-
-    private static int IntValue(Arguments args, string name, int fallback)
-        => int.TryParse(args.Value(name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : fallback;
-
-    private static string Segment(string value) => Uri.EscapeDataString(value);
-    private static ControlRequest Get(string path) => new("GET", path, null);
-    private static ControlRequest Post(string path, JsonObject? body = null) => new("POST", path, body);
-    private static ControlRequest Put(string path, JsonObject? body = null) => new("PUT", path, body);
-    private static ControlRequest Patch(string path, JsonObject? body = null) => new("PATCH", path, body);
-    private static ControlRequest Delete(string path) => new("DELETE", path, null);
-
-    private sealed record ControlRequest(string Method, string Path, JsonObject? Body);
-    private sealed record RawModelStop(string Model, string Action);
-    private sealed record DiscoveryDocument(int Version, int ProcessId, string BaseUrl, string ProtectedToken, string WorkspaceRoot, DateTimeOffset StartedAt);
-
-    private sealed class Arguments
-    {
-        private readonly Dictionary<string, List<string>> _options = new(StringComparer.OrdinalIgnoreCase);
-        public List<string> Positionals { get; } = [];
-
-        public Arguments(string[] args)
-        {
-            for (var i = 0; i < args.Length; i++)
-            {
-                var item = args[i];
-                if (!item.StartsWith("--", StringComparison.Ordinal))
-                {
-                    Positionals.Add(item);
-                    continue;
-                }
-                var option = item[2..];
-                var equals = option.IndexOf('=');
-                if (equals >= 0)
-                {
-                    Add(option[..equals], option[(equals + 1)..]);
-                    continue;
-                }
-                if (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
-                    Add(option, args[++i]);
-                else
-                    Add(option, "true");
-            }
-        }
-
-        public bool Has(string name) => _options.ContainsKey(name);
-        public string? Value(string name) => _options.TryGetValue(name, out var values) ? values.LastOrDefault() : null;
-        public IReadOnlyList<string> Values(string name) => _options.TryGetValue(name, out var values) ? values : [];
-        private void Add(string name, string value)
-        {
-            if (!_options.TryGetValue(name, out var values)) _options[name] = values = [];
-            values.Add(value);
-        }
-    }
-
-    private const string HelpText = """
-llwmctl - control llama.cpp Windows Manager
-
-Core:
-  llwmctl status | capabilities | self [--endpoint URL|--model ID|--session ID]
-  llwmctl models list|get|scan|import|companions|delete
-  llwmctl load|restart|unload MODEL [--profile NAME] [--runtime ID] [--set name=value] [--wait]
-  llwmctl profiles list|create|update|delete --model MODEL [--id ID] [--name NAME] [--set name=value]
-  llwmctl groups list|get|create|update|delete [GROUP] [--name NAME] [--retention inherit|pinned|idle-timeout] [--idle-minutes N] [--priority low|normal|high]
-  llwmctl groups assign MODEL PROFILE --group GROUP | groups unassign MODEL PROFILE
-  llwmctl sessions list|get|logs|metrics|inspect [SESSION]
-  llwmctl gateway inspect
-  llwmctl metrics
-  llwmctl logs list|tail FILE [--tail CHARACTERS]
-  llwmctl settings get|set --set name=value | settings rotate-key
-  llwmctl runtimes list|scan|register --folder PATH
-  llwmctl hf search QUERY
-  llwmctl hf download --repo OWNER/REPO --file FILE.gguf [--revision REV]
-  llwmctl jobs list|pause|resume|cancel JOB
-  llwmctl operations list
-  llwmctl operations run NAME [--set name=value] [--dry-run|--confirm]
-
-Full settings:
-  Repeat --set for any field returned by `llwmctl capabilities`.
-  Use --settings-file settings.json for large setting objects.
-  Launch overrides are one-shot unless --save-profile[=NAME] is supplied.
-  Self-stop operations are blocked when identity is known; use --allow-self-stop only on explicit request.
-
-Raw API:
-  llwmctl request METHOD /api/v1/path [--body JSON|--body-file FILE]
-
-Connection:
-  The CLI auto-discovers the current app. Override with --connection FILE or --workspace PATH.
-  Add --compact for single-line JSON.
-""";
 }

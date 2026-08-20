@@ -7,6 +7,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-publish:
     name: Build, test, and publish
@@ -15,16 +22,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
 
       - name: Restore and build
         shell: pwsh
-        run: .\scripts\build-app.ps1 -Restore
+        run: .\scripts\build-app.ps1 -Restore -LockedRestore
 
       - name: Test and enforce coverage
         shell: pwsh
@@ -54,7 +61,7 @@ jobs:
           $zip = Join-Path $PWD "dist\LlamaCppWindowsManager-win-x64.zip"
           if (-not (Test-Path -LiteralPath $exe)) { throw "Published executable was not produced: $exe" }
           if (-not (Test-Path -LiteralPath "$exe.sha256")) { throw "Published executable checksum was not produced: $exe.sha256" }
-          foreach ($sidecar in @("llwmctl.exe", "llwmctl.exe.sha256", "AGENTS.md", "agent.md", "docs\CONTROL_API.md")) {
+          foreach ($sidecar in @("llwmctl.exe", "llwmctl.exe.sha256", "AGENTS.md", "agent.md", "docs\CONTROL_API.md", "sbom.spdx.json")) {
             $sidecarPath = Join-Path $publishDir $sidecar
             if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) { throw "Required control sidecar was not produced: $sidecarPath" }
           }
@@ -63,3 +70,25 @@ jobs:
           if (-not (Test-Path -LiteralPath "$zip.sha256")) { throw "Portable release archive checksum was not produced: $zip.sha256" }
           $pdbs = Get-ChildItem -Path (Split-Path -Parent $exe) -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue
           if ($pdbs) { throw "Release publish contains PDB files." }
+
+      - name: Install pinned Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Pinned Inno Setup installation failed with exit code $LASTEXITCODE." }
+          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) { $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw "Inno Setup compiler was not found." }
+          "path=$compiler" >> $env:GITHUB_OUTPUT
+
+      - name: Build installer
+        shell: pwsh
+        run: .\scripts\build-installer.ps1 -SkipPublish -InnoSetupPath "${{ steps.inno.outputs.path }}"
+
+      - name: Test silent install, repair, and uninstall
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem .\dist\installer\LlamaCppWindowsManager-Setup-*-win-x64.exe -File
+          if ($installer.Count -ne 1) { throw "Expected exactly one installer, found $($installer.Count)." }
+          .\scripts\test-installer-smoke.ps1 -InstallerPath $installer.FullName

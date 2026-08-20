@@ -1,0 +1,97 @@
+using LocalLlmConsole.Models;
+using LocalLlmConsole.Services;
+
+namespace LocalLlmConsole.Tests;
+
+public sealed partial class ReleaseHardeningTests
+{
+    [Fact]
+    public void RuntimeMetricSummaryTrackerKeepsPerRuntimeRateBaselines()
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot());
+        var tracker = new RuntimeMetricSummaryTracker();
+        var capturedAt = DateTimeOffset.Parse("2026-05-26T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+
+        tracker.Apply(
+            "model-a|runtime|8081",
+            [
+                new PrometheusSample("llama_tokens_predicted_total", "", 10, "10", "counter", ""),
+                new PrometheusSample("llama_tokens_predicted_seconds_total", "", 5, "5", "counter", "")
+            ],
+            settings,
+            slotSnapshot: null,
+            mtpTokenSnapshot: null,
+            capturedAt);
+        tracker.Apply(
+            "model-b|runtime|8082",
+            [
+                new PrometheusSample("llama_tokens_predicted_total", "", 100, "100", "counter", ""),
+                new PrometheusSample("llama_tokens_predicted_seconds_total", "", 50, "50", "counter", "")
+            ],
+            settings,
+            slotSnapshot: null,
+            mtpTokenSnapshot: null,
+            capturedAt.AddSeconds(1));
+
+        var secondA = tracker.Apply(
+            "model-a|runtime|8081",
+            [
+                new PrometheusSample("llama_tokens_predicted_total", "", 16, "16", "counter", ""),
+                new PrometheusSample("llama_tokens_predicted_seconds_total", "", 8, "8", "counter", "")
+            ],
+            settings,
+            slotSnapshot: null,
+            mtpTokenSnapshot: null,
+            capturedAt.AddSeconds(2));
+
+        Assert.Equal("Gen 2.0 t/s (2.0 avg)\nPrompt Unknown", secondA.GenerationRate);
+    }
+
+    [Fact]
+    public void RuntimeMetricSummaryTrackerUsesLogMtpDurationsForAverages()
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot()) with { SpeculativeType = "draft-mtp" };
+        var tracker = new RuntimeMetricSummaryTracker();
+        var capturedAt = DateTimeOffset.Parse("2026-05-26T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var firstStats = RuntimeDashboardService.ParseMtpTokenStats(
+            "statistics draft-mtp: #calls(b,g,a) = 1 10 10, #gen drafts = 10, #acc drafts = 8, #gen tokens = 100, #acc tokens = 80, dur(b,g,a) = 0.001, 10000.000, 0.250 ms");
+        var secondStats = RuntimeDashboardService.ParseMtpTokenStats(
+            "statistics draft-mtp: #calls(b,g,a) = 2 20 20, #gen drafts = 20, #acc drafts = 13, #gen tokens = 160, #acc tokens = 130, dur(b,g,a) = 0.001, 20000.000, 0.500 ms");
+
+        var first = tracker.Apply("model|runtime|8081", [], settings, null, firstStats, capturedAt);
+        var second = tracker.Apply("model|runtime|8081", [], settings, null, secondStats, capturedAt.AddSeconds(2));
+        var idle = tracker.Apply("model|runtime|8081", [], settings, null, secondStats, capturedAt.AddSeconds(4));
+        var stale = tracker.Apply("model|runtime|8081", [], settings, null, null, capturedAt.AddSeconds(6));
+
+        Assert.Equal("Unknown (Gen) | 10.0 t/s (Avg) | 100 t (Total)\nUnknown (Accepted) | 8.0 t/s (Avg) | 80 t (Total)", first.MtpTokens);
+        Assert.Equal("30.0 t/s (Gen) | 8.0 t/s (Avg) | 160 t (Total)\n25.0 t/s (Accepted) | 6.5 t/s (Avg) | 130 t (Total)", second.MtpTokens);
+        Assert.Equal("0.0 t/s (Gen) | 8.0 t/s (Avg) | 160 t (Total)\n0.0 t/s (Accepted) | 6.5 t/s (Avg) | 130 t (Total)", idle.MtpTokens);
+        Assert.True(stale.UsedLastKnown);
+        Assert.Equal(idle.MtpTokens, stale.MtpTokens);
+    }
+
+    [Fact]
+    public void GpuSummaryCacheOwnsFreshnessAndFallback()
+    {
+        var cache = new GpuSummaryCache();
+        var now = DateTimeOffset.Parse("2026-05-28T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.False(cache.TryGet(now, out var initial));
+        Assert.Equal("Unavailable", initial);
+        Assert.Equal("Intel Arc 24 GB free", cache.Store("Intel Arc 24 GB free", now));
+        Assert.True(cache.TryGet(now.AddSeconds(9), out var fresh));
+        Assert.Equal("Intel Arc 24 GB free", fresh);
+        Assert.False(cache.TryGet(now.AddSeconds(10), out var expired));
+        Assert.Equal("Unavailable", expired);
+        Assert.Equal("Unavailable", cache.Store("", now));
+        Assert.Equal("GPU 0: 76% | 62C | 12.0/24.0 GiB", cache.Store("GPU 0: 76%|62C|12.0/24.0 GiB", now));
+        Assert.Equal("NVIDIA 16 GB free", cache.Store("cuda", "NVIDIA 16 GB free", now));
+        Assert.False(cache.TryGet("vulkan", now.AddSeconds(1), out var wrongKey));
+        Assert.Equal("Unavailable", wrongKey);
+
+        cache.Store("NVIDIA 16 GB free", now);
+        cache.Clear();
+        Assert.False(cache.TryGet(now.AddSeconds(1), out var cleared));
+        Assert.Equal("Unavailable", cleared);
+    }
+}

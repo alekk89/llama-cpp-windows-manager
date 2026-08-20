@@ -82,7 +82,7 @@ public sealed partial class HuggingFaceService
             _activeDownloadDestinations.TryRemove(fullDestination, out _);
             throw new InvalidOperationException("That download is already active.");
         }
-        active.Completion = RunDownloadWorkerAsync(job, file, settings, destination, active);
+        active.Completion = Task.Run(() => RunDownloadWorkerAsync(job, file, settings, destination, active));
         _ = active.Completion;
     }
 
@@ -147,7 +147,11 @@ public sealed partial class HuggingFaceService
                 }
 
                 var finalBytes = new FileInfo(destination).Length;
-                var verificationError = VerifyDownloadedFile(destination, payload.File, expectedBytes);
+                var verificationError = await VerifyDownloadedFileAsync(
+                    destination,
+                    payload.File,
+                    expectedBytes,
+                    CancellationToken.None);
                 if (!string.IsNullOrWhiteSpace(verificationError))
                 {
                     await _jobs.UpdateAsync(job, JobStatus.Failed, JsonSerializer.Serialize(payload with

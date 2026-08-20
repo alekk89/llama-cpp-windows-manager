@@ -96,6 +96,34 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Fact]
+    public void AgentSidecarBootstrapFullVerificationChecksBundleWhenTargetsAreCurrent()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            foreach (var file in AgentSidecarFiles)
+            {
+                var path = Path.Combine(root, file.Key.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllBytes(path, file.Value);
+            }
+            var corrupt = AgentSidecarFiles.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+            corrupt["llwmctl.exe"] = Encoding.UTF8.GetBytes("bad-binary");
+            using var bundle = CreateAgentSidecarBundle(corrupt, manifestFiles: AgentSidecarFiles);
+
+            var result = new AgentSidecarBootstrapService().Install(bundle, root, verifyBundleContents: true);
+
+            Assert.Equal(AgentSidecarBootstrapStatus.Failed, result.Status);
+            Assert.Contains("SHA-256", result.Error, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(AgentSidecarFiles["llwmctl.exe"], File.ReadAllBytes(Path.Combine(root, "llwmctl.exe")));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void AgentSidecarBootstrapRejectsUnexpectedArchivePaths()
     {
         var root = CreateTempRoot();

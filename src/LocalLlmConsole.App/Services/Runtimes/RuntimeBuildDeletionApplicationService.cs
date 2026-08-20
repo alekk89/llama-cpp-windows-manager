@@ -107,7 +107,7 @@ public sealed class RuntimeBuildDeletionApplicationService
         ArgumentNullException.ThrowIfNull(source);
         Validate(settings, actions);
 
-        var plan = _deletionPlanner.PlanRuntimeSourceDeletion(source, settings.RuntimeRoot);
+        var plan = await _deletionPlanner.PlanRuntimeSourceDeletionAsync(source, settings.RuntimeRoot);
         if (!plan.CanDelete)
             return Blocked(plan.StatusMessage, actions);
 

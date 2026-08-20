@@ -229,11 +229,7 @@ public static class PageSectionFactory
                 factory.SetValue(AutomationProperties.HelpTextProperty, toolTip);
             }
         }
-        factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
-        factory.SetValue(FrameworkElement.MinHeightProperty, 22.0);
-        factory.SetValue(WpfControl.PaddingProperty, new Thickness(7, 1, 7, 2));
-        factory.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
-        factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
+        ConfigureGridActionButton(factory);
         var labelFactory = new FrameworkElementFactory(typeof(TextBlock));
         labelFactory.SetBinding(TextBlock.TextProperty, new WpfBinding("."));
         labelFactory.SetBinding(TextBlock.ForegroundProperty, new WpfBinding(nameof(WpfControl.Foreground))
@@ -256,6 +252,16 @@ public static class PageSectionFactory
             CanUserResize = true,
             CellTemplate = new DataTemplate { VisualTree = factory }
         });
+    }
+
+    public static void ConfigureGridActionButton(FrameworkElementFactory factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        factory.SetValue(ToolTipService.ShowOnDisabledProperty, true);
+        factory.SetValue(FrameworkElement.MinHeightProperty, 22.0);
+        factory.SetValue(WpfControl.PaddingProperty, new Thickness(7, 1, 7, 2));
+        factory.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
+        factory.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
     }
 
 }

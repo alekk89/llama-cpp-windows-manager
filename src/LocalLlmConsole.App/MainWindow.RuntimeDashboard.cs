@@ -15,7 +15,10 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private async Task RefreshJobsAsync()
-        => _viewModel.Jobs.ReplaceJobs(await AppServices.StateStore.ListJobsAsync());
+    {
+        var jobs = await AppServices.StateStore.ListJobsAsync();
+        _viewModel.Jobs.ReplaceJobs(await _coreServices.Runtime.JobRows.ProjectAsync(jobs));
+    }
 
     private async Task RefreshOverviewAsync()
     {

@@ -11,14 +11,14 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        var sidecars = new AgentSidecarBootstrapService().InstallEmbedded(typeof(App).Assembly, AppContext.BaseDirectory);
-        if (sidecars.Status == AgentSidecarBootstrapStatus.Failed)
-        {
-            Trace.TraceWarning($"Agent control sidecar bootstrap failed: {sidecars.Error}");
-        }
-
         if (e.Args.Contains("--bootstrap-agent-sidecars-only", StringComparer.OrdinalIgnoreCase))
         {
+            var sidecars = new AgentSidecarBootstrapService().InstallEmbedded(
+                typeof(App).Assembly,
+                AppContext.BaseDirectory,
+                verifyBundleContents: true);
+            if (sidecars.Status == AgentSidecarBootstrapStatus.Failed)
+                Trace.TraceWarning($"Agent control sidecar bootstrap failed: {sidecars.Error}");
             Shutdown(AgentSidecarBootstrapService.VerificationExitCode(sidecars.Status));
             return;
         }
@@ -29,6 +29,10 @@ public partial class App : System.Windows.Application
             Shutdown();
             return;
         }
+
+        var startupSidecars = new AgentSidecarBootstrapService().InstallEmbedded(typeof(App).Assembly, AppContext.BaseDirectory);
+        if (startupSidecars.Status == AgentSidecarBootstrapStatus.Failed)
+            Trace.TraceWarning($"Agent control sidecar bootstrap failed: {startupSidecars.Error}");
 
         base.OnStartup(e);
         var window = new MainWindow();

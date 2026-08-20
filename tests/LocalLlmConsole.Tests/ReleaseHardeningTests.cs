@@ -26,8 +26,8 @@ public sealed partial class ReleaseHardeningTests
         using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: false);
         writer.Write(System.Text.Encoding.ASCII.GetBytes("GGUF"));
         writer.Write((uint)3);
-        writer.Write((ulong)0);
-        writer.Write((ulong)3);
+        writer.Write((ulong)1);
+        writer.Write((ulong)4);
         WriteGgufString(writer, "general.architecture");
         writer.Write((uint)8);
         WriteGgufString(writer, "qwen3");
@@ -37,6 +37,16 @@ public sealed partial class ReleaseHardeningTests
         WriteGgufString(writer, "tokenizer.chat_template");
         writer.Write((uint)8);
         WriteGgufString(writer, "{{ bos_token }}");
+        WriteGgufString(writer, "tokenizer.ggml.scores");
+        writer.Write((uint)9);
+        writer.Write((uint)0);
+        writer.Write((ulong)100_001);
+        writer.Write(new byte[100_001]);
+        WriteGgufString(writer, "weights");
+        writer.Write((uint)1);
+        writer.Write((ulong)7_000_000_000);
+        writer.Write((uint)0);
+        writer.Write((ulong)0);
     }
 
     private static void WriteGgufString(BinaryWriter writer, string value)
@@ -105,6 +115,32 @@ public sealed partial class ReleaseHardeningTests
         return string.Join(
             Environment.NewLine,
             Directory.EnumerateFiles(appRoot, "MainWindow*.cs", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Select(File.ReadAllText));
+    }
+
+    private static string ReadApplicationResourceSources()
+    {
+        var appXamlPath = FindRepositoryFile("src", "LocalLlmConsole.App", "App.xaml");
+        var appRoot = Path.GetDirectoryName(appXamlPath)!;
+        var themeRoot = Path.Combine(appRoot, "Themes");
+        return string.Join(
+            Environment.NewLine,
+            new[] { appXamlPath }.Concat(
+                Directory.EnumerateFiles(themeRoot, "*.xaml", SearchOption.TopDirectoryOnly)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                .Select(File.ReadAllText));
+    }
+
+    private static string ReadLocalControlApiSources()
+    {
+        var hostPath = FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Control", "LocalControlApi.cs");
+        var controlRoot = Path.GetDirectoryName(hostPath)!;
+        return string.Join(
+            Environment.NewLine,
+            new[] { hostPath }
+                .Concat(Directory.EnumerateFiles(controlRoot, "Control*Endpoints.cs", SearchOption.TopDirectoryOnly))
+                .Append(Path.Combine(controlRoot, "ControlEndpointHandler.cs"))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .Select(File.ReadAllText));
     }

@@ -10,6 +10,9 @@ bin/
 obj/
 /dist/
 /workspace/
+/CONTROL_API.md
+/sbom.spdx.json
+/*.sha256
 *.log
 *.tmp
 *.dmp

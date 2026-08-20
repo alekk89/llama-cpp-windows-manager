@@ -29,7 +29,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installe
 The setup executable is written to:
 
 ```text
-dist\installer\LlamaCppWindowsManager-Setup-2.2.0-win-x64.exe
+dist\installer\LlamaCppWindowsManager-Setup-2.3.0-win-x64.exe
 ```
 
 ## Install Behavior

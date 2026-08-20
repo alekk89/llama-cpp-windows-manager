@@ -64,6 +64,9 @@ public sealed partial class AppServiceFactory
         RuntimeSessionFollowupApplicationService followupApplication)
         => new(commands, followupApplication);
 
+    public JobRowProjectionService CreateJobRowProjectionService()
+        => new();
+
     public ModelRuntimeStartFollowupService CreateModelRuntimeStartFollowupService()
         => new();
 

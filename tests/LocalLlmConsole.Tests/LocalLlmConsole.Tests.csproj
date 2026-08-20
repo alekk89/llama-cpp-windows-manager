@@ -17,8 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\LocalLlmConsole.Core\LocalLlmConsole.Core.csproj" />
     <ProjectReference Include="..\..\src\LocalLlmConsole.App\LocalLlmConsole.App.csproj" />
     <ProjectReference Include="..\..\src\LocalLlmConsole.ControlCli\LocalLlmConsole.ControlCli.csproj" />
+    <ProjectReference Include="..\LocalLlmConsole.FakeRuntime\LocalLlmConsole.FakeRuntime.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>

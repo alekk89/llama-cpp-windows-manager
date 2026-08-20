@@ -49,6 +49,7 @@ public sealed class RuntimeCatalogViewService
             modelsByRuntime.TryGetValue(runtime.Id, out var modelNames);
             modelNames ??= [];
             var isActiveRuntime = activeRuntimeIds.Contains(runtime.Id);
+            var provenance = RuntimeInstallationVerificationService.Describe(runtime);
             rows.Add(new RuntimeCatalogRow
             {
                 Kind = RuntimeCatalogRowKind.Runtime,
@@ -56,14 +57,17 @@ public sealed class RuntimeCatalogViewService
                 Backend = runtime.Backend.ToString(),
                 State = availability.IsAvailable ? $"Built {runtime.Mode}" : "Missing executable",
                 Location = runtime.ExecutablePath,
-                Details = !availability.IsAvailable
-                    ? $"{availability.Reason} Repair or reinstall this runtime before loading a model."
-                    : modelNames.Count == 0
-                    ? "No saved model launch settings use this runtime."
-                    : "Models using this runtime:" + Environment.NewLine + string.Join(Environment.NewLine, modelNames.Select(model => $"- {model}")),
+                Details = RuntimeDetails(availability, provenance, modelNames),
                 Vendor = RuntimeInventoryFilterService.Vendor(runtime.Backend),
                 Platform = RuntimeInventoryFilterService.Platform(runtime.Mode),
                 CanBuild = false,
+                VerifyAction = Loc.T("Runtimes.ActionBtn.Verify"),
+                CanVerify = provenance.CanReverify,
+                VerifyToolTip = provenance.CanReverify
+                    ? "Re-hash the installed runtime files and compare them with the installation manifest."
+                    : provenance.IsManaged
+                        ? "Reinstall this managed runtime to create a file manifest before re-verification."
+                        : "Custom runtimes are user-trusted and do not have a Manager verification manifest.",
                 BuildToolTip = availability.IsAvailable
                     ? "This source has already been built."
                     : "The built runtime executable is missing. Rebuild or reinstall it.",
@@ -282,6 +286,21 @@ public sealed class RuntimeCatalogViewService
         if (modelNames.Count > 0)
             return $"Delete this runtime and move saved launch settings that use it to another registered runtime. Used by: {modelList}.";
         return "Delete this runtime registration and local build files.";
+    }
+
+    private static string RuntimeDetails(
+        RuntimeAvailability availability,
+        RuntimeProvenance provenance,
+        IReadOnlyList<string> modelNames)
+    {
+        var lines = new List<string> { provenance.Details };
+        if (!availability.IsAvailable)
+            lines.Add($"{availability.Reason} Repair or reinstall this runtime before loading a model.");
+        else if (modelNames.Count == 0)
+            lines.Add("No saved model launch settings use this runtime.");
+        else
+            lines.Add("Models using this runtime:" + Environment.NewLine + string.Join(Environment.NewLine, modelNames.Select(model => $"- {model}")));
+        return string.Join(Environment.NewLine + Environment.NewLine, lines.Where(line => !string.IsNullOrWhiteSpace(line)));
     }
 
     public static bool HasBuiltRuntimeForSource(RuntimeSourceEntry source, IReadOnlyList<RuntimeRecord> runtimes)

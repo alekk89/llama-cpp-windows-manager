@@ -59,7 +59,9 @@ public sealed class RuntimeTelemetryApplicationService
     public void ResetMetricCounters()
         => _metricSummaries.Reset();
 
-    public IReadOnlyList<TokenUsageDelta> ObserveLifetimeTokenDeltas(IReadOnlyList<RuntimeMetricPollResult> pollResults)
+    public IReadOnlyList<TokenUsageDelta> ObserveLifetimeTokenDeltas(
+        IReadOnlyList<RuntimeMetricPollResult> pollResults,
+        DateTimeOffset? capturedAt = null)
     {
         ArgumentNullException.ThrowIfNull(pollResults);
 
@@ -69,16 +71,37 @@ public sealed class RuntimeTelemetryApplicationService
         {
             var generatedCounter = RuntimeDashboardService.GeneratedTokenCounter(result.Samples);
             var promptCounter = RuntimeDashboardService.PromptTokensProcessedCounter(result.Samples);
+            var cachedPromptCounter = RuntimeDashboardService.PromptCachedTokenCounter(result.Samples);
+            var generatedSecondsCounter = RuntimeDashboardService.GeneratedSecondsCounter(result.Samples);
+            var promptSecondsCounter = RuntimeDashboardService.PromptSecondsCounter(result.Samples);
+            var requestCounter = RuntimeDashboardService.CompletedRequestCounter(result.Samples);
+            var failedRequestCounter = RuntimeDashboardService.FailedRequestCounter(result.Samples);
             var delta = _lifetimeCounters.Observe(
                 result.RuntimeKey,
                 result.Session.ModelId,
                 result.Session.ModelName,
                 generatedCounter,
                 promptCounter,
-                result.SlotSnapshot);
+                result.SlotSnapshot,
+                cachedPromptCounter,
+                capturedAt,
+                generatedSecondsCounter,
+                promptSecondsCounter,
+                requestCounter,
+                failedRequestCounter);
 
-            if (delta.HasTokens)
-                deltas.Add(delta);
+            if (delta.HasActivity)
+            {
+                deltas.Add(delta with
+                {
+                    LaunchProfileId = result.Session.LaunchProfileId,
+                    LaunchProfileName = result.Session.LaunchProfileName,
+                    RuntimeId = result.Session.RuntimeId,
+                    RuntimeName = result.Session.RuntimeName,
+                    RuntimeMode = result.Session.Mode,
+                    RuntimeBackend = result.Session.Backend
+                });
+            }
         }
 
         return deltas;

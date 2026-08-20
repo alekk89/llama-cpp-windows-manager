@@ -18,16 +18,20 @@ public sealed class LoadedModelSessionManager : IDisposable
         public bool IsStopping { get; set; }
     }
 
-    private static readonly TimeSpan RecentStoppedLifetime = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan RecentStoppedLifetime = TimeSpan.FromSeconds(2);
     private const int EndpointFailureThreshold = 3;
     private readonly Dictionary<string, LoadedModelSession> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<LoadedModelSessionSnapshot> _recentlyStopped = [];
     private readonly Func<LlamaProcessSupervisor> _createSupervisor;
+    private readonly Func<DateTimeOffset> _utcNow;
     private readonly LlamaProcessSupervisor _inactiveSupervisor;
 
-    public LoadedModelSessionManager(Func<LlamaProcessSupervisor> createSupervisor)
+    public LoadedModelSessionManager(
+        Func<LlamaProcessSupervisor> createSupervisor,
+        Func<DateTimeOffset>? utcNow = null)
     {
         _createSupervisor = createSupervisor ?? throw new ArgumentNullException(nameof(createSupervisor));
+        _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
         _inactiveSupervisor = CreateSupervisor();
     }
 
@@ -103,7 +107,7 @@ public sealed class LoadedModelSessionManager : IDisposable
             Model = model,
             Runtime = runtime,
             LaunchSettings = settings,
-            StartedAt = DateTimeOffset.UtcNow,
+            StartedAt = _utcNow(),
             Supervisor = supervisor,
             LaunchProfileId = launchProfileId ?? "",
             LaunchProfileName = launchProfileName ?? ""
@@ -175,12 +179,25 @@ public sealed class LoadedModelSessionManager : IDisposable
             await StopAsync(SelectedSessionId);
     }
 
-    public Task StopAsync(string sessionId, string reason = "Unloaded by user")
+    public async Task StopAsync(
+        string sessionId,
+        string reason = "Unloaded by user",
+        CancellationToken cancellationToken = default)
     {
-        if (!_sessions.TryGetValue(sessionId, out var session)) return Task.CompletedTask;
+        if (!_sessions.TryGetValue(sessionId, out var session)) return;
         session.IsStopping = true;
         session.StatusReason = "Stopping runtime process";
-        var stop = session.Supervisor.StopVerified();
+        LlamaProcessSupervisor.StopVerification stop;
+        try
+        {
+            stop = await session.Supervisor.StopVerifiedAsync(cancellationToken);
+        }
+        catch
+        {
+            session.IsStopping = false;
+            session.StatusReason = "Runtime stop was interrupted";
+            throw;
+        }
         if (!stop.VerifiedStopped)
         {
             session.IsStopping = false;
@@ -193,10 +210,8 @@ public sealed class LoadedModelSessionManager : IDisposable
 
         _sessions.Remove(sessionId);
         AddRecentlyStopped(session, reason);
-        session.Supervisor.Dispose();
         if (string.Equals(SelectedSessionId, sessionId, StringComparison.OrdinalIgnoreCase))
             SelectedSessionId = _sessions.Keys.FirstOrDefault() ?? "";
-        return Task.CompletedTask;
     }
 
     public async Task StopAllAsync()
@@ -356,7 +371,7 @@ public sealed class LoadedModelSessionManager : IDisposable
             IsSelected = false,
             EndpointHealth = RuntimeEndpointHealth.Unreachable,
             StatusReason = reason,
-            StoppedAt = DateTimeOffset.UtcNow
+            StoppedAt = _utcNow()
         };
         _recentlyStopped.RemoveAll(item => string.Equals(item.SessionId, session.SessionId, StringComparison.OrdinalIgnoreCase));
         _recentlyStopped.Add(snapshot);
@@ -365,7 +380,7 @@ public sealed class LoadedModelSessionManager : IDisposable
 
     private void PruneRecentStopped()
     {
-        var cutoff = DateTimeOffset.UtcNow - RecentStoppedLifetime;
+        var cutoff = _utcNow() - RecentStoppedLifetime;
         _recentlyStopped.RemoveAll(snapshot => snapshot.StoppedAt is null || snapshot.StoppedAt < cutoff);
     }
 

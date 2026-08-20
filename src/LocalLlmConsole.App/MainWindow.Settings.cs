@@ -16,8 +16,13 @@ public partial class MainWindow
 {
     private void ShowSettings()
     {
+        var pageVersion = ++_settingsPageVersion;
         SetPage("Settings", "Application preferences.");
-        var definitions = _coreServices.App.SettingsPageDefinitions.BuildRows(_settings);
+        var cacheRoot = _settings.CacheRoot;
+        var knownCacheSize = string.Equals(_settingsCacheSizeRoot, cacheRoot, StringComparison.OrdinalIgnoreCase)
+            ? _settingsCacheSizeBytes
+            : null;
+        var definitions = _coreServices.App.SettingsPageDefinitions.BuildRows(_settings, knownCacheSize);
         _viewModel.Settings.ReplaceRows(definitions);
 
         var page = SettingsPageFactory.Create(new SettingsPageRequest(
@@ -29,6 +34,41 @@ public partial class MainWindow
             _viewModel.Settings.Rows,
             ScheduleSettingsApply);
         PageHost.Content = page.Root;
+
+        if (_viewModel.Settings.CacheRow is { } cacheRow)
+            RunBackground(
+                () => RefreshSettingsCacheSizeAsync(cacheRoot, cacheRow, pageVersion),
+                "Cache size refresh failed");
+    }
+
+    private async Task RefreshSettingsCacheSizeAsync(
+        string cacheRoot,
+        EditableSettingRow cacheRow,
+        int pageVersion)
+    {
+        var size = await CacheSizeRefreshTask(cacheRoot);
+        if (!string.Equals(_settingsCacheSizeRoot, cacheRoot, StringComparison.OrdinalIgnoreCase)) return;
+
+        _settingsCacheSizeBytes = size;
+        if (_viewModel.CurrentPage != "Settings"
+            || _settingsPageVersion != pageVersion
+            || !ReferenceEquals(_viewModel.Settings.CacheRow, cacheRow))
+            return;
+
+        cacheRow.Value = _coreServices.App.SettingsPageDefinitions.CacheDisplayValue(cacheRoot, size);
+    }
+
+    private Task<long> CacheSizeRefreshTask(string cacheRoot)
+    {
+        if (string.Equals(_settingsCacheSizeRoot, cacheRoot, StringComparison.OrdinalIgnoreCase)
+            && _settingsCacheSizeRefreshTask is { IsCompleted: false })
+            return _settingsCacheSizeRefreshTask;
+
+        if (!string.Equals(_settingsCacheSizeRoot, cacheRoot, StringComparison.OrdinalIgnoreCase))
+            _settingsCacheSizeBytes = null;
+        _settingsCacheSizeRoot = cacheRoot;
+        _settingsCacheSizeRefreshTask = CacheMaintenanceService.SizeAsync(cacheRoot);
+        return _settingsCacheSizeRefreshTask;
     }
 
     private void PreviewSettingsTheme()

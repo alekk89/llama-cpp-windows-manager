@@ -1,5 +1,6 @@
 param(
   [switch] $Restore,
+  [switch] $LockedRestore,
   [string] $Configuration = "Release"
 )
 
@@ -40,6 +41,9 @@ if (-not (Test-Path -LiteralPath $CliProject)) {
 
 if ($Restore) {
   $restoreArgs = @("restore", (Join-Path $AppDir "LocalLlmConsole.sln"))
+  if ($LockedRestore) {
+    $restoreArgs += "--locked-mode"
+  }
   & $Dotnet @restoreArgs
   if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed." }
 }

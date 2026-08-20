@@ -31,12 +31,13 @@ public static class FileSystemSafetyService
             DeleteDirectoryTree(directory);
     }
 
-    public static long DirectorySize(string root)
+    public static long DirectorySize(string root, CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(root)) return 0;
         long size = 0;
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 size += new FileInfo(file).Length;
@@ -47,6 +48,19 @@ public static class FileSystemSafetyService
             }
         }
         return size;
+    }
+
+    public static async Task<string> Sha256Async(string path, CancellationToken cancellationToken = default)
+    {
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            128 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return Convert.ToHexStringLower(hash);
     }
 
     public static void DeleteDirectoryTree(string folder)

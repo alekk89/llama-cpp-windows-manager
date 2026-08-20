@@ -45,6 +45,51 @@ public partial class MainWindow : Window
         _windowsPage = uiState.WindowsPage;
         _wslPage = uiState.WslPage;
         _environmentPageSnapshots = uiState.EnvironmentPageSnapshots;
+        _launchSettingsController = new LaunchSettingsPageController(
+            _workspaceRoot,
+            _launchSettingsPanel,
+            _coreServices.Ui,
+            _coreServices.Models,
+            new LaunchSettingsPageControllerActions(
+                () => _settings,
+                settings => _settings = settings,
+                SelectedModel,
+                SelectedModelLaunchProfileId,
+                SelectedLaunchRuntimeId,
+                () => ModelServices,
+                RunAsync,
+                RunBackground,
+                runtimeId => RefreshRuntimeSelectorAsync(runtimeId),
+                ApplyModelCapabilitiesAsync,
+                RefreshModelsAsync,
+                SelectLaunchProfileAfterRefresh,
+                RefreshOverviewModelSelectorAsync,
+                PersistSettingsAsync,
+                UpdateLaunchControlVisibility,
+                UpdateRuntimeCommandPreview,
+                UpdateContextSizeSuggestion,
+                NormalizeContextSizeBox,
+                CancelRuntimeLaunchOptionDiscovery,
+                request => _coreServices.App.FileSystemDialogs.PickOpenFile(request, this),
+                SetStatus));
+        _overviewSelection = new OverviewSelectionController(
+            _viewModel,
+            _overviewPage,
+            _sessions,
+            _coreServices.Runtime,
+            _coreServices.Models,
+            _coreServices.Ui.SelectionReentrancy,
+            new OverviewSelectionControllerActions(
+                () => AppServices,
+                () => ModelServices,
+                () => _settings,
+                settings => _activeRuntimeSettings = settings,
+                ModelRuntimeUnloadActions,
+                SaveActiveRuntimeSessionsAsync,
+                RefreshRuntimeMetricsAsync,
+                SetStatus,
+                this,
+                _coreServices.App.Clipboard.SetText));
         _pageControllers = CreatePageControllers();
         InitializeTrayIcon();
     }

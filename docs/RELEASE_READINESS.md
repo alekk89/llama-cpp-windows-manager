@@ -1,6 +1,6 @@
 # Release Readiness Checklist
 
-Last updated: 2026-08-15
+Last updated: 2026-08-20
 
 ## Automated Gate
 
@@ -44,7 +44,7 @@ companions, and be described as unsigned.
 ## Release Gate
 
 - Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.2.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.3.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
@@ -77,6 +77,12 @@ companions, and be described as unsigned.
   is available for a required package asset.
 - Confirm installing a prebuilt runtime does not require Git, CMake, Visual Studio Build Tools, WSL build tools, or source checkout.
 - Confirm installed prebuilt runtimes are registered, can be selected per model, and show update/delete state on the Runtime Downloads page.
+- Select a newly installed managed runtime and confirm its details show provider,
+  repository, release, assets, checksum/signature status, installed time,
+  backend, version, and **Hash verified**. Run **Verify**, modify a copied test
+  runtime file, verify again, and confirm the runtime reports modified files.
+  Confirm manual runtimes are labelled **Unverified custom runtime** and legacy
+  managed installs without a manifest explain that reinstall is required.
 - Confirm changing the runtime on the Models launch form immediately clears the previous runtime's discovered controls, names the runtime being scanned, and renders only the newly selected executable's safe options in grouped two-column sections without dropping unmatched custom parameters. Confirm discovered editors match the curated 28px control sizing and compact field proportions, readable labels replace raw flags, exact `--flag-name` searches still work, and unknown text/choice defaults remain visually blank. Confirm advertised positive/negative switch pairs cycle Default/Enabled/Disabled and emit the matching alias, unpaired switches expose only their advertised direction, and search-filtered runtime options reflow without blank half-rows.
 - Confirm official prebuilt CUDA downloads include the matching runtime DLL/archive companion when upstream publishes one.
 - Confirm source-built official runtimes can be reconciled with matching prebuilt runtimes by local runtime fingerprint.
@@ -108,12 +114,21 @@ companions, and be described as unsigned.
   both open the themed endpoint report populated from `/health`, `/v1/models`,
   `/props`, and `/slots`, including context, output limit, reasoning/template
   capability, sampling defaults, and current slot state without generating text.
+  Confirm field text and table cells can be selected, **Copy endpoint** copies
+  the direct `/v1` URL, **Copy report** includes the visible endpoint details but
+  no API key, and **Copy API key** copies the credential used by that session.
 - Inspect the gateway row and endpoint link. Confirm the report shows advertised
   profile model IDs, running sessions, policy, and exposure, and explains that
   context/reasoning/output defaults belong to each routed model. Confirm a runtime
   without `/props` or `/slots` still shows available data plus a compact warning.
+  Confirm the gateway's dedicated API-key action copies the current model API
+  key from Settings.
 - Confirm Overview places Model, Launch profile, and Load on one row; Model and
   Launch profile retain fixed practical widths at non-maximized window sizes.
+  Confirm each available model is labelled `Name · size` in the Model dropdown,
+  while group choices keep their `Group · name (count)` label. Remove a registered
+  GGUF, rescan, and confirm the Models Size column shows `Missing`, Overview shows
+  `Name · Missing`, and the model's launch profiles remain registered.
   When a model is running, selecting its active profile hides Load, while
   selecting a different profile shows Load and replaces the model session with
   that exact saved profile.
@@ -132,13 +147,35 @@ companions, and be described as unsigned.
   the bottom row, retain at most 60 samples, and reset when the selected runtime
   changes. Confirm Slots appears on the top row and shows active/total capacity,
   queued requests, and busy decode slots.
+- Generate requests with prompt-cache reuse, open **Metrics**, and confirm the
+  7-day, current-month, 90-day, and all-time ranges show evaluated input, cached input, output,
+  totals, and cache hit rate. Confirm model/profile/runtime filters update the
+  responsive activity calendar and breakdown without restarting the app.
+  Confirm fixed-size day boxes reveal more history as the window grows, up to
+  the 24-month calendar data window, while dates before tracking and future
+  dates are unavailable rather than false zero
+  usage. Click a day twice to select and clear it; use Ctrl+click for disjoint
+  dates, Shift+click for a continuous week/range, and Ctrl+Shift+click to add a
+  range. Confirm selected dates drive every summary card and model row. Confirm the compact
+  7D/Month/90D/All selector updates the calendar in one click, and Month includes
+  every calendar day through the end of the current month.
+- Confirm active days, average tokens per active day, peak day, tracked-token
+  share, and prompt/generation throughput match the persisted facts. Confirm
+  request totals remain unavailable for runtimes without a compatible counter
+  and become selectable in the calendar when a counter is exposed.
+- Confirm an upgraded workspace preserves its previous lifetime totals, labels
+  them as predating daily tracking, and does not fabricate historical days.
+  Verify `llwmctl metrics usage --range month` matches the page totals.
+  Verify repeated `--date YYYY-MM-DD` values match the same multi-day UI selection.
 - Confirm the Overview Hardware card shows CPU temperature for CPU-backed
   sessions, uses NVIDIA metrics for CUDA when available, falls back to Windows
   GPU performance counters for AMD/Intel/Vulkan-backed sessions, and does not
   show stale cached hardware data after switching runtimes.
 - Confirm the Settings API key Generate action creates a new model API key.
-- Confirm the gateway `/v1/models` response lists every saved launch profile and
-  requesting another profile for a running model restarts it with that profile.
+- Confirm the gateway `/v1/models` response lists every saved launch profile,
+  reports each profile's configured `context_length`, exposes accurate GGUF
+  training context, parameter count, and file size in `meta`, and requesting
+  another profile for a running model restarts it with that profile.
 - Confirm Settings is separated into named category sections arranged in two
   equal-width columns rather than one large full-width settings grid. Confirm
   Network and UI remain in opposite columns and narrow values/actions do not
@@ -204,6 +241,9 @@ companions, and be described as unsigned.
   `/v1/chat/completions` rejects missing or invalid credentials, and the gateway
   rejects unauthenticated `/v1/models` requests. Upstream direct health or model
   catalog metadata may be public and is not an inference-authentication test.
+- Run the deterministic fake-runtime integration tests and confirm supervised
+  startup, bearer-authenticated health/model probes, served-model discovery,
+  redacted logs, deliberate crash reporting, and verified process termination.
 - Load a model and run `llwmctl sessions inspect <session>`; confirm health,
   models, defaults, and slots are returned without the serving API key appearing
   in the response or Control API log. Run `llwmctl gateway inspect` and confirm
@@ -295,26 +335,31 @@ companions, and be described as unsigned.
 
 ## Latest Local Verification
 
-Current local check on 2026-08-15:
+Current local check on 2026-08-20:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps1
 ```
 
-Result: .NET 10 Release app and CLI builds succeeded with zero warnings;
-service/unit tests passed (`548/548`) and the WPF smoke test passed (`1/1`) with
-no skips; service coverage was 80.9% and model/view-model coverage was 97.4%;
+Result: the platform-neutral .NET 10 Core library, Windows Release app, and CLI
+builds succeeded with zero warnings; service/unit tests passed (`581/581`) and
+the WPF smoke test passed (`1/1`) with no skips; service coverage was 81.9% and
+model/view-model coverage was 96.8%;
 formatting, diff whitespace, and the vulnerability, deprecation, and
 direct-package currency audit passed. The portable publish and embedded
-operator/control sidecar packaging also succeeded, as did the installer gate.
-The current local portable and installer artifacts remain unsigned test builds.
+operator/control sidecar packaging succeeded, including SHA-256 verification,
+sidecar bootstrap, ZIP content checks, and the SPDX 2.3 SBOM. Inno Setup is not
+installed on this workstation, so the local installer smoke step was skipped;
+the pinned Windows CI job builds the installer and tests silent install, repair,
+and uninstall. The current local portable artifacts remain unsigned test builds.
 The next release notes draft is tracked in
-`docs/GITHUB_RELEASE_NEXT.md`.
+the GitHub release draft.
 
 ## Manual Clean-Machine Test
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.2.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.3.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.
@@ -339,8 +384,23 @@ The next release notes draft is tracked in
     inverse.
 23. Import an external model folder, delete the registration, and verify GGUF files remain.
 24. Add a downloaded app-owned model, delete it, and verify only app-owned paths are removed.
-25. Verify `GET /v1/models` lists each saved profile as a separate model id.
+25. Verify `GET /v1/models` lists each saved profile as a separate model id and reports its configured `context_length` plus available GGUF `meta` values.
 26. Verify app update checks can reach the GitHub release feed, and that update install works from a copied portable exe folder.
+27. Create a diagnostics bundle from Logs, review its contents, and confirm it contains no credentials, private paths, model data, or sensitive launch arguments.
+
+## Repository Settings After Merge
+
+Apply these settings after the workflow files are present on the default branch:
+
+- Add topics: `llama-cpp`, `local-llm`, `gguf`, `windows`, `wpf`, `wsl`,
+  `openai-api`, and `llm-server`.
+- Set the project homepage to the latest release or user guide and enable
+  Discussions if community support will be monitored.
+- Protect `main`: block force pushes and deletion, require the **Build, test,
+  and publish** check, require branches to be current, allow administrator
+  emergency bypass, and require review for external contributors.
+- Confirm CodeQL, dependency review, and Dependabot are enabled and allowed by
+  the repository's Actions/security settings.
 
 ## Release Blockers
 

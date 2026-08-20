@@ -28,9 +28,6 @@ public sealed class WslRuntimeStopService
         _wslExe = wslExe ?? HostExecutableResolver.WslExe;
     }
 
-    public void Stop(WslRuntimeStopRequest request)
-        => StopAsync(request).GetAwaiter().GetResult();
-
     public async Task<WslRuntimeStopResult> StopAsync(WslRuntimeStopRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

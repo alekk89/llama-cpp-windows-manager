@@ -33,7 +33,7 @@ public static class RuntimePackageAssetVerifier
             return;
         }
 
-        var actual = ComputeSha256(assetPath);
+        var actual = await ComputeSha256Async(assetPath, cancellationToken);
         if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expected), Convert.FromHexString(actual)))
             throw new InvalidOperationException($"Runtime package checksum mismatch for {asset.Name}. Expected SHA-256 {expected}, found {actual}.");
     }
@@ -69,9 +69,6 @@ public static class RuntimePackageAssetVerifier
             throw new InvalidOperationException($"Runtime package size mismatch for {asset.Name}. Expected {asset.SizeBytes:N0} bytes, found {actual:N0} bytes.");
     }
 
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-    }
+    private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
+        => await FileSystemSafetyService.Sha256Async(path, cancellationToken);
 }

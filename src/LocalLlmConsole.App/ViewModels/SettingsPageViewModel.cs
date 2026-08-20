@@ -20,6 +20,9 @@ public sealed class SettingsPageViewModel
 
     public ObservableCollection<EditableSettingRow> Rows { get; } = new();
 
+    public EditableSettingRow? CacheRow
+        => Rows.FirstOrDefault(row => string.Equals(row.Key, "cache", StringComparison.Ordinal));
+
     public void ReplaceRows(IReadOnlyList<SettingRowDefinition> definitions)
     {
         DetachModelAccessHandler();

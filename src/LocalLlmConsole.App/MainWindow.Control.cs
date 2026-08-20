@@ -39,7 +39,8 @@ public partial class MainWindow
                 Path.Combine(_workspaceRoot, "logs"),
                 () => _settings.MaxLogFileSizeMb),
             ModelServices.ModelGroups,
-            _coreServices.Runtime.EndpointInspection));
+            _coreServices.Runtime.EndpointInspection,
+            AppServices.LifetimeMetricsApplication));
         _controlApi = api;
         return _serviceFactory.CreateLocalAppService(
             stateStore,

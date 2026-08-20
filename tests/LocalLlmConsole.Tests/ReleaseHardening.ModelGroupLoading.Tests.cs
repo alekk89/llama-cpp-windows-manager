@@ -69,10 +69,16 @@ public sealed partial class ReleaseHardeningTests
         var snapshot = Snapshot(group, profile);
         var viewModel = new LocalLlmConsole.ViewModels.OverviewPageViewModel();
 
-        viewModel.ReplaceModels([model], [group], snapshot.Assignments, [profile]);
+        viewModel.ReplaceModels(
+            [model],
+            [group],
+            snapshot.Assignments,
+            [profile],
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [model.Id] = "1 KB" });
 
         Assert.Equal(2, viewModel.ModelChoices.Count);
         Assert.Equal(OverviewModelChoiceKind.Model, viewModel.ModelChoices[0].Kind);
+        Assert.Equal("model-a · 1 KB", viewModel.ModelChoices[0].DisplayName);
         Assert.Equal(OverviewModelChoiceKind.Group, viewModel.ModelChoices[1].Kind);
         Assert.Equal("Group · Assistants (1)", viewModel.ModelChoices[1].DisplayName);
         Assert.Equal([profile.Id], viewModel.ModelChoices[1].LaunchProfileIds);

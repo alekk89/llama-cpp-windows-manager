@@ -42,6 +42,7 @@ public sealed class SettingsPageState
 
     private void SettingRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (sender is EditableSettingRow { Type: "readonly" }) return;
         if (e.PropertyName == nameof(EditableSettingRow.Value))
             _preferencesChanged?.Invoke();
     }

@@ -34,11 +34,15 @@ public sealed record OverviewModelChoice(
     ModelRecord? Model = null,
     ModelGroupRecord? Group = null,
     int LaunchProfileCount = 0,
-    IReadOnlyList<string>? LaunchProfileIds = null)
+    IReadOnlyList<string>? LaunchProfileIds = null,
+    string SizeLabel = "")
 {
+    public bool IsMissing => Kind == OverviewModelChoiceKind.Model
+        && string.Equals(SizeLabel, "Missing", StringComparison.OrdinalIgnoreCase);
+
     public string DisplayName => Kind == OverviewModelChoiceKind.Group
         ? $"Group · {Name} ({LaunchProfileCount})"
-        : Name;
+        : string.IsNullOrWhiteSpace(SizeLabel) ? Name : $"{Name} · {SizeLabel}";
 }
 
 public sealed class OverviewPageViewModel
@@ -54,12 +58,18 @@ public sealed class OverviewPageViewModel
         IEnumerable<ModelRecord> models,
         IEnumerable<ModelGroupRecord> groups,
         IReadOnlyDictionary<string, ModelGroupAssignment> assignments,
-        IEnumerable<NamedModelLaunchProfile> profiles)
+        IEnumerable<NamedModelLaunchProfile> profiles,
+        IReadOnlyDictionary<string, string>? modelSizeLabels = null)
     {
         var modelChoices = models
             .Where(model => !ModelAliasService.IsLaunchAlias(model))
             .OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(model => new OverviewModelChoice(model.Id, model.Name, OverviewModelChoiceKind.Model, Model: model));
+            .Select(model => new OverviewModelChoice(
+                model.Id,
+                model.Name,
+                OverviewModelChoiceKind.Model,
+                Model: model,
+                SizeLabel: modelSizeLabels?.GetValueOrDefault(model.Id) ?? ""));
         var assignedProfileIds = profiles.Select(profile => profile.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var profilesByGroup = assignments.Values
             .Where(assignment => assignedProfileIds.Contains(assignment.LaunchProfileId))

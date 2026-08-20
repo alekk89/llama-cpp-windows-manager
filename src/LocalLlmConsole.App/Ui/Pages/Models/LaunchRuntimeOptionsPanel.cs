@@ -15,8 +15,7 @@ public sealed class LaunchRuntimeOptionsPanel
 {
     private const double EditorHeight = 28;
     private readonly WpfTextBox _rawParameters;
-    private readonly Func<string, string?> _chooseFile;
-    private readonly Func<string, string?> _chooseDirectory;
+    private readonly LaunchRuntimeOptionEditorFactory _editorFactory;
     private readonly StackPanel _rows = new();
     private readonly TextBlock _status;
     private readonly WpfTextBox _preview;
@@ -35,8 +34,9 @@ public sealed class LaunchRuntimeOptionsPanel
         Func<string, string?> chooseDirectory)
     {
         _rawParameters = rawParameters ?? throw new ArgumentNullException(nameof(rawParameters));
-        _chooseFile = chooseFile ?? throw new ArgumentNullException(nameof(chooseFile));
-        _chooseDirectory = chooseDirectory ?? throw new ArgumentNullException(nameof(chooseDirectory));
+        ArgumentNullException.ThrowIfNull(chooseFile);
+        ArgumentNullException.ThrowIfNull(chooseDirectory);
+        _editorFactory = new LaunchRuntimeOptionEditorFactory(chooseFile, chooseDirectory, () => Changed?.Invoke());
         _status = new TextBlock
         {
             Text = "",
@@ -87,7 +87,7 @@ public sealed class LaunchRuntimeOptionsPanel
         additionalSettings.Children.Add(_status);
         additionalSettings.Children.Add(_rows);
         AdditionalSettingsRoot = additionalSettings;
-        CommandRoot = CreateGroup("Runtime Command", commandContent);
+        CommandRoot = LaunchRuntimeOptionLayout.CreateGroup("Runtime Command", commandContent);
         var content = new StackPanel();
         content.Children.Add(AdditionalSettingsRoot);
         content.Children.Add(CommandRoot);
@@ -139,20 +139,20 @@ public sealed class LaunchRuntimeOptionsPanel
         var normalizedOptions = RuntimeLaunchOptionSwitchService.Normalize(options);
         foreach (var group in RuntimeLaunchOptionGroupingService.Group(normalizedOptions))
         {
-            var groupRows = CreateGroupRowsGrid();
-            var groupView = new RuntimeOptionGroupView(group.Title, CreateGroup(group.Title, groupRows), groupRows, []);
+            var groupRows = LaunchRuntimeOptionLayout.CreateGroupRowsGrid();
+            var groupView = new RuntimeOptionGroupView(group.Title, LaunchRuntimeOptionLayout.CreateGroup(group.Title, groupRows), groupRows, []);
             foreach (var option in group.Options)
             {
-                var editor = CreateEditor(option);
+                var editor = _editorFactory.Create(option);
                 _editors[option.Name] = editor;
-                var row = CreateRow(option, editor.Control);
-                var optionRow = new RuntimeOptionRow(row, $"{group.Title} {SearchText(option)}");
+                var row = LaunchRuntimeOptionLayout.CreateRow(option, editor.Control);
+                var optionRow = new RuntimeOptionRow(row, $"{group.Title} {LaunchRuntimeOptionLayout.SearchText(option)}");
                 groupView.Rows.Add(optionRow);
                 _optionRows.Add(optionRow);
                 groupRows.Children.Add(row);
             }
 
-            ReflowGroup(groupView);
+            LaunchRuntimeOptionLayout.ReflowGroup(groupView);
             _optionGroups.Add(groupView);
             _rows.Children.Add(groupView.Root);
         }
@@ -189,7 +189,7 @@ public sealed class LaunchRuntimeOptionsPanel
                 }
             }
 
-            ReflowGroup(group);
+            LaunchRuntimeOptionLayout.ReflowGroup(group);
             group.Root.Visibility = groupVisible > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -331,343 +331,5 @@ public sealed class LaunchRuntimeOptionsPanel
         _rows.Children.Clear();
     }
 
-    private static Grid CreateGroupRowsGrid()
-    {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        return grid;
-    }
-
-    private static void ReflowGroup(RuntimeOptionGroupView group)
-    {
-        group.RowsGrid.RowDefinitions.Clear();
-        var visibleIndex = 0;
-        foreach (var optionRow in group.Rows.Where(candidate => candidate.Row.Visibility == Visibility.Visible))
-        {
-            var row = visibleIndex / 2;
-            if (visibleIndex % 2 == 0)
-                group.RowsGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetRow(optionRow.Row, row);
-            Grid.SetColumn(optionRow.Row, visibleIndex % 2 == 0 ? 0 : 2);
-            visibleIndex++;
-        }
-    }
-
-    private static Border CreateGroup(string title, FrameworkElement rows)
-    {
-        var header = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 4) };
-        header.Children.Add(new Border
-        {
-            Width = 3,
-            Height = 17,
-            Background = ResourceBrush("AccentStrong"),
-            CornerRadius = new CornerRadius(2),
-            Margin = new Thickness(0, 1, 6, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        });
-        header.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 13,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = ResourceBrush("TextMain"),
-            VerticalAlignment = VerticalAlignment.Center
-        });
-        var content = new StackPanel();
-        content.Children.Add(header);
-        content.Children.Add(new Border
-        {
-            Height = 1,
-            Background = ResourceBrush("PanelBorder"),
-            Margin = new Thickness(0, 0, 0, 5)
-        });
-        content.Children.Add(rows);
-        return new Border
-        {
-            Background = ResourceBrush("SurfaceRaised"),
-            BorderBrush = ResourceBrush("PanelBorderStrong"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(8, 6, 8, 6),
-            Margin = new Thickness(0, 0, 0, 6),
-            Child = content
-        };
-    }
-
-    private RuntimeOptionEditor CreateEditor(RuntimeLaunchOptionDefinition option)
-    {
-        FrameworkElement valueControl;
-        FrameworkElement control;
-        if (option.ValueKind == RuntimeLaunchOptionValueKind.Switch)
-        {
-            var button = SwitchButton(option);
-            valueControl = button;
-            control = button;
-            button.Click += (_, _) =>
-            {
-                SetSwitchState(button, NextSwitchState(button, option), option);
-                Changed?.Invoke();
-            };
-        }
-        else if (option.ValueKind == RuntimeLaunchOptionValueKind.Choice)
-        {
-            var combo = CrispCompactControl(new WpfComboBox
-            {
-                ItemsSource = new[] { RuntimeDefaultChoiceLabel(option) }.Concat(option.Choices).ToArray(),
-                SelectedIndex = 0,
-                Height = EditorHeight,
-                MinHeight = EditorHeight,
-                Margin = new Thickness(0),
-                Padding = new Thickness(8, 2, 8, 2),
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Foreground = ResourceBrush("TextMain")
-            });
-            valueControl = combo;
-            control = combo;
-        }
-        else
-        {
-            var textBox = CrispCompactControl(new WpfTextBox
-            {
-                Height = EditorHeight,
-                MinHeight = EditorHeight,
-                Margin = new Thickness(0),
-                Padding = new Thickness(8, 2, 8, 2),
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Foreground = ResourceBrush("TextMain")
-            });
-            var textEditor = TextEditor(textBox, option);
-            valueControl = textBox;
-            control = option.ValueKind switch
-            {
-                RuntimeLaunchOptionValueKind.File => PathEditor(textBox, textEditor, _chooseFile),
-                RuntimeLaunchOptionValueKind.Directory => PathEditor(textBox, textEditor, _chooseDirectory),
-                _ => textEditor
-            };
-        }
-
-        control.Height = EditorHeight;
-        control.MinHeight = EditorHeight;
-        control.MinWidth = Math.Max(control.MinWidth, 72);
-        control.Margin = new Thickness(0, 0, 4, 1);
-        control.VerticalAlignment = VerticalAlignment.Center;
-        control.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
-        control.ToolTip = OptionToolTip(option);
-        var editor = new RuntimeOptionEditor(option, control, valueControl);
-        if (valueControl is WpfComboBox comboBox) comboBox.SelectionChanged += OnChanged;
-        if (valueControl is WpfTextBox text) text.TextChanged += OnChanged;
-        return editor;
-    }
-
-    private static Grid TextEditor(WpfTextBox textBox, RuntimeLaunchOptionDefinition option)
-    {
-        var hint = new TextBlock
-        {
-            Text = RuntimeDefaultLabel(option),
-            Foreground = ResourceBrush("TextMain"),
-            FontFamily = new WpfFontFamily("Segoe UI"),
-            FontSize = 12,
-            FontWeight = FontWeights.Normal,
-            Margin = new Thickness(9, 0, 7, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            IsHitTestVisible = false
-        };
-        TextOptions.SetTextHintingMode(hint, TextHintingMode.Fixed);
-        textBox.TextChanged += (_, _) =>
-            hint.Visibility = string.IsNullOrEmpty(textBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-        var host = new Grid { Height = EditorHeight };
-        host.Children.Add(textBox);
-        host.Children.Add(hint);
-        return host;
-    }
-
-    private static Grid PathEditor(WpfTextBox textBox, FrameworkElement textEditor, Func<string, string?> choose)
-    {
-        var grid = new Grid { Height = EditorHeight };
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        textEditor.Margin = new Thickness(0, 0, 5, 0);
-        grid.Children.Add(textEditor);
-        var button = CrispCompactControl(new WpfButton
-        {
-            Content = Loc.T("Common.ChooseButton"),
-            Height = EditorHeight,
-            MinHeight = EditorHeight,
-            MinWidth = 62,
-            Margin = new Thickness(0)
-        });
-        button.Click += (_, _) =>
-        {
-            var selected = choose(textBox.Text.Trim());
-            if (!string.IsNullOrWhiteSpace(selected)) textBox.Text = selected;
-        };
-        Grid.SetColumn(button, 1);
-        grid.Children.Add(button);
-        return grid;
-    }
-
-    private void OnChanged(object sender, RoutedEventArgs args) => Changed?.Invoke();
-
-    private static Grid CreateRow(RuntimeLaunchOptionDefinition option, FrameworkElement control)
-    {
-        var grid = new Grid { Margin = new Thickness(0, 0, 0, 2), MinHeight = EditorHeight };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(104) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.Children.Add(new TextBlock
-        {
-            Text = LaunchSettingMetadataService.RuntimeOptionLabel(RuntimeLaunchOptionSwitchService.DisplayFlag(option)),
-            Foreground = ResourceBrush("TextSoft"),
-            FontSize = 11.5,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            ToolTip = OptionToolTip(option)
-        });
-        Grid.SetColumn(control, 1);
-        grid.Children.Add(control);
-        return grid;
-    }
-
-    private static WpfButton SwitchButton(RuntimeLaunchOptionDefinition option)
-    {
-        var button = CrispCompactControl(new WpfButton
-        {
-            Height = EditorHeight,
-            MinHeight = EditorHeight,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
-            Margin = new Thickness(0),
-            Padding = new Thickness(8, 2, 8, 2),
-            VerticalContentAlignment = VerticalAlignment.Center,
-            Tag = RuntimeSwitchState.Default
-        });
-        SetSwitchState(button, RuntimeSwitchState.Default, option);
-        return button;
-    }
-
-    private static RuntimeSwitchState NextSwitchState(WpfButton button, RuntimeLaunchOptionDefinition option)
-    {
-        var current = button.Tag is RuntimeSwitchState state ? state : RuntimeSwitchState.Default;
-        return current switch
-        {
-            RuntimeSwitchState.Default when !string.IsNullOrWhiteSpace(option.EnabledName) => RuntimeSwitchState.Enabled,
-            RuntimeSwitchState.Default when !string.IsNullOrWhiteSpace(option.DisabledName) => RuntimeSwitchState.Disabled,
-            RuntimeSwitchState.Enabled when !string.IsNullOrWhiteSpace(option.DisabledName) => RuntimeSwitchState.Disabled,
-            RuntimeSwitchState.Enabled => RuntimeSwitchState.Default,
-            _ => RuntimeSwitchState.Default
-        };
-    }
-
-    private static void SetSwitchState(WpfButton button, RuntimeSwitchState state, RuntimeLaunchOptionDefinition option)
-    {
-        button.Tag = state;
-        button.Content = state.ToString();
-        VisualRole.SetButtonRole(button, state == RuntimeSwitchState.Enabled ? VisualRole.Primary : "");
-    }
-
-    private static string RuntimeDefaultLabel(RuntimeLaunchOptionDefinition option)
-        => string.IsNullOrWhiteSpace(option.DefaultValue) ? "" : $"Default: {option.DefaultValue}";
-
-    private static string RuntimeDefaultChoiceLabel(RuntimeLaunchOptionDefinition option)
-        => string.IsNullOrWhiteSpace(option.DefaultValue) ? "" : $"Inherit (runtime default: {option.DefaultValue})";
-
-    private static string OptionToolTip(RuntimeLaunchOptionDefinition option)
-    {
-        var description = string.IsNullOrWhiteSpace(option.Description) ? option.Name : option.Description;
-        var advertisedDefault = RuntimeDefaultLabel(option);
-        var inheritance = string.IsNullOrWhiteSpace(advertisedDefault)
-            ? "Leave unchanged to inherit the runtime default."
-            : $"{advertisedDefault}. Leave unchanged to inherit it.";
-        var aliases = string.Join(", ", option.Aliases.Where(alias => alias.StartsWith("--", StringComparison.Ordinal)).Distinct(StringComparer.OrdinalIgnoreCase));
-        return $"{LaunchSettingMetadataService.RuntimeOptionLabel(RuntimeLaunchOptionSwitchService.DisplayFlag(option))} ({aliases}){Environment.NewLine}{description}{Environment.NewLine}{inheritance}";
-    }
-
-    private static string SearchText(RuntimeLaunchOptionDefinition option)
-        => $"{LaunchSettingMetadataService.RuntimeOptionLabel(RuntimeLaunchOptionSwitchService.DisplayFlag(option))} {option.Name} {string.Join(" ", option.Aliases)} {option.ValueHint} {option.Description} {option.DefaultValue}";
-
-    private static T CrispCompactControl<T>(T control) where T : System.Windows.Controls.Control
-    {
-        control.FontFamily = new WpfFontFamily("Segoe UI");
-        control.FontSize = 12;
-        control.FontWeight = FontWeights.Normal;
-        control.SnapsToDevicePixels = true;
-        control.UseLayoutRounding = true;
-        TextOptions.SetTextFormattingMode(control, TextFormattingMode.Display);
-        TextOptions.SetTextRenderingMode(control, TextRenderingMode.ClearType);
-        TextOptions.SetTextHintingMode(control, TextHintingMode.Fixed);
-        return control;
-    }
-
     private static WpfBrush ResourceBrush(string key) => (WpfBrush)WpfApplication.Current.Resources[key];
-
-    private sealed record RuntimeOptionEditor(
-        RuntimeLaunchOptionDefinition Option,
-        FrameworkElement Control,
-        FrameworkElement ValueControl)
-    {
-        public void AppendTokens(ICollection<string> tokens)
-        {
-            if (Option.ValueKind == RuntimeLaunchOptionValueKind.Switch)
-            {
-                var argument = Value();
-                if (!string.IsNullOrWhiteSpace(argument)) tokens.Add(argument);
-                return;
-            }
-
-            var value = Value();
-            if (string.IsNullOrWhiteSpace(value)) return;
-            tokens.Add(Option.Name);
-            tokens.Add(value);
-        }
-
-        public string Value() => ValueControl switch
-        {
-            WpfButton { Tag: RuntimeSwitchState.Enabled } => Option.EnabledName,
-            WpfButton { Tag: RuntimeSwitchState.Disabled } => Option.DisabledName,
-            WpfComboBox combo => combo.SelectedIndex <= 0 ? "" : combo.SelectedItem?.ToString() ?? "",
-            WpfTextBox textBox => textBox.Text.Trim(),
-            _ => ""
-        };
-
-        public void Set(string value)
-        {
-            if (ValueControl is WpfButton button)
-            {
-                var state = string.Equals(value, Option.DisabledName, StringComparison.OrdinalIgnoreCase)
-                    ? RuntimeSwitchState.Disabled
-                    : RuntimeSwitchState.Enabled;
-                SetSwitchState(button, state, Option);
-            }
-            if (ValueControl is WpfTextBox textBox) textBox.Text = value;
-            if (ValueControl is WpfComboBox combo)
-                combo.SelectedItem = combo.Items.Cast<object>().Skip(1)
-                    .FirstOrDefault(item => string.Equals(item.ToString(), value, StringComparison.OrdinalIgnoreCase))
-                    ?? combo.Items[0];
-        }
-
-        public void Clear()
-        {
-            if (ValueControl is WpfButton button) SetSwitchState(button, RuntimeSwitchState.Default, Option);
-            if (ValueControl is WpfTextBox textBox) textBox.Clear();
-            if (ValueControl is WpfComboBox combo) combo.SelectedIndex = 0;
-        }
-    }
-
-    private sealed record RuntimeOptionRow(FrameworkElement Row, string SearchText);
-
-    private sealed record RuntimeOptionGroupView(
-        string Title,
-        FrameworkElement Root,
-        Grid RowsGrid,
-        List<RuntimeOptionRow> Rows);
-
-    private enum RuntimeSwitchState
-    {
-        Default,
-        Enabled,
-        Disabled
-    }
 }

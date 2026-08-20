@@ -16,6 +16,8 @@ public sealed record ModelsPageActions(
     Func<Task> ManageModelGroupsAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> AssignLaunchProfileGroupAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> RemoveLaunchProfileGroupAsync,
+    Func<ModelRecord, NamedModelLaunchProfile, Task> LoadLaunchProfileAsync,
+    Action BeginNewLaunchProfile,
     Action<DataGrid, DataGrid?> SelectModelGridRow,
     RoutedEventHandler OpenModelFolderRowClick,
     RoutedEventHandler DeleteModelRowClick,
@@ -98,6 +100,7 @@ public static class ModelsPageFactory
         PageSectionFactory.AddButtonColumn(modelsGrid, Loc.T("Models.ActionBtn.Delete"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .65, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger);
         request.Actions.ConfigureModelGridColumnSizing(modelsGrid);
         modelsGrid.ItemsSource = request.ViewModel.Models.Rows;
+        AttachModelContextMenu(modelsGrid, request.Actions);
         var modelVariantsGrid = PageSectionFactory.GridFor(
             (Loc.T("Models.Col.Name"), nameof(ModelGridRow.Name), 1.35),
             (Loc.T("Models.Col.BaseModel"), nameof(ModelGridRow.BaseModel), 1.35),
@@ -107,8 +110,7 @@ public static class ModelsPageFactory
             request.Actions.RemoveLaunchProfileGroupAsync));
         PageSectionFactory.AddButtonColumn(modelVariantsGrid, Loc.T("Models.ActionBtn.Remove"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .68, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger);
         modelVariantsGrid.ItemsSource = request.ViewModel.Models.VariantRows;
-        modelVariantsGrid.ContextMenu = LaunchProfileContextMenu(modelVariantsGrid, request.Actions.AssignLaunchProfileGroupAsync);
-        modelVariantsGrid.PreviewMouseRightButtonDown += (_, e) => SelectRightClickedRow(modelVariantsGrid, e);
+        AttachLaunchProfileContextMenu(modelVariantsGrid, request.Actions);
 
         modelsGrid.SelectionChanged += (_, _) => request.Actions.SelectModelGridRow(modelsGrid, modelVariantsGrid);
         modelVariantsGrid.SelectionChanged += (_, _) => request.Actions.SelectModelGridRow(modelVariantsGrid, modelsGrid);
@@ -132,13 +134,8 @@ public static class ModelsPageFactory
         addButton.SetValue(ContentControl.ContentProperty, "Add");
         addButton.SetBinding(FrameworkElement.ToolTipProperty, new WpfBinding(nameof(ModelGridRow.GroupToolTip)));
         addButton.SetBinding(FrameworkElement.TagProperty, new WpfBinding());
-        addButton.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Left);
-        addButton.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        addButton.SetValue(FrameworkElement.MinWidthProperty, 52d);
-        addButton.SetValue(FrameworkElement.MinHeightProperty, 22d);
-        addButton.SetValue(FrameworkElement.HeightProperty, 22d);
-        addButton.SetValue(System.Windows.Controls.Control.PaddingProperty, new Thickness(7, 0, 7, 1));
-        addButton.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
+        PageSectionFactory.ConfigureGridActionButton(addButton);
+        addButton.SetValue(FrameworkElement.MinWidthProperty, 0d);
         RoutedEventHandler addClick = async (sender, _) =>
         {
             if ((sender as FrameworkElement)?.Tag is ModelGridRow { LaunchProfile: { } profile } row)
@@ -153,13 +150,8 @@ public static class ModelsPageFactory
         groupButton.SetBinding(FrameworkElement.ToolTipProperty, new WpfBinding(nameof(ModelGridRow.GroupToolTip)));
         groupButton.SetBinding(FrameworkElement.TagProperty, new WpfBinding());
         groupButton.SetValue(VisualRole.ButtonRoleProperty, VisualRole.Quiet);
-        groupButton.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
-        groupButton.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        PageSectionFactory.ConfigureGridActionButton(groupButton);
         groupButton.SetValue(FrameworkElement.MinWidthProperty, 0d);
-        groupButton.SetValue(FrameworkElement.MinHeightProperty, 22d);
-        groupButton.SetValue(FrameworkElement.HeightProperty, 22d);
-        groupButton.SetValue(System.Windows.Controls.Control.PaddingProperty, new Thickness(5, 0, 5, 1));
-        groupButton.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 1, 2, 1));
         var groupLabel = new FrameworkElementFactory(typeof(TextBlock));
         groupLabel.SetBinding(TextBlock.TextProperty, new WpfBinding("."));
         groupLabel.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
@@ -212,35 +204,61 @@ public static class ModelsPageFactory
         };
     }
 
-    private static ContextMenu LaunchProfileContextMenu(
-        DataGrid profilesGrid,
-        Func<ModelRecord, NamedModelLaunchProfile, Task> assignLaunchProfileGroupAsync)
+    private static void AttachModelContextMenu(DataGrid grid, ModelsPageActions actions)
     {
-        var menu = new ContextMenu();
-        var assign = new MenuItem
-        {
-            Header = Loc.T("ModelGroups.AssignAction"),
-            ToolTip = Loc.T("ModelGroups.AssignTooltip")
-        };
-        assign.Click += async (_, _) =>
-        {
-            if (profilesGrid.SelectedItem is ModelGridRow { LaunchProfile: { } profile } row)
-                await assignLaunchProfileGroupAsync(row.Model, profile);
-        };
-        menu.Items.Add(assign);
-        return menu;
+        DataGridRowContextMenu.Attach(
+            grid,
+            new(_ => Loc.T("Models.ActionBtn.OpenFolder"),
+                row => row is ModelGridRow { CanOpenFolder: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(actions.OpenModelFolderRowClick, row)),
+            new(_ => Loc.T("Launch.SaveAsNewButton"),
+                row => row is ModelGridRow { IsMissing: false },
+                _ => BeginNewLaunchProfileAsync(actions)),
+            new(_ => Loc.T("Models.ActionBtn.Delete"),
+                row => row is ModelGridRow { CanDelete: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(actions.DeleteModelRowClick, row),
+                SeparatorBefore: true));
     }
 
-    private static void SelectRightClickedRow(DataGrid grid, System.Windows.Input.MouseButtonEventArgs e)
+    private static void AttachLaunchProfileContextMenu(DataGrid grid, ModelsPageActions actions)
     {
-        for (var element = e.OriginalSource as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
-        {
-            if (element is not DataGridRow row) continue;
-            row.IsSelected = true;
-            grid.SelectedItem = row.Item;
-            break;
-        }
+        DataGridRowContextMenu.Attach(
+            grid,
+            new(_ => Loc.T("Overview.LoadButton"),
+                row => row is ModelGridRow { LaunchProfile: not null, CanLoad: true },
+                row => LoadProfileAsync(actions, (ModelGridRow)row),
+                ToolTip: row => ((ModelGridRow)row).IsMissing
+                    ? Loc.T("Overview.MissingModelLoadTooltip")
+                    : Loc.T("Tooltip.Load")),
+            new(row => ((ModelGridRow)row).CanAssignGroup
+                    ? Loc.T("ModelGroups.AssignAction")
+                    : Loc.T("ModelGroups.ChangeGroup"),
+                row => row is ModelGridRow { LaunchProfile: not null },
+                row => AssignGroupAsync(actions, (ModelGridRow)row)),
+            new(_ => Loc.T("ModelGroups.RemoveFromGroup"),
+                row => row is ModelGridRow { LaunchProfile: not null, CanAssignGroup: false },
+                row => RemoveGroupAsync(actions, (ModelGridRow)row),
+                IsVisible: row => row is ModelGridRow { CanAssignGroup: false }),
+            new(_ => Loc.T("Models.ActionBtn.Remove"),
+                row => row is ModelGridRow { CanDelete: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(actions.DeleteModelRowClick, row),
+                SeparatorBefore: true));
     }
+
+    private static Task BeginNewLaunchProfileAsync(ModelsPageActions actions)
+    {
+        actions.BeginNewLaunchProfile();
+        return Task.CompletedTask;
+    }
+
+    private static Task LoadProfileAsync(ModelsPageActions actions, ModelGridRow row)
+        => actions.LoadLaunchProfileAsync(row.Model, row.LaunchProfile!);
+
+    private static Task AssignGroupAsync(ModelsPageActions actions, ModelGridRow row)
+        => actions.AssignLaunchProfileGroupAsync(row.Model, row.LaunchProfile!);
+
+    private static Task RemoveGroupAsync(ModelsPageActions actions, ModelGridRow row)
+        => actions.RemoveLaunchProfileGroupAsync(row.Model, row.LaunchProfile!);
 
     private static Task OpenModelsFolder(ModelsPageActions actions)
     {

@@ -144,14 +144,19 @@ public sealed partial class RuntimeDeletionPlanner
                 .ToList();
         }
 
-        if (!RuntimeFileService.CanDeleteRuntimeFiles(runtime, runtimeRoot, out var folder, out var reason))
+        var filePlan = await Task.Run(() =>
+        {
+            var canDelete = RuntimeFileService.CanDeleteRuntimeFiles(runtime, runtimeRoot, out var folder, out var reason);
+            return (CanDelete: canDelete, Folder: folder, Reason: reason);
+        });
+        if (!filePlan.CanDelete)
         {
             return new RuntimeDeletionPlan(
                 RuntimeDeletionPlanKind.RegistrationOnly,
                 "",
                 [runtime],
-                string.IsNullOrWhiteSpace(folder) ? [] : [folder],
-                reason,
+                string.IsNullOrWhiteSpace(filePlan.Folder) ? [] : [filePlan.Folder],
+                filePlan.Reason,
                 [],
                 reassignments);
         }
@@ -160,7 +165,7 @@ public sealed partial class RuntimeDeletionPlanner
             RuntimeDeletionPlanKind.DeleteFiles,
             "",
             [runtime],
-            [folder],
+            [filePlan.Folder],
             "",
             [],
             reassignments);

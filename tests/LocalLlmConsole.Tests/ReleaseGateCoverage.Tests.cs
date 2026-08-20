@@ -59,6 +59,40 @@ public sealed partial class ReleaseHardeningTests
 
         foreach (var path in new[] { "/api/v1/status", "/api/v1/capabilities", "/api/v1/self", "/api/v1/models", "/api/v1/model-groups", "/api/v1/runtimes", "/api/v1/sessions", "/api/v1/settings", "/api/v1/logs", "/api/v1/metrics", "/api/v1/jobs", "/api/v1/operations" })
             Assert.Equal(200, (await api.HandleAsync(Request("GET", path))).StatusCode);
+        await store.RecordTokenUsageAsync(new TokenUsageDelta(
+            "metrics-model", "Metrics Model", 20, 10, 5, true, DateTimeOffset.UtcNow,
+            PromptSeconds: 2, GeneratedSeconds: 1, TimingCounterObserved: true,
+            RequestCount: 1, RequestCounterObserved: true));
+        var usageResponse = await api.HandleAsync(Request(
+            "GET",
+            "/api/v1/metrics/usage",
+            query: new Dictionary<string, string> { ["range"] = "30d", ["timeZone"] = "UTC" }));
+        Assert.Equal(200, usageResponse.StatusCode);
+        var usageJson = JsonSerializer.Serialize(usageResponse.Body);
+        Assert.Contains("\"insights\"", usageJson, StringComparison.Ordinal);
+        Assert.Contains("\"averagePromptTokensPerSecond\"", usageJson, StringComparison.Ordinal);
+        Assert.Contains("\"requestCounterObserved\"", usageJson, StringComparison.Ordinal);
+        Assert.Contains("\"trackedTokenShare\"", usageJson, StringComparison.Ordinal);
+        Assert.Equal(200, (await api.HandleAsync(Request(
+            "GET",
+            "/api/v1/metrics/usage",
+            query: new Dictionary<string, string> { ["range"] = "month", ["timeZone"] = "UTC" }))).StatusCode);
+        Assert.Equal(200, (await api.HandleAsync(Request(
+            "GET",
+            "/api/v1/metrics/usage",
+            query: new Dictionary<string, string> { ["range"] = "1d", ["timeZone"] = "UTC" }))).StatusCode);
+        Assert.Equal(200, (await api.HandleAsync(Request(
+            "GET",
+            "/api/v1/metrics/usage",
+            query: new Dictionary<string, string> { ["dates"] = "2026-08-18,2026-08-20", ["timeZone"] = "UTC" }))).StatusCode);
+        Assert.Equal(400, (await api.HandleAsync(Request(
+            "GET",
+            "/api/v1/metrics/usage",
+            query: new Dictionary<string, string> { ["dates"] = "08/20/2026" }))).StatusCode);
+        Assert.Equal(400, (await api.HandleAsync(Request(
+            "GET",
+            "/api/v1/metrics/usage",
+            query: new Dictionary<string, string> { ["range"] = "invalid" }))).StatusCode);
         Assert.Equal(200, (await api.HandleAsync(Request("GET", "/api/v1/gateway/inspect"))).StatusCode);
 
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/unknown"))).StatusCode);
@@ -70,6 +104,17 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/api/v1/logs/missing.log"))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("POST", "/api/v1/jobs/missing/pause"))).StatusCode);
         Assert.Equal(400, (await api.HandleAsync(Request("POST", "/api/v1/huggingface/download", new JsonObject()))).StatusCode);
+
+        var runtimeBuildJob = await jobs.CreateAsync("runtime-build", "{}", TestContext.Current.CancellationToken);
+        await jobs.UpdateAsync(runtimeBuildJob, JobStatus.Running, runtimeBuildJob.PayloadJson, TestContext.Current.CancellationToken);
+        Assert.Equal(409, (await api.HandleAsync(Request("POST", $"/api/v1/jobs/{runtimeBuildJob.Id}/pause"))).StatusCode);
+        Assert.Equal(409, (await api.HandleAsync(Request("POST", $"/api/v1/jobs/{runtimeBuildJob.Id}/cancel"))).StatusCode);
+        Assert.Equal(JobStatus.Running, (await store.ListJobsAsync()).Single(job => job.Id == runtimeBuildJob.Id).Status);
+
+        var downloadJob = await jobs.CreateAsync("huggingface-download", "{}", TestContext.Current.CancellationToken);
+        await jobs.UpdateAsync(downloadJob, JobStatus.Running, downloadJob.PayloadJson, TestContext.Current.CancellationToken);
+        Assert.Equal(200, (await api.HandleAsync(Request("POST", $"/api/v1/jobs/{downloadJob.Id}/pause"))).StatusCode);
+        Assert.Equal(JobStatus.Paused, (await store.ListJobsAsync()).Single(job => job.Id == downloadJob.Id).Status);
 
         var patched = await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject
         {
@@ -384,10 +429,19 @@ public sealed partial class ReleaseHardeningTests
         var defaults = AppSettings.CreateDefault(root);
         var profile = new NamedModelLaunchProfile("profile-1", model.Id, "Qwen 128K", ModelLaunchSettings.FromAppSettings(defaults with { Port = 8096 }), now);
         var secondProfile = profile with { Id = "profile-2", Name = "Qwen Fast", IsDefault = true };
+        var modelSizeLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [model.Id] = "1.5 KB",
+            [other.Id] = "Missing"
+        };
         var models = new ModelsPageViewModel();
 
-        models.ReplaceModels([model, other], candidate => candidate.Id == model.Id, [profile, secondProfile]);
+        models.ReplaceModels([model, other], candidate => candidate.Id == model.Id, [profile, secondProfile], modelSizeLabels);
         Assert.Equal(2, models.Rows.Count);
+        var missingModelRow = models.Rows.Single(row => row.Model.Id == other.Id);
+        Assert.Equal("Missing", missingModelRow.Size);
+        Assert.True(missingModelRow.IsMissing);
+        Assert.False(missingModelRow.CanLoad);
         Assert.Equal(2, models.VariantRows.Count);
         Assert.All(models.VariantRows, row => Assert.False(row.CanDelete));
         Assert.Equal(model.Id, models.ModelIdForLaunchProfile(profile.Id));
@@ -396,9 +450,19 @@ public sealed partial class ReleaseHardeningTests
         Assert.Null(models.ModelIdForLaunchProfile(""));
 
         var overview = new OverviewPageViewModel();
-        overview.ReplaceModels([other, model]);
+        overview.ReplaceModels(
+            [other, model],
+            [],
+            new Dictionary<string, ModelGroupAssignment>(),
+            [],
+            modelSizeLabels);
         overview.ReplaceLaunchProfiles([profile, secondProfile]);
         Assert.Equal(2, overview.ModelChoices.Count);
+        Assert.Equal("Llama Test · Missing", overview.ModelChoices[0].DisplayName);
+        Assert.True(overview.ModelChoices[0].IsMissing);
+        Assert.False(overview.ModelChoices[1].IsMissing);
+        Assert.Equal("Qwen Test · 1.5 KB", overview.ModelChoices[1].DisplayName);
+        Assert.Equal(model.Id, overview.ModelChoices[1].Id);
         Assert.Equal(2, overview.LaunchProfileChoices.Count);
         overview.ReplaceSessions([]);
         Assert.Empty(overview.SessionRows);
@@ -441,10 +505,10 @@ public sealed partial class ReleaseHardeningTests
 
         var lifetime = new LifetimeMetricsViewModel();
         lifetime.ReplaceRows([]);
-        Assert.Single(lifetime.Rows);
-        Assert.False(lifetime.Rows[0].B1);
+        Assert.Empty(lifetime.Rows);
         lifetime.ReplaceRows([new TokenUsageRecord(model.Id, model.Name, 10, 15, now)]);
-        Assert.Equal("25", lifetime.Rows[0].C4);
+        Assert.Equal("15", lifetime.Rows[0].C5);
+        Assert.Equal("25", lifetime.Rows[0].C6);
 
         var wsl = new WslLinuxPageViewModel();
         wsl.ReplaceDistroRows(new WslEnvironmentReport(false, false, "Missing", "", "", "Ubuntu-24.04", "Install Ubuntu", []), "");

@@ -13,18 +13,25 @@ public sealed partial class RuntimeDeletionPlanner
             .GroupBy(runtime => RuntimeMetadataService.Folder(runtime), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(runtime => runtime.UpdatedAt).First())
             .ToList();
-        var sources = allSources
-            .Where(source => string.Equals(source.PresetId, preset.Id, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var sourceFolders = new HashSet<string>(
-            sources
-                .Select(source => source.SourceDir)
-                .Where(folder => !string.IsNullOrWhiteSpace(folder) && RuntimeFileService.IsSafeRuntimeFolder(runtimeRoot, folder)),
-            StringComparer.OrdinalIgnoreCase);
-        var defaultSourceDir = RuntimeBuildCatalogService.SourceDir(runtimeRoot, preset);
-        var hasPartialSourceCache = Directory.Exists(defaultSourceDir)
-            && RuntimeFileService.IsSafeRuntimeFolder(runtimeRoot, defaultSourceDir)
-            && sourceFolders.Add(defaultSourceDir);
+        var localFiles = await Task.Run(() =>
+        {
+            var sources = allSources
+                .Where(source => string.Equals(source.PresetId, preset.Id, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var sourceFolders = new HashSet<string>(
+                sources
+                    .Select(source => source.SourceDir)
+                    .Where(folder => !string.IsNullOrWhiteSpace(folder) && RuntimeFileService.IsSafeRuntimeFolder(runtimeRoot, folder)),
+                StringComparer.OrdinalIgnoreCase);
+            var defaultSourceDir = RuntimeBuildCatalogService.SourceDir(runtimeRoot, preset);
+            var hasPartialSourceCache = Directory.Exists(defaultSourceDir)
+                && RuntimeFileService.IsSafeRuntimeFolder(runtimeRoot, defaultSourceDir)
+                && sourceFolders.Add(defaultSourceDir);
+            return (Sources: sources, SourceFolders: sourceFolders, HasPartialSourceCache: hasPartialSourceCache);
+        });
+        var sources = localFiles.Sources;
+        var sourceFolders = localFiles.SourceFolders;
+        var hasPartialSourceCache = localFiles.HasPartialSourceCache;
 
         if (runtimes.Count == 0 && sourceFolders.Count == 0)
         {
@@ -62,11 +69,11 @@ public sealed partial class RuntimeDeletionPlanner
                 usedByModels);
         }
 
-        var runtimeFolders = runtimes
-            .Select(runtime => RuntimeFileService.CanDeleteRuntimeFiles(runtime, runtimeRoot, out var folder, out _) ? folder : "")
-            .Where(folder => !string.IsNullOrWhiteSpace(folder))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var runtimeFolders = await Task.Run(() => runtimes
+                .Select(runtime => RuntimeFileService.CanDeleteRuntimeFiles(runtime, runtimeRoot, out var folder, out _) ? folder : "")
+                .Where(folder => !string.IsNullOrWhiteSpace(folder))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList());
 
         return new RuntimeBuildPresetDeletionPlan(
             RuntimeBuildPresetDeletionPlanKind.DeleteBuildsAndSources,

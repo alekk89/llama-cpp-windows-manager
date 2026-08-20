@@ -120,7 +120,10 @@ public sealed class RuntimeBuildExecutionService
 
         try
         {
-            RuntimeFileService.DeleteSafeRuntimeFolder(settings.RuntimeRoot, source.SourceDir);
+            await RuntimeFileService.DeleteSafeRuntimeFolderAsync(
+                settings.RuntimeRoot,
+                source.SourceDir,
+                cancellationToken);
             var message = $"Deleted downloaded source after successful build: {source.SourceDir}";
             await BoundedLogFile.AppendAsync(logPath, $"[{DateTimeOffset.Now:O}] Completed: {message}{Environment.NewLine}", MaxLogBytes(settings));
             return " Downloaded source deleted.";

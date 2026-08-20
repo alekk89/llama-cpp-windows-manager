@@ -1,0 +1,106 @@
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using LocalLlmConsole.Models;
+using LocalLlmConsole.ViewModels;
+
+namespace LocalLlmConsole.UiTests;
+
+public sealed partial class WpfUiSmokeTests
+{
+    private static void AssertLifetimeUsageSurface()
+    {
+        var rangeChanges = 0;
+        var dateSelectionChanges = 0;
+        var page = LocalLlmConsole.LifetimePageFactory.Create(new LocalLlmConsole.LifetimePageRequest(
+            Array.Empty<UiRow>(),
+            LifetimeMetricsSelection.Default,
+            new LocalLlmConsole.LifetimePageActions(
+                (_, _) => rangeChanges++,
+                (_, _) => { },
+                (_, _) => dateSelectionChanges++,
+                (_, _) => { },
+                (_, _) => { },
+                (_, _) => { })));
+        page.Content.Measure(new Size(900, 680));
+        page.Content.Arrange(new Rect(0, 0, 900, 680));
+        page.Content.UpdateLayout();
+
+        Assert.Equal(UsageMetricsRange.All, page.Controls.RangeSelector.SelectedRange);
+        Assert.Equal(
+            ["1D", "7D", "30D", "All"],
+            page.Controls.RangeSelector.Children.OfType<Button>().Select(button => button.Content).ToArray());
+        Assert.Equal(5, page.Controls.CalendarMetric.Items.Count);
+        Assert.Equal(UsageCalendarMetric.TotalTokens, page.Controls.HistoryCalendar.Metric);
+        page.Controls.ClearDateSelectionButton.Visibility = Visibility.Visible;
+        page.Content.UpdateLayout();
+        Assert.Equal(32, page.Controls.ClearDateSelectionButton.ActualHeight, precision: 1);
+        Assert.Equal(
+            page.Controls.CalendarMetric.ActualHeight,
+            page.Controls.ClearDateSelectionButton.ActualHeight,
+            precision: 1);
+        Assert.Equal(
+            page.Controls.CalendarMetric.TranslatePoint(new Point(0, 0), page.Content).Y,
+            page.Controls.ClearDateSelectionButton.TranslatePoint(new Point(0, 0), page.Content).Y,
+            precision: 1);
+        page.Controls.CalendarMetric.SelectedIndex = 3;
+        Assert.Equal(UsageCalendarMetric.CachedPromptTokens, page.Controls.HistoryCalendar.Metric);
+        page.Controls.RangeSelector.SetRange(UsageMetricsRange.SevenDays, raiseEvent: true);
+        Assert.Equal(UsageMetricsRange.SevenDays, page.Controls.RangeSelector.SelectedRange);
+        Assert.Equal(1, rangeChanges);
+
+        var days = Enumerable.Range(0, 8)
+                .Select(index => new UsageMetricDay(
+                    DateOnly.FromDateTime(DateTime.Today).AddDays(index - 7),
+                    new UsageMetricTotals(index + 1, index, index * 2, true),
+                    IsTracked: index > 0))
+                .ToArray();
+        page.Controls.HistoryCalendar.SetData(days);
+        page.Controls.HistoryCalendar.Metric = UsageCalendarMetric.Requests;
+        page.Content.UpdateLayout();
+        Assert.Equal(8, page.Controls.HistoryCalendar.DayCount);
+        Assert.False(page.Controls.HistoryCalendar.ApplySelection(days[0].Date, UsageDateSelectionMode.Replace));
+        Assert.True(page.Controls.HistoryCalendar.ApplySelection(days[1].Date, UsageDateSelectionMode.Replace));
+        Assert.Single(page.Controls.HistoryCalendar.SelectedDates);
+        Assert.True(page.Controls.HistoryCalendar.ApplySelection(days[1].Date, UsageDateSelectionMode.Replace));
+        Assert.Empty(page.Controls.HistoryCalendar.SelectedDates);
+        Assert.True(page.Controls.HistoryCalendar.ApplySelection(days[2].Date, UsageDateSelectionMode.Replace));
+        Assert.True(page.Controls.HistoryCalendar.ApplySelection(days[4].Date, UsageDateSelectionMode.Toggle));
+        Assert.True(page.Controls.HistoryCalendar.ApplySelection(days[6].Date, UsageDateSelectionMode.Range));
+        Assert.Equal(days[4..7].Select(day => day.Date), page.Controls.HistoryCalendar.SelectedDates);
+        Assert.Equal(5, dateSelectionChanges);
+        Assert.Contains("calendar", AutomationProperties.GetName(page.Controls.HistoryCalendar), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ScrollBarVisibility.Disabled, page.Controls.HistoryScroller.HorizontalScrollBarVisibility);
+        Assert.Equal(System.Windows.HorizontalAlignment.Stretch, page.Controls.HistoryScroller.HorizontalContentAlignment);
+        var compactModelX = page.Controls.ModelFilter.TranslatePoint(new Point(0, 0), page.Content).X;
+        var compactProfileX = page.Controls.ProfileFilter.TranslatePoint(new Point(0, 0), page.Content).X;
+        var compactRuntimeX = page.Controls.RuntimeFilter.TranslatePoint(new Point(0, 0), page.Content).X;
+        Assert.Equal(190, page.Controls.ModelFilter.ActualWidth, precision: 1);
+        Assert.Equal(170, page.Controls.ProfileFilter.ActualWidth, precision: 1);
+        Assert.Equal(170, page.Controls.RuntimeFilter.ActualWidth, precision: 1);
+
+        var calendarDays = Enumerable.Range(0, 730)
+            .Select(index => new UsageMetricDay(
+                DateOnly.FromDateTime(DateTime.Today).AddDays(index - 729),
+                new UsageMetricTotals(index + 1, index, index * 2, true),
+                IsTracked: true))
+            .ToArray();
+        page.Controls.HistoryCalendar.SetData(calendarDays);
+        page.Content.Measure(new Size(900, 680));
+        page.Content.Arrange(new Rect(0, 0, 900, 680));
+        page.Content.UpdateLayout();
+        var compactCalendarWidth = page.Controls.HistoryCalendar.ActualWidth;
+        var compactVisibleWeeks = page.Controls.HistoryCalendar.VisibleWeekCount;
+
+        page.Content.Measure(new Size(2048, 1080));
+        page.Content.Arrange(new Rect(0, 0, 2048, 1080));
+        page.Content.UpdateLayout();
+        Assert.Equal(compactModelX, page.Controls.ModelFilter.TranslatePoint(new Point(0, 0), page.Content).X, precision: 1);
+        Assert.Equal(compactProfileX, page.Controls.ProfileFilter.TranslatePoint(new Point(0, 0), page.Content).X, precision: 1);
+        Assert.Equal(compactRuntimeX, page.Controls.RuntimeFilter.TranslatePoint(new Point(0, 0), page.Content).X, precision: 1);
+        Assert.True(page.Controls.HistoryCalendar.ActualWidth > compactCalendarWidth);
+        Assert.True(page.Controls.HistoryCalendar.VisibleWeekCount > compactVisibleWeeks);
+        Assert.True(page.Controls.HistoryCalendar.VisibleWeekCount > 53);
+        Assert.Equal(page.Controls.HistoryScroller.ViewportWidth, page.Controls.HistoryCalendar.ActualWidth, 1);
+    }
+}

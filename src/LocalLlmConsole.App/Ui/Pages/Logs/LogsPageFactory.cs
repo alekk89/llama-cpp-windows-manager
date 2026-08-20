@@ -12,6 +12,7 @@ public sealed record LogsPageActions(
     RoutedEventHandler Refresh,
     RoutedEventHandler OpenSelected,
     RoutedEventHandler OpenLogsFolder,
+    RoutedEventHandler CreateDiagnosticsBundle,
     RoutedEventHandler DeleteSelected,
     RoutedEventHandler DeleteAll,
     RoutedEventHandler OpenRow,
@@ -61,6 +62,17 @@ public static class LogsPageFactory
         PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Open"), "C6", "B1", request.Actions.OpenRow, .55, tooltipBinding: "T1");
         PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Delete"), "C7", "B2", request.Actions.DeleteRow, .65, tooltipBinding: "T2", visualRole: VisualRole.Danger);
         logsGrid.ItemsSource = request.Rows;
+        DataGridRowContextMenu.Attach(
+            logsGrid,
+            new(row => ((UiRow)row).C6,
+                row => row is UiRow { B1: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.OpenRow, row),
+                ToolTip: row => ((UiRow)row).T1),
+            new(row => ((UiRow)row).C7,
+                row => row is UiRow { B2: true },
+                row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.DeleteRow, row),
+                SeparatorBefore: true,
+                ToolTip: row => ((UiRow)row).T2));
         logsGrid.SelectionChanged += request.Actions.SelectionChanged;
         var listFrame = PageSectionFactory.GridFrame(logsGrid);
         Grid.SetRow(listFrame, 1);
@@ -102,6 +114,7 @@ public static class LogsPageFactory
         leftActions.Children.Add(Button(Loc.T("Logs.RefreshButton"), request.Actions.Refresh, request.ButtonToolTip));
         leftActions.Children.Add(Button(Loc.T("Logs.OpenSelectedButton"), request.Actions.OpenSelected, request.ButtonToolTip));
         leftActions.Children.Add(Button(Loc.T("Logs.OpenFolderButton"), request.Actions.OpenLogsFolder, request.ButtonToolTip));
+        leftActions.Children.Add(Button(Loc.T("Logs.CreateDiagnosticsButton"), request.Actions.CreateDiagnosticsBundle, request.ButtonToolTip));
         toolbar.Children.Add(leftActions);
 
         var rightActions = Bar();

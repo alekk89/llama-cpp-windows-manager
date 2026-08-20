@@ -67,6 +67,43 @@ public partial class MainWindow
     private void OpenSelectedLogFile()
         => OpenLogPath(SelectedLogPath());
 
+    private async Task CreateDiagnosticsBundleAsync()
+    {
+        var stateStore = AppServices.StateStore;
+        var wsl = await BestEffortAsync(
+            async () => (await _coreServices.Environment.WslPageWorkflow.DetectRecommendedDistroAsync(_settings)).Report,
+            new WslEnvironmentReport(false, false, "WSL probe unavailable", "", "", "", "", []));
+        var gpu = await BestEffortAsync(() => _coreServices.App.GpuStatus.WindowsSummaryAsync(), "GPU probe unavailable");
+        var cpu = await BestEffortAsync(() => _coreServices.App.GpuStatus.CpuSummaryAsync(), "CPU probe unavailable");
+        var result = await DiagnosticsBundleService.CreateAsync(new DiagnosticsBundleRequest(
+            Path.Combine(_workspaceRoot, "diagnostics"),
+            Path.Combine(_workspaceRoot, "logs"),
+            AppVersionLabel,
+            _settings,
+            await stateStore.ListModelsAsync(),
+            await stateStore.ListRuntimesAsync(),
+            await stateStore.ListJobsAsync(),
+            _sessions.Snapshots(),
+            wsl,
+            gpu,
+            cpu));
+
+        _coreServices.App.ShellIntegration.OpenFolder(Path.GetDirectoryName(result.ArchivePath)!);
+        SetStatus($"{Loc.T("Status.DiagnosticsBundleCreated")} {Path.GetFileName(result.ArchivePath)}");
+    }
+
+    private static async Task<T> BestEffortAsync<T>(Func<Task<T>> action, T fallback)
+    {
+        try
+        {
+            return await action();
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
     private async Task DeleteSelectedLogAsync()
     {
         var logPageApplication = AppServices.LogPageApplication;

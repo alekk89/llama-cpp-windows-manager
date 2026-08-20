@@ -26,7 +26,7 @@ public partial class MainWindow
         foreach (var delta in _coreServices.Runtime.RuntimeTelemetryApplication.ObserveLifetimeTokenDeltas(pollResults))
             await lifetimeMetrics.AddUsageAsync(delta);
 
-        if (_viewModel.CurrentPage == "Lifetime") await RefreshLifetimeMetricsAsync();
+        if (_viewModel.CurrentPage == "Metrics") await RefreshLifetimeMetricsAsync();
     }
 
     private void ResetLifetimeCounters()

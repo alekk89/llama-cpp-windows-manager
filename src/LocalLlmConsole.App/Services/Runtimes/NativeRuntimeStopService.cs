@@ -13,7 +13,9 @@ public sealed class NativeRuntimeStopService
     private const int PrimaryExitWaitMilliseconds = 3000;
     private const int VerificationExitWaitMilliseconds = 1000;
 
-    public NativeRuntimeStopResult Stop(Process? process)
+    public async Task<NativeRuntimeStopResult> StopAsync(
+        Process? process,
+        CancellationToken cancellationToken = default)
     {
         if (process is null)
             return new NativeRuntimeStopResult(false, true, true);
@@ -23,9 +25,12 @@ public sealed class NativeRuntimeStopService
 
         var processId = TryGetProcessId(process);
         var startTime = TryGetStartTime(process);
-        var exitedAfterPrimaryKill = KillAndWait(process, PrimaryExitWaitMilliseconds);
+        var exitedAfterPrimaryKill = await KillAndWaitAsync(
+            process,
+            TimeSpan.FromMilliseconds(PrimaryExitWaitMilliseconds),
+            cancellationToken);
         var exitedAfterVerificationKill = exitedAfterPrimaryKill
-            || KillVerifiedProcessById(processId, startTime);
+            || await KillVerifiedProcessByIdAsync(processId, startTime, cancellationToken);
 
         return new NativeRuntimeStopResult(
             true,
@@ -33,7 +38,10 @@ public sealed class NativeRuntimeStopService
             exitedAfterVerificationKill);
     }
 
-    private static bool KillAndWait(Process process, int timeoutMilliseconds)
+    private static async Task<bool> KillAndWaitAsync(
+        Process process,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -41,7 +49,15 @@ public sealed class NativeRuntimeStopService
                 return true;
 
             process.Kill(entireProcessTree: true);
-            return process.WaitForExit(timeoutMilliseconds) || HasExited(process);
+            return await WaitForExitAsync(process, timeout, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            return HasExited(process);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -49,7 +65,10 @@ public sealed class NativeRuntimeStopService
         }
     }
 
-    private static bool KillVerifiedProcessById(int processId, DateTime? expectedStartTime)
+    private static async Task<bool> KillVerifiedProcessByIdAsync(
+        int processId,
+        DateTime? expectedStartTime,
+        CancellationToken cancellationToken)
     {
         if (processId <= 0)
             return false;
@@ -67,7 +86,10 @@ public sealed class NativeRuntimeStopService
                 return true;
 
             process.Kill(entireProcessTree: true);
-            return process.WaitForExit(VerificationExitWaitMilliseconds) || HasExited(process);
+            return await WaitForExitAsync(
+                process,
+                TimeSpan.FromMilliseconds(VerificationExitWaitMilliseconds),
+                cancellationToken);
         }
         catch (ArgumentException)
         {
@@ -76,6 +98,22 @@ public sealed class NativeRuntimeStopService
         catch
         {
             return false;
+        }
+    }
+
+    private static async Task<bool> WaitForExitAsync(
+        Process process,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).WaitAsync(timeout, cancellationToken);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return HasExited(process);
         }
     }
 

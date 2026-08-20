@@ -59,7 +59,9 @@ public sealed class RuntimeSourceRepositoryService
 
     public async Task CloneOrUpdateAsync(RuntimeSourceRepositoryRequest request)
     {
-        if (!RuntimeFileService.IsSafeRuntimeFolder(request.RuntimeRoot, request.SourceDir))
+        if (!await Task.Run(
+                () => RuntimeFileService.IsSafeRuntimeFolder(request.RuntimeRoot, request.SourceDir),
+                request.CancellationToken))
             throw new InvalidOperationException("Refusing to write runtime source outside the configured runtimes folder.");
 
         if (Directory.Exists(request.SourceDir))
@@ -74,7 +76,10 @@ public sealed class RuntimeSourceRepositoryService
             }
 
             await RuntimeBuildJobService.AppendRecoveryLogAsync(request.LogPath, $"Discarding incomplete runtime source folder before reclone: {request.SourceDir}", request.MaxLogBytes);
-            RuntimeFileService.DeleteSafeRuntimeFolder(request.RuntimeRoot, request.SourceDir);
+            await RuntimeFileService.DeleteSafeRuntimeFolderAsync(
+                request.RuntimeRoot,
+                request.SourceDir,
+                request.CancellationToken);
         }
 
         Directory.CreateDirectory(request.RuntimeRoot);
@@ -221,8 +226,13 @@ public sealed class RuntimeSourceRepositoryService
     {
         try
         {
-            if (Directory.Exists(request.SourceDir) && RuntimeFileService.IsSafeRuntimeFolder(request.RuntimeRoot, request.SourceDir))
-                RuntimeFileService.DeleteSafeRuntimeFolder(request.RuntimeRoot, request.SourceDir);
+            if (Directory.Exists(request.SourceDir))
+            {
+                await RuntimeFileService.DeleteSafeRuntimeFolderAsync(
+                    request.RuntimeRoot,
+                    request.SourceDir,
+                    CancellationToken.None);
+            }
         }
         catch (Exception cleanupEx)
         {

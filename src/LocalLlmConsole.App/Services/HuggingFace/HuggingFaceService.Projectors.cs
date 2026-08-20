@@ -18,7 +18,11 @@ public sealed partial class HuggingFaceService
             if (File.Exists(destination))
             {
                 RejectUnsafeExistingFile(destination, "vision projector");
-                var existingError = VerifyDownloadedFile(destination, projector, ExpectedBytes(projector, projector.SizeBytes));
+                var existingError = await VerifyDownloadedFileAsync(
+                    destination,
+                    projector,
+                    ExpectedBytes(projector, projector.SizeBytes),
+                    cancellationToken);
                 return string.IsNullOrWhiteSpace(existingError)
                     ? new VisionProjectorDownloadResult(destination, "")
                     : new VisionProjectorDownloadResult("", $"Existing vision projector did not verify: {existingError}");
@@ -41,7 +45,11 @@ public sealed partial class HuggingFaceService
                 await input.CopyToAsync(output, cancellationToken);
             }
 
-            var verificationError = VerifyDownloadedFile(partial, projector, ExpectedBytes(projector, total));
+            var verificationError = await VerifyDownloadedFileAsync(
+                partial,
+                projector,
+                ExpectedBytes(projector, total),
+                cancellationToken);
             if (!string.IsNullOrWhiteSpace(verificationError))
                 return new VisionProjectorDownloadResult("", $"Vision projector did not verify: {verificationError}");
             File.Move(partial, destination);

@@ -153,6 +153,33 @@ The full profile surface includes runtime and port, context, GPU layers/mode/dev
 
 The OpenAI-compatible gateway is separate from the control API. When enabled, query its model catalog with `GET http://127.0.0.1:<gateway-port>/v1/models`. Every saved launch profile is returned as a separate model entry:
 
+```json
+{
+  "id": "qwen--128k",
+  "object": "model",
+  "name": "Qwen",
+  "profile_name": "128K",
+  "context_length": 131072,
+  "meta": {
+    "n_ctx_train": 262144,
+    "n_params": 27000000000,
+    "size": 18000000000
+  }
+}
+```
+
+`context_length` is the context size configured on that saved profile, so
+profiles for the same GGUF may report different values. A value of `0` preserves
+the profile's automatic context setting; it is not an inferred model-training
+limit or a measurement of currently available KV cache.
+
+The optional `meta` values describe the underlying GGUF rather than the launch
+profile: `n_ctx_train` is its declared training context, `n_params` is its GGUF
+parameter count, and `size` is its current file size in bytes. They remain
+`null` when the file or metadata is unavailable and are never inferred from its
+name. Multiple profiles for one GGUF therefore share `meta` while retaining
+their own `context_length`.
+
 The gateway authenticates this catalog and all inference requests. Direct
 llama.cpp inference also requires the configured model API key, although some
 upstream builds expose health or model-catalog metadata without authentication.
@@ -224,6 +251,9 @@ llwmctl gateway inspect
 llwmctl sessions metrics <session-or-model>
 llwmctl sessions logs <session-or-model> --tail 32000
 llwmctl metrics
+llwmctl metrics usage --range month
+llwmctl metrics usage --range 90d --model <model-id> --profile <profile-id> --runtime <runtime-id>
+llwmctl metrics usage --date 2026-08-18 --date 2026-08-20
 llwmctl logs list
 llwmctl logs tail llama-server-example.log --tail 80000
 ```
@@ -237,6 +267,29 @@ include raw parsed Prometheus samples, metric type/help metadata, endpoint
 responsiveness, and the current `/slots` snapshot. Log responses are bounded and
 redact the configured model API key and common bearer/command-line secret patterns.
 
+`llwmctl metrics` returns the current raw live metrics. `llwmctl metrics usage`
+queries persisted usage history through `GET /api/v1/metrics/usage`. Accepted
+ranges are `1d`, `7d`, `month`, `30d`, `90d`, and `all`; `1d` uses the current
+local calendar day, while `month` returns the complete
+current calendar month while `30d` remains a rolling window. Optional `model`, `profile`, `runtime`,
+and `timeZone` query parameters narrow or regroup the result. Repeat `--date
+YYYY-MM-DD` (or pass a comma-separated `dates` query value) to aggregate up to
+366 exact local dates; exact dates take precedence over the range for totals.
+The response contains selected-period and tracked totals, selected local-day
+buckets, a separate rolling 24-month `calendarDays` surface with `isTracked`
+availability, model breakdowns and tracked-token share, active-day and peak-day
+insights, available filter dimensions, the daily-tracking start time, and a flag
+when all-time totals include preserved usage from before daily tracking.
+
+Input tokens are evaluated prompt tokens plus prompt tokens reused from cache.
+Cache hit rate uses only periods where the runtime exposed its cumulative cache
+counter. Average prompt and generation throughput uses cumulative active
+processing seconds reported by llama.cpp rather than wall time. Request totals
+and success rates appear only when a compatible runtime request counter is
+available. Optional counters are reported as unavailable rather than zero.
+Daily history starts at upgrade; pre-existing lifetime totals remain visible
+but are not assigned to synthetic dates.
+
 ## Hugging Face downloads and jobs
 
 ```powershell
@@ -249,7 +302,7 @@ llwmctl jobs resume <job-id>
 llwmctl jobs cancel <job-id>
 ```
 
-The existing Manager download pipeline remains responsible for filename safety, byte-count/SHA-256 validation, resumable partials, companion projector discovery, registration, launch-profile suggestions, and UI/job updates.
+The existing Manager download pipeline remains responsible for filename safety, byte-count/SHA-256 validation, resumable partials, companion projector discovery, registration, launch-profile suggestions, and UI/job updates. Generic `jobs pause|resume|cancel` commands apply only to Hugging Face download jobs. Runtime-build, runtime-package, and unknown job kinds return HTTP `409` without changing stored job state; use their matching runtime operations instead.
 
 ## Application settings
 
@@ -333,6 +386,7 @@ The complete live route and settings list is returned by `GET /api/v1/capabiliti
 - `GET /api/v1/models/{model}/companions`
 - `GET|PATCH /api/v1/settings`
 - `GET /api/v1/huggingface/search` and `POST /api/v1/huggingface/download`
+- `POST /api/v1/jobs/{job}/pause|resume|cancel` for Hugging Face downloads only
 - `GET /api/v1/operations` and `POST /api/v1/operations/{operation}`
 
 For uncommon or future routes, use the raw client while retaining discovery and authentication:

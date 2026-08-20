@@ -132,6 +132,28 @@ public partial class MainWindow
                 _overviewPage.SelectedLaunchProfileName));
     }
 
+    private async Task LoadLaunchProfileAsync(ModelRecord model, NamedModelLaunchProfile profile)
+    {
+        var loadedProfileId = _sessions.SessionForModel(model.Id) is { IsRunning: true } session
+            ? session.LaunchProfileId
+            : "";
+        await _coreServices.Models.ModelRuntimeLoadApplication.LoadOverviewAsync(
+            new OverviewModelRuntimeLoadApplicationRequest(
+                model,
+                IsModelLoaded(model),
+                IsModelActive(model),
+                AppReady: true,
+                SelectedProfileLoaded: string.Equals(loadedProfileId, profile.Id, StringComparison.OrdinalIgnoreCase)),
+            ModelRuntimeLoadActions(() => _settings, profile.Id, profile.Name));
+    }
+
+    private void BeginNewLaunchProfile()
+    {
+        _launchSettingsPanel.SetSaveAsNewModelName("");
+        _launchSettingsPanel.FocusSaveAsNewModelName();
+        SetStatus("Enter a profile name, adjust its settings, then choose Save New Profile.");
+    }
+
     private ModelRuntimeLoadApplicationActions ModelRuntimeLoadActions(
         Func<AppSettings> readLaunchSettings,
         string launchProfileId,
@@ -142,7 +164,7 @@ public partial class MainWindow
             () => RenderSelectedModelLaunchSettingsAsync(),
             readLaunchSettings,
             ListRuntimesAsync,
-            model => DraftModelLaunchProfileAsync(model, SelectedOverviewLaunchProfileId()),
+            model => DraftModelLaunchProfileAsync(model, launchProfileId),
             StopModelRuntimeAsync,
             (runtime, model, launchSettings) => StartModelRuntimeAsync(
                 runtime,

@@ -109,6 +109,7 @@ public sealed record MainWindowCoreRuntimeServices(
     RuntimeReadinessCompletionApplicationService RuntimeReadinessCompletionApplication,
     RuntimeReadinessMonitorApplicationService RuntimeReadinessMonitorApplication,
     RuntimeSessionApplicationService RuntimeSessionApplication,
+    JobRowProjectionService JobRows,
     RuntimeEndpointProbeService RuntimeEndpointProbe,
     EndpointInspectionService EndpointInspection,
     RuntimeTelemetryApplicationService RuntimeTelemetryApplication,

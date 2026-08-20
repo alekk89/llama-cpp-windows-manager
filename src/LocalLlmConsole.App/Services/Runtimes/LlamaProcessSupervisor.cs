@@ -7,7 +7,7 @@ public enum LlamaRuntimeState
     Loaded,
     Failed
 }
-public sealed partial class LlamaProcessSupervisor : IDisposable
+public sealed partial class LlamaProcessSupervisor : IDisposable, IAsyncDisposable
 {
     private readonly WslRuntimeStopService _wslRuntimeStop;
     private readonly NativeRuntimeStopService _nativeRuntimeStop;
@@ -56,10 +56,12 @@ public sealed partial class LlamaProcessSupervisor : IDisposable
         _nativeRuntimeStop = nativeRuntimeStop ?? throw new ArgumentNullException(nameof(nativeRuntimeStop));
     }
 
-    public Task StartAsync(RuntimeRecord runtime, ModelRecord model, AppSettings settings, string logRoot)
+    public async Task StartAsync(RuntimeRecord runtime, ModelRecord model, AppSettings settings, string logRoot)
     {
         RuntimeAvailabilityService.EnsureAvailable(runtime);
-        Stop();
+        var previousStop = await StopVerifiedAsync();
+        if (!previousStop.VerifiedStopped)
+            throw new InvalidOperationException(previousStop.Error);
         Directory.CreateDirectory(logRoot);
         LogPath = Path.Combine(logRoot, $"llama-server-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.log");
         _log = new BoundedLogWriter(LogPath, BoundedLogFile.MegabytesToBytes(settings.MaxLogFileSizeMb));
@@ -208,7 +210,6 @@ public sealed partial class LlamaProcessSupervisor : IDisposable
         ActiveModelId = model.Id;
         ActiveRuntimeId = runtime.Id;
         _lastSettings = settings;
-        return Task.CompletedTask;
     }
 
     public bool MarkLoadedIfRunning()

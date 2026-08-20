@@ -8,7 +8,7 @@ endpoints on native Windows or Ubuntu/WSL.
 > `llama.cpp` or `ggml-org`.
 
 [Download the latest release](https://github.com/alekk89/llama-cpp-windows-manager/releases/latest)
-· [Read the documentation](docs/DEVELOPMENT.md)
+· [Read the user guide](docs/USER_GUIDE.md)
 · [Automate with `llwmctl`](docs/CONTROL_API.md)
 
 <p align="center">
@@ -29,8 +29,9 @@ endpoints on native Windows or Ubuntu/WSL.
 * **Connect OpenAI compatible coding and chat clients** through direct model
   endpoints or one shared gateway.
 * **Automate and monitor advanced workflows** with model groups, transactional
-  loading, idle unloading, live metrics, logs, and the authenticated `llwmctl`
-  control API.
+  loading, idle unloading, live and historical metrics, a selectable 24-month
+  activity calendar, cache reuse and throughput statistics, logs, and the
+  authenticated `llwmctl` control API.
 
 > Choose a chat focused tool when simplicity is the priority. Choose llama.cpp
 > Windows Manager when you need deeper control, multiple managed models, and
@@ -77,7 +78,9 @@ file integrity; it is not a publisher identity guarantee.
    is ready when its state becomes **Loaded**.
 5. Point an OpenAI-compatible client at the displayed direct endpoint, or enable
    the shared gateway in **Settings** and use a model ID returned by
-   `GET /v1/models`.
+   `GET /v1/models`. Each gateway model entry also reports the saved profile's
+   configured `context_length` plus available GGUF training-context, parameter,
+   and file-size metadata for client discovery.
 
 Model inference always requires the API key configured in **Settings**. The key
 is protected for the current Windows user and passed to `llama-server` through
@@ -120,6 +123,7 @@ llwmctl load <model> --profile <profile> --wait
 llwmctl sessions inspect <session>
 llwmctl gateway inspect
 llwmctl sessions metrics <session>
+llwmctl metrics usage --range month
 llwmctl sessions logs <session>
 ```
 
@@ -138,6 +142,8 @@ The full command and HTTP contracts are documented in
   if the Manager exits unexpectedly.
 - Downloads and updates validate sizes, checksums when supplied, filenames, and
   archive paths before installation.
+- Managed runtime installs record file hashes for visible provenance and later
+  re-verification; manually registered runtimes are clearly marked unverified.
 - Installer repair, update, and normal uninstall preserve application data
   unless data removal is explicitly selected.
 
@@ -169,13 +175,22 @@ Architecture and contribution details are in
 [Development guide](docs/DEVELOPMENT.md) and
 [Architecture contract](docs/ARCHITECTURE.md).
 
+## Roadmap
+
+- [First-class vLLM runtime support through WSL](https://github.com/alekk89/llama-cpp-windows-manager/issues/17)
+  is planned and open for contributions. Comment on the issue before starting
+  so the runtime contract, model support, and UI work can be coordinated.
+
 ## Documentation
 
+- [User guide](docs/USER_GUIDE.md)
 - [Release readiness](docs/RELEASE_READINESS.md)
 - [Windows installer](docs/INSTALLER.md)
 - [Signing releases](docs/SIGNING.md)
 - [Local control API](docs/CONTROL_API.md)
-- [Release hardening audit](docs/AUDIT.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
 
 ## License
 

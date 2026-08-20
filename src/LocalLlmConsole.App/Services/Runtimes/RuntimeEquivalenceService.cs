@@ -60,7 +60,7 @@ public static class RuntimeEquivalenceService
         if (!string.IsNullOrWhiteSpace(RuntimeMetadataService.RuntimeFingerprint(runtime))) return runtime;
         var folder = RuntimeMetadataService.Folder(runtime);
         if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return runtime;
-        var fingerprint = ComputeFolderFingerprint(folder);
+        var fingerprint = await ComputeFolderFingerprintAsync(folder, cancellationToken);
         if (string.IsNullOrWhiteSpace(fingerprint)) return runtime;
         var updated = WithMetadata(runtime, metadata =>
         {
@@ -97,6 +97,11 @@ public static class RuntimeEquivalenceService
         overall.TransformFinalBlock([], 0, 0);
         return Convert.ToHexString(overall.Hash ?? []).ToLowerInvariant();
     }
+
+    public static Task<string> ComputeFolderFingerprintAsync(
+        string folder,
+        CancellationToken cancellationToken = default)
+        => Task.Run(() => ComputeFolderFingerprint(folder), cancellationToken);
 
     private static IEnumerable<string> FingerprintFiles(string folder)
     {

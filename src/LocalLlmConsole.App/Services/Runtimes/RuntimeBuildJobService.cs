@@ -146,7 +146,14 @@ public static class RuntimeBuildJobService
         metadata["managedPresetLabel"] = preset.Label;
         metadata["managedMode"] = RuntimeBuildCatalogService.ModeKey(preset.Mode);
         metadata["managedAction"] = update ? "update" : "build";
+        metadata["packageSource"] = "Local source build";
+        metadata["repoUrl"] = preset.RepoUrl;
+        metadata["sourceUrl"] = preset.RepoUrl;
+        metadata["runtimeVersion"] = metadata["commit"]?.ToString() ?? preset.Branch;
+        metadata["checksumStatus"] = "not-applicable-local-build";
+        metadata["signatureStatus"] = "not-applicable-local-build";
         metadata["managedInstalledAt"] = DateTimeOffset.UtcNow.ToString("O");
+        await RuntimeInstallationVerificationService.StampManifestAsync(installDir, metadata);
         await File.WriteAllTextAsync(metadataPath, metadata.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 

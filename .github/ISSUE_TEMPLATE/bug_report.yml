@@ -1,0 +1,77 @@
+name: Bug report
+description: Report a reproducible problem in llama.cpp Windows Manager.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, control tokens, private URLs, or unredacted sensitive logs.
+  - type: input
+    id: version
+    attributes:
+      label: Application version
+      placeholder: v2.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: distribution
+    attributes:
+      label: Distribution
+      options: [Installer, Portable ZIP, Single executable, Source build]
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Native Windows or WSL, source/version, backend, GPU and driver if relevant.
+      placeholder: Native Windows, official b9354, Vulkan, Radeon RX 7800 XT
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model filename
+      description: Filename only is usually enough. Do not include a private full path.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Open ...\n2. Select ...\n3. Observe ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Paste only the relevant redacted excerpt or attach a sanitized file.
+      render: text
+  - type: dropdown
+    id: restart
+    attributes:
+      label: Does it persist after restarting the Manager?
+      options: [Yes, No, Not tested]
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed API keys, control tokens, private URLs, and sensitive personal data.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true

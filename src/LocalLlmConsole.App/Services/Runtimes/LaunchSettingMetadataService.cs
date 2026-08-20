@@ -3,7 +3,7 @@ namespace LocalLlmConsole.Services;
 
 public static class LaunchSettingMetadataService
 {
-    public const string AtomicMtpSpeculativeType = "atomic-mtp";
+    public const string AtomicMtpSpeculativeType = SpeculativeTypePolicy.AtomicMtp;
 
     public static readonly IReadOnlyList<string> AutoOnOffOptions = ["auto", "on", "off"];
     public static readonly IReadOnlyList<string> OnOffOptions = ["on", "off"];
@@ -16,20 +16,13 @@ public static class LaunchSettingMetadataService
     public static readonly IReadOnlyList<string> GpuModeOptions = ["auto", "single", "layer", "row", "tensor"];
 
     public static string NormalizeSpeculativeType(string value)
-    {
-        var normalized = (value ?? "")
-            .Trim()
-            .ToLowerInvariant()
-            .Replace('_', '-')
-            .Replace(' ', '-');
-        return normalized == "mtp" ? AtomicMtpSpeculativeType : normalized;
-    }
+        => SpeculativeTypePolicy.Normalize(value);
 
     public static bool IsAtomicMtpSpeculativeType(string value)
-        => NormalizeSpeculativeType(value).Equals(AtomicMtpSpeculativeType, StringComparison.OrdinalIgnoreCase);
+        => SpeculativeTypePolicy.IsAtomicMtp(value);
 
     public static string LlamaSpeculativeTypeArgument(string value)
-        => IsAtomicMtpSpeculativeType(value) ? "mtp" : NormalizeSpeculativeType(value);
+        => SpeculativeTypePolicy.LlamaArgument(value);
 
     public static string NormalizeGpuMode(string value)
     {

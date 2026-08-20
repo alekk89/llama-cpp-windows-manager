@@ -43,8 +43,8 @@ public sealed class WslEnvironmentService
         var listTask = RunWslAsync(["-l", "-v"], cancellationToken);
         await Task.WhenAll(statusTask, listTask);
 
-        var status = statusTask.Result;
-        var list = listTask.Result;
+        var status = await statusTask;
+        var list = await listTask;
         if (LooksLikeWslNotInstalled(FirstText(status.Error, list.Error, status.Output, list.Output)))
             return WslNotInstalledReport(FirstText(status.Error, list.Error, status.Output, list.Output));
 

@@ -13,6 +13,11 @@ public static class CacheMaintenanceService
     public static long Size(string cacheRoot)
         => FileSystemSafetyService.DirectorySize(cacheRoot);
 
+    public static Task<long> SizeAsync(string cacheRoot, CancellationToken cancellationToken = default)
+        => Task.Run(
+            () => FileSystemSafetyService.DirectorySize(cacheRoot, cancellationToken),
+            cancellationToken);
+
     public static void ClearSafeCacheRoot(string workspaceRoot, string cacheRoot)
     {
         if (!IsSafeCacheRoot(workspaceRoot, cacheRoot))

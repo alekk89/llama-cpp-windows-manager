@@ -49,21 +49,7 @@ public static class AppPreferenceService
         if (LocalizedEquals(text, "Pref.DirectModelsLanOnly")) return "models";
         if (LocalizedEquals(text, "Pref.GatewayAndDirectLan")) return "both";
         if (LocalizedEquals(text, "Pref.LocalOnly")) return "local";
-
-        var value = (text ?? "").Trim()
-            .Replace("-", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("_", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("+", "", StringComparison.OrdinalIgnoreCase)
-            .Replace(" ", "", StringComparison.OrdinalIgnoreCase)
-            .ToLowerInvariant();
-        return value switch
-        {
-            "gateway" or "gatewaylan" or "gatewayonly" or "gatewaylanonly" or "router" or "routerlan" or "routeronly" or "routerlanonly" => "gateway",
-            "models" or "modellan" or "modelsnetwork" or "modelsaccess" or "modelsnetworkaccess" or "direct" or "directlan" or "directonly" or "directlanonly" or "directmodels" or "directmodelslan" or "directmodelsonly" or "directmodelslanonly" => "models",
-            "both" or "all" or "gatewaydirect" or "gatewaydirectlan" or "routerdirect" or "routerdirectlan" or "gatewaymodels" or "gatewaymodelslan" => "both",
-            "lan" or "lanaccess" or "network" or "networkaccess" => "both",
-            _ => "local"
-        };
+        return ModelAccessPolicy.Normalize(text);
     }
 
     public static string ModelAccessModeLabel(string text) => ModelAccessMode(text) switch
@@ -83,16 +69,10 @@ public static class AppPreferenceService
     ];
 
     public static bool GatewayAllowsLanAccess(string text)
-    {
-        var mode = ModelAccessMode(text);
-        return mode is "gateway" or "both";
-    }
+        => ModelAccessPolicy.GatewayAllowsLanAccess(ModelAccessMode(text));
 
     public static bool DirectModelsAllowLanAccess(string text)
-    {
-        var mode = ModelAccessMode(text);
-        return mode is "models" or "both";
-    }
+        => ModelAccessPolicy.DirectModelsAllowLanAccess(ModelAccessMode(text));
 
     public static string GatewaySwapPolicy(string text)
     {
@@ -122,13 +102,7 @@ public static class AppPreferenceService
     {
         if (LocalizedEquals(text, "Pref.Compatibility")) return "compatibility";
         if (LocalizedEquals(text, "Pref.Latest")) return "latest";
-
-        var value = (text ?? "").Trim()
-            .Replace("-", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("_", "", StringComparison.OrdinalIgnoreCase)
-            .Replace(" ", "", StringComparison.OrdinalIgnoreCase)
-            .ToLowerInvariant();
-        return value is "compatibility" or "compatible" or "cuda12" or "cuda12compatibility" ? "compatibility" : "latest";
+        return PackagePreferencePolicy.NormalizeCuda(text);
     }
 
     public static string CudaPackagePreferenceLabel(string text)
@@ -188,7 +162,7 @@ public static class AppPreferenceService
         => string.Equals((value ?? "").Trim(), Loc.T(localizationKey).Trim(), StringComparison.CurrentCultureIgnoreCase);
 
     public static string RuntimeHostForAccessMode(string accessMode)
-        => DirectModelsAllowLanAccess(accessMode) ? "0.0.0.0" : "127.0.0.1";
+        => ModelAccessPolicy.RuntimeHost(ModelAccessMode(accessMode));
 
     public static bool TryIntValue(string text, out int value)
         => int.TryParse((text ?? "").Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);

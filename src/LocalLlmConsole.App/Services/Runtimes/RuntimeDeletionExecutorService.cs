@@ -9,15 +9,20 @@ public sealed class RuntimeDeletionExecutorService
         _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
     }
 
-    public async Task DeleteRuntimeSourceAsync(RuntimeSourceDeletionPlan plan, string runtimeRoot)
+    public async Task DeleteRuntimeSourceAsync(
+        RuntimeSourceDeletionPlan plan,
+        string runtimeRoot,
+        CancellationToken cancellationToken = default)
     {
         if (!plan.CanDelete) return;
         if (Directory.Exists(plan.SourceDir))
-            RuntimeFileService.DeleteSafeRuntimeFolder(runtimeRoot, plan.SourceDir);
-        await Task.CompletedTask;
+            await RuntimeFileService.DeleteSafeRuntimeFolderAsync(runtimeRoot, plan.SourceDir, cancellationToken);
     }
 
-    public async Task DeleteRuntimeAsync(RuntimeDeletionPlan plan, string runtimeRoot)
+    public async Task DeleteRuntimeAsync(
+        RuntimeDeletionPlan plan,
+        string runtimeRoot,
+        CancellationToken cancellationToken = default)
     {
         if (!plan.CanDelete) return;
 
@@ -29,12 +34,15 @@ public sealed class RuntimeDeletionExecutorService
         if (plan.Kind != RuntimeDeletionPlanKind.DeleteFiles) return;
         foreach (var folder in plan.Folders)
         {
-            if (Directory.Exists(folder) && RuntimeFileService.IsSafeRuntimeFolder(runtimeRoot, folder))
-                RuntimeFileService.DeleteRuntimeFiles(runtimeRoot, folder);
+            if (Directory.Exists(folder))
+                await RuntimeFileService.DeleteRuntimeFilesAsync(runtimeRoot, folder, cancellationToken);
         }
     }
 
-    public async Task DeletePackageAsync(RuntimeDeletionPlan plan, string runtimeRoot)
+    public async Task DeletePackageAsync(
+        RuntimeDeletionPlan plan,
+        string runtimeRoot,
+        CancellationToken cancellationToken = default)
     {
         if (!plan.CanDelete) return;
 
@@ -43,26 +51,34 @@ public sealed class RuntimeDeletionExecutorService
 
         foreach (var folder in plan.Folders)
         {
-            if (Directory.Exists(folder) && RuntimeFileService.IsSafeRuntimeFolder(runtimeRoot, folder))
-                RuntimeFileService.DeleteSafeRuntimeFolder(runtimeRoot, folder);
+            if (Directory.Exists(folder))
+                await RuntimeFileService.DeleteSafeRuntimeFolderAsync(runtimeRoot, folder, cancellationToken);
         }
     }
 
-    public async Task DeleteBuildPresetAsync(RuntimeBuildPresetDeletionPlan plan, string runtimeRoot)
+    public async Task DeleteBuildPresetAsync(
+        RuntimeBuildPresetDeletionPlan plan,
+        string runtimeRoot,
+        CancellationToken cancellationToken = default)
     {
         if (!plan.CanDelete) return;
 
         foreach (var runtime in plan.Runtimes)
         {
             await _stateStore.DeleteRuntimeAsync(runtime.Id);
-            if (RuntimeFileService.CanDeleteRuntimeFiles(runtime, runtimeRoot, out var folder, out _))
-                RuntimeFileService.DeleteRuntimeFiles(runtimeRoot, folder);
+            var deletionTarget = await Task.Run(() =>
+            {
+                var canDelete = RuntimeFileService.CanDeleteRuntimeFiles(runtime, runtimeRoot, out var folder, out _);
+                return (CanDelete: canDelete, Folder: folder);
+            }, cancellationToken);
+            if (deletionTarget.CanDelete)
+                await RuntimeFileService.DeleteRuntimeFilesAsync(runtimeRoot, deletionTarget.Folder, cancellationToken);
         }
 
         foreach (var sourceDir in plan.SourceFolders)
         {
             if (Directory.Exists(sourceDir))
-                RuntimeFileService.DeleteSafeRuntimeFolder(runtimeRoot, sourceDir);
+                await RuntimeFileService.DeleteSafeRuntimeFolderAsync(runtimeRoot, sourceDir, cancellationToken);
         }
 
         if (plan.RemoveCustomRepository)

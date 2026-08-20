@@ -37,8 +37,15 @@ llwmctl load <model> --profile <profile> --wait
 llwmctl sessions inspect <session>
 llwmctl gateway inspect
 llwmctl sessions metrics <session>
+llwmctl metrics usage --range month
+llwmctl metrics usage --date 2026-08-18 --date 2026-08-20
 llwmctl sessions logs <session>
 ```
+
+The shared gateway's `GET /v1/models` catalog reports every saved profile route
+and its configured context size as `context_length`; `0` means automatic context
+sizing. Its optional `meta` object reports GGUF training context, parameter
+count, and file size without guessing missing values.
 
 Run `self` before any action that can stop or replace a loaded model. Never use
 `--allow-self-stop` or `--confirm` without explicit authorization for the stated

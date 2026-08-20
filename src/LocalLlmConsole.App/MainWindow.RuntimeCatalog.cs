@@ -64,6 +64,21 @@ public partial class MainWindow
             RuntimeCatalogCustomRepositoryActions(SetStatus));
     }
 
+    private async Task VerifyRuntimeInstallationAsync(RuntimeRecord runtime)
+    {
+        SetStatus($"Verifying {runtime.Name}...");
+        var result = await RuntimeInstallationVerificationService.VerifyAsync(runtime);
+        await RefreshRuntimesAsync();
+        SetStatus(result.Summary);
+        if (!result.IsVerified)
+        {
+            var details = result.Problems.Count == 0
+                ? result.Summary
+                : result.Summary + Environment.NewLine + string.Join(Environment.NewLine, result.Problems.Take(10));
+            _coreServices.App.Dialogs.Notify(this, details, "Runtime verification", MessageBoxImage.Warning);
+        }
+    }
+
     private RuntimeCustomRepositoryDraft? ShowCustomRuntimeRepositoryDialog()
     {
         var customRuntimeRepositories = RuntimeServices.CustomRuntimeRepositories;

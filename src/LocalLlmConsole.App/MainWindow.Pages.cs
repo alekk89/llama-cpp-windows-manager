@@ -91,7 +91,7 @@ public partial class MainWindow
             case "Models": ShowModels(); break;
             case "Runtimes": ShowRuntimes(); break;
             case "Settings": ShowSettings(); break;
-            case "Lifetime": ShowLifetime(); break;
+            case "Metrics": ShowLifetime(); break;
             case "Logs": ShowLogs(); break;
             case "Windows": ShowWindows(); break;
             case "WSL Linux": ShowWslLinux(); break;

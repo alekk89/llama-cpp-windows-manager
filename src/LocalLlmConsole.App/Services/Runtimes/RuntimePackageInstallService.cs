@@ -44,7 +44,9 @@ public sealed class RuntimePackageInstallService
             var selection = RuntimePackageAssetSelector.SelectAssets(request.Preset, release, request.Settings.CudaPackagePreference);
             installDir = RuntimePackageInstallFileService.InstallDir(request.Settings.RuntimeRoot, selection);
             var cacheDir = RuntimePackageInstallFileService.DownloadCacheDir(request.Settings.CacheRoot, selection);
-            PrepareInstallDirectory(request.Settings.RuntimeRoot, installDir);
+            await Task.Run(
+                () => PrepareInstallDirectory(request.Settings.RuntimeRoot, installDir),
+                request.CancellationToken);
             Directory.CreateDirectory(cacheDir);
 
             foreach (var asset in selection.AllAssets)
@@ -63,7 +65,9 @@ public sealed class RuntimePackageInstallService
                 }
                 else
                 {
-                    RuntimePackageInstallFileService.ExtractArchive(archivePath, installDir);
+                    await Task.Run(
+                        () => RuntimePackageInstallFileService.ExtractArchive(archivePath, installDir),
+                        request.CancellationToken);
                 }
             }
 
@@ -91,12 +95,14 @@ public sealed class RuntimePackageInstallService
         catch
         {
             if (!string.IsNullOrWhiteSpace(installDir)
-                && Directory.Exists(installDir)
-                && RuntimeFileService.IsSafeRuntimeFolder(request.Settings.RuntimeRoot, installDir))
+                && Directory.Exists(installDir))
             {
                 try
                 {
-                    RuntimeFileService.DeleteSafeRuntimeFolder(request.Settings.RuntimeRoot, installDir);
+                    await RuntimeFileService.DeleteSafeRuntimeFolderAsync(
+                        request.Settings.RuntimeRoot,
+                        installDir,
+                        CancellationToken.None);
                 }
                 catch (Exception cleanupEx)
                 {

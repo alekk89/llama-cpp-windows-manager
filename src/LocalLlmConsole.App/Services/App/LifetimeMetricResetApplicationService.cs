@@ -59,7 +59,7 @@ public sealed class LifetimeMetricResetApplicationService
 
         var confirmation = new LifetimeMetricResetConfirmation(
             "Reset lifetime metrics",
-            $"Reset lifetime token metrics for:{Environment.NewLine}{Environment.NewLine}{modelName}");
+            $"Reset usage metrics for:{Environment.NewLine}{Environment.NewLine}{modelName}");
         if (!actions.ConfirmReset(confirmation))
             return LifetimeMetricResetApplicationOutcome.Cancelled;
 
@@ -74,7 +74,7 @@ public sealed class LifetimeMetricResetApplicationService
     {
         var confirmation = new LifetimeMetricResetConfirmation(
             "Reset all lifetime metrics",
-            "Reset lifetime token metrics for all models?");
+            "Reset usage metrics for all models?");
         if (!actions.ConfirmReset(confirmation))
             return LifetimeMetricResetApplicationOutcome.Cancelled;
 

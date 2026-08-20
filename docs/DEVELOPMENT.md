@@ -1,6 +1,6 @@
 # Development Guide
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-20
 
 This repo is a Windows-first .NET 10 WPF app. The app should stay easy to run
 from source, but end users should receive the published portable app or
@@ -17,7 +17,7 @@ models, or llama.cpp runtimes.
 git clone https://github.com/alekk89/llama-cpp-windows-manager.git
 Set-Location llama-cpp-windows-manager
 Get-Content AGENTS.md
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-app.ps1 -Restore -LockedRestore
 ```
 
 Before launching a source build, check whether the single-instance production
@@ -71,6 +71,11 @@ selected in `global.json`; project-specific commands therefore use `dotnet test
 --project <path>`, while a solution-wide run uses `dotnet test --solution
 LocalLlmConsole.sln`.
 
+NuGet lock files are committed for every project. CI and release preparation
+must restore them in locked mode. Update lock files intentionally with
+`dotnet restore LocalLlmConsole.sln --force-evaluate`, review the dependency
+diff, then return to `-LockedRestore`.
+
 To include packaging on a machine with publish/installer prerequisites, run:
 
 ```powershell
@@ -91,7 +96,24 @@ Contract". Treat that section as the source of truth when deciding whether a
 change belongs in `MainWindow`, a page controller, an application service, a
 workflow service, a domain service, or infrastructure.
 
-Top-level `Services` files are reserved for composition/root wiring:
+`src/LocalLlmConsole.Core` targets platform-neutral `net10.0`. It owns all
+shared model contracts and reusable behavior that does not require WPF,
+Windows-specific APIs, SQLite, or app localization. Keep its dependency graph
+closed: `LocalLlmConsole.App` may reference Core, but Core must never reference
+the app. The architecture test enforces this rule.
+
+Core feature folders currently contain:
+
+| Folder | Ownership |
+| --- | --- |
+| `Models` | Shared settings, model/runtime/session/job records, UI row contracts, runtime catalog/package contracts, and telemetry snapshots. |
+| `Services/App` | Portable preference and access policy normalization. |
+| `Services/HuggingFace` | README/config/command launch-setting suggestion parsing. |
+| `Services/Infrastructure` | Platform-neutral display formatting only. |
+| `Services/Models` | Pure model allocation policy. |
+| `Services/Runtimes` | Endpoint addressing, launch parsing/options, package selection, runtime/session decisions, and telemetry/dashboard policy. |
+
+Top-level WPF-app `Services` files are reserved for composition/root wiring:
 
 - `AppServiceFactory*.cs`
 - `MainWindowServices.cs`
@@ -99,17 +121,26 @@ Top-level `Services` files are reserved for composition/root wiring:
   - Keep new dependencies in the narrowest matching bundle rather than adding
     another top-level constructor parameter.
 
-Implementation services live under feature modules:
+Windows, storage, network-hosting, localization, and UI-facing implementation
+services remain under `src/LocalLlmConsole.App` feature modules:
 
 | Folder | Ownership |
 | --- | --- |
 | `Services/App` | App settings, startup/shutdown, updates, logs, help, cache, and shared app workflows. |
 | `Services/Environment` | Windows and WSL detection, setup command planning, and visible tool setup launchers. |
 | `Services/Gateway` | Local model gateway host/runtime contracts and gateway activity state. |
-| `Services/HuggingFace` | Hugging Face search, metadata, download safety, download history, and launch suggestions. |
-| `Services/Infrastructure` | State store, local app service, process runner, filesystem/config safety, dialogs, jobs, formatting, and shell helpers. |
+| `Services/HuggingFace` | Hugging Face search, metadata, download safety, and download history. |
+| `Services/Infrastructure` | State store, local app service, process runner, filesystem/config safety, dialogs, jobs, and shell helpers. |
 | `Services/Models` | Model catalog, model capabilities, aliases, model launch profiles, and model deletion/import behavior. |
-| `Services/Runtimes` | Runtime registry, packages, source/build jobs, launch validation, sessions, metrics, readiness, and process supervision. |
+| `Services/Runtimes` | Runtime registry, source/build jobs, launch execution, sessions, metric polling, readiness, and process supervision. |
+
+The control API host and router remain in `Services/Control/LocalControlApi.cs`;
+focused handlers own model, profile, group, runtime, session/gateway/metrics,
+settings, logs, jobs/Hugging Face, and operation routes, while
+`ControlEndpointHandler` owns shared request parsing and response projection.
+The host is not partial and does not implement domain endpoints.
+Application-wide WPF resources are composed from the focused dictionaries under
+`Themes`.
 
 UI factories and page state live under:
 
@@ -151,9 +182,9 @@ Use these rules when touching `MainWindow`:
 - Loaded services should be reached through `AppServices`, `ModelServices`,
   `GatewayServices`, and `RuntimeServices`. Do not add flat pass-through aliases
   to `MainWindowLoadedServices`.
-- Page-specific row/event routing belongs in page controllers. Models, Hugging
-  Face download history, Runtimes, Windows, WSL, Overview, Logs,
-  Lifetime, and Settings pages already follow this pattern.
+- Page-specific row/event routing belongs in page controllers. Models, launch
+  settings, Hugging Face download history, Runtimes, Windows, WSL, Overview,
+  Logs, Lifetime, and Settings pages already follow this pattern.
 - Runtime control-API dispatch and workflow composition belong in
   `ControlRuntimeOperationApplicationService`; theme resource mutation belongs
   in `ApplicationThemeService`; shared visual-tree and accessibility helpers
@@ -164,6 +195,9 @@ Use these rules when touching `MainWindow`:
 - Keep `ModelGroupDialogFactory` split by dialog responsibility; each partial is
   limited to 300 nonblank lines by the architecture test.
 - Empty placeholder partials should be deleted.
+- Production C# files must stay at or below 425 lines and test C# files at or
+  below 675 lines. The architecture test enforces both limits. Split by stable
+  responsibility before reaching the limit; do not create numbered part files.
 
 ## Test Guidance
 
@@ -171,12 +205,26 @@ Prefer behavior tests over source-shape tests. Source-shape tests are acceptable
 for architectural guardrails, but they should check durable boundaries, not
 fragile line-by-line implementation details.
 
+The coverage gate includes both Core and App source paths. A new Core service
+must remain behavior-tested even though it is consumed through the WPF app.
+
 Useful test groups:
 
 - `ReleaseHardening.Architecture.Tests.cs`: module layout guardrails.
-- `ReleaseHardening.Runtime.Tests.cs`: runtime/session/metrics/build behavior.
-- `ReleaseHardening.HuggingFace.Tests.cs`: search/download/safety behavior.
-- `ReleaseHardening.Ui.Tests.cs`: view model and UI composition invariants.
+- `ReleaseHardening.RuntimeProcessLifecycle.Tests.cs` and
+  `ReleaseHardening.RuntimeAdapter.Tests.cs`: process and launch behavior.
+- `ReleaseHardening.RuntimeMetricParsing.Tests.cs` and
+  `ReleaseHardening.RuntimeTelemetry.Tests.cs`: metric parsing, state, and UI
+  application behavior.
+- `ReleaseHardening.ModelCompanions.Tests.cs`,
+  `ReleaseHardening.DownloadSafety.Tests.cs`, and
+  `ReleaseHardening.ModelCatalogIntegrity.Tests.cs`: model and download safety.
+- `ReleaseHardening.UiShell.Tests.cs`,
+  `ReleaseHardening.UiThemesAndLayout.Tests.cs`, and
+  `ReleaseHardening.UiApplicationBoundaries.Tests.cs`: shell, theme, layout,
+  view-model, and application-boundary invariants.
+- `FakeRuntimeIntegration.Tests.cs`: real process supervision against the
+  deterministic test runtime under `tests/LocalLlmConsole.FakeRuntime`.
 
 ### Adding an app-level UI preference
 
@@ -210,7 +258,8 @@ pass:
   architectural guardrails.
 - `docs/RELEASE_READINESS.md` for manual validation steps and latest verified
   command results.
-- `docs/GITHUB_RELEASE_NEXT.md` for unreleased user-visible changes.
+- GitHub release drafts for unreleased user-visible changes; do not keep
+  copy/paste release notes or internal working notes in the source tree.
 - `AGENTS.md`, `agent.md`, and `docs/CONTROL_API.md` when an automation-facing
   field or operation changes; these are embedded release sidecars.
 - `Services/App/HelpCatalogService.cs` for concise Help topics and search terms,

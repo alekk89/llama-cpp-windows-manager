@@ -371,7 +371,8 @@ public sealed partial class ReleaseHardeningTests
         var runtime = new RuntimeRecord("runtime", "llama.cpp CUDA", RuntimeMode.Native, RuntimeBackend.Cuda, Path.Combine(root, "llama-server.exe"), "{}", DateTimeOffset.UtcNow);
         var modelA = new ModelRecord("model-a", "Model A", Path.Combine(root, "a.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
         var modelB = new ModelRecord("model-b", "Model B", Path.Combine(root, "b.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
-        using var manager = CreateLoadedModelSessionManager();
+        var now = new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
+        using var manager = CreateLoadedModelSessionManager(() => now);
         var coordinator = new RuntimeSessionCoordinator(manager, Path.Combine(root, "logs"));
         manager.AttachExisting(runtime, modelA, settings with { Port = 8081 }, "a.log", LlamaRuntimeState.Loaded, "", LoadedModelSessionManager.SessionIdFor(modelA.Id), DateTimeOffset.UtcNow);
 
@@ -394,7 +395,8 @@ public sealed partial class ReleaseHardeningTests
         var runtime = new RuntimeRecord("runtime", "llama.cpp CUDA", RuntimeMode.Native, RuntimeBackend.Cuda, Path.Combine(root, "llama-server.exe"), "{}", DateTimeOffset.UtcNow);
         var modelA = new ModelRecord("model-a", "Model A", Path.Combine(root, "a.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
         var modelB = new ModelRecord("model-b", "Model B", Path.Combine(root, "b.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
-        using var manager = CreateLoadedModelSessionManager();
+        var now = new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.Zero);
+        using var manager = CreateLoadedModelSessionManager(() => now);
         var coordinator = new RuntimeSessionCoordinator(manager, Path.Combine(root, "logs"));
         manager.AttachExisting(runtime, modelA, settings with { Port = 8081 }, "a.log", LlamaRuntimeState.Loaded, "", "session-a", DateTimeOffset.UtcNow);
         manager.AttachExisting(runtime, modelB, settings with { Port = 8083 }, "b.log", LlamaRuntimeState.Loaded, "", "session-b", DateTimeOffset.UtcNow);
@@ -408,6 +410,11 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(8081, stopped.ActiveSettings?.Port);
         Assert.False(manager.IsModelLoaded(modelB.Id));
         Assert.True(manager.IsModelLoaded(modelA.Id));
+        Assert.Contains(manager.OverviewSnapshots(), session => session.ModelId == modelB.Id && !session.IsRunning);
+
+        now = now.AddSeconds(2.1);
+
+        Assert.DoesNotContain(manager.OverviewSnapshots(), session => session.ModelId == modelB.Id);
     }
 
 

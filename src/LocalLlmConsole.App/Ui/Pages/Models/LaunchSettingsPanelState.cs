@@ -78,6 +78,13 @@ public sealed class LaunchSettingsPanelState
             SaveAsNewModelNameBox.Text = name ?? "";
     }
 
+    public void FocusSaveAsNewModelName()
+    {
+        if (SaveAsNewModelNameBox is null) return;
+        SaveAsNewModelNameBox.Focus();
+        SaveAsNewModelNameBox.SelectAll();
+    }
+
     public void SetSaveAsNewEnabled(bool enabled)
     {
         if (SaveAsNewModelButton is not null)

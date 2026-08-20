@@ -41,13 +41,27 @@ public sealed class ModelCatalogRefreshApplicationService
         }
 
         var namedProfiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
-        var sizeLabels = await Task.Run(
-            () => models.ToDictionary(
-                model => model.Id,
-                model => ModelSizeLabel(model.ModelPath),
-                StringComparer.OrdinalIgnoreCase),
-            cancellationToken);
+        var sizeLabels = await ReadModelSizeLabelsAsync(models, cancellationToken);
         return new ModelCatalogRefreshApplicationResult(models, profiles, namedProfiles, sizeLabels);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> ReadModelSizeLabelsAsync(
+        IEnumerable<ModelRecord> models,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        var snapshot = models.ToArray();
+        return await Task.Run(() =>
+        {
+            var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var model in snapshot)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                labels[model.Id] = ModelSizeLabel(model.ModelPath);
+            }
+
+            return (IReadOnlyDictionary<string, string>)labels;
+        }, cancellationToken);
     }
 
     private static void Validate(ModelCatalogRefreshApplicationActions actions)
@@ -62,11 +76,11 @@ public sealed class ModelCatalogRefreshApplicationService
         {
             return File.Exists(modelPath)
                 ? DisplayFormatService.Bytes(new FileInfo(modelPath).Length)
-                : "";
+                : "Missing";
         }
         catch
         {
-            return "";
+            return "Missing";
         }
     }
 }

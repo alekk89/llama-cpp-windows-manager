@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Collections.Concurrent;
+using LocalLlmConsole.Localization;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 
@@ -70,7 +71,7 @@ public sealed partial class ReleaseHardeningTests
             var json = request.RequestUri?.AbsolutePath switch
             {
                 "/health" => "{\"ok\":true,\"gateway\":\"model-auto-load\"}",
-                "/v1/models" => "{\"data\":[{\"id\":\"qwen:128k\",\"name\":\"Qwen\",\"profile_name\":\"128k\",\"owned_by\":\"local-llm-console\"}]}",
+                "/v1/models" => "{\"data\":[{\"id\":\"qwen:128k\",\"name\":\"Qwen\",\"profile_name\":\"128k\",\"owned_by\":\"local-llm-console\",\"context_length\":131072}]}",
                 "/running" => "{\"data\":[{\"id\":\"qwen\",\"name\":\"Qwen\",\"endpoint\":\"http://127.0.0.1:8089/v1\",\"status\":\"Running\",\"runtime\":\"CUDA\",\"startedAt\":\"2026-08-15T10:00:00Z\"}]}",
                 _ => "{}"
             };
@@ -92,6 +93,8 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("Healthy", report.Health);
         Assert.Equal("qwen:128k", Assert.Single(report.Models).Id);
         Assert.Equal("128k", report.Models[0].Profile);
+        Assert.Equal(131072, report.Models[0].ConfiguredContext);
+        Assert.Null(report.Models[0].TrainingContext);
         Assert.Equal("http://127.0.0.1:8089/v1", Assert.Single(report.RunningModels).Endpoint);
         Assert.Null(report.Defaults);
         Assert.Empty(report.Slots);
@@ -116,5 +119,35 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("model", Assert.Single(report.Models).Id);
         Assert.Null(report.Defaults);
         Assert.Contains(report.UnavailableSources, source => source.StartsWith("/props: HTTP 404", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EndpointInspectionReportFormatterProducesCompleteSecretFreeText()
+    {
+        const string apiKey = "this-key-must-never-enter-the-general-report";
+        var report = new EndpointInspectionReport(
+            EndpointInspectionKind.Gateway,
+            "Shared gateway",
+            "http://127.0.0.1:8082/v1",
+            "Healthy",
+            new DateTimeOffset(2026, 8, 20, 12, 30, 0, TimeSpan.Zero),
+            [new EndpointInspectionModel("qwen:128k", "Qwen", "manager", "128k", null, 131072, null, 32_000_000_000, 18_000_000_000)],
+            null,
+            [],
+            [new EndpointInspectionRunningModel("qwen", "Qwen", "Running", "CUDA", "http://127.0.0.1:8089/v1", DateTimeOffset.UtcNow)],
+            "Prefer keeping loaded models",
+            "Local only",
+            ["/running: HTTP 404"]);
+
+        var text = EndpointInspectionReportFormatter.Format(report, apiKeyConfigured: true);
+
+        Assert.Contains(report.Endpoint, text, StringComparison.Ordinal);
+        Assert.Contains("qwen:128k", text, StringComparison.Ordinal);
+        Assert.Contains(Loc.T("EndpointInspection.ContextSize"), text, StringComparison.Ordinal);
+        Assert.DoesNotContain(Loc.T("EndpointInspection.TrainingContext"), text, StringComparison.Ordinal);
+        Assert.Contains("http://127.0.0.1:8089/v1", text, StringComparison.Ordinal);
+        Assert.Contains("/running: HTTP 404", text, StringComparison.Ordinal);
+        Assert.Contains(Loc.T("EndpointInspection.ApiKeyConfigured"), text, StringComparison.Ordinal);
+        Assert.DoesNotContain(apiKey, text, StringComparison.Ordinal);
     }
 }

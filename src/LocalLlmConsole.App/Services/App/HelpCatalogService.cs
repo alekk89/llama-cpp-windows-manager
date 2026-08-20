@@ -28,7 +28,7 @@ public sealed record HelpSearchResult(
     public bool IsSearch => !string.IsNullOrWhiteSpace(Query);
 }
 
-public sealed class HelpCatalogService
+public sealed partial class HelpCatalogService
 {
     public const string FirstSteps = "first-steps";
 
@@ -102,12 +102,12 @@ public sealed class HelpCatalogService
             "Inspect an endpoint without generating text",
             "Open a compact report for health, model metadata, defaults, capabilities, and slots.",
             [
-                "Double-click a loaded-session or gateway row, or select its endpoint link.",
+                "Double-click a loaded-session or gateway row, or select its endpoint link. Report text is selectable, and the toolbar copies the endpoint, the safe report, or the API key separately.",
                 "Direct inspection reads /health, /v1/models, /props, and /slots.",
                 "Gateway inspection reads /health, /v1/models, and /running."
             ],
             [Action("Open Overview", "loaded-sessions")],
-            ["health", "props", "slots", "endpoint report", "inspect"]),
+            ["health", "props", "slots", "endpoint report", "inspect", "copy", "api key"]),
 
         Article(
             "metrics",
@@ -121,6 +121,20 @@ public sealed class HelpCatalogService
             ],
             [Action("Open Overview", "overview"), Action("Open Logs", "logs")],
             ["tokens per second", "gpu", "kv cache", "slow", "telemetry"]),
+
+        Article(
+            "usage-history",
+            "overview",
+            "Understand usage metrics",
+            "Metrics shows daily token activity, cache reuse, throughput, request counts when available, and model-level totals.",
+            [
+                "Input is evaluated prompt tokens plus prompt tokens reused from cache; output is generated tokens.",
+                "Cache hit rate is cached input divided by all tracked input. Prompt and generation speeds use llama.cpp active-processing time. Request counts appear only when a runtime exposes compatible counters; unsupported values remain unavailable.",
+                "Daily history starts after this feature is installed. Older lifetime totals are preserved but are not assigned to invented dates.",
+                "Day boxes stay fixed in size while resizing the window reveals more or less history, up to the latest 24 calendar months. Choose Total, Input, Output, Cached, or Requests, then click a tracked day to inspect or clear it, Control-click to toggle dates, and Shift-click to select a range; pre-tracking and future dates remain unavailable."
+            ],
+            [Action("Open Metrics", "lifetime")],
+            ["lifetime", "daily usage", "token history", "cache hit", "cached prompt", "metrics"]),
 
         Article(
             "add-models",
@@ -142,7 +156,7 @@ public sealed class HelpCatalogService
             "Use profiles and groups",
             "Profiles save launch variants; groups apply retention policy to selected profiles.",
             [
-                "Keep separate profiles for low memory, long context, vision, or different runtimes.",
+                "Keep separate profiles for low memory, long context, vision, or different runtimes; right-click model or profile rows for their available actions.",
                 "A group can pin sessions, inherit the global idle timeout, or use its own idle timeout.",
                 "Group priority controls automatic idle-eviction order, not inference scheduling.",
                 "A group load validates runtimes, ports, duplicate models, and aggregate VRAM before starting anything."
@@ -192,6 +206,20 @@ public sealed class HelpCatalogService
             ["cuda", "nvidia", "vulkan", "amd", "sycl", "intel arc", "cpu"]),
 
         Article(
+            "runtime-trust",
+            "runtimes",
+            "Verify a runtime installation",
+            "Managed runtimes record provenance and installed-file hashes; custom runtimes remain explicitly user-trusted.",
+            [
+                "Select an installed runtime to see its provider, repository, release, assets, checksum and signature status, install time, backend, and version.",
+                "Use Verify to re-hash managed runtime files and detect changed or missing files.",
+                "A legacy managed runtime needs to be reinstalled once before it has a file manifest.",
+                "An unverified custom runtime was supplied manually and cannot be authenticated by the Manager."
+            ],
+            [Action("Open Runtimes", "runtime-download")],
+            ["trust", "verify runtime", "hash", "sha256", "modified files", "missing files", "provenance", "custom runtime"]),
+
+        Article(
             "source-builds",
             "runtimes",
             "Build a runtime from source",
@@ -224,7 +252,7 @@ public sealed class HelpCatalogService
             "Connect an OpenAI-compatible client",
             "Use the shared gateway for one stable address or a loaded model's direct endpoint.",
             [
-                "Read GET /v1/models from the gateway and send the returned profile route as the model id.",
+                "Read GET /v1/models from the gateway, send the returned profile route as the model id, and use context_length plus meta to discover its configured context and available GGUF details.",
                 "Send the Settings model API key as Authorization: Bearer <key>; the gateway also accepts x-api-key.",
                 "A direct endpoint serves only its loaded model; the gateway can load the requested saved profile on demand."
             ],
@@ -307,115 +335,11 @@ public sealed class HelpCatalogService
             [
                 "Installer update, repair, and normal uninstall preserve data unless removal is explicitly selected.",
                 "A portable update requires its matching SHA-256 companion and rolls back incomplete replacement.",
-                "Use Logs for app, runtime, job, and bounded redacted Control API activity."
+                "Use Logs for app, runtime, job, and bounded redacted Control API activity.",
+                "Create Diagnostics Bundle collects safe inventory, environment details, runtime trust state, and sanitized log tails. Review the ZIP before sharing it."
             ],
-            [Action("Check Updates", "updates"), Action("Open Logs", "logs"), Action("Open Lifetime", "lifetime")],
+            [Action("Check Updates", "updates"), Action("Open Logs", "logs"), Action("Open Metrics", "lifetime")],
             ["update failed", "sha256", "rollback", "preserve data", "control api log"])
     ];
 
-    private string _activeSection = FirstSteps;
-
-    public IReadOnlyList<HelpSectionDefinition> Sections => DefaultSections;
-    public IReadOnlyList<HelpArticleDefinition> Articles => DefaultArticles.Select(LocalizeArticle).ToArray();
-    public string ActiveSection => _activeSection;
-
-    public HelpSectionDefinition Select(string? sectionKey)
-    {
-        var definition = DefinitionFor(sectionKey);
-        _activeSection = definition.Key;
-        return definition;
-    }
-
-    public HelpSectionDefinition DefinitionFor(string? sectionKey)
-        => DefaultSections.FirstOrDefault(section => string.Equals(section.Key, sectionKey, StringComparison.Ordinal))
-            ?? DefaultSections[0];
-
-    public HelpSearchResult Search(string? query, string? sectionKey = null)
-    {
-        var normalizedQuery = Normalize(query);
-        var activeSection = DefinitionFor(sectionKey ?? _activeSection);
-        var tokens = normalizedQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var localizedArticles = Articles;
-        var candidates = tokens.Length == 0
-            ? localizedArticles.Where(article => string.Equals(article.SectionKey, activeSection.Key, StringComparison.Ordinal))
-            : localizedArticles.Where(article => MatchesEveryToken(article, tokens));
-        var articles = candidates
-            .OrderByDescending(article => SearchScore(article, tokens))
-            .ThenBy(article => article.Title, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        return new HelpSearchResult((query ?? "").Trim(), activeSection, articles);
-    }
-
-    private static bool MatchesEveryToken(HelpArticleDefinition article, IReadOnlyList<string> tokens)
-    {
-        var searchable = SearchableText(article);
-        return tokens.All(searchable.Contains);
-    }
-
-    private static int SearchScore(HelpArticleDefinition article, IReadOnlyList<string> tokens)
-    {
-        if (tokens.Count == 0) return 0;
-        var title = Normalize(article.Title);
-        var summary = Normalize(article.Summary);
-        var score = 0;
-        foreach (var token in tokens)
-        {
-            if (title.StartsWith(token, StringComparison.Ordinal)) score += 12;
-            else if (title.Contains(token, StringComparison.Ordinal)) score += 8;
-            if (summary.Contains(token, StringComparison.Ordinal)) score += 4;
-            if (article.Keywords.Any(keyword => Normalize(keyword).Contains(token, StringComparison.Ordinal))) score += 2;
-        }
-        return score;
-    }
-
-    private static string SearchableText(HelpArticleDefinition article)
-        => Normalize(string.Join(' ',
-            article.Title,
-            article.Summary,
-            string.Join(' ', article.Details),
-            string.Join(' ', article.Keywords)));
-
-    private static string Normalize(string? value)
-        => string.Join(' ', (value ?? "")
-            .Trim()
-            .ToLowerInvariant()
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-
-    private static HelpArticleDefinition LocalizeArticle(HelpArticleDefinition article)
-    {
-        var prefix = $"Help.Article.{article.Id}";
-        return article with
-        {
-            Title = Localized($"{prefix}.Title", article.Title),
-            Summary = Localized($"{prefix}.Summary", article.Summary),
-            Details = article.Details
-                .Select((detail, index) => Localized($"{prefix}.Detail.{index + 1}", detail))
-                .ToArray(),
-            Actions = article.Actions
-                .Select((action, index) => action with
-                {
-                    Label = Localized($"{prefix}.Action.{index + 1}", action.Label)
-                })
-                .ToArray()
-        };
-    }
-
-    private static string Localized(string key, string fallback)
-    {
-        var value = Loc.T(key);
-        return string.Equals(value, key, StringComparison.Ordinal) ? fallback : value;
-    }
-
-    private static HelpArticleDefinition Article(
-        string id,
-        string sectionKey,
-        string title,
-        string summary,
-        IReadOnlyList<string> details,
-        IReadOnlyList<HelpActionDefinition> actions,
-        IReadOnlyList<string> keywords)
-        => new(id, sectionKey, title, summary, details, actions, keywords);
-
-    private static HelpActionDefinition Action(string label, string target)
-        => new(label, target);
 }

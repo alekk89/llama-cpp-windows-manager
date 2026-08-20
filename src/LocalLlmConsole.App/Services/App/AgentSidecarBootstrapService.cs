@@ -43,17 +43,23 @@ public sealed class AgentSidecarBootstrapService
     public static int VerificationExitCode(AgentSidecarBootstrapStatus status)
         => status is AgentSidecarBootstrapStatus.Current or AgentSidecarBootstrapStatus.Installed ? 0 : 1;
 
-    public AgentSidecarBootstrapResult InstallEmbedded(Assembly assembly, string targetRoot)
+    public AgentSidecarBootstrapResult InstallEmbedded(
+        Assembly assembly,
+        string targetRoot,
+        bool verifyBundleContents = false)
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
         using var bundle = assembly.GetManifestResourceStream(ResourceName);
         return bundle is null
             ? new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.BundleUnavailable, [], [])
-            : Install(bundle, targetRoot);
+            : Install(bundle, targetRoot, verifyBundleContents);
     }
 
-    public AgentSidecarBootstrapResult Install(Stream bundle, string targetRoot)
+    public AgentSidecarBootstrapResult Install(
+        Stream bundle,
+        string targetRoot,
+        bool verifyBundleContents = false)
     {
         ArgumentNullException.ThrowIfNull(bundle);
         ArgumentException.ThrowIfNullOrWhiteSpace(targetRoot);
@@ -66,13 +72,17 @@ public sealed class AgentSidecarBootstrapService
         {
             var normalizedRoot = Path.GetFullPath(targetRoot);
             Directory.CreateDirectory(normalizedRoot);
-            stagingRoot = Path.Combine(normalizedRoot, $".llwm-sidecars-{Environment.ProcessId}-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(stagingRoot);
 
             using var archive = new ZipArchive(bundle, ZipArchiveMode.Read, leaveOpen: true);
             var entries = ValidateArchive(archive);
             var manifest = ReadManifest(entries["manifest.json"]);
             var manifestFiles = ValidateManifest(manifest);
+            var currentTargets = CurrentTargets(normalizedRoot, manifestFiles);
+            if (!verifyBundleContents && currentTargets.Count == RequiredPaths.Length)
+                return new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.Current, [], RequiredPaths);
+
+            stagingRoot = Path.Combine(normalizedRoot, $".llwm-sidecars-{Environment.ProcessId}-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(stagingRoot);
 
             foreach (var relativePath in RequiredPaths)
             {
@@ -89,13 +99,9 @@ public sealed class AgentSidecarBootstrapService
                     throw new InvalidDataException($"Embedded sidecar '{relativePath}' has an unexpected size.");
                 }
 
-                using (var input = entry.Open())
-                using (var output = new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                {
-                    input.CopyTo(output);
-                }
-
-                var stagedHash = ComputeSha256(stagedPath);
+                using var input = entry.Open();
+                using var output = new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                var stagedHash = CopyAndComputeSha256(input, output);
                 if (!string.Equals(stagedHash, file.Sha256, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidDataException($"Embedded sidecar '{relativePath}' failed SHA-256 validation.");
@@ -106,9 +112,9 @@ public sealed class AgentSidecarBootstrapService
             {
                 var stagedPath = ResolveContainedPath(stagingRoot, relativePath);
                 var targetPath = ResolveContainedPath(normalizedRoot, relativePath);
-                var expectedHash = ComputeSha256(stagedPath);
+                var expectedHash = manifestFiles[relativePath].Sha256!;
 
-                if (File.Exists(targetPath) && string.Equals(ComputeSha256(targetPath), expectedHash, StringComparison.OrdinalIgnoreCase))
+                if (currentTargets.Contains(relativePath))
                 {
                     current.Add(relativePath);
                     continue;
@@ -285,6 +291,39 @@ public sealed class AgentSidecarBootstrapService
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+    }
+
+    private static HashSet<string> CurrentTargets(
+        string root,
+        IReadOnlyDictionary<string, AgentSidecarManifestFile> manifestFiles)
+    {
+        var current = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var relativePath in RequiredPaths)
+        {
+            var targetPath = ResolveContainedPath(root, relativePath);
+            var expected = manifestFiles[relativePath];
+            if (File.Exists(targetPath)
+                && new FileInfo(targetPath).Length == expected.Size
+                && string.Equals(ComputeSha256(targetPath), expected.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                current.Add(relativePath);
+            }
+        }
+        return current;
+    }
+
+    private static string CopyAndComputeSha256(Stream input, Stream output)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[128 * 1024];
+        int read;
+        while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            output.Write(buffer, 0, read);
+            hash.AppendData(buffer, 0, read);
+        }
+        output.Flush();
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 
     private sealed record AgentSidecarManifest(string? Version, IReadOnlyList<AgentSidecarManifestFile?>? Files);

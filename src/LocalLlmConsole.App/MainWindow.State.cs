@@ -10,7 +10,7 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private const string AppDisplayName = "llama.cpp Windows Manager";
-    private const string AppVersionLabel = "v2.2.0";
+    private const string AppVersionLabel = "v2.3.0";
 
     private readonly string _workspaceRoot;
     private readonly AppServiceFactory _serviceFactory;
@@ -34,12 +34,18 @@ public partial class MainWindow
     private LlamaProcessSupervisor _llama => _sessions.ActiveSupervisor;
     private readonly RuntimeCatalogSessionState _runtimeCatalogState;
     private readonly LaunchSettingsPanelState _launchSettingsPanel;
+    private readonly LaunchSettingsPageController _launchSettingsController;
     private readonly ModelsPageState _modelsPage;
     private readonly OverviewPageState _overviewPage;
+    private readonly OverviewSelectionController _overviewSelection;
     private readonly RuntimesPageState _runtimesPage;
     private readonly LogsPageState _logsPage;
     private readonly LifetimePageState _lifetimePage;
     private readonly SettingsPageState _settingsPage;
+    private Task<long>? _settingsCacheSizeRefreshTask;
+    private string _settingsCacheSizeRoot = "";
+    private long? _settingsCacheSizeBytes;
+    private int _settingsPageVersion;
     private readonly DownloadHistoryPageState _downloadHistoryPageState;
     private readonly RuntimeDashboardPageState _runtimeDashboardPage;
     private readonly WindowsPageState _windowsPage;

@@ -113,6 +113,11 @@ public static class RuntimePackageInstallFileService
             ["releaseApiUrl"] = RuntimePackageSourceCatalog.ReleaseApiUrlFor(selection.Preset),
             ["releaseTag"] = selection.ReleaseTag,
             ["releaseUrl"] = selection.ReleaseUrl,
+            ["publishedAt"] = selection.PublishedAt.ToString("O"),
+            ["downloadedAt"] = DateTimeOffset.UtcNow.ToString("O"),
+            ["runtimeVersion"] = selection.ReleaseTag,
+            ["checksumStatus"] = "verified",
+            ["signatureStatus"] = "not-provided",
             ["installRoot"] = Path.GetFullPath(installRoot),
             ["managedInstalledAt"] = DateTimeOffset.UtcNow.ToString("O")
         };
@@ -130,6 +135,8 @@ public static class RuntimePackageInstallFileService
             });
         }
         metadata["assets"] = assets;
+
+        await RuntimeInstallationVerificationService.StampManifestAsync(runtimeFolder, metadata, cancellationToken);
 
         Directory.CreateDirectory(runtimeFolder);
         await File.WriteAllTextAsync(

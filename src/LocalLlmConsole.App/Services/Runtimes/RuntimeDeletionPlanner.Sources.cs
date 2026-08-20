@@ -19,4 +19,10 @@ public sealed partial class RuntimeDeletionPlanner
             source,
             source.SourceDir);
     }
+
+    public Task<RuntimeSourceDeletionPlan> PlanRuntimeSourceDeletionAsync(
+        RuntimeSourceEntry source,
+        string runtimeRoot,
+        CancellationToken cancellationToken = default)
+        => Task.Run(() => PlanRuntimeSourceDeletion(source, runtimeRoot), cancellationToken);
 }

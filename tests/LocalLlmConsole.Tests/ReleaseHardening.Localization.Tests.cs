@@ -148,7 +148,7 @@ public sealed partial class ReleaseHardeningTests
                           || key.StartsWith("EndpointInspection.", StringComparison.Ordinal))
             .ToArray();
 
-        Assert.Equal(119, requiredKeys.Length);
+        Assert.Equal(130, requiredKeys.Length);
         foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
         {
             var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
@@ -188,8 +188,8 @@ public sealed partial class ReleaseHardeningTests
         var requiredKeys = fixedKeys.Concat(articleKeys).Distinct(StringComparer.Ordinal).ToArray();
         var translatedHelpCodes = new[] { "ar", "bg", "cs", "de", "es", "fa", "fr", "hi", "id", "it", "ja" };
 
-        Assert.Equal(141, articleKeys.Length);
-        Assert.Equal(176, requiredKeys.Length);
+        Assert.Equal(148, articleKeys.Length);
+        Assert.Equal(183, requiredKeys.Length);
         foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
         {
             var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
@@ -204,7 +204,8 @@ public sealed partial class ReleaseHardeningTests
             }
             else
             {
-                Assert.Equal(174, requiredKeys.Count(key => pack[key] == english[key]));
+                var expectedEnglishFallbacks = code == "nl" ? 180 : 181;
+                Assert.Equal(expectedEnglishFallbacks, requiredKeys.Count(key => pack[key] == english[key]));
             }
         }
     }

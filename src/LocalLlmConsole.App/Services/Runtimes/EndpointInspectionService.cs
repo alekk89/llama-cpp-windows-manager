@@ -15,6 +15,7 @@ public sealed record EndpointInspectionModel(
     string Owner,
     string Profile,
     long? Created,
+    long? ConfiguredContext,
     long? TrainingContext,
     long? ParameterCount,
     long? SizeBytes);
@@ -212,6 +213,7 @@ public sealed class EndpointInspectionService
                 Text(model, "owned_by"),
                 Text(model, "profile_name"),
                 Integer(model, "created"),
+                Integer(model, "context_length"),
                 Integer(meta, "n_ctx_train"),
                 Integer(meta, "n_params"),
                 Integer(meta, "size"));

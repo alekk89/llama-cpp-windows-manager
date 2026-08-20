@@ -1,6 +1,6 @@
 # Target Architecture
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-20
 
 ## Boundary
 
@@ -13,6 +13,7 @@ The release target is Windows-first and self-contained for the UI, with llama.cp
 - hidden process supervisor for native Windows or Ubuntu/WSL `llama-server`
 - local-only model serving by default, with an API key required for inference and scoped LAN exposure for gateway and/or direct model ports; upstream health or catalog metadata may remain public
 - hidden runtime-package/source-build/download jobs
+- managed-runtime provenance and installed-file hash re-verification
 - Windows and WSL/Linux environment detectors and setup launchers
 - GitHub release update checker with staged portable-exe install
 - PowerShell build script only when the user starts a build
@@ -23,7 +24,7 @@ The repo does not own large data by default:
 - GGUF models
 - downloaded/extracted llama.cpp builds
 
-The startup workspace is fixed for the process and defaults to `data` beside `LlamaCppWindowsManager.exe` when that location is writable. If not, it falls back to `%LocalAppData%\llama.cpp Windows Manager`, while reusing `%LocalAppData%\llama.cpp Console` or `%LocalAppData%\LocalLlmConsole` only when those legacy folders already exist. It can be overridden with `LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE` before launch; `LLAMA_CPP_CONSOLE_WORKSPACE` and `LOCAL_LLM_CONSOLE_WORKSPACE` remain accepted as legacy aliases. Models and runtimes are configured in App Settings and stored in SQLite. Cache data is kept inside the fixed workspace and is not exposed as a separate Settings folder. The source tree contains the WPF app, the `llwmctl` control CLI, tests, docs, and the helper script used for llama.cpp builds. Release builds embed the CLI and operator/control sidecars in the app executable and restore verified copies beside it at startup.
+The startup workspace is fixed for the process and defaults to `data` beside `LlamaCppWindowsManager.exe` when that location is writable. If not, it falls back to `%LocalAppData%\llama.cpp Windows Manager`, while reusing `%LocalAppData%\llama.cpp Console` or `%LocalAppData%\LocalLlmConsole` only when those legacy folders already exist. It can be overridden with `LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE` before launch; `LLAMA_CPP_CONSOLE_WORKSPACE` and `LOCAL_LLM_CONSOLE_WORKSPACE` remain accepted as legacy aliases. Models and runtimes are configured in App Settings and stored in SQLite. Cache data is kept inside the fixed workspace and is not exposed as a separate Settings folder. The source tree contains the platform-neutral Core library, the WPF app, the `llwmctl` control CLI, tests, docs, and the helper script used for llama.cpp builds. Release builds embed the CLI and operator/control sidecars in the app executable and restore verified copies beside it at startup. Normal startup compares installed sidecars with the embedded manifest before extracting anything; the explicit bootstrap-only verification mode additionally validates every embedded payload.
 
 ## Runtime Shape
 
@@ -62,6 +63,10 @@ Current:
 8. Model-group definitions and launch-profile assignments are replaced in one
    SQLite transaction; a failed constraint or write leaves the previous group
    snapshot intact.
+9. Usage writes update the legacy token aggregate and an hourly UTC fact bucket
+   in one transaction. The fact stores tokens plus optional active-processing
+   time and request counters. Core aggregates facts into local calendar days,
+   preserving old totals without inventing historical dates.
 
 ## Architecture Contract
 
@@ -71,34 +76,58 @@ new behavior to `MainWindow` or guessing which service owns a decision.
 
 Dependency direction is intentionally one-way:
 
-1. Composition roots (`AppServiceFactory*` and `MainWindowServices`) create and
+1. `LocalLlmConsole.Core` targets plain `net10.0` and owns shared models plus
+   portable domain/application policy. It has no WPF, Windows Forms, registry,
+   SQLite, or app-localization dependency. The WPF app references Core; Core
+   never references the app.
+2. Composition roots (`AppServiceFactory*` and `MainWindowServices`) create and
    group services. `AppServiceFactory` is split by lifecycle stage:
    infrastructure services, core shell services, loaded database-backed
    services, catalog helpers, foundation helpers, runtime helpers, and
    model-runtime/gateway helpers. They do not own feature behavior.
-2. `MainWindow` is the shell: navigation, app lifetime, foreground/background
+3. `MainWindow` is the shell: navigation, app lifetime, foreground/background
    execution wrappers, page hosting, and final UI result application.
-3. Page controllers adapt WPF events and page state to application services.
+4. Page controllers adapt WPF events and page state to application services.
    They may coordinate selection, timers, and reentrancy for a page, but should
    not own domain rules.
-4. Page factories build WPF controls only. They should not call domain,
+5. Page factories build WPF controls only. They should not call domain,
    workflow, storage, process, network, or settings services.
-5. Page state classes hold WPF control references and apply simple visual state.
+6. Page state classes hold WPF control references and apply simple visual state.
    They should not perform business decisions, IO, or service calls.
-6. View models own observable rows, selected items, status/busy text, and
+7. View models own observable rows, selected items, status/busy text, and
    deterministic row projection. They should not launch processes, touch files,
    or call remote APIs.
-7. Application services adapt domain/workflow results to UI-facing actions such
+8. Application services adapt domain/workflow results to UI-facing actions such
    as busy runners, confirmations, status updates, refreshes, and selection.
    UI callbacks belong at this boundary, not inside domain services.
-8. Workflow services own multi-step async flows, jobs, external command
+9. Workflow services own multi-step async flows, jobs, external command
    sequences, and recovery/retry behavior. They return plans/results and stay
    independent of WPF controls.
-9. Domain services own pure decisions and feature-specific rules. They should
+10. Domain services own pure decisions and feature-specific rules. They should
    return records, plans, rows, or validation outcomes instead of mutating UI.
-10. Infrastructure services own OS, filesystem, process, storage, HTTP,
+11. Infrastructure services own OS, filesystem, process, storage, HTTP,
     security, formatting, and dialog primitives. They should not encode feature
     policy beyond their narrow boundary.
+
+The local control surface preserves its small `HttpListener` host but is split
+by responsibility: `LocalControlApi.cs` owns admission, audit, routing, status,
+and capability discovery. Explicit handlers separate model, profile, group,
+runtime, session/gateway/metrics, settings, logs, jobs/Hugging Face, and
+operation routes while sharing the narrow request/response infrastructure in
+`ControlEndpointHandler`. New endpoint domains belong in a focused handler
+rather than a `LocalControlApi` partial or a larger host/router.
+
+Application resources follow the same composition rule. `App.xaml` only merges
+the palette, foundation/button, input/menu, and data/surface dictionaries under
+`Themes`; controls continue to resolve the same dynamic resource keys so live
+theme switching remains behaviorally unchanged.
+
+Managed runtime packages and source builds stamp `local-llm-runtime.json` with
+provider/source identity and a SHA-256 manifest of installed files. Runtime
+inventory details read that file directly, and re-verification compares current
+files with the recorded baseline. Manual registrations have no trusted baseline
+and are labelled user-trusted/unverified rather than being presented as equal to
+Manager-installed runtimes.
 
 Service naming should describe ownership:
 
@@ -124,12 +153,31 @@ service composition, and deliberate absence of direct `MainWindow` or WPF
 coupling. They should not freeze incidental implementation strings when a
 behavior test can express the rule.
 
+Reviewability limits are executable architecture rules: production C# files
+may not exceed 425 lines and test C# files may not exceed 675 lines. These are
+early-warning thresholds rather than targets. Splits must name a cohesive
+behavioral area; numbered or arbitrary partial files do not satisfy the design
+rule.
+
 ## Current Service Boundaries
+
+`LocalLlmConsole.Core` owns the complete model contract and reusable portable
+behavior: access/package preference normalization, endpoint addressing, launch
+argument and option parsing, Hugging Face launch suggestions, runtime package
+asset selection, runtime/session decisions, dashboard selection/render policy,
+and metric/slot parsing and aggregation. Existing `LocalLlmConsole.Models` and
+`LocalLlmConsole.Services` namespaces remain stable across the assembly split.
+The architecture test enforces the plain `net10.0` target, the absence of
+Windows/WPF/SQLite/localization references, and the one-way App-to-Core project
+reference.
 
 The WPF window is intentionally a shell: app lifetime, shell navigation, event
 brokerage, and final UI result application stay there. Reusable behavior is
 split into feature services, workflow/application services, view models, page
-state, and page controllers. Startup/shutdown wiring stays in
+state, and page controllers. `LaunchSettingsPageController` owns launch-form
+render/save/reset coordination and `OverviewSelectionController` owns Overview
+model/profile/session selection plus endpoint inspection. Their MainWindow
+partials are thin delegates. Startup/shutdown wiring stays in
 `MainWindow.xaml.cs`; shell fields and loaded-service lifecycle holders stay in
 `MainWindow.State.cs`; page-specific row/event routing lives behind page
 controllers where a page has meaningful action wiring.
@@ -141,8 +189,8 @@ their post-startup bundles (`App`, `Models`, `Gateway`, and `Runtime`). These
 bundle records intentionally do not expose flat pass-through aliases; the
 dependency graph should be readable by module.
 
-Service files are grouped by feature instead of living in one flat folder. The
-top-level `Services` folder is reserved for composition/root wiring
+App-owned service files are grouped by feature instead of living in one flat
+folder. The top-level WPF-app `Services` folder is reserved for composition/root wiring
 (`AppServiceFactory*` and `MainWindowServices`), while implementation code lives
 under `Services/App`, `Services/Environment`, `Services/Gateway`,
 `Services/HuggingFace`, `Services/Infrastructure`, `Services/Models`,
@@ -156,19 +204,33 @@ file-scoped namespaces stable; namespace tightening can happen module-by-module
 if it provides clear value.
 
 - `MainWindowViewModel` and page view models (`OverviewPageViewModel`, `ModelsPageViewModel`, `RuntimesPageViewModel`, `RuntimePackagesPageViewModel`, `RuntimeBuildsPageViewModel`, `RuntimeMetricsViewModel`, `WindowsPageViewModel`, `WslLinuxPageViewModel`, `HuggingFacePageViewModel`, `JobsViewModel`, `LogsViewModel`, `SettingsPageViewModel`, `LaunchSettingsViewModel`, `UpdatesPageViewModel`, and `LifetimeMetricsViewModel`) own row collections, selection lists, status/busy state, and deterministic row projection for migrated pages.
-- `LocalControlApi`, `LocalControlDiscoveryService`, and `llwmctl` own the versioned loopback automation surface, current-user endpoint/token discovery, safe model self-identification, full typed setting patches, endpoint inspection without secret disclosure, and structured command output. `ControlAppSettingsMutationService` owns control-surface settings normalization, protected-field enforcement, mandatory API-key validation, and live port-conflict checks. `ControlRuntimeOperationApplicationService` owns runtime package/source/build/job operation dispatch and composes the existing runtime application services without placing those workflows in `MainWindow`. `ControlRequestAdmissionService` applies self-preservation rules, while `ControlOperationCatalog` exposes machine and application operations. `ControlApiAuditLogService` writes a bounded request audit containing only method, path, result status, and duration; `LogFileService` exposes it in the Logs page as Type **Control API**. Control actions reuse the same model/runtime services and dispatch UI synchronization through the shell bridge.
+- `LocalControlApi`, its explicit endpoint handlers, `LocalControlDiscoveryService`, and `llwmctl` own the versioned loopback automation surface, current-user endpoint/token discovery, safe model self-identification, full typed setting patches, endpoint inspection without secret disclosure, and structured command output. The CLI separates argument parsing, connection discovery/DPAPI handling, output, and help from request construction and self-stop admission. `ControlAppSettingsMutationService` owns control-surface settings normalization, protected-field enforcement, mandatory API-key validation, and live port-conflict checks. `ControlRuntimeOperationApplicationService` owns runtime package/source/build/job operation dispatch and composes the existing runtime application services without placing those workflows in `MainWindow`. `ControlRequestAdmissionService` applies self-preservation rules, while `ControlOperationCatalog` exposes machine and application operations. `ControlApiAuditLogService` writes a bounded request audit containing only method, path, result status, and duration; `LogFileService` exposes it in the Logs page as Type **Control API**. Control actions reuse the same model/runtime services and dispatch UI synchronization through the shell bridge.
 - `StateStore`, `ModelGroupService`, `OverviewModelGroupLoadPlanningService`, `OverviewModelGroupLoadApplicationService`, `JobEngine`, and `SecretProtector` own durable state, transactional launch-profile-group replacement, validated membership/retention policy, group-load planning and rollback, jobs, protected settings, and persisted job-transition validation. A supervised session resolves policy through its stored launch-profile ID, allowing profiles of one model to differ. Legacy model-level assignments migrate to the model's default profile. Group loading validates the complete runtime/port/aggregate-VRAM plan before starting its first member, stops all sessions that must be replaced before cross-port swaps, and restores the original sessions if any target fails to start. Group eviction priority ranks automatic idle-unload candidates only; it is not an inference scheduler.
-- `ModelCatalogService`, `HuggingFaceService`, `HuggingFaceInstallStateService`, `HuggingFaceLaunchSettingsSuggester`, and `ModelCapabilityService` own model discovery, download lifecycle, exact-model-folder companion discovery, embedded NextN/MTP precedence, type-safe MTP/DFlash/DSpark/Eagle3/draft classification, matching mmproj/projector companion downloads, installed/download button state, README launch hints, and local model capability inference. Hugging Face launch suggestion parsing is split across config JSON parsing, README command extraction, shell tokenization, and option mapping.
-- `RuntimeRegistryService`, `RuntimeAdapter`, `RuntimeLaunchOptionSwitchService`, `RuntimeDeletionPlanner`, `RuntimeDeletionExecutorService`, `RuntimePackageSourceCatalog`, `RuntimePackageReleaseClient`, `RuntimePackageAssetSelector`, `RuntimePackageInstallFileService`, `RuntimePackageInventoryPresenter`, `RuntimeBuildCatalogService`, `RuntimeBuildJobService`, `RuntimeBuildToolService`, `RuntimeMetadataService`, `RuntimeEquivalenceService`, `RuntimeFileService`, `RuntimePortAllocator`, `ModelPortAllocator`, and `RuntimeEndpointService` own runtime discovery, launch validation, advertised positive/negative switch pairing, deletion planning, deletion execution, prebuilt package source/feed selection, release parsing, asset matching, extraction/metadata stamping, package inventory projection, source/build catalog metadata and remote-ref parsing, build job payload/log metadata, build-tool command construction, source/prebuilt equivalence, safe delete boundaries, model-server URLs, stable per-model ports, and served-model matching.
-- `LlamaProcessSupervisor`, `NativeRuntimeStopService`, `LlamaRuntimeOutputObserver`, `TrackedProcessRunner`, `WindowsEnvironmentService`, `WindowsSetupCommands`, `WslEnvironmentService`, `WslSetupCommands`, and `CommandLineService` own process supervision, native process stop verification, runtime stdout/stderr observation, tracked process execution, Windows and WSL detection/status/tool-probe parsing, setup/probe commands, and visible shell command quoting/launching.
-- `RuntimeMetrics`, `RuntimeDashboardService`, `GpuStatusService`, `LogFileService`, `FileSystemSafetyService`, `VramAdmissionService`, and `CacheMaintenanceService` own metrics parsing, live runtime dashboard math, CUDA/NVIDIA GPU summaries, Intel SYCL identification, vendor-neutral Windows GPU fallback summaries, log previews/classification/redaction/deletion planning, shared filesystem guardrails, conservative multi-model VRAM admission, and cache clearing safety.
-- `AppPreferenceService`, `DisplayFormatService`, `LaunchSettingMetadataService`, `LoadedModelSessionManager`, `ActiveRuntimeSessionStore`, `ModelRuntimeStatusTracker`, `ModelRuntimeStatusController`, `ModelRuntimeStatusRenderService`, `AppUpdateService`, `AppUpdateReleaseParser`, and `AppUpdateAssetVerifier` own settings option normalization, shared UI value formatting, launch-setting option/help/suggestion text, in-memory loaded-session state, running-runtime recovery state, transient model loading/loaded status timing, persisted completed load-duration display, GitHub release updates, release asset selection/version parsing, and update checksum verification.
+- `ModelCatalogService`, `HuggingFaceService`, `HuggingFaceInstallStateService`, `HuggingFaceLaunchSettingsSuggester`, and `ModelCapabilityService` own model discovery, download lifecycle, exact-model-folder companion discovery, embedded NextN/MTP precedence, type-safe MTP/DFlash/DSpark/Eagle3/draft classification, matching mmproj/projector companion downloads, installed/download button state, README launch hints, and local model capability inference. Model and projector transfers run as background workers, and their potentially multi-gigabyte SHA-256 verification uses asynchronous sequential file reads. Hugging Face launch suggestion parsing is split across config JSON parsing, README command extraction, shell tokenization, and option mapping.
+- `RuntimeRegistryService`, `RuntimeAdapter`, `RuntimeLaunchOptionSwitchService`, `RuntimeDeletionPlanner`, `RuntimeDeletionExecutorService`, `RuntimePackageSourceCatalog`, `RuntimePackageReleaseClient`, `RuntimePackageAssetSelector`, `RuntimePackageInstallFileService`, `RuntimePackageInventoryPresenter`, `RuntimeBuildCatalogService`, `RuntimeBuildJobService`, `RuntimeBuildToolService`, `RuntimeMetadataService`, `RuntimeEquivalenceService`, `RuntimeFileService`, `RuntimePortAllocator`, `ModelPortAllocator`, and `RuntimeEndpointService` own runtime discovery, launch validation, advertised positive/negative switch pairing, deletion planning, deletion execution, prebuilt package source/feed selection, release parsing, asset matching, extraction/metadata stamping, package inventory projection, source/build catalog metadata and remote-ref parsing, build job payload/log metadata, build-tool command construction, source/prebuilt equivalence, safe delete boundaries, model-server URLs, stable per-model ports, and served-model matching. Package checksum/extraction, recursive safety inspection/deletion, runtime fingerprinting, and filesystem-backed catalog projection execute away from the WPF dispatcher.
+- `LlamaProcessSupervisor`, `NativeRuntimeStopService`, `LlamaRuntimeOutputObserver`, `TrackedProcessRunner`, `WindowsEnvironmentService`, `WindowsSetupCommands`, `WslEnvironmentService`, `WslSetupCommands`, and `CommandLineService` own process supervision, asynchronously awaited native/WSL stop verification, runtime stdout/stderr observation, tracked process execution, Windows and WSL detection/status/tool-probe parsing, setup/probe commands, and visible shell command quoting/launching. Normal unload and restart paths never synchronously wait on a process from the UI dispatcher; the synchronous supervisor fallback is reserved for final disposal after the awaited shutdown path.
+- `RuntimeMetrics`, `RuntimeDashboardService`, `RuntimeMtpLogParser`, `RuntimeMetricSummaryTracker`, `RuntimeMetricSummaryCalculations`, `GpuStatusService`, `LogFileService`, `FileSystemSafetyService`, `VramAdmissionService`, and `CacheMaintenanceService` own metrics parsing, live runtime dashboard math, MTP log parsing, per-runtime display state, rate/staleness calculations, CUDA/NVIDIA GPU summaries, Intel SYCL identification, vendor-neutral Windows GPU fallback summaries, log previews/classification/redaction/deletion planning, shared filesystem guardrails, conservative multi-model VRAM admission, and cache clearing safety.
+- `UsageMetricsService` owns rolling, complete-current-month, and exact-date
+  windows; the rolling 24-month calendar data window; tracking-availability boundaries;
+  time-zone-safe daily aggregation,
+  cache-hit and throughput calculations, optional request totals, active/peak
+  day insights, filters, legacy-total separation, and model breakdowns.
+  `LifetimeMetricsApplicationService` coordinates those rules with `StateStore`;
+  the Metrics page only projects and renders the returned report.
+  `UsageDateSelectionService` owns replace, toggle, anchored-range, and additive
+  range semantics without a WPF dependency. `LifetimeUsageCalendar` maps input
+  modifiers and renders the returned state with WPF drawing primitives, adding
+  no charting dependency. Its week-based layout keeps day boxes fixed in size
+  and reveals more or less of the latest 24 calendar months with the viewport,
+  while the compact range and calendar-metric selectors remain independent from
+  storage.
+- `AppPreferenceService`, `DisplayFormatService`, `LaunchSettingMetadataService`, `LoadedModelSessionManager`, `JobRowProjectionService`, `ActiveRuntimeSessionStore`, `ModelRuntimeStatusTracker`, `ModelRuntimeStatusController`, `ModelRuntimeStatusRenderService`, `AppUpdateService`, `AppUpdateReleaseParser`, and `AppUpdateAssetVerifier` own settings option normalization, shared UI value formatting, launch-setting option/help/suggestion text, in-memory loaded-session state, filesystem-aware asynchronous job-row projection outside view models, running-runtime recovery state, transient model loading/loaded status timing, persisted completed load-duration display, GitHub release updates, release asset selection/version parsing, and asynchronous update checksum/extraction work.
 - `HelpCatalogService` owns the compact task-article catalog, section selection,
   localized article projection, deterministic cross-topic search, and result ranking. `HelpPageController`,
   `HelpPageState`, `HelpPageFactory`, and `HelpResultsFactory` own Help search
   interaction, visual state, page composition, expandable result cards, and
   contextual navigation without placing Help behavior in `MainWindow`.
-- `EndpointInspectionService` performs read-only, authenticated live inspection of direct model endpoints (`/health`, `/v1/models`, `/props`, and `/slots`) and the shared gateway (`/health`, `/v1/models`, and `/running`). It preserves partial results when a fork omits an optional endpoint. `EndpointInspectionDialogFactory` renders those normalized results without issuing inference requests; its complete surface and the Model Groups dialogs use the same 21-pack localization contract as the shell.
+- `EndpointInspectionService` performs read-only, authenticated live inspection of direct model endpoints (`/health`, `/v1/models`, `/props`, and `/slots`) and the shared gateway (`/health`, `/v1/models`, and `/running`). It preserves partial results when a fork omits an optional endpoint. `EndpointInspectionDialogFactory` renders those normalized results without issuing inference requests and exposes selectable fields plus separate copy actions. `EndpointInspectionReportFormatter` has no API-key input, so the general copied report cannot include the model credential; only the dedicated key action receives it. The complete surface and the Model Groups dialogs use the same 21-pack localization contract as the shell.
 - `OverviewPageState` applies persisted UI visibility preferences to individual
   metric cards and the log/raw-metrics rows, and evaluates the selected
   model/profile action state so Load is suppressed only when the running launch
@@ -233,7 +295,7 @@ Current:
 Gateway routing:
 
 - The auto-load gateway listens on one OpenAI-compatible `/v1` port and never serves a model process itself.
-- `GET /v1/models` exposes one route for every saved launch profile. The default profile retains the registered model id and existing model aliases; non-default profiles receive deterministic route ids derived from the model and saved profile id. Normalization collisions receive a stable hash suffix so no profile disappears from discovery.
+- `GET /v1/models` exposes one route for every saved launch profile, including a `context_length` extension containing that profile's configured context size and llama.cpp-compatible `meta` values for the GGUF training context, parameter count, and current file size. Metadata inspection is cached by model-file fingerprint, never inferred from names, and reused across profiles for the same model. The default profile retains the registered model id and existing model aliases; non-default profiles receive deterministic route ids derived from the model and saved profile id. Normalization collisions receive a stable hash suffix so no profile disappears from discovery.
 - Each requested profile still launches on its saved direct runtime port. The gateway resolves the requested route to a model/profile pair, ensures that exact profile is loaded, then proxies the request to that direct port. Requesting another profile for an already-running model stops that session and restarts it with the requested profile. Concurrent requests for the active profile remain concurrent until another profile queues; queued profile groups then receive FIFO priority so continuous active-profile traffic cannot starve a switch. Requests for different models remain concurrent.
 - `Prefer keeping loaded models` leaves existing sessions running and uses conservative VRAM admission before adding another GPU-backed model. `Single active model` unloads other direct sessions before loading the requested model.
 - Third-party clients discover current profile routes from `GET /v1/models`; the Manager does not discover or edit client configuration.

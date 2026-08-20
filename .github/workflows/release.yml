@@ -80,6 +80,7 @@ jobs:
             dist/LlamaCppWindowsManager-win-x64/docs/CONTROL_API.md
             dist/LlamaCppWindowsManager-win-x64/LICENSE
             dist/LlamaCppWindowsManager-win-x64/THIRD-PARTY-NOTICES.md
+            dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json
             dist/LlamaCppWindowsManager-win-x64/licenses/**
             dist/LlamaCppWindowsManager-win-x64.zip
             dist/LlamaCppWindowsManager-win-x64.zip.sha256
