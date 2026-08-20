@@ -298,7 +298,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("postinstall", installer, StringComparison.Ordinal);
         Assert.Contains("InitializeUninstall", installer, StringComparison.Ordinal);
         Assert.Contains("DeleteAppDataOnUninstall := False", installer, StringComparison.Ordinal);
+        Assert.Contains("SuppressibleMsgBox", installer, StringComparison.Ordinal);
         Assert.Contains("MB_DEFBUTTON2", installer, StringComparison.Ordinal);
+        Assert.Contains("IDNO) = IDYES", installer, StringComparison.Ordinal);
         Assert.Contains("DelTree(ExpandConstant('{app}\\data')", installer, StringComparison.Ordinal);
         Assert.Contains("[InstallDelete]", installer, StringComparison.Ordinal);
         Assert.Contains(@"{app}\LlamaCppConsole.exe", installer, StringComparison.Ordinal);

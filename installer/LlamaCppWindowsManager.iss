@@ -100,13 +100,14 @@ begin
   if DirExists(DataDir) then
   begin
     DeleteAppDataOnUninstall :=
-      MsgBox(
+      SuppressibleMsgBox(
         'Uninstall llama.cpp Windows Manager?' + #13#10 + #13#10 +
         'Your models, runtimes, logs, cache, and settings in:' + #13#10 +
         DataDir + #13#10 + #13#10 +
         'will be kept by default. Delete this data too?',
         mbConfirmation,
-        MB_YESNO or MB_DEFBUTTON2) = IDYES;
+        MB_YESNO or MB_DEFBUTTON2,
+        IDNO) = IDYES;
   end;
 end;
 
