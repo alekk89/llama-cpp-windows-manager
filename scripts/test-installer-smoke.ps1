@@ -53,8 +53,8 @@ try {
     "/SUPPRESSMSGBOXES",
     "/NORESTART",
     "/TASKS=",
-    "/DIR=$InstallDir",
-    "/LOG=$InstallLog"
+    "/DIR=`"$InstallDir`"",
+    "/LOG=`"$InstallLog`""
   )
   Invoke-CheckedProcess -FilePath $Installer -ArgumentList $installArgs -Label "Silent clean install"
   Assert-InstalledFiles
@@ -72,8 +72,8 @@ try {
     "/SUPPRESSMSGBOXES",
     "/NORESTART",
     "/TASKS=",
-    "/DIR=$InstallDir",
-    "/LOG=$RepairLog"
+    "/DIR=`"$InstallDir`"",
+    "/LOG=`"$RepairLog`""
   )
   Invoke-CheckedProcess -FilePath $Installer -ArgumentList $repairArgs -Label "Silent repair install"
   Assert-InstalledFiles
@@ -89,7 +89,7 @@ try {
     "/VERYSILENT",
     "/SUPPRESSMSGBOXES",
     "/NORESTART",
-    "/LOG=$UninstallLog"
+    "/LOG=`"$UninstallLog`""
   ) -Label "Silent uninstall"
 
   if (Test-Path -LiteralPath $app -PathType Leaf) {
