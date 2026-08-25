@@ -79,42 +79,4 @@ internal static class OverviewPageResponsiveCoordinator
         button.VerticalAlignment = VerticalAlignment.Center;
     }
 
-    public static void ConfigureMetricLayout(Grid dashboard)
-    {
-        var cards = dashboard.Children.OfType<Border>().ToArray();
-        var appliedColumns = 0;
-        var appliedVisibleCards = -1;
-
-        void Apply(double availableWidth)
-        {
-            var visibleCards = cards.Where(card => card.Visibility == Visibility.Visible).ToArray();
-            var columns = OverviewResponsiveLayout.MetricColumnCount(availableWidth, visibleCards.Length);
-            if (columns == appliedColumns && visibleCards.Length == appliedVisibleCards) return;
-            appliedColumns = columns;
-            appliedVisibleCards = visibleCards.Length;
-
-            dashboard.ColumnDefinitions.Clear();
-            dashboard.RowDefinitions.Clear();
-            for (var column = 0; column < columns; column++)
-                dashboard.ColumnDefinitions.Add(new ColumnDefinition());
-            var rows = (int)Math.Ceiling(visibleCards.Length / (double)columns);
-            for (var row = 0; row < rows; row++)
-                dashboard.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            for (var index = 0; index < visibleCards.Length; index++)
-            {
-                var column = index % columns;
-                Grid.SetRow(visibleCards[index], index / columns);
-                Grid.SetColumn(visibleCards[index], column);
-                visibleCards[index].Margin = new Thickness(column == 0 ? 0 : 5, 0, column == columns - 1 ? 0 : 5, 8);
-            }
-        }
-
-        foreach (var card in cards)
-            card.IsVisibleChanged += (_, _) => Apply(dashboard.ActualWidth);
-        dashboard.Loaded += (_, _) => Apply(dashboard.ActualWidth);
-        dashboard.SizeChanged += (_, args) => Apply(args.NewSize.Width);
-        Apply(0);
-    }
-
 }

@@ -53,13 +53,30 @@ public sealed class MetricSparkline : FrameworkElement
         base.OnRender(drawingContext);
         if (ActualWidth <= 1 || ActualHeight <= 1) return;
 
-        var gridBrush = ResourceBrush("PanelBorder").Clone();
-        gridBrush.Opacity = 0.55;
-        var gridPen = new WpfPen(gridBrush, 0.6) { DashStyle = DashStyles.Dot };
+        var plotRect = new Rect(.5, .5, Math.Max(0, ActualWidth - 1), Math.Max(0, ActualHeight - 1));
+        var plotBackground = ResourceBrush("InputBack").Clone();
+        plotBackground.Opacity = .58;
+        var frameBrush = ResourceBrush("PanelBorderStrong").Clone();
+        frameBrush.Opacity = .58;
+        drawingContext.DrawRoundedRectangle(
+            plotBackground,
+            new WpfPen(frameBrush, .75),
+            plotRect,
+            3,
+            3);
+
+        var gridBrush = ResourceBrush("PanelBorderStrong").Clone();
+        gridBrush.Opacity = .30;
+        var gridPen = new WpfPen(gridBrush, .55) { DashStyle = DashStyles.Dot };
         for (var division = 1; division <= 2; division++)
         {
             var y = Math.Round(ActualHeight * division / 3.0) + 0.5;
-            drawingContext.DrawLine(gridPen, new WpfPoint(0, y), new WpfPoint(ActualWidth, y));
+            drawingContext.DrawLine(gridPen, new WpfPoint(3, y), new WpfPoint(ActualWidth - 3, y));
+        }
+        for (var division = 1; division <= 3; division++)
+        {
+            var x = Math.Round(ActualWidth * division / 4.0) + .5;
+            drawingContext.DrawLine(gridPen, new WpfPoint(x, 3), new WpfPoint(x, ActualHeight - 3));
         }
 
         if (_samples.Count == 0) return;
@@ -83,7 +100,7 @@ public sealed class MetricSparkline : FrameworkElement
         WpfBrush brush,
         double maximum)
     {
-        var pen = new WpfPen(brush, 1.5);
+        var pen = new WpfPen(brush, 1.45);
         WpfPoint? previous = null;
         WpfPoint? latest = null;
         for (var index = 0; index < _samples.Count; index++)
@@ -95,10 +112,14 @@ public sealed class MetricSparkline : FrameworkElement
                 continue;
             }
 
-            var plotWidth = Math.Max(0, ActualWidth - 3);
-            var x = _samples.Count == 1 ? plotWidth + 1 : 1 + index * plotWidth / (_samples.Count - 1.0);
+            const double plotInset = 3;
+            var plotWidth = Math.Max(0, ActualWidth - plotInset * 2);
+            var x = _samples.Count == 1
+                ? plotInset + plotWidth
+                : plotInset + index * plotWidth / (_samples.Count - 1.0);
             var fraction = Math.Clamp(value.Value / maximum, 0, 1);
-            var point = new WpfPoint(x, Math.Max(1, (ActualHeight - 2) * (1 - fraction) + 1));
+            var plotHeight = Math.Max(0, ActualHeight - plotInset * 2);
+            var point = new WpfPoint(x, plotInset + plotHeight * (1 - fraction));
             if (previous is { } start)
                 drawingContext.DrawLine(pen, start, point);
             previous = point;
@@ -106,7 +127,10 @@ public sealed class MetricSparkline : FrameworkElement
         }
 
         if (latest is { } marker)
-            drawingContext.DrawEllipse(brush, null, marker, 2.2, 2.2);
+        {
+            drawingContext.DrawEllipse(ResourceBrush("InputBack"), null, marker, 3, 3);
+            drawingContext.DrawEllipse(brush, null, marker, 1.8, 1.8);
+        }
     }
 
     private WpfBrush ResourceBrush(string key)

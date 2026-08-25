@@ -23,6 +23,8 @@ public sealed class SettingsPageDefinitionService
             ToolTip: Loc.T("Tooltip.Setting.GatewayPort")),
         new(Loc.T("Settings.Group.Network"), Loc.T("Setting.GatewayPolicy"), "autoLoadGatewayPolicy", AppPreferenceService.GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy), "choice", AppPreferenceService.GatewaySwapPolicyOptions(),
             ToolTip: Loc.T("Tooltip.Setting.GatewayPolicy")),
+        new(Loc.T("Settings.Group.Network"), Loc.T("Setting.ApiKeyAuth"), "requireApiKeyAuth", AppPreferenceService.EnableDisableLabel(settings.RequireApiKeyAuth), "choice", AppPreferenceService.EnableDisableOptions(),
+            ToolTip: Loc.T("Tooltip.Setting.ApiKeyAuth")),
         new(Loc.T("Settings.Group.Network"), Loc.T("Setting.ApiKey"), "modelApiKey", settings.ModelApiKey, "secret", Action: Loc.T("Action.Generate"),
             ToolTip: Loc.T("Tooltip.Setting.ApiKey")),
         UiVisibility(Loc.T("Overview.Metric.ModelStatus"), "showOverviewModelStatus", settings.ShowOverviewModelStatus),
@@ -35,8 +37,24 @@ public sealed class SettingsPageDefinitionService
         UiVisibility(Loc.T("Overview.RuntimeMetricsTitle"), "showOverviewAllMetrics", settings.ShowOverviewAllMetrics),
         new(Loc.T("Settings.Group.UI"), Loc.T("Setting.ShowModelsHuggingFace"), "showModelsHuggingFace", AppPreferenceService.ShowHideLabel(settings.ShowModelsHuggingFace), "choice", AppPreferenceService.ShowHideOptions(),
             ToolTip: Loc.T("Tooltip.Setting.ShowModelsHuggingFace")),
+        new(Loc.T("Settings.Group.Electricity"), Loc.T("Setting.ElectricityCurrency"), "electricityCurrencyCode", settings.ElectricityCurrencyCode,
+            ToolTip: Loc.T("Tooltip.Setting.ElectricityCurrency")),
+        new(Loc.T("Settings.Group.Electricity"), Loc.T("Setting.ElectricityDayRate"), "electricityDayRatePerKwh", settings.ElectricityDayRatePerKwh.ToString(CultureInfo.InvariantCulture),
+            ToolTip: Loc.T("Tooltip.Setting.ElectricityDayRate")),
+        new(Loc.T("Settings.Group.Electricity"), Loc.T("Setting.ElectricityNightRate"), "electricityNightRatePerKwh", settings.ElectricityNightRatePerKwh.ToString(CultureInfo.InvariantCulture),
+            ToolTip: Loc.T("Tooltip.Setting.ElectricityNightRate")),
+        new(Loc.T("Settings.Group.Electricity"), Loc.T("Setting.ElectricityNightStart"), "electricityNightStartLocal", settings.ElectricityNightStartLocal,
+            ToolTip: Loc.T("Tooltip.Setting.ElectricityNightStart")),
+        new(Loc.T("Settings.Group.Electricity"), Loc.T("Setting.ElectricityNightEnd"), "electricityNightEndLocal", settings.ElectricityNightEndLocal,
+            ToolTip: Loc.T("Tooltip.Setting.ElectricityNightEnd")),
+        new(Loc.T("Settings.Group.Electricity"), Loc.T("Setting.TrackGpuEnergyWhileIdle"), "trackGpuEnergyWhileIdle",
+            AppPreferenceService.YesNoLabel(settings.TrackGpuEnergyWhileIdle), "choice", AppPreferenceService.YesNoOptions(),
+            ToolTip: Loc.T("Tooltip.Setting.TrackGpuEnergyWhileIdle")),
         new(Loc.T("Settings.Group.Logs"), Loc.T("Setting.MaxLogFileSizeMb"), "maxLogFileSizeMb", settings.MaxLogFileSizeMb.ToString(CultureInfo.InvariantCulture),
-            ToolTip: Loc.T("Tooltip.Setting.MaxLogFileSizeMb"))
+            ToolTip: Loc.T("Tooltip.Setting.MaxLogFileSizeMb")),
+        new(Loc.T("Settings.Group.Logs"), Loc.T("Setting.RuntimeLogOrder"), "runtimeLogOrder",
+            AppPreferenceService.RuntimeLogOrderLabel(settings.RuntimeLogOrder), "choice", AppPreferenceService.RuntimeLogOrderOptions(),
+            ToolTip: Loc.T("Tooltip.Setting.RuntimeLogOrder"))
     ];
 
     public string CacheDisplayValue(string cacheRoot, long? cacheSizeBytes)

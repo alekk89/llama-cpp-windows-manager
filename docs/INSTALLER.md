@@ -1,6 +1,6 @@
 # Windows Installer
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-25
 
 The installer is built with Inno Setup 6 from the self-contained `win-x64` publish output.
 
@@ -29,7 +29,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installe
 The setup executable is written to:
 
 ```text
-dist\installer\LlamaCppWindowsManager-Setup-2.3.0-win-x64.exe
+dist\installer\LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe
 ```
 
 ## Install Behavior
@@ -62,7 +62,7 @@ Installer updates and repairs overwrite application files only. They do not dele
 
 UI visibility choices are stored in the preserved SQLite state. An update keeps
 existing choices. When upgrading a workspace that predates the **Settings >
-UI** fields, the six Overview status cards and live log default visible; raw
+UI** fields, the default Overview metric groups and live log default visible; raw
 llama.cpp metrics and the Models Hugging Face section default hidden.
 
 Uninstall keeps `data` by default. If `data` exists, the uninstaller asks whether to delete it, with the safe default set to keep the data.

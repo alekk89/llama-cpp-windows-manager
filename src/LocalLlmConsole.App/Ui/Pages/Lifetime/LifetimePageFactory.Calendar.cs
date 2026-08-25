@@ -95,12 +95,13 @@ public static partial class LifetimePageFactory
             new LifetimeCalendarMetricOption(UsageCalendarMetric.InputTokens, Loc.T("Lifetime.CalendarMetric.Input")),
             new LifetimeCalendarMetricOption(UsageCalendarMetric.GeneratedTokens, Loc.T("Lifetime.CalendarMetric.Output")),
             new LifetimeCalendarMetricOption(UsageCalendarMetric.CachedPromptTokens, Loc.T("Lifetime.CalendarMetric.Cached")),
-            new LifetimeCalendarMetricOption(UsageCalendarMetric.Requests, Loc.T("Lifetime.CalendarMetric.Requests"))
+            new LifetimeCalendarMetricOption(UsageCalendarMetric.Requests, Loc.T("Lifetime.CalendarMetric.Requests")),
+            new LifetimeCalendarMetricOption(UsageCalendarMetric.GpuEnergy, Loc.T("Lifetime.CalendarMetric.GpuEnergy"))
         };
         var combo = new WpfComboBox
         {
             ItemsSource = options,
-            SelectedItem = options.First(option => option.Metric == selected),
+            SelectedItem = options.FirstOrDefault(option => option.Metric == selected) ?? options[0],
             MinWidth = 92,
             Margin = new Thickness(0, 0, 12, 0),
             Padding = new Thickness(7, 2, 7, 2),

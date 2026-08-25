@@ -1,6 +1,6 @@
 # Target Architecture
 
-Last reviewed: 2026-08-20
+Last reviewed: 2026-08-25
 
 ## Boundary
 
@@ -11,7 +11,8 @@ The release target is Windows-first and self-contained for the UI, with llama.cp
 - Local app service with per-session auth token
 - serialized SQLite state store
 - hidden process supervisor for native Windows or Ubuntu/WSL `llama-server`
-- local-only model serving by default, with an API key required for inference and scoped LAN exposure for gateway and/or direct model ports; upstream health or catalog metadata may remain public
+- local-only model serving by default, with API-key authentication enabled by default and an explicit Local-only opt-out for browser/client testing; scoped LAN exposure for gateway and/or direct model ports always requires a strong key, while upstream health or catalog metadata may remain public
+- settings choice rows update immediately, while ordinary text bindings use an idle delay before the shared auto-save debounce so transient typing states are not persisted; focus transitions still commit naturally
 - hidden runtime-package/source-build/download jobs
 - managed-runtime provenance and installed-file hash re-verification
 - Windows and WSL/Linux environment detectors and setup launchers
@@ -216,7 +217,15 @@ if it provides clear value.
   cache-hit and throughput calculations, optional request totals, active/peak
   day insights, filters, legacy-total separation, and model breakdowns.
   `LifetimeMetricsApplicationService` coordinates those rules with `StateStore`;
-  the Metrics page only projects and renders the returned report.
+  host GPU energy is stored in combined and per-device hourly buckets. The
+  Metrics page renders combined historical energy while per-device history
+  remains available to the control API. Device buckets
+  begin at first observation rather than inventing a split for older combined data.
+  `ElectricityTariffPolicy` validates the app-level ISO-style currency code,
+  day/night rates, and local tariff boundary. It derives cost from the immutable
+  hourly energy facts, apportions a bucket across minute-level tariff boundaries,
+  and is shared by historical reports and in-memory app-live per-GPU totals.
+  Changing the tariff therefore recalculates estimates without rewriting energy.
   `UsageDateSelectionService` owns replace, toggle, anchored-range, and additive
   range semantics without a WPF dependency. `LifetimeUsageCalendar` maps input
   modifiers and renders the returned state with WPF drawing primitives, adding
@@ -231,20 +240,132 @@ if it provides clear value.
   interaction, visual state, page composition, expandable result cards, and
   contextual navigation without placing Help behavior in `MainWindow`.
 - `EndpointInspectionService` performs read-only, authenticated live inspection of direct model endpoints (`/health`, `/v1/models`, `/props`, and `/slots`) and the shared gateway (`/health`, `/v1/models`, and `/running`). It preserves partial results when a fork omits an optional endpoint. `EndpointInspectionDialogFactory` renders those normalized results without issuing inference requests and exposes selectable fields plus separate copy actions. `EndpointInspectionReportFormatter` has no API-key input, so the general copied report cannot include the model credential; only the dedicated key action receives it. The complete surface and the Model Groups dialogs use the same 21-pack localization contract as the shell.
-- `OverviewPageState` applies persisted UI visibility preferences to individual
-  metric cards and the log/raw-metrics rows, and evaluates the selected
+- `OverviewDashboardLayoutPolicy` owns the versioned, platform-neutral dashboard
+  layout contract, normalization, legacy visibility projection, card ordering,
+  metric membership, bounded free-form geometry, version migration, and independent
+  per-metric chart selection. `OverviewDashboardController` owns awaited,
+  always-active context menus, two-dimensional movement, content-bounded
+  eight-direction outer-card resizing, responsive coordinate
+  translation, and keyed metric updates; `OverviewDashboardMetricRegistry` owns
+  the curated metric catalog, semantic value/unit/detail readings, and
+  runtime-discovered Prometheus samples. Hardware readings remain atomic: CPU
+  load/temperature/current clock, RAM load/used capacity/configured clock, and
+  per-GPU load/VRAM/draw power/core clock/core temperature/VRAM temperature can be placed independently
+  when their host probes expose values. Curated time-varying readings can be
+  charted; configured clocks, capacities, slot counters, and raw samples cannot.
+  Hardware plots share a stable host series key rather than the selected runtime
+  key, so polling appends history instead of clearing it. Host telemetry refreshes
+  through a keyed single-flight cache: CPU/RAM/vendor probes run in parallel and
+  slow timer ticks do not overlap. The normal Windows host refresh combines CPU,
+  RAM, and Windows GPU identity/performance-counter queries into one PowerShell
+  process, while vendor tools remain independent capability adapters. The
+  formatted adapter output is parsed once into a typed `HostHardwareSnapshot` at
+  the cache boundary; dashboard and energy consumers use that snapshot directly.
+  Full hardware snapshots remain fresh for ten
+  seconds. The energy sampler reuses a recent full snapshot when it contains
+  power sensors; otherwise it runs a power-focused accelerator/identity probe
+  that skips the CPU and RAM queries. The Overview always consumes the full host snapshot rather than a
+  selected-session-filtered device list. Sampling begins before runtime/model
+  selection, and no-runtime transitions clear only runtime
+  histories, keeping CPU, RAM, and GPU values and charts live without a loaded
+  model. Power-reporting GPUs also register optional app-live energy rows before
+  a runtime starts. `ObservedGpuEnergyTracker` accumulates the same per-device
+  deltas that are written to historical storage while a model session is active.
+  With the default session-only policy, idle power detection backs off to five
+  minutes and does not write history; `trackGpuEnergyWhileIdle` restores continuous
+  ten-second idle sampling and persistence.
+  Its Overview values reset when the Manager process restarts. WPF card and metric-row views render
+  those typed presentations without parsing legacy free-form metric lines.
+  The curated catalog omits derived per-poll generation, prompt, and speculative
+  rates when the runtime only exposes dependable averages; v5 normalization
+  removes those stale choices and moves existing charts to average-rate metrics.
+  V6 normalization removes static/dead chart choices, while unsupported optional
+  sensor rows remain hidden until a finite observation is available.
+  V7 normalization migrates the former session-named energy IDs to app-live
+  observed-energy IDs without discarding saved cards.
+  V8 persists a dashboard-wide card-size lock and the device-independent
+  surface width captured when it is enabled. Horizontal positions remain
+  responsive, while card widths use that captured sizing reference; the
+  placement engine wraps locked cards before applying its single-card viewport
+  safety clamp.
+  V9 adds an optional bounded title to the generic card contract. Untitled cards
+  allocate no header space, and metric rows measure the value/unit column before
+  assigning the remaining width to the wrapping label column. V10 introduces a curated catalog and compatibility-safe
+  deprecation: cache reuse, draft acceptance, recent counter-delta throughput,
+  context high-water/shift counters, selected server-process telemetry, optional
+  extended GPU sensors, and gateway observations are atomic rows. Unsupported
+  optional rows stay out of the picker; saved legacy rows remain resolvable.
+  `GpuPowerObservationParser` and `GpuEnergyAccumulator` convert capability-driven
+  host power samples into trapezoid-integrated Wh segments, split them at UTC hour
+  boundaries, and reject long gaps or changed sensor sets. `StateStore` persists
+  those segments independently from model token usage; the Metrics report rolls
+  them into local days and carries observed/detected GPU coverage so partial mixed-
+  vendor measurements cannot appear as complete totals. NVIDIA SMI, AMD SMI, and
+  Intel XPU-SMI are opportunistic adapters; absent tools or unsupported sensors
+  remain unavailable and never produce estimated readings.
+  The one-second telemetry poll continues while the window is minimized so
+  readiness, counters, and idle-unload policy remain current, while WPF rendering
+  is limited to one frame every five seconds and refreshed immediately on restore.
+  Runtime output uses a bounded writer that flushes after one second, 64 KiB, or
+  session shutdown instead of forcing a disk flush for every line.
+  Cards remain headerless by default but may render one optional user title;
+  each row still labels itself and owns its optional charts so chart identity
+  does not depend on card position. The card context
+  menu manages metric membership, charts, and card removal; persisted geometry
+  is changed directly through Windows-style
+  geometric hit-testing maps the visible outer border to four side and four
+  corner resize directions without adding overlay controls; the border supplies
+  hover feedback and the interior remains the move surface. The
+  layout engine resolves placement after WPF measures each card's real text and
+  chart minimum, snaps nearby cards, and prevents overlap while preserving a
+  minimum visual gap. Vertically resized edges align with the corresponding edge
+  of an already adjacent card when they enter the snap threshold. Drag and resize interactions begin from those rendered
+  outer bounds rather than stale persisted coordinates, then atomically persist
+  every resolved card position so collision correction cannot leave overlapping
+  coordinates behind. Dashboard-specific
+  telemetry styling remains entirely
+  theme-keyed: raised surfaces, hairline row separators, tabular measurement
+  typography, and framed microplot grids reuse the shell palette in both themes.
+  The shell retains the composed Overview surface across normal page navigation,
+  while localization changes may explicitly rebuild it. The independent hardware
+  sampler continues applying host readings to that retained controller off-page,
+  so returning to Overview displays existing cards and current hardware state immediately.
+- `OverviewPageState` applies the persisted dashboard layout plus visibility
+  preferences for the log/raw-metrics rows, and evaluates the selected
   model/profile action state so Load is suppressed only when the running launch
   profile matches the selected profile; `ModelsPageState` does the same for
   the Hugging Face row. They collapse associated grid space and splitters while
   leaving runtime observation and download services active.
-  `SettingsPageDefinitionService` projects the nine booleans into the compact
+  `SettingsPageDefinitionService` projects the nine compatibility booleans into the compact
   **UI** category, `AppSettingsUpdateService` validates the Show/Hide editor values,
-  and `StateStore.Settings` explicitly reads and writes each SQLite key. A
+  and `StateStore.Settings` explicitly reads and writes each SQLite key plus the
+  structured `overviewDashboardLayout`. Cards are generic containers; v2
+  introduced atomic metric IDs for CPU, RAM, individual GPUs, runtime counters,
+  token rates/totals, KV values, and raw Prometheus series, while v3 persists
+  responsive horizontal and pixel-based vertical bounds, v4 persists a set
+  of independently enabled metric charts, and v5 retires unreliable live-rate
+  rows while preserving their average-rate equivalents. V6 limits charts to
+  curated time-varying values and gates optional hardware rows on observed host
+  capabilities, v7 migrates observed-energy IDs, and v8 adds the persisted
+  dashboard-wide fixed-size mode. V9 adds optional card titles without changing
+  metric membership. V10 adds curated metric categories, derived efficiency and
+  context readings, process/GPU capability readings, and gateway performance
+  observations while retaining legacy-ID rendering. V11 changes the production
+  default to unlocked, equal-width runtime-summary and host/energy cards; the
+  Overview controller adds GPU cards only for discrete devices and leaves GPU
+  core clock out of the default template without removing either metric from
+  custom layouts. V12 makes the production-default cards uniformly compact and
+  removes GPU power draw from their default charts while preserving it as a live
+  value; GPU utilization remains charted. The six compatibility
+  booleans project metric-group presence into the canonical layout so existing
+  control clients remain compatible. Version 1 composite IDs, v2 packed cards,
+  v3 singular-chart layouts, and v4/v5 chart selections migrate without
+  discarding valid metric membership, sizing, or charts. A
   debounced `SettingsPageState` change notification persists valid edits and
   reapplies page state without rebuilding the focused editor. Missing keys use
   the documented per-surface defaults. The typed `AppSettings` control schema
   exposes the same fields automatically.
-- `ModelGatewayService`, `ModelGatewayRequestAccessPolicy`, `ModelGatewayRequestResolver`, `ModelGatewayUpstreamProxy`, `ModelGatewayResponseWriter`, `GatewayModelLoadWorkflowService`, `GatewayRuntimeApplicationService`, `GatewayActivityStatusTracker`, and `GatewayActivityStatusController` own the shared auto-load router, access/CORS checks, model-id resolution, upstream proxying, client-facing response payloads, policy-aware load workflow, client-facing load failures, and Overview routing status.
+- `ModelGatewayService`, `ModelGatewayRequestAccessPolicy`, `ModelGatewayRequestResolver`, `ModelGatewayUpstreamProxy`, `ModelGatewayResponseWriter`, `GatewayModelLoadWorkflowService`, `GatewayRuntimeApplicationService`, `GatewayActivityStatusTracker`, `GatewayActivityStatusController`, and `GatewayPerformanceTracker` own the shared auto-load router, access/CORS checks, model-id resolution, upstream proxying, client-facing response payloads, policy-aware load workflow, client-facing load failures, Overview routing status, and bounded request latency/health observations.
 The largest service classes are also split by concern: `StateStore` separates catalog, model-group policy, settings, job persistence, and legacy launch-default migration; `HuggingFaceService` separates search, download lifecycle, safety verification, projector companion handling, and launch-profile suggestions; `LlamaProcessSupervisor` separates runtime lifecycle, launch helpers, and WSL cleanup helpers; `RuntimeBuildCatalogService` separates default presets, custom repository persistence, downloaded source metadata, preset row presentation, and backend/mode identity helpers; `RuntimeMetadataService` separates package metadata reads, preset inference, commit helpers, and runtime folder/package path helpers; `ModelGatewayService` delegates access policy, request/model resolution, upstream proxying, and response payloads to gateway helpers; `RuntimeDeletionPlanner` separates direct runtime, package, source-cache, and build-preset planning while `RuntimeDeletionExecutorService` performs state/filesystem mutation; `AppUpdateService` delegates release parsing and checksum verification to update helpers; and `ModelCatalogService` keeps legacy metadata parsing separate from normal scan/import/delete flows.
 
 Domain models are grouped by use instead of living in one catch-all file: core records/enums, app defaults, per-model launch settings, and runtime/download launch payloads each have dedicated model files. MainWindow background refreshes and monitors go through a shared `RunBackground` wrapper so failures are logged and surfaced in the status line instead of becoming unobserved tasks.
@@ -276,19 +397,20 @@ Still needed:
 
 Current:
 
-1. Choose a models folder or scan it on demand.
-2. Auto-register missing GGUF model folders in SQLite.
-3. Pick a prebuilt or custom built llama.cpp runtime and launch settings.
-4. Load/restart/unload explicitly; more than one model can stay loaded at the same time when each model has a unique saved port and hardware capacity allows it.
-5. Search Hugging Face from the Models page, paste a Hugging Face repo or GGUF file URL directly, review compatibility signals, open the selected repo's model card, and download/install the selected GGUF plus a discoverable verified mmproj/projector companion as a background job.
-6. Delete registration or app-owned model directory according to ownership flags.
-7. Generate compact model manifests from readable GGUF metadata while preserving imported/download metadata.
-8. Verify expected byte counts or SHA-256 before registering downloaded GGUF files.
-9. Validate local vision/projector pairing by surfacing missing mmproj files in capability summaries, invalidating cached capabilities when a projector is added or removed, carrying auto-detected, embedded/model-bundled, or explicit per-model Vision head choices, carrying a separate MTP head path for compatible `--mtp-head` runtimes, and carrying per-model dynamic-resolution image token allowances through to `llama-server`.
-10. Save named launch variants per model so users can keep multiple runtime/port/context/vision profiles without duplicating model registration.
-11. Keep model serving local-only unless Settings explicitly enables LAN exposure. LAN exposure can be scoped to the auto-load gateway, direct model ports, or both. All launches require an API key; LAN exposure opens only model-serving endpoints, not the app-local control API.
-12. Show model loading progress in Overview with separate model-name and loading-time rows, and retain the completed load duration after readiness is reached so users can see how long startup took.
-13. Treat UI visibility as presentation state only. Collapsing cards, logs, raw
+1. Choose a models folder, scan it on demand, or explicitly select one GGUF file anywhere on disk.
+2. Classify readable GGUFs from role metadata first (`MainModel`, `VisionProjector`, `SpeculativeAssistant`, or `Ambiguous`), use narrow filename conventions only as a fallback or conflict signal, and return per-file scan diagnostics instead of silently relying on broad name exclusions.
+3. Auto-register main-model GGUFs in SQLite. An explicit file import rejects invalid GGUFs, asks for confirmation before treating a companion or ambiguous file as a main model, and persists that confirmation so later scans do not discard the registration.
+4. Pick a prebuilt or custom built llama.cpp runtime and launch settings.
+5. Load/restart/unload explicitly; more than one model can stay loaded at the same time when each model has a unique saved port and hardware capacity allows it.
+6. Search Hugging Face from the Models page, paste a Hugging Face repo or GGUF file URL directly, review compatibility signals, open the selected repo's model card, and download/install the selected GGUF plus a discoverable verified mmproj/projector companion as a background job.
+7. Delete registration or app-owned model directory according to ownership flags.
+8. Generate compact model manifests from readable GGUF metadata while preserving imported/download metadata.
+9. Verify expected byte counts or SHA-256 before registering downloaded GGUF files.
+10. Validate local vision/projector pairing by surfacing missing mmproj files in capability summaries, invalidating cached capabilities when a projector is added or removed, carrying auto-detected, embedded/model-bundled, or explicit per-model Vision head choices, carrying a separate MTP head path for compatible `--mtp-head` runtimes, and carrying per-model dynamic-resolution image token allowances through to `llama-server`.
+11. Save named launch variants per model so users can keep multiple runtime/port/context/vision profiles without duplicating model registration.
+12. Keep model serving local-only unless Settings explicitly enables LAN exposure. Local-only mode may explicitly disable model API-key authentication, which clears the active key while retaining a protected backup for re-enabling it. LAN exposure can be scoped to the auto-load gateway, direct model ports, or both, and always requires a strong key. These settings affect only model-serving endpoints, not the independently authenticated app-local control API.
+13. Show model loading progress in Overview with separate model-name and loading-time rows, and retain the completed load duration after readiness is reached so users can see how long startup took.
+14. Treat UI visibility as presentation state only. Collapsing cards, logs, raw
     metrics, or Hugging Face controls must never disable collection, downloads,
     or model serving. Absent keys use the documented per-surface defaults.
 
@@ -328,6 +450,11 @@ Current:
 16. Treat Intel Arc SYCL as a separate setup action, checking Windows oneAPI tools for native launches/builds and Ubuntu Level Zero/OpenCL runtime plus oneAPI DPC++/MKL/DNNL tools for WSL launches/builds.
 17. Detect Windows CPU/CUDA/Vulkan/SYCL build tool presence from the Windows page and WSL CPU/CUDA/Vulkan/SYCL build tool presence from the WSL Linux page.
 18. Keep Windows and WSL runtime presets distinct so package downloads, source downloads, update checks, build jobs, retries, and delete-all actions do not mix native and WSL artifacts.
+19. Treat `master` and latest-release endpoints as discovery channels rather than
+    mutable installed identities. A downloaded source records its resolved Git
+    commit; a package records its release tag, published target, selected assets,
+    verified asset checksums, and an installed-file hash manifest. Existing
+    installations remain pinned until the user explicitly updates them.
 
 Still needed:
 

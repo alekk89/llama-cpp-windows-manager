@@ -1,56 +1,62 @@
-using System.Windows.Controls;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
 using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace LocalLlmConsole;
 
 public sealed class RuntimeDashboardPageState
 {
-    public Grid? ModelMetric { get; private set; }
-
-    public Grid? GpuMetric { get; private set; }
-
-    public Grid? KvCacheMetric { get; private set; }
-
-    public Grid? TokensMetric { get; private set; }
-
-    public TextBlock? TokensLastKnown { get; private set; }
-
-    public Grid? MtpTokensMetric { get; private set; }
-
-    public Grid? SlotsMetric { get; private set; }
-
-    public MetricSparkline? TokensGraph { get; private set; }
-
-    public MetricSparkline? MtpTokensGraph { get; private set; }
-
-    public MetricSparkline? KvCacheGraph { get; private set; }
+    public OverviewDashboardController? DashboardController { get; private set; }
 
     public WpfTextBox? RuntimeLogBox { get; private set; }
 
     public DataGrid? RuntimeMetricsGrid { get; private set; }
 
-    public WpfProgressBar? ModelProgress { get; private set; }
+    public bool IsAvailable => DashboardController is not null;
+
+    public IDisposable DeferDashboardUpdates()
+        => DashboardController?.DeferUpdates() ?? EmptyScope.Instance;
 
     public void Apply(OverviewPageControls controls)
     {
         ArgumentNullException.ThrowIfNull(controls);
 
-        ModelMetric = controls.RuntimeDashboardModel;
-        GpuMetric = controls.RuntimeDashboardGpu;
-        KvCacheMetric = controls.RuntimeDashboardKvCache;
-        TokensMetric = controls.RuntimeDashboardTokens;
-        TokensLastKnown = controls.RuntimeDashboardTokensLastKnown;
-        MtpTokensMetric = controls.RuntimeDashboardMtpTokens;
-        SlotsMetric = controls.RuntimeDashboardSlots;
-        TokensGraph = controls.RuntimeDashboardTokensGraph;
-        MtpTokensGraph = controls.RuntimeDashboardMtpTokensGraph;
-        KvCacheGraph = controls.RuntimeDashboardKvCacheGraph;
+        DashboardController = controls.DashboardController;
         RuntimeLogBox = controls.RuntimeLogBox;
         RuntimeMetricsGrid = controls.RuntimeMetricsGrid;
-        ModelProgress = null;
     }
 
-    public void SetRuntimeLogText(string text, bool followTail)
-        => TextBoxTailPresenter.SetText(RuntimeLogBox, text, followTail);
+    public void SetMetricValue(string metricId, string value)
+        => DashboardController?.SetMetricValue(metricId, value);
+
+    public void ApplyMetricSummary(RuntimeMetricSummaryPresentation summary)
+        => DashboardController?.ApplyMetricSummary(summary);
+
+    public void ApplyHardwareSummary(string summary)
+        => DashboardController?.ApplyHardwareSummary(summary);
+
+    public Task ApplyHardwareSummaryAsync(HostHardwareSnapshot snapshot)
+        => DashboardController?.ApplyHardwareSummaryAsync(snapshot) ?? Task.CompletedTask;
+
+    public void ApplyObservedGpuEnergy(ObservedGpuEnergySnapshot? snapshot)
+        => DashboardController?.ApplyObservedGpuEnergy(snapshot);
+
+    public void SetRuntimeLogText(
+        string text,
+        bool followTail,
+        bool forceFollowTail = false,
+        bool forceTop = false)
+    {
+        var changed = TextBoxTailPresenter.SetText(RuntimeLogBox, text, followTail, forceFollowTail);
+        if (!changed || !forceTop || RuntimeLogBox is null) return;
+        RuntimeLogBox.CaretIndex = 0;
+        RuntimeLogBox.ScrollToHome();
+    }
+
+    private sealed class EmptyScope : IDisposable
+    {
+        public static EmptyScope Instance { get; } = new();
+
+        public void Dispose()
+        {
+        }
+    }
 }

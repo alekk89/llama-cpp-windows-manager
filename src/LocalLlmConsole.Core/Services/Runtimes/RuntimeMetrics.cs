@@ -1,7 +1,11 @@
 
 namespace LocalLlmConsole.Services;
 
-public sealed record PrometheusSample(string Name, string Labels, double Value, string RawValue, string Type, string Help);
+public sealed record PrometheusSample(string Name, string Labels, double Value, string RawValue, string Type, string Help)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string NormalizedName { get; } = RuntimeMetrics.NormalizeMetricName(Name);
+}
 
 public static class RuntimeMetrics
 {
@@ -80,17 +84,42 @@ public static class RuntimeMetrics
 
     private static IEnumerable<PrometheusSample> Matching(IReadOnlyList<PrometheusSample> samples, string[] include, string[] exclude)
     {
+        var normalizedInclude = include.Select(NormalizeMetricName).ToArray();
+        var normalizedExclude = exclude.Select(NormalizeMetricName).ToArray();
         foreach (var sample in samples)
         {
-            var name = NormalizeMetricName(sample.Name);
-            if (include.Any(term => !name.Contains(NormalizeMetricName(term), StringComparison.OrdinalIgnoreCase))) continue;
-            if (exclude.Any(term => name.Contains(NormalizeMetricName(term), StringComparison.OrdinalIgnoreCase))) continue;
+            var name = sample.NormalizedName;
+            if (normalizedInclude.Any(term => !name.Contains(term, StringComparison.Ordinal))) continue;
+            if (normalizedExclude.Any(term => name.Contains(term, StringComparison.Ordinal))) continue;
             yield return sample;
         }
     }
 
-    private static string NormalizeMetricName(string value)
-        => Regex.Replace(value.ToLowerInvariant(), "[^a-z0-9]+", "_");
+    internal static string NormalizeMetricName(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        var normalized = new StringBuilder(value.Length);
+        var previousWasSeparator = false;
+        foreach (var character in value)
+        {
+            if (character is >= 'a' and <= 'z' or >= '0' and <= '9')
+            {
+                normalized.Append(character);
+                previousWasSeparator = false;
+            }
+            else if (character is >= 'A' and <= 'Z')
+            {
+                normalized.Append(char.ToLowerInvariant(character));
+                previousWasSeparator = false;
+            }
+            else if (!previousWasSeparator)
+            {
+                normalized.Append('_');
+                previousWasSeparator = true;
+            }
+        }
+        return normalized.ToString();
+    }
 
     private static int LastWhitespace(string text)
     {
@@ -112,4 +141,3 @@ public static class RuntimeMetrics
         return double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : double.NaN;
     }
 }
-

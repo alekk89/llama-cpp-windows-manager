@@ -1,6 +1,6 @@
 # Development Guide
 
-Last reviewed: 2026-08-20
+Last reviewed: 2026-08-25
 
 This repo is a Windows-first .NET 10 WPF app. The app should stay easy to run
 from source, but end users should receive the published portable app or
@@ -44,6 +44,11 @@ been reviewed. Do not execute an untrusted contribution on a machine containing
 production Manager data, signing certificates, or release credentials. If a
 contributor cannot push to the canonical repository, use their fork and a pull
 request only after that GitHub mutation has been requested.
+
+Localization packs may omit untranslated keys. The runtime deliberately falls
+back to the English pack, and the localization contract tests verify placeholder
+compatibility for every translated value. Do not copy English text into another
+pack merely to satisfy key parity; leave the key absent until it is translated.
 
 ## Local Gate
 
@@ -133,6 +138,13 @@ services remain under `src/LocalLlmConsole.App` feature modules:
 | `Services/Infrastructure` | State store, local app service, process runner, filesystem/config safety, dialogs, jobs, and shell helpers. |
 | `Services/Models` | Model catalog, model capabilities, aliases, model launch profiles, and model deletion/import behavior. |
 | `Services/Runtimes` | Runtime registry, source/build jobs, launch execution, sessions, metric polling, readiness, and process supervision. |
+
+Runtime readiness is also the authentication-policy boundary. Once an endpoint
+responds, a non-inference probe must prove the configured policy before the
+session is marked loaded: protected endpoints reject an unauthenticated request
+and accept the configured model API key, while explicitly unauthenticated
+Local-only endpoints accept the credential-free probe. Keep public upstream
+health/catalog behavior separate from this route check.
 
 The control API host and router remain in `Services/Control/LocalControlApi.cs`;
 focused handlers own model, profile, group, runtime, session/gateway/metrics,
@@ -243,9 +255,40 @@ UI preference requires all of the following:
 6. Add update-service, SQLite save/reload, WPF visibility/reflow, localization,
    control-schema, Help, and release-readiness coverage.
 
-The six Overview status-card switches and live runtime log are default-`true`.
-The dense raw metrics table and Models Hugging Face section are default-`false`.
-Choose defaults deliberately when adding future optional surfaces.
+The versioned Overview dashboard layout stores generic card containers whose
+v2 contents are atomic metrics such as CPU, RAM, an indexed GPU, a token rate,
+or a slot counter. Version 3 adds bounded free-form card geometry using a
+responsive 12-unit horizontal surface and device-independent vertical pixels.
+Version 4 adds independent charts. Version 5 removes rate rows that cannot be supplied dependably on every
+poll and migrates their chart selections to the corresponding average rates.
+Version 8 adds a dashboard-wide fixed-card-size mode using the surface width
+captured when the user locks the layout.
+Version 9 adds optional bounded card titles; untitled cards retain the compact
+headerless rendering. Metric-row values are content-sized so labels wrap only
+after the value and unit consume their measured width.
+Version 10 adds the curated Core, Hardware, Energy, Gateway, Advanced, and Raw
+catalog. Optional process, GPU, and gateway rows are registered only after an
+observation. Keep deprecated IDs resolvable for saved layouts but hide them from
+the picker, and never chart static configuration or cumulative counters.
+Version 1 composite metrics, v2 packed layouts, and v3 singular chart choices
+are migrated during normalization. WPF owns geometric border hit areas,
+content minimums, snapping, minimum spacing, and rendering.
+Version 11 makes the production cards responsive, equal-width, and unlocked by
+default. After hardware discovery, the application adds the GPU template only
+for discrete GPUs and omits GPU core clock from that template; integrated-GPU
+and core-clock metrics remain available for custom cards. Additional GPU cards
+wrap onto later rows. Custom layouts outside this default family are not
+rewritten. Version 12 gives every production-default card the same compact
+height and charts GPU utilization without charting GPU power draw; power remains
+available as a live value. The live runtime log defaults to visible with newest
+entries first. The persisted Runtime log order preference can instead present
+chronological entries with the newest entry at the bottom.
+The six legacy status-card switches remain compatibility projections
+into metric-group presence in that layout. The dense
+raw metrics table and Models Hugging Face section are default-hidden. Add future
+dashboard metrics through the registry and layout policy, and provide separate
+value/unit/detail readings for the semantic row renderer rather than adding more
+card-specific settings, free-form line parsing, controls, or `MainWindow` fields.
 
 ## Documentation Guidance
 

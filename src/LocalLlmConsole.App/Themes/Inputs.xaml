@@ -184,7 +184,7 @@
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
-      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="FontSize" Value="12"/>
       <Setter Property="HasDropShadow" Value="False"/>
       <Setter Property="OverridesDefaultStyle" Value="True"/>
       <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -194,8 +194,8 @@
             <Border Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="7"
-                    Padding="4"
+                    CornerRadius="5"
+                    Padding="3"
                     SnapsToDevicePixels="True">
               <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
             </Border>
@@ -206,23 +206,77 @@
     <Style TargetType="MenuItem">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
-      <Setter Property="Padding" Value="10,7"/>
-      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="Padding" Value="7,4"/>
+      <Setter Property="MinHeight" Value="26"/>
       <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="MenuItem">
-            <Border x:Name="ItemChrome"
-                    Background="{TemplateBinding Background}"
-                    CornerRadius="4"
-                    Padding="{TemplateBinding Padding}"
-                    SnapsToDevicePixels="True">
-              <ContentPresenter ContentSource="Header"
-                                HorizontalAlignment="Left"
-                                VerticalAlignment="Center"
-                                RecognizesAccessKey="True"/>
-            </Border>
+            <Grid SnapsToDevicePixels="True">
+              <Border x:Name="ItemChrome"
+                      Background="{TemplateBinding Background}"
+                      CornerRadius="4"
+                      Padding="{TemplateBinding Padding}"
+                      SnapsToDevicePixels="True">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="CheckGlyph"
+                             Grid.Column="0"
+                             Text="✓"
+                             FontSize="11"
+                             FontWeight="SemiBold"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Visibility="Collapsed"/>
+                  <ContentPresenter Grid.Column="1"
+                                    ContentSource="Header"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    RecognizesAccessKey="True"/>
+                  <TextBlock x:Name="SubmenuGlyph"
+                             Grid.Column="2"
+                             Text="›"
+                             FontSize="14"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Center"
+                             Visibility="Collapsed"/>
+                </Grid>
+              </Border>
+              <Popup x:Name="PART_Popup"
+                     AllowsTransparency="True"
+                     Focusable="False"
+                     HorizontalOffset="-1"
+                     IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                     Placement="Right"
+                     PopupAnimation="Fade">
+                <Border Background="{DynamicResource PanelBackAlt}"
+                        BorderBrush="{DynamicResource PanelBorderStrong}"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        Padding="3"
+                        SnapsToDevicePixels="True">
+                  <ScrollViewer CanContentScroll="True"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
             <ControlTemplate.Triggers>
+              <Trigger Property="Role" Value="SubmenuHeader">
+                <Setter TargetName="SubmenuGlyph" Property="Visibility" Value="Visible"/>
+              </Trigger>
+              <Trigger Property="Role" Value="TopLevelHeader">
+                <Setter TargetName="SubmenuGlyph" Property="Visibility" Value="Visible"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible"/>
+              </Trigger>
               <Trigger Property="IsHighlighted" Value="True">
                 <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource AccentSoft}"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
@@ -237,7 +291,7 @@
       </Setter>
     </Style>
     <Style TargetType="Separator">
-      <Setter Property="Margin" Value="5,4"/>
+      <Setter Property="Margin" Value="20,2,5,2"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Separator">

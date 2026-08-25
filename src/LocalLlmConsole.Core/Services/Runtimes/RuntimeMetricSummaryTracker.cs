@@ -3,52 +3,6 @@ using static LocalLlmConsole.Services.RuntimeMetricSummaryCalculations;
 
 namespace LocalLlmConsole.Services;
 
-public sealed record RuntimeMetricDisplaySnapshot(
-    string RuntimeKey,
-    IReadOnlyList<PrometheusSample> Samples,
-    string Tokens,
-    string GenerationRate,
-    string TotalTokens,
-    string MtpTokens,
-    string Slots,
-    string KvCache,
-    DateTimeOffset CapturedAt,
-    double? GeneratedTokens,
-    double? PromptTokens,
-    double? MtpGeneratedTokens,
-    double? MtpAcceptedTokens,
-    double? AverageGenerationRate,
-    double? AveragePromptRate,
-    double? AverageMtpGeneratedRate,
-    double? AverageMtpAcceptedRate,
-    DateTimeOffset? GeneratedTokensCapturedAt,
-    DateTimeOffset? PromptTokensCapturedAt,
-    DateTimeOffset? MtpGeneratedTokensCapturedAt,
-    DateTimeOffset? MtpAcceptedTokensCapturedAt,
-    DateTimeOffset? AverageGenerationRateCapturedAt,
-    DateTimeOffset? AveragePromptRateCapturedAt,
-    DateTimeOffset? AverageMtpGeneratedRateCapturedAt,
-    DateTimeOffset? AverageMtpAcceptedRateCapturedAt);
-
-public sealed record RuntimeMetricSummaryResult(
-    string Tokens,
-    string GenerationRate,
-    string TotalTokens,
-    string MtpTokens,
-    string Slots,
-    string KvCache,
-    bool UsedLastKnown,
-    DateTimeOffset? LastKnownCapturedAt,
-    RuntimeMetricGraphSample GraphSample);
-
-public sealed record RuntimeMetricGraphSample(
-    string RuntimeKey,
-    double? GenerationRate,
-    double? PromptRate,
-    double? SpeculativeGeneratedRate,
-    double? SpeculativeAcceptedRate,
-    double? KvCacheUsagePercent);
-
 public sealed class RuntimeMetricSummaryTracker
 {
     private readonly Dictionary<string, RuntimeMetricSummaryState> _states = new(StringComparer.Ordinal);
@@ -82,7 +36,8 @@ public sealed class RuntimeMetricSummaryTracker
                 snapshot.KvCache,
                 UsedLastKnown: true,
                 LastKnownCapturedAt(snapshot),
-                new RuntimeMetricGraphSample(runtimeKey, null, null, null, null, null));
+                new RuntimeMetricGraphSample(runtimeKey, null, null, null, null, null),
+                snapshot.Atomic);
         }
 
         var now = capturedAt ?? DateTimeOffset.UtcNow;
@@ -92,6 +47,10 @@ public sealed class RuntimeMetricSummaryTracker
             ?? RuntimeMetrics.Sum(samples, ["eval", "time"], ["prompt"]);
         var promptTokensProcessed = RuntimeDashboardService.PromptTokensProcessedCounter(samples);
         var promptTokensCached = RuntimeDashboardService.PromptCachedTokenCounter(samples);
+        var promptCacheActivity = RuntimeDashboardService.SumNullable(promptTokensProcessed, promptTokensCached);
+        var promptCacheReusePercent = promptTokensCached is { } cached && promptCacheActivity is > 0
+            ? Math.Clamp(100 * cached / promptCacheActivity.Value, 0, 100)
+            : (double?)null;
         var promptSeconds = RuntimeMetrics.Sum(samples, ["prompt", "seconds", "total"], [])
             ?? RuntimeMetrics.Sum(samples, ["prompt", "time"], []);
         var slotObservation = ObserveSlots(state, slotSnapshot, now);
@@ -106,6 +65,11 @@ public sealed class RuntimeMetricSummaryTracker
         var mtpAcceptedSeconds = RuntimeDashboardService.MtpAcceptedSecondsCounter(samples)
             ?? mtpTokenSnapshot?.AcceptedSeconds
             ?? mtpGeneratedSeconds;
+        var draftAcceptancePercent = observedMtpAcceptedTokens is { } accepted && observedMtpGeneratedTokens is > 0
+            ? Math.Clamp(100 * accepted / observedMtpGeneratedTokens.Value, 0, 100)
+            : (double?)null;
+        var peakContextTokens = RuntimeDashboardService.PeakContextTokenCounter(samples);
+        var contextShiftCount = RuntimeDashboardService.ContextShiftCounter(samples);
 
         var liveGenerationRate = CounterRateAndRemember(predictedTokens, ref state.LastPredictedTokenCounter, ref state.LastPredictedTokenPollAt, now);
         var livePromptRate = CounterRateAndRemember(promptTokensProcessed, ref state.LastPromptTokenCounter, ref state.LastPromptTokenPollAt, now);
@@ -150,6 +114,17 @@ public sealed class RuntimeMetricSummaryTracker
         var contextCapacityTokens = slotSnapshot?.ContextCapacityTokens
             ?? (metricsSettings.ContextSize > 0 ? metricsSettings.ContextSize : contextSize);
         var kvUsagePercent = RuntimeDashboardService.KvCacheUsagePercent(kvUsage, kvTokens, contextCapacityTokens);
+        var activeSlots = RuntimeMetrics.First(samples, ["requests", "processing"], [])
+            ?? SlotProcessingCount(slotSnapshot)
+            ?? 0;
+        var queuedRequests = RuntimeMetrics.First(samples, ["requests", "deferred"], []) ?? 0;
+        var busyDecodeSlots = RuntimeMetrics.First(samples, ["busy", "slots", "decode"], [])
+            ?? RuntimeMetrics.First(samples, ["n", "busy", "slots", "per", "decode"], [])
+            ?? SlotProcessingCount(slotSnapshot)
+            ?? 0;
+        var slotCapacity = Math.Max(
+            Math.Max(metricsSettings.ParallelSlots, slotSnapshot?.SlotCounters?.Count ?? 0),
+            (int)Math.Ceiling(Math.Max(0, activeSlots)));
 
         var observedGeneratedTokens = predictedTokens ?? slotObservation.GeneratedTokens;
         var observedPromptTokens = promptTokensProcessed ?? slotObservation.PromptTokens;
@@ -213,6 +188,39 @@ public sealed class RuntimeMetricSummaryTracker
             kvTokens,
             contextCapacityTokens,
             metricsSettings.KvUnified);
+        var atomic = new RuntimeMetricAtomicSnapshot(
+            liveGenerationRate,
+            livePromptRate,
+            displayAverageGenerationRate,
+            displayAveragePromptRate,
+            displayGeneratedTokens,
+            displayPromptTokens,
+            liveMtpGeneratedRate ?? observedAverageMtpGeneratedRate,
+            liveMtpAcceptedRate ?? observedAverageMtpAcceptedRate,
+            displayAverageMtpGeneratedRate,
+            displayAverageMtpAcceptedRate,
+            displayMtpGeneratedTokens,
+            displayMtpAcceptedTokens,
+            activeSlots,
+            slotCapacity,
+            queuedRequests,
+            busyDecodeSlots,
+            kvTokens,
+            contextCapacityTokens,
+            kvUsagePercent,
+            metricsSettings.KvUnified.ToLowerInvariant() switch
+            {
+                "on" => "Unified",
+                "off" => "Partitioned",
+                _ => "Automatic"
+            },
+            liveGenerationRate,
+            livePromptRate,
+            promptTokensCached,
+            promptCacheReusePercent,
+            draftAcceptancePercent,
+            peakContextTokens,
+            contextShiftCount);
         var snapshotCapturedAt = usedLastKnown && previous is not null ? previous.CapturedAt : now;
 
         Remember(
@@ -241,7 +249,8 @@ public sealed class RuntimeMetricSummaryTracker
             averagePromptRateCapturedAt,
             averageMtpGeneratedRateCapturedAt,
             averageMtpAcceptedRateCapturedAt,
-            snapshotCapturedAt);
+            snapshotCapturedAt,
+            atomic);
         return new RuntimeMetricSummaryResult(
             tokensText,
             generationRateText,
@@ -257,7 +266,8 @@ public sealed class RuntimeMetricSummaryTracker
                 displayAveragePromptRate,
                 liveMtpGeneratedRate ?? observedAverageMtpGeneratedRate,
                 liveMtpAcceptedRate ?? observedAverageMtpAcceptedRate,
-                kvUsagePercent));
+                kvUsagePercent),
+            atomic);
     }
 
     public IReadOnlyList<PrometheusSample> LastKnownSamples(string runtimeKey)
@@ -297,7 +307,8 @@ public sealed class RuntimeMetricSummaryTracker
         DateTimeOffset? averagePromptRateCapturedAt,
         DateTimeOffset? averageMtpGeneratedRateCapturedAt,
         DateTimeOffset? averageMtpAcceptedRateCapturedAt,
-        DateTimeOffset capturedAt)
+        DateTimeOffset capturedAt,
+        RuntimeMetricAtomicSnapshot atomic)
     {
         if (displayGeneratedTokens is null
             && displayPromptTokens is null
@@ -341,7 +352,8 @@ public sealed class RuntimeMetricSummaryTracker
             averageGenerationRateCapturedAt,
             averagePromptRateCapturedAt,
             averageMtpGeneratedRateCapturedAt,
-            averageMtpAcceptedRateCapturedAt);
+            averageMtpAcceptedRateCapturedAt,
+            atomic);
     }
 
     private static string MtpTokensText(
@@ -370,6 +382,13 @@ public sealed class RuntimeMetricSummaryTracker
         var speculativeType = SpeculativeTypePolicy.Normalize(metricsSettings.SpeculativeType);
         return speculativeType.StartsWith("draft-", StringComparison.OrdinalIgnoreCase)
             || speculativeType.Contains("mtp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static double? SlotProcessingCount(RuntimeSlotSnapshot? snapshot)
+    {
+        if (snapshot?.SlotCounters is { Count: > 0 } counters)
+            return counters.Count(counter => counter.IsProcessing);
+        return snapshot?.IsProcessing == true ? 1 : snapshot is null ? null : 0;
     }
 
     private RuntimeMetricSummaryState StateFor(string runtimeKey)

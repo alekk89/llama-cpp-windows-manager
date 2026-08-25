@@ -178,15 +178,6 @@ public sealed partial class ModelCatalogService
     private static string MetadataString(IReadOnlyDictionary<string, object?> metadata, string key)
         => metadata.TryGetValue(key, out var value) ? Convert.ToString(value, CultureInfo.InvariantCulture) ?? "" : "";
 
-    private static bool HasStandaloneSpeculativeArchitecture(string path)
-    {
-        var architecture = MetadataString(GgufMetadataReader.TryRead(path), "general.architecture");
-        return architecture.Equals("eagle3", StringComparison.OrdinalIgnoreCase)
-            || architecture.Equals("dflash", StringComparison.OrdinalIgnoreCase)
-            || architecture.EndsWith("-assistant", StringComparison.OrdinalIgnoreCase)
-            || architecture.EndsWith("_assistant", StringComparison.OrdinalIgnoreCase);
-    }
-
     private static bool LooksCompatibleWithMainModel(
         string mainName,
         string companionName,
@@ -268,20 +259,4 @@ public sealed partial class ModelCatalogService
             || normalized.Contains("vision-mtp", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool LooksLikeDraftOrMtpHeadName(string name)
-    {
-        var normalized = (name ?? "").Replace('_', '-').Replace('.', '-');
-        return normalized.StartsWith("mtp-", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("-mtp-", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("-mtp-head", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("mtp-head", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("dspark", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("dflash", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("eagle3", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("eagle-3", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("-draft-", StringComparison.OrdinalIgnoreCase)
-            || normalized.StartsWith("draft-", StringComparison.OrdinalIgnoreCase)
-            || normalized.Contains("-spec-", StringComparison.OrdinalIgnoreCase)
-            || normalized.StartsWith("spec-", StringComparison.OrdinalIgnoreCase);
-    }
 }

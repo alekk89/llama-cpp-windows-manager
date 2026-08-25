@@ -26,6 +26,7 @@ public sealed partial class AppServiceFactory
         var uiTimerFactory = CreateUiTimerFactory();
         var downloadHistoryRefreshTimer = CreateUiAsyncRefreshTimerController(uiTimerFactory);
         var runtimeDashboardRefreshTimer = CreateUiAsyncRefreshTimerController(uiTimerFactory);
+        var gpuEnergyTrackingTimer = CreateUiAsyncRefreshTimerController(uiTimerFactory);
         var gatewayActivity = CreateGatewayActivityStatusController(
             CreateGatewayActivityStatusTracker(),
             uiTimerFactory);
@@ -136,6 +137,7 @@ public sealed partial class AppServiceFactory
             launchRuntimeSelection);
         var modelRuntimeUnloadApplication = CreateModelRuntimeUnloadApplicationService(modelRuntimeCommands);
         var modelFolderApplication = CreateModelFolderApplicationService();
+        var modelImportApplication = CreateModelImportApplicationService();
         var modelDeletionApplication = CreateModelDeletionApplicationService();
         var modelGatewayHostFactory = CreateModelGatewayHostFactoryService();
         var modelGatewayLifecycleApplication = CreateModelGatewayLifecycleApplicationService();
@@ -173,6 +175,7 @@ public sealed partial class AppServiceFactory
                 uiState,
                 downloadHistoryRefreshTimer,
                 runtimeDashboardRefreshTimer,
+                gpuEnergyTrackingTimer,
                 gatewayActivity,
                 selectedCapabilities,
                 advancedSections,
@@ -261,6 +264,7 @@ public sealed partial class AppServiceFactory
                 modelRuntimeUnloadApplication,
                 launchRuntimeSelection,
                 modelFolderApplication,
+                modelImportApplication,
                 modelDeletionApplication,
                 modelGatewayHostFactory,
                 modelGatewayLifecycleApplication,

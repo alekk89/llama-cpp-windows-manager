@@ -21,7 +21,8 @@ public enum UsageCalendarMetric
     InputTokens,
     GeneratedTokens,
     CachedPromptTokens,
-    Requests
+    Requests,
+    GpuEnergy
 }
 
 /// <summary>Dependency-free, week-based daily activity calendar for persisted token usage.</summary>
@@ -63,6 +64,9 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
         {
             if (_metric == value) return;
             _metric = value;
+            _keyboardIndex = _days.FindLastIndex(IsMetricTracked);
+            if (_keyboardIndex < 0 && _days.Count > 0) _keyboardIndex = _days.Count - 1;
+            SetSelection(SelectedDates, raiseEvent: false);
             InvalidateVisual();
         }
     }
@@ -74,7 +78,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
         ArgumentNullException.ThrowIfNull(days);
         _days.Clear();
         _days.AddRange(days.OrderBy(day => day.Date));
-        _keyboardIndex = _days.FindLastIndex(day => day.IsTracked);
+        _keyboardIndex = _days.FindLastIndex(IsMetricTracked);
         if (_keyboardIndex < 0 && _days.Count > 0) _keyboardIndex = _days.Count - 1;
         _gridStart = _days.Count == 0 ? default : StartOfWeek(_days[0].Date);
         SetSelection(selectedDates ?? SelectedDates, raiseEvent: false);
@@ -85,7 +89,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
     public void SetSelection(IReadOnlyList<DateOnly> dates, bool raiseEvent = false)
     {
         ArgumentNullException.ThrowIfNull(dates);
-        var selectable = _days.Where(day => day.IsTracked).Select(day => day.Date).ToHashSet();
+        var selectable = _days.Where(IsMetricTracked).Select(day => day.Date).ToHashSet();
         _selectedDates.Clear();
         _selectedDates.UnionWith(dates.Where(selectable.Contains));
         if (_selectedDates.Count == 0)
@@ -109,7 +113,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
 
     public bool ApplySelection(DateOnly date, UsageDateSelectionMode mode, bool raiseEvent = true)
     {
-        var selectable = _days.Where(day => day.IsTracked).Select(day => day.Date).ToHashSet();
+        var selectable = _days.Where(IsMetricTracked).Select(day => day.Date).ToHashSet();
         if (!selectable.Contains(date)) return false;
         var current = new UsageDateSelection(SelectedDates, _selectionAnchor);
         var result = _selectionService.Apply(current, date, mode, selectable);
@@ -145,15 +149,15 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
 
         DrawWeekdayLabels(drawingContext);
         DrawMonthLabels(drawingContext);
-        var maximum = Math.Max(1, _days.Max(day => MetricValue(day.Totals)));
+        var maximum = Math.Max(1, _days.Max(MetricValue));
         var visibleStart = VisibleGridStart;
         for (var index = 0; index < _days.Count; index++)
         {
             var day = _days[index];
             if (day.Date < visibleStart) continue;
             var bounds = DayBounds(day.Date);
-            var fill = day.IsTracked
-                ? IntensityBrush(MetricValue(day.Totals), maximum)
+            var fill = IsMetricTracked(day)
+                ? IntensityBrush(MetricValue(day), maximum)
                 : UntrackedBrush();
             drawingContext.DrawRoundedRectangle(fill, null, bounds, 3, 3);
             if (day.Date == DateOnly.FromDateTime(DateTime.Today))
@@ -175,7 +179,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
         {
             var day = _days[hit.Index];
             ToolTip = DayTooltip(day);
-            Cursor = day.IsTracked ? WpfCursors.Hand : WpfCursors.Arrow;
+            Cursor = IsMetricTracked(day) ? WpfCursors.Hand : WpfCursors.Arrow;
         }
     }
 
@@ -191,7 +195,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
         base.OnMouseLeftButtonDown(e);
         var point = e.GetPosition(this);
         var hit = _hitAreas.FirstOrDefault(area => area.Bounds.Contains(point));
-        if (hit.Bounds.IsEmpty || !_days[hit.Index].IsTracked) return;
+        if (hit.Bounds.IsEmpty || !IsMetricTracked(_days[hit.Index])) return;
         Focus();
         _keyboardIndex = hit.Index;
         ApplySelection(_days[hit.Index].Date, SelectionMode(Keyboard.Modifiers));
@@ -201,7 +205,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
     protected override void OnKeyDown(WpfKeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (_days.Count == 0) return;
+        if (_days.Count == 0 || _keyboardIndex < 0) return;
         if (e.Key is Key.Enter or Key.Space)
         {
             ApplySelection(_days[_keyboardIndex].Date, SelectionMode(Keyboard.Modifiers));
@@ -270,7 +274,7 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
             CellSize);
     }
 
-    private WpfBrush IntensityBrush(long value, long maximum)
+    private WpfBrush IntensityBrush(double value, double maximum)
     {
         if (value <= 0)
         {
@@ -339,10 +343,22 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
         => _days.Count == 0
             ? Loc.T("Lifetime.Chart.NoData")
             : Loc.T("Lifetime.Chart.SelectionHelp") + " "
-              + string.Join("; ", _days.Where(day => day.IsTracked).TakeLast(31).Select(DayTooltip));
+              + string.Join("; ", _days.Where(IsMetricTracked).TakeLast(31).Select(DayTooltip));
 
-    private static string DayTooltip(UsageMetricDay day)
+    private string DayTooltip(UsageMetricDay day)
     {
+        if (Metric == UsageCalendarMetric.GpuEnergy)
+        {
+            if (day.GpuEnergy?.PowerObserved != true)
+                return Loc.T("Lifetime.Chart.EnergyUnavailableTooltip", day.Date.ToString("D", CultureInfo.CurrentCulture));
+            var energy = $"{day.GpuEnergy.KilowattHours.ToString(day.GpuEnergy.KilowattHours < 1 ? "N4" : "N2")} kWh";
+            return Loc.T(
+                "Lifetime.Chart.EnergyTooltip",
+                day.Date.ToString("D", CultureInfo.CurrentCulture),
+                energy,
+                day.GpuEnergy.ObservedGpuCount,
+                day.GpuEnergy.DetectedGpuCount);
+        }
         if (!day.IsTracked)
             return day.Date > DateOnly.FromDateTime(DateTime.Today)
                 ? Loc.T("Lifetime.Chart.FutureDay", day.Date.ToString("D", CultureInfo.CurrentCulture))
@@ -363,15 +379,21 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
             : tokens;
     }
 
-    private long MetricValue(UsageMetricTotals totals)
+    private double MetricValue(UsageMetricDay day)
         => Metric switch
         {
-            UsageCalendarMetric.InputTokens => totals.InputTokens,
-            UsageCalendarMetric.GeneratedTokens => totals.GeneratedTokens,
-            UsageCalendarMetric.CachedPromptTokens => totals.CachedPromptTokens,
-            UsageCalendarMetric.Requests => totals.RequestCounterObserved ? totals.RequestCount : 0,
-            _ => totals.TotalTokens
+            UsageCalendarMetric.InputTokens => day.Totals.InputTokens,
+            UsageCalendarMetric.GeneratedTokens => day.Totals.GeneratedTokens,
+            UsageCalendarMetric.CachedPromptTokens => day.Totals.CachedPromptTokens,
+            UsageCalendarMetric.Requests => day.Totals.RequestCounterObserved ? day.Totals.RequestCount : 0,
+            UsageCalendarMetric.GpuEnergy => day.GpuEnergy?.WattHours ?? 0,
+            _ => day.Totals.TotalTokens
         };
+
+    private bool IsMetricTracked(UsageMetricDay day)
+        => Metric == UsageCalendarMetric.GpuEnergy
+            ? day.GpuEnergy?.PowerObserved == true
+            : day.IsTracked;
 
     private static UsageDateSelectionMode SelectionMode(ModifierKeys modifiers)
         => modifiers.HasFlag(ModifierKeys.Shift)

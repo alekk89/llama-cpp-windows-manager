@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using LocalLlmConsole.Models;
@@ -48,7 +50,7 @@ public sealed partial class WpfUiSmokeTests
                 var statusY = statusCard.TranslatePoint(new Point(0, 0), windowContent).Y;
                 Assert.True(statusY > helpY + helpButton.ActualHeight, $"Help bottom {helpY + helpButton.ActualHeight}, status top {statusY}.");
                 Assert.True(statusY + statusCard.ActualHeight <= 680, $"Status bottom {statusY + statusCard.ActualHeight}.");
-                Assert.Equal("v2.3.0", appVersionText.Text);
+                Assert.Equal("v2.4.0", appVersionText.Text);
                 Assert.Equal(28, navigationToggle.Width);
                 var navigationToggleGlyph = Assert.IsType<TextBlock>(navigationToggle.Content);
                 Assert.Equal("\uE700", navigationToggleGlyph.Text);
@@ -167,8 +169,12 @@ public sealed partial class WpfUiSmokeTests
                         () => Task.CompletedTask,
                         () => Task.CompletedTask,
                         (_, _) => { },
-                        (_, _) => { }),
-                    _ => { }));
+                        (_, _) => { },
+                        _ => Task.CompletedTask,
+                        action => action(),
+                        action => action()),
+                    _ => { },
+                    OverviewDashboardLayoutPolicy.Default));
                 overview.LaunchProfileCombo.SelectedIndex = 0;
                 overview.Root.Measure(new Size(900, 680));
                 overview.Root.Arrange(new Rect(0, 0, 900, 680));
@@ -296,7 +302,7 @@ public sealed partial class WpfUiSmokeTests
                     settings.ModelsRoot,
                     new Grid(),
                     new LocalLlmConsole.ModelsPageActions(
-                        () => Task.CompletedTask,
+                        () => Task.CompletedTask, () => Task.CompletedTask,
                         () => Task.CompletedTask,
                         () => { },
                         () => Task.CompletedTask,
@@ -364,61 +370,93 @@ public sealed partial class WpfUiSmokeTests
                     groupNameButton.ContextMenu!.Items.Cast<MenuItem>().Select(item => item.Header).ToArray());
                 groupNameButton.ContextMenu.IsOpen = false;
 
-                LocalLlmConsole.MetricCardFactory.SetMetricText(
-                    overview.RuntimeDashboardGpu,
-                    "CPU: AMD Ryzen 9 7950X\nTelemetry: 18.5% load | 16C/32T | 57.2 °C thermal\nGPU 0: AMD Radeon RX 7900 XTX | 53.4% | 8.0/24.0 GiB");
-                Assert.Equal(3, overview.RuntimeDashboardGpu.RowDefinitions.Count);
+                var dashboard = overview.DashboardController;
+                dashboard.ApplyHardwareSummary(
+                    "CPU: AMD Ryzen 9 7950X\nTelemetry: 18.5% load | 16C/32T | 57.2 °C thermal\nRAM: 12.0/32.0 GiB | 37.5%\nGPU 0: AMD Radeon RX 7900 XTX | 53.4% | 8.0/24.0 GiB");
+                dashboard.ApplyMetricSummary(new RuntimeMetricSummaryPresentation(
+                    "Gen 35 t/s\nPrompt 17.5 t/s",
+                    "Generated 4.5 t/s\nAccepted 3.5 t/s",
+                    "Active 1/1 | Queued 0\nBusy/decode 1.0",
+                    "Used 8,192 t | 50%\nCapacity 16,384 t | unified",
+                    null,
+                    new RuntimeMetricGraphSample("model|runtime|8081", 35, 17.5, 4.5, 3.5, 50),
+                    [new PrometheusSample("llama_active_slots", "state=busy", 1, "1", "gauge", "Active slots")],
+                    new RuntimeMetricAtomicSnapshot(
+                        35, 17.5, 30, 15, 1200, 600, 4.5, 3.5, 4, 3, 69, 47,
+                        1, 1, 0, 1, 8192, 16384, 50, "Unified")));
 
-                var metricCards = new[]
-                {
-                    overview.RuntimeDashboardModel,
-                    overview.RuntimeDashboardGpu,
-                    overview.RuntimeDashboardKvCache,
-                    overview.RuntimeDashboardTokens,
-                    overview.RuntimeDashboardMtpTokens,
-                    overview.RuntimeDashboardSlots
-                }.Select(MetricCard).ToArray();
-                Assert.All(metricCards, card => Assert.Equal(104, card.Height));
-                var metricDashboard = Assert.IsType<Grid>(metricCards[0].Parent);
-                Assert.Equal(2, metricDashboard.ColumnDefinitions.Count);
+                var metricCards = dashboard.Cards.Select(card => card.Root).ToArray();
+                Assert.Equal(3, metricCards.Length);
+                Assert.All(dashboard.Cards, card => Assert.True(card.Root.Height >= card.Layout.Bounds!.Height));
+                var metricDashboard = dashboard.DashboardGrid;
+                var metricCanvas = dashboard.DashboardCanvas;
+                Assert.Empty(metricDashboard.ColumnDefinitions);
+                Assert.Equal(3, metricCanvas.Children.Count);
+                var cpuCard = dashboard.Cards.Single(card => card.MetricIds.Contains(OverviewDashboardMetricIds.Cpu));
+                var cpuText = VisualDescendants<TextBlock>(cpuCard.Root).Select(block => block.Text).ToArray();
+                Assert.Contains("18.5", cpuText);
+                Assert.Contains("%", cpuText);
+                Assert.Contains("AMD Ryzen 9 7950X · 16C/32T", cpuText);
+                Assert.DoesNotContain(LocalLlmConsole.Localization.Loc.T("Dashboard.CustomCardTitle"), cpuText);
+                Assert.DoesNotContain(VisualDescendants<Button>(cpuCard.Root), button => button.IsVisible);
+                Assert.Equal(new CornerRadius(6), cpuCard.Root.CornerRadius);
+                Assert.Equal(new Thickness(11, 9, 11, 9), cpuCard.Root.Padding);
+                var cpuValue = VisualDescendants<TextBlock>(cpuCard.Root).Single(block => block.Text == "18.5");
+                Assert.Contains("Cascadia Mono", cpuValue.FontFamily.Source, StringComparison.Ordinal);
+                Assert.Equal(FontNumeralAlignment.Tabular, Typography.GetNumeralAlignment(cpuValue));
+                AssertUnavailableMetricPolish();
                 Assert.All(VisualDescendants<GridSplitter>(overview.Root), splitter => Assert.True(splitter.ShowsPreview));
-
-                overview.RuntimeDashboardTokensGraph.Push("model|runtime|8081", 35, 17.5);
-                overview.RuntimeDashboardMtpTokensGraph.Push("model|runtime|8081", 4.5, 3.5);
-                overview.RuntimeDashboardKvCacheGraph.Push("model|runtime|8081", 47.25);
-                LocalLlmConsole.MetricCardFactory.SetMetricText(overview.RuntimeDashboardTokens, "Gen 35 t/s\nPrompt 17.5 t/s");
-                var unchangedMetricChild = overview.RuntimeDashboardTokens.Children[0];
-                LocalLlmConsole.MetricCardFactory.SetMetricText(overview.RuntimeDashboardTokens, "Gen 35 t/s\nPrompt 17.5 t/s");
-                Assert.Same(unchangedMetricChild, overview.RuntimeDashboardTokens.Children[0]);
-                LocalLlmConsole.MetricCardFactory.SetMetricText(overview.RuntimeDashboardMtpTokens, "Inactive");
-                LocalLlmConsole.MetricCardFactory.SetMetricText(overview.RuntimeDashboardKvCache, "Used 8,192 t | 50%\nCapacity 16,384 t | unified");
                 overview.Root.UpdateLayout();
-                Assert.Equal(1, overview.RuntimeDashboardTokensGraph.SampleCount);
-                Assert.Equal(1, overview.RuntimeDashboardMtpTokensGraph.SampleCount);
-                Assert.Equal(1, overview.RuntimeDashboardKvCacheGraph.SampleCount);
-                var graphOffsets = new[]
-                {
-                    (Graph: overview.RuntimeDashboardTokensGraph, Card: MetricCard(overview.RuntimeDashboardTokens)),
-                    (Graph: overview.RuntimeDashboardMtpTokensGraph, Card: MetricCard(overview.RuntimeDashboardMtpTokens)),
-                    (Graph: overview.RuntimeDashboardKvCacheGraph, Card: MetricCard(overview.RuntimeDashboardKvCache))
-                }.Select(item => item.Graph.TranslatePoint(new Point(0, 0), item.Card).Y).ToArray();
-                Assert.All(graphOffsets, offset => Assert.Equal(graphOffsets[0], offset, precision: 1));
-                Assert.All(
-                    new[]
-                    {
-                        overview.RuntimeDashboardTokens,
-                        overview.RuntimeDashboardMtpTokens,
-                        overview.RuntimeDashboardKvCache
-                    },
-                    metric => Assert.All(
-                        metric.Children.OfType<TextBlock>(),
-                        line => Assert.Equal(2, Grid.GetColumnSpan(line))));
+                var graphCards = dashboard.Cards.Where(card => card.Graph is not null).ToArray();
+                Assert.Equal(2, graphCards.Length);
+                Assert.All(graphCards, card => Assert.Equal(2, card.Graph!.SampleCount));
+                AssertDashboardCardsSeparated(dashboard);
+                AssertDashboardGraphsAreNamed(graphCards);
+                dashboard.ApplyLayout(dashboard.Layout);
+                graphCards = dashboard.Cards.Where(card => card.Graph is not null).ToArray();
+                Assert.All(graphCards, card => Assert.Equal(1, card.Graph!.SampleCount));
+
+                AssertHardwareChartHistoryAndOptionalSensors(dashboard);
+                AssertHiddenDashboardCardsDoNotReserveSpace();
+
+                AssertDashboardPolish(overview);
+                var tokensCard = dashboard.Cards.Single(card =>
+                    card.MetricIds.Contains(OverviewDashboardMetricIds.AverageGenerationRate));
+                var tokensMenu = OpenContextMenu(tokensCard.Root);
+                var chartMenu = tokensMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, LocalLlmConsole.Localization.Loc.T("Dashboard.Chart")));
+                var promptChartItem = chartMenu.Items.OfType<MenuItem>()
+                    .Single(item => Equals(item.Header, "Average prompt rate"));
+                Assert.True(promptChartItem.StaysOpenOnClick);
+                promptChartItem.IsChecked = true;
+                promptChartItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                Assert.True(tokensMenu.IsOpen);
+                tokensMenu.IsOpen = false;
+                tokensCard = dashboard.Cards.Single(card =>
+                    card.MetricIds.Contains(OverviewDashboardMetricIds.AverageGenerationRate));
+                Assert.Single(tokensCard.Graphs);
+                Assert.Contains(OverviewDashboardMetricIds.AveragePromptRate, tokensCard.Graphs.Keys);
+
+                tokensMenu = OpenContextMenu(tokensCard.Root);
+                var removeMetricMenu = tokensMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, LocalLlmConsole.Localization.Loc.T("Dashboard.RemoveMetric")));
+                AssertDashboardSubmenuTemplate(removeMetricMenu);
+                var promptRemoveItem = removeMetricMenu.Items.OfType<MenuItem>()
+                    .Single(item => Equals(item.Header, "Average prompt rate"));
+                Assert.True(promptRemoveItem.StaysOpenOnClick);
+                promptRemoveItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                Assert.False(promptRemoveItem.IsEnabled);
+                Assert.True(tokensMenu.IsOpen);
+                tokensMenu.IsOpen = false;
+                tokensCard = dashboard.Cards.Single(card =>
+                    card.MetricIds.Contains(OverviewDashboardMetricIds.AverageGenerationRate));
+                Assert.DoesNotContain(OverviewDashboardMetricIds.AveragePromptRate, tokensCard.MetricIds);
+                Assert.Empty(tokensCard.Graphs);
+                graphCards = dashboard.Cards.Where(card => card.Graph is not null).ToArray();
 
                 var modelBar = Assert.IsType<Grid>(overview.ModelCombo.Parent);
                 overview.Root.Measure(new Size(700, 680));
                 overview.Root.Arrange(new Rect(0, 0, 700, 680));
                 overview.Root.UpdateLayout();
-                Assert.Equal(2, metricDashboard.ColumnDefinitions.Count);
+                Assert.Empty(metricDashboard.ColumnDefinitions);
                 Assert.Equal(1, Grid.GetRow(overview.LaunchProfileCombo));
                 Assert.Equal(2, Grid.GetRowSpan(overview.LoadButton));
                 Assert.True(modelBar.ActualWidth < 760);
@@ -427,80 +465,132 @@ public sealed partial class WpfUiSmokeTests
                 overview.Root.Measure(new Size(1024, 680));
                 overview.Root.Arrange(new Rect(0, 0, 1024, 680));
                 overview.Root.UpdateLayout();
-                Assert.Equal(2, metricDashboard.ColumnDefinitions.Count);
+                Assert.Empty(metricDashboard.ColumnDefinitions);
                 Assert.Equal(0, Grid.GetRow(overview.LaunchProfileCombo));
                 Assert.Equal(1, Grid.GetRowSpan(overview.LoadButton));
-                Assert.Equal(1, Grid.GetRow(MetricCard(overview.RuntimeDashboardSlots)));
-                Assert.Equal(0, Grid.GetColumn(MetricCard(overview.RuntimeDashboardSlots)));
-
+                var gpuCard = dashboard.Cards.Single(card => card.MetricIds.Contains(OverviewDashboardMetricIds.Gpu(0)));
+                Assert.Equal(0, Canvas.GetTop(gpuCard.Root));
+                Assert.Equal(Math.Max(metricDashboard.ActualWidth, dashboard.Layout.LockedSurfaceWidth!) * gpuCard.Layout.Bounds!.X / 12, Canvas.GetLeft(gpuCard.Root), precision: 1);
                 overview.Root.InvalidateMeasure();
                 overview.Root.Measure(new Size(1180, 680));
                 overview.Root.Arrange(new Rect(0, 0, 1180, 680));
                 overview.Root.UpdateLayout();
-                Assert.Equal(3, metricDashboard.ColumnDefinitions.Count);
-                Assert.Equal(0, Grid.GetRow(MetricCard(overview.RuntimeDashboardSlots)));
-                Assert.Equal(2, Grid.GetColumn(MetricCard(overview.RuntimeDashboardSlots)));
-                Assert.Equal(1, Grid.GetRow(MetricCard(overview.RuntimeDashboardTokens)));
-                Assert.Equal(1, Grid.GetRow(MetricCard(overview.RuntimeDashboardMtpTokens)));
-                Assert.Equal(1, Grid.GetRow(MetricCard(overview.RuntimeDashboardKvCache)));
-                Assert.All(
-                    new[]
-                    {
-                        overview.RuntimeDashboardTokensGraph,
-                        overview.RuntimeDashboardMtpTokensGraph,
-                        overview.RuntimeDashboardKvCacheGraph
-                    },
-                    graph => Assert.Equal(28, graph.ActualHeight));
+                Assert.Empty(metricDashboard.ColumnDefinitions);
+                Assert.Equal(Math.Max(metricDashboard.ActualWidth, dashboard.Layout.LockedSurfaceWidth!) * gpuCard.Layout.Bounds!.X / 12, Canvas.GetLeft(gpuCard.Root), precision: 1);
+                Assert.All(graphCards, card => Assert.Equal(30, card.Graph!.ActualHeight));
 
                 var overviewState = new LocalLlmConsole.OverviewPageState();
                 overviewState.Apply(overview);
+                AssertOverviewSurfaceRetention(overviewState, overview, dashboard, settings);
+                var hiddenMetricsLayout = OverviewDashboardLayoutPolicy.ApplyLegacyVisibilityChanges(
+                    dashboard.Layout,
+                    OverviewDashboardLayoutPolicy.LegacyVisibility(dashboard.Layout),
+                    new OverviewDashboardLegacyVisibility(true, false, true, true, false, true));
                 overviewState.ApplyUiPreferences(settings with
                 {
-                    ShowOverviewHardware = false,
-                    ShowOverviewMtpTokens = false,
+                    OverviewDashboardLayout = hiddenMetricsLayout,
                     ShowOverviewLiveRuntimeLog = false,
                     ShowOverviewAllMetrics = false
                 });
                 overview.Root.UpdateLayout();
-                Assert.Equal(Visibility.Collapsed, MetricCard(overview.RuntimeDashboardGpu).Visibility);
-                Assert.Equal(Visibility.Collapsed, MetricCard(overview.RuntimeDashboardMtpTokens).Visibility);
+                Assert.DoesNotContain(dashboard.Cards, card => card.MetricIds.Any(id =>
+                    id == OverviewDashboardMetricIds.Cpu || id == OverviewDashboardMetricIds.Ram
+                    || OverviewDashboardMetricIds.IsGpuMetric(id)));
+                Assert.DoesNotContain(dashboard.Cards, card => card.MetricIds.Any(id =>
+                    id.StartsWith("overview.runtime.mtp.", StringComparison.Ordinal)));
                 Assert.Equal(Visibility.Collapsed, overview.RuntimeLogSection.Visibility);
                 Assert.Equal(Visibility.Collapsed, overview.MetricsSection.Visibility);
                 Assert.Equal(Visibility.Collapsed, overview.RuntimeSectionsSplitter.Visibility);
                 Assert.Equal(0, overview.Root.RowDefinitions[2].Height.Value);
                 Assert.Equal(0, overview.Root.RowDefinitions[3].Height.Value);
                 Assert.Equal(0, overview.Root.RowDefinitions[4].Height.Value);
-                Assert.Equal(3, metricDashboard.ColumnDefinitions.Count);
-                Assert.Equal(2, metricDashboard.RowDefinitions.Count);
+                Assert.Empty(metricDashboard.ColumnDefinitions);
+                Assert.Empty(metricDashboard.RowDefinitions);
+                Assert.Equal(3, metricCanvas.Children.Count);
 
-                overviewState.ApplyUiPreferences(settings with
+                EnsureDashboardCardSizesUnlocked(overview, dashboard);
+                var originalMetricCount = dashboard.Layout.Cards[0].MetricIds.Count;
+                var customLayout = OverviewDashboardLayoutPolicy.AddMetrics(
+                    dashboard.Layout,
+                    dashboard.Layout.Cards[0].Id,
+                    [OverviewDashboardMetricIds.Prometheus("llama_active_slots", "state=busy")]);
+                customLayout = OverviewDashboardLayoutPolicy.ResizeCard(
+                    customLayout,
+                    customLayout.Cards[0].Id,
+                    2,
+                    OverviewDashboardCardHeight.Tall);
+                dashboard.ApplyLayout(customLayout);
+                Assert.Equal(originalMetricCount + 1, dashboard.Cards[0].MetricIds.Count);
+                Assert.True(dashboard.Cards[0].Root.Height >= 176);
+                Assert.Equal(8, dashboard.Cards[0].Layout.Bounds!.Width);
+                var configuredCardWidth = metricDashboard.ActualWidth * 8 / 12 - OverviewDashboardLayoutPolicy.CardGap;
+                Assert.InRange(dashboard.Cards[0].Root.Width, dashboard.Cards[0].MinimumWidth, configuredCardWidth);
+
+                Assert.True(dashboard.IsEditing);
+                Assert.DoesNotContain(VisualDescendants<Button>(overview.Root),
+                    button => Equals(button.Content, LocalLlmConsole.Localization.Loc.T("Dashboard.Customize")));
+                Assert.Contains(VisualDescendants<Button>(overview.Root),
+                    button => Equals(button.Content, LocalLlmConsole.Localization.Loc.T("Dashboard.AddCard")));
+                Assert.All(dashboard.Cards, card =>
                 {
-                    ShowOverviewModelStatus = false,
-                    ShowOverviewHardware = false,
-                    ShowOverviewSlots = false,
-                    ShowOverviewTokens = false,
-                    ShowOverviewMtpTokens = false,
-                    ShowOverviewKvCache = false
+                    var width = card.Root.ActualWidth > 0 ? card.Root.ActualWidth : card.Root.Width;
+                    var height = card.Root.ActualHeight > 0 ? card.Root.ActualHeight : card.Root.Height;
+                    Assert.Equal(OverviewDashboardResizeEdge.Left,
+                        card.ResizeEdgeAt(new Point(1, height / 2)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Right,
+                        card.ResizeEdgeAt(new Point(width - 1, height / 2)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Top,
+                        card.ResizeEdgeAt(new Point(width / 2, 1)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Bottom,
+                        card.ResizeEdgeAt(new Point(width / 2, height - 1)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Left | OverviewDashboardResizeEdge.Top,
+                        card.ResizeEdgeAt(new Point(1, 1)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Right | OverviewDashboardResizeEdge.Top,
+                        card.ResizeEdgeAt(new Point(width - 1, 1)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Left | OverviewDashboardResizeEdge.Bottom,
+                        card.ResizeEdgeAt(new Point(1, height - 1)));
+                    Assert.Equal(OverviewDashboardResizeEdge.Right | OverviewDashboardResizeEdge.Bottom,
+                        card.ResizeEdgeAt(new Point(width - 1, height - 1)));
+                    card.UpdatePointer(new Point(width - 1, height - 1));
+                    Assert.Equal(Cursors.SizeNWSE, card.Root.Cursor);
+                    card.ResetPointer();
+                    Assert.Equal(Cursors.SizeAll, card.Root.Cursor);
                 });
-                Assert.Equal(Visibility.Collapsed, overview.ModelStatusSection.Visibility);
-                overviewState.ApplyUiPreferences(settings);
-                Assert.Equal(Visibility.Visible, overview.ModelStatusSection.Visibility);
+
+                var firstCardMenu = dashboard.Cards[0].Root.ContextMenu!;
+                Assert.DoesNotContain(firstCardMenu.Items.OfType<MenuItem>(), item =>
+                    Equals(item.Header, LocalLlmConsole.Localization.Loc.T("Dashboard.Customize"))
+                    || Equals(item.Header, LocalLlmConsole.Localization.Loc.T("Dashboard.MoveEarlier"))
+                    || Equals(item.Header, LocalLlmConsole.Localization.Loc.T("Dashboard.MoveLater"))
+                    || Equals(item.Header, LocalLlmConsole.Localization.Loc.T("Dashboard.Size")));
+                Assert.Single(firstCardMenu.Items.OfType<Separator>());
+
+                var sessionRows = new[]
+                {
+                    new UiRow { C1 = "First", Data = new System.Text.Json.Nodes.JsonObject { ["SessionId"] = "session-1" } },
+                    new UiRow { C1 = "Metrics source", Data = new System.Text.Json.Nodes.JsonObject { ["SessionId"] = "session-2" } }
+                };
+                overview.LoadedSessionsGrid.ItemsSource = sessionRows;
+                overviewState.RestoreLoadedSessionSelection("session-2", sessionRows);
+                Assert.Same(sessionRows[1], overview.LoadedSessionsGrid.SelectedItem);
+                overviewState.RestoreLoadedSessionSelection("", sessionRows);
+                Assert.Null(overview.LoadedSessionsGrid.SelectedItem);
+
+                overviewState.ApplyUiPreferences(settings with { OverviewDashboardLayout = OverviewDashboardLayoutPolicy.Default });
                 Assert.Equal(Visibility.Visible, overview.RuntimeLogSection.Visibility);
                 Assert.Equal(Visibility.Collapsed, overview.MetricsSection.Visibility);
                 Assert.Equal(Visibility.Collapsed, overview.RuntimeSectionsSplitter.Visibility);
 
-                for (var sample = 0; sample < 65; sample++)
-                    overview.RuntimeDashboardTokensGraph.Push("model|runtime|8081", sample, sample / 2.0);
-                Assert.Equal(60, overview.RuntimeDashboardTokensGraph.SampleCount);
-                overview.RuntimeDashboardTokensGraph.Push("other|runtime|8082", 1, 2);
-                Assert.Equal(1, overview.RuntimeDashboardTokensGraph.SampleCount);
-
                 overview.Root.Measure(new Size(580, 900));
                 overview.Root.Arrange(new Rect(0, 0, 580, 900));
                 overview.Root.UpdateLayout();
-                Assert.Single(metricDashboard.ColumnDefinitions);
-                Assert.All(metricCards, card => Assert.Equal(104, card.ActualHeight));
-
+                Assert.Empty(metricDashboard.ColumnDefinitions);
+                Assert.All(dashboard.Cards, card => Assert.True(
+                    card.Root.ActualHeight >= card.Layout.Bounds!.Height));
+                Assert.All(dashboard.Cards, card => Assert.True(
+                    card.Root.ActualWidth >= card.MinimumWidth));
+                AssertDashboardCardsSeparated(dashboard);
+                AssertHiddenDashboardOverflow(overview);
                 AssertLifetimeUsageSurface();
 
                 var persistedSettings = settings with { ModelApiKey = "persisted-key" };

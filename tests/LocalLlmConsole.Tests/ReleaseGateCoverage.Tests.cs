@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LocalLlmConsole.Localization;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
@@ -73,6 +74,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("\"averagePromptTokensPerSecond\"", usageJson, StringComparison.Ordinal);
         Assert.Contains("\"requestCounterObserved\"", usageJson, StringComparison.Ordinal);
         Assert.Contains("\"trackedTokenShare\"", usageJson, StringComparison.Ordinal);
+        Assert.Contains("\"gpuEnergy\"", usageJson, StringComparison.Ordinal);
+        Assert.Contains("\"gpuEnergyDevices\"", usageJson, StringComparison.Ordinal);
+        Assert.Contains("\"wattHours\"", usageJson, StringComparison.Ordinal);
         Assert.Equal(200, (await api.HandleAsync(Request(
             "GET",
             "/api/v1/metrics/usage",
@@ -99,6 +103,15 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(404, (await api.HandleAsync(Request("POST", "/api/v1/operations"))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/api/v1/models/missing"))).StatusCode);
         Assert.Equal(400, (await api.HandleAsync(Request("POST", "/api/v1/models/import", new JsonObject { ["folder"] = Path.Combine(root, "missing-model") }))).StatusCode);
+        var importedModelPath = Path.Combine(root, "external", "Future-Model-MTP-Edition.gguf");
+        Directory.CreateDirectory(Path.GetDirectoryName(importedModelPath)!);
+        WriteMinimalGguf(importedModelPath, "qwen35");
+        var importResponse = await api.HandleAsync(Request(
+            "POST",
+            "/api/v1/models/import",
+            new JsonObject { ["file"] = importedModelPath }));
+        Assert.Equal(200, importResponse.StatusCode);
+        Assert.Contains("\"source\":\"file\"", JsonSerializer.Serialize(importResponse.Body), StringComparison.Ordinal);
         Assert.Equal(400, (await api.HandleAsync(Request("POST", "/api/v1/runtimes/register", new JsonObject { ["folder"] = Path.Combine(root, "missing-runtime") }))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/api/v1/sessions/missing"))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/api/v1/logs/missing.log"))).StatusCode);
@@ -124,11 +137,13 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(200, patched.StatusCode);
         Assert.Equal(65536, settings.ContextSize);
         Assert.True(settings.RequireApiKeyAuth);
-        Assert.Equal(400, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject
+        Assert.Equal(200, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject
         {
             ["requireApiKeyAuth"] = false
         }))).StatusCode);
-        Assert.True(settings.RequireApiKeyAuth);
+        Assert.False(settings.RequireApiKeyAuth);
+        Assert.Equal("", settings.ModelApiKey);
+        Assert.True(ApiSecurity.IsStrongBearerSecret(settings.ModelApiKeyBackup));
         Assert.Equal(400, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject { ["port"] = 70000 }))).StatusCode);
         Assert.Equal(400, (await api.HandleAsync(Request("PATCH", "/api/v1/settings", new JsonObject { ["workspaceRoot"] = "blocked" }))).StatusCode);
 
@@ -238,6 +253,7 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public async Task SettingsWorkflowsAndLocalHttpHostCoverReleaseSecurityPaths()
     {
+        Loc.LoadLanguage("en");
         var root = CreateTempRoot();
         var current = AppSettings.CreateDefault(root) with
         {
@@ -249,7 +265,7 @@ public sealed partial class ReleaseHardeningTests
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["modelAccessMode"] = "Gateway + direct LAN",
-            ["requireApiKeyAuth"] = "Yes",
+            ["requireApiKeyAuth"] = "Enable",
             ["modelApiKey"] = "",
             ["autoLoadGatewayEnabled"] = "Yes",
             ["autoLoadGatewayPort"] = "8090",
@@ -265,8 +281,10 @@ public sealed partial class ReleaseHardeningTests
             ["showOverviewMtpTokens"] = "Hide",
             ["showOverviewKvCache"] = "Hide",
             ["showOverviewLiveRuntimeLog"] = "Hide",
+            ["runtimeLogOrder"] = "Latest on bottom",
             ["showOverviewAllMetrics"] = "Hide",
             ["showModelsHuggingFace"] = "Hide",
+            ["trackGpuEnergyWhileIdle"] = "Yes",
             ["maxLogFileSizeMb"] = "99999"
         };
         var updated = service.Build(new AppSettingsUpdateRequest(current, root, "dark", values, new HashSet<int>()));
@@ -281,8 +299,18 @@ public sealed partial class ReleaseHardeningTests
         Assert.False(updated.Settings.ShowOverviewMtpTokens);
         Assert.False(updated.Settings.ShowOverviewKvCache);
         Assert.False(updated.Settings.ShowOverviewLiveRuntimeLog);
+        Assert.Equal("oldestFirst", updated.Settings.RuntimeLogOrder);
         Assert.False(updated.Settings.ShowOverviewAllMetrics);
         Assert.False(updated.Settings.ShowModelsHuggingFace);
+        Assert.True(updated.Settings.TrackGpuEnergyWhileIdle);
+        var idleEnergyTracking = new SettingsPageDefinitionService().BuildRows(updated.Settings)
+            .Single(row => row.Key == "trackGpuEnergyWhileIdle");
+        Assert.Equal("choice", idleEnergyTracking.Type);
+        var runtimeLogOrder = new SettingsPageDefinitionService().BuildRows(updated.Settings)
+            .Single(row => row.Key == "runtimeLogOrder");
+        Assert.Equal("choice", runtimeLogOrder.Type);
+        Assert.Contains("Latest on top", runtimeLogOrder.Options!);
+        Assert.Contains("Latest on bottom", runtimeLogOrder.Options!);
 
         foreach (var invalid in new[]
         {
@@ -301,11 +329,17 @@ public sealed partial class ReleaseHardeningTests
 
         var disabled = service.Build(new AppSettingsUpdateRequest(current, root, "system", new Dictionary<string, string>
         {
-            ["requireApiKeyAuth"] = "No"
+            ["requireApiKeyAuth"] = "Disable"
         }, new HashSet<int>()));
-        Assert.False(disabled.Success);
-        Assert.True(disabled.Settings.RequireApiKeyAuth);
-        Assert.Equal(current.ModelApiKey, disabled.Settings.ModelApiKey);
+        Assert.True(disabled.Success);
+        Assert.False(disabled.Settings.RequireApiKeyAuth);
+        Assert.Equal("", disabled.Settings.ModelApiKey);
+        Assert.Equal(current.ModelApiKey, disabled.Settings.ModelApiKeyBackup);
+        var apiKeyAuth = new SettingsPageDefinitionService().BuildRows(disabled.Settings)
+            .Single(row => row.Key == "requireApiKeyAuth");
+        Assert.Equal("choice", apiKeyAuth.Type);
+        Assert.Equal("Disable", apiKeyAuth.Value);
+        Assert.Equal(new[] { "Enable", "Disable" }, apiKeyAuth.Options);
 
         var database = Path.Combine(root, "state", "settings.db");
         await using var store = new StateStore(database);
@@ -322,14 +356,24 @@ public sealed partial class ReleaseHardeningTests
         Assert.False(reloaded.ShowOverviewMtpTokens);
         Assert.False(reloaded.ShowOverviewKvCache);
         Assert.False(reloaded.ShowOverviewLiveRuntimeLog);
+        Assert.Equal("oldestFirst", reloaded.RuntimeLogOrder);
         Assert.False(reloaded.ShowOverviewAllMetrics);
         Assert.False(reloaded.ShowModelsHuggingFace);
-        var enforced = await workflow.EnsureModelApiKeyAsync(saved.Settings, saved.Settings with { RequireApiKeyAuth = false }, TestContext.Current.CancellationToken);
-        Assert.True(enforced.Settings.RequireApiKeyAuth);
-        Assert.True(ApiSecurity.IsStrongBearerSecret(enforced.Settings.ModelApiKey));
+        Assert.True(reloaded.TrackGpuEnergyWhileIdle);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => workflow.EnsureModelApiKeyAsync(
+            saved.Settings,
+            saved.Settings with { RequireApiKeyAuth = false },
+            TestContext.Current.CancellationToken));
+        var localUnauthenticated = await workflow.EnsureModelApiKeyAsync(
+            saved.Settings,
+            saved.Settings with { RequireApiKeyAuth = false, ModelAccessMode = "local", Host = "127.0.0.1" },
+            TestContext.Current.CancellationToken);
+        Assert.False(localUnauthenticated.Settings.RequireApiKeyAuth);
+        Assert.Equal("", localUnauthenticated.Settings.ModelApiKey);
+        Assert.True(ApiSecurity.IsStrongBearerSecret(localUnauthenticated.Settings.ModelApiKeyBackup));
         var generated = await workflow.EnsureModelApiKeyAsync(
-            enforced.PersistedSettings with { ModelApiKey = "", ModelApiKeyBackup = "" },
-            enforced.Settings with { ModelApiKey = "", ModelApiKeyBackup = "" },
+            localUnauthenticated.PersistedSettings with { RequireApiKeyAuth = true, ModelApiKey = "", ModelApiKeyBackup = "" },
+            localUnauthenticated.Settings with { RequireApiKeyAuth = true, ModelApiKey = "", ModelApiKeyBackup = "" },
             TestContext.Current.CancellationToken);
         Assert.True(generated.GeneratedApiKey);
         var trimmed = await workflow.EnsureModelApiKeyAsync(generated.PersistedSettings, generated.Settings with { ModelApiKey = $"  {new string('b', 32)}  " }, TestContext.Current.CancellationToken);

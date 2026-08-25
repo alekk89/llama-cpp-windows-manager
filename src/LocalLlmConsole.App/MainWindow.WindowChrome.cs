@@ -79,7 +79,12 @@ public partial class MainWindow
         }
 
         if (WindowState != WindowState.Minimized)
+        {
             HideTrayIcon();
+            _minimizedUiRefreshPolicy.Reset();
+            if (_viewModel.CurrentPage == "Overview")
+                RunBackground(RefreshRuntimeMetricsAsync, "Runtime metrics refresh failed");
+        }
     }
 
     private void ApplyWindowWorkAreaBounds()

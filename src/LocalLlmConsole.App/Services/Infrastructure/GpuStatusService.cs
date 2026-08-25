@@ -11,13 +11,75 @@ public static class GpuStatusService
         if (parts.Length < 6) return "";
         var index = parts[0];
         var name = parts[1];
-        var utilization = parts[2];
-        var temperature = parts[3];
-        var used = double.TryParse(parts[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var usedMb) ? usedMb / 1024 : 0;
-        var total = double.TryParse(parts[5], NumberStyles.Float, CultureInfo.InvariantCulture, out var totalMb) ? totalMb / 1024 : 0;
-        var memory = total > 0 ? $"{used:0.0}/{total:0.0} GiB" : $"{parts[4]}/{parts[5]} MiB";
         var identity = string.IsNullOrWhiteSpace(name) ? $"GPU {index}" : $"GPU {index}: {name}";
-        return NormalizeMetricSeparators($"{identity} | {utilization}% | {temperature}C | {memory}");
+        var observations = new List<string>();
+        if (CsvNumber(parts[2]) is { } utilization)
+            observations.Add($"{Math.Clamp(utilization, 0, 100):0.#}% load");
+        if (CsvNumber(parts[3]) is { } temperature)
+            observations.Add($"{temperature:0.#} °C");
+        if (CsvNumber(parts[4]) is { } usedMb && CsvNumber(parts[5]) is { } totalMb && totalMb > 0)
+            observations.Add($"{usedMb / 1024:0.0}/{totalMb / 1024:0.0} GiB VRAM");
+        if (parts.Length > 6 && CsvNumber(parts[6]) is { } power)
+            observations.Add($"{power:0.#} W");
+        if (parts.Length > 7 && CsvNumber(parts[7]) is { } clock)
+            observations.Add($"{clock:0} MHz core");
+        return NormalizeMetricSeparators(observations.Count == 0
+            ? identity
+            : $"{identity} | {string.Join(" | ", observations)}");
+    }
+
+    public static string FormatNvidiaPowerCsvLine(string line)
+    {
+        var parts = line.Split(',').Select(part => part.Trim()).ToArray();
+        if (parts.Length < 2) return "";
+        var identity = string.IsNullOrWhiteSpace(parts[1])
+            ? $"GPU {parts[0]}"
+            : $"GPU {parts[0]}: {parts[1]}";
+        return parts.Length > 2 && CsvNumber(parts[2]) is { } power && power is >= 0 and <= 2000
+            ? $"{identity} | {power:0.#} W"
+            : identity;
+    }
+
+    public static string MergeNvidiaExtendedSummary(IReadOnlyList<string> baseLines, string extendedCsv)
+    {
+        var extensions = new Dictionary<int, string>();
+        foreach (var line in (extendedCsv ?? "").Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split(',').Select(part => part.Trim()).ToArray();
+            if (parts.Length < 2 || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var index))
+                continue;
+            var observations = new List<string>();
+            if (CsvNumber(parts[1]) is { } memoryClock && memoryClock is > 0 and <= 10000)
+                observations.Add($"{memoryClock:0} MHz memory");
+            if (parts.Length > 2 && CsvNumber(parts[2]) is { } memoryActivity && memoryActivity is >= 0 and <= 100)
+                observations.Add($"{memoryActivity:0.#}% memory");
+            if (parts.Length > 3 && CsvNumber(parts[3]) is { } fan && fan is >= 0 and <= 100)
+                observations.Add($"{fan:0.#}% fan");
+            if (parts.Length > 4 && CsvNumber(parts[4]) is { } powerLimit && powerLimit is > 0 and <= 2000)
+                observations.Add($"{powerLimit:0.#} W limit");
+            if (parts.Length > 5 && !string.IsNullOrWhiteSpace(parts[5])
+                && !parts[5].Contains("N/A", StringComparison.OrdinalIgnoreCase))
+            {
+                var normalized = parts[5].Trim();
+                var active = !normalized.Equals("0", StringComparison.OrdinalIgnoreCase)
+                             && !normalized.Equals("0x0000000000000000", StringComparison.OrdinalIgnoreCase);
+                observations.Add(active ? "throttle active" : "throttle none");
+            }
+            if (parts.Length > 6 && CsvNumber(parts[6]) is { } memoryTemperature
+                && memoryTemperature is >= -20 and <= 125)
+                observations.Add($"{memoryTemperature:0.#} °C memory");
+            if (observations.Count > 0) extensions[index] = string.Join(" | ", observations);
+        }
+
+        return string.Join(Environment.NewLine, baseLines.Select(line =>
+        {
+            var match = Regex.Match(line, @"^GPU\s+(\d+)\s*:", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            return match.Success
+                   && int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+                   && extensions.TryGetValue(index, out var extension)
+                ? $"{line} | {extension}"
+                : line;
+        }));
     }
 
     public static string NormalizeMetricSeparators(string text)
@@ -91,6 +153,7 @@ public static class GpuStatusService
             var utilization = JsonDouble(element, "Utilization") ?? JsonDouble(element, "LoadPercentage");
             var physicalCores = JsonInt(element, "PhysicalCores") ?? JsonInt(element, "NumberOfCores");
             var logicalProcessors = JsonInt(element, "LogicalProcessors") ?? JsonInt(element, "NumberOfLogicalProcessors");
+            var currentClock = JsonDouble(element, "CurrentClockMHz") ?? JsonDouble(element, "CurrentClockSpeed");
             var temperature = CpuTemperatureCelsius(element);
             var lines = new List<string>();
             if (!string.IsNullOrWhiteSpace(name)) lines.Add($"CPU: {name}");
@@ -102,10 +165,45 @@ public static class GpuStatusService
                 observations.Add($"{physicalCores}C/{logicalProcessors}T");
             if (temperature is { } celsius && double.IsFinite(celsius))
                 observations.Add($"{Math.Clamp(celsius, -20, 125):0.#} °C thermal");
+            if (currentClock is { } clock && double.IsFinite(clock) && clock > 0)
+                observations.Add($"{clock:0} MHz core");
             if (observations.Count > 0)
                 lines.Add($"Telemetry: {string.Join(" | ", observations)}");
 
             return lines.Count > 0 ? string.Join(Environment.NewLine, lines) : "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    public static string FormatWindowsMemoryStatusJson(string output)
+    {
+        var json = ExtractJsonPayload(output);
+        if (string.IsNullOrWhiteSpace(json)) return "";
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var element = document.RootElement.ValueKind == JsonValueKind.Array
+                ? document.RootElement.EnumerateArray().FirstOrDefault()
+                : document.RootElement;
+            if (element.ValueKind != JsonValueKind.Object) return "";
+            var used = JsonDouble(element, "UsedBytes");
+            var total = JsonDouble(element, "TotalBytes");
+            var usage = JsonDouble(element, "UsagePercent");
+            var clock = JsonDouble(element, "ClockMHz");
+            if (total is not > 0 || !double.IsFinite(total.Value)) return "";
+
+            var usedGiB = used is >= 0 && double.IsFinite(used.Value) ? used.Value / BytesPerGiB : 0;
+            var usagePercent = usage is { } percent && double.IsFinite(percent)
+                ? Math.Clamp(percent, 0, 100)
+                : Math.Clamp(100 * usedGiB / (total.Value / BytesPerGiB), 0, 100);
+            var summary = $"RAM: {usedGiB:0.0}/{total.Value / BytesPerGiB:0.0} GiB | {usagePercent:0.#}%";
+            return clock is { } clockMhz && double.IsFinite(clockMhz) && clockMhz > 0
+                ? $"{summary} | {clockMhz:0} MHz"
+                : summary;
         }
         catch
         {
@@ -156,7 +254,7 @@ public static class GpuStatusService
         var parts = new List<string> { name };
 
         if (utilization is { } util && double.IsFinite(util))
-            parts.Add($"{Math.Clamp(util, 0, 100):0.#}%");
+            parts.Add($"{Math.Clamp(util, 0, 100):0.#}% load");
 
         var memory = FormatGpuMemory(usedBytes, totalBytes);
         if (!string.IsNullOrWhiteSpace(memory))
@@ -170,13 +268,19 @@ public static class GpuStatusService
         var hasUsed = usedBytes is { } used && double.IsFinite(used) && used >= 0;
         var hasTotal = totalBytes is { } total && double.IsFinite(total) && total > 0;
         if (hasUsed && hasTotal)
-            return $"{usedBytes!.Value / BytesPerGiB:0.0}/{totalBytes!.Value / BytesPerGiB:0.0} GiB";
+            return $"{usedBytes!.Value / BytesPerGiB:0.0}/{totalBytes!.Value / BytesPerGiB:0.0} GiB VRAM";
         if (hasTotal)
-            return $"{totalBytes!.Value / BytesPerGiB:0.0} GiB";
+            return $"{totalBytes!.Value / BytesPerGiB:0.0} GiB VRAM";
         if (hasUsed)
-            return $"{usedBytes!.Value / BytesPerGiB:0.0} GiB used";
+            return $"{usedBytes!.Value / BytesPerGiB:0.0} GiB VRAM used";
         return "";
     }
+
+    private static double? CsvNumber(string value)
+        => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+           && double.IsFinite(parsed)
+            ? parsed
+            : null;
 
     private static string CleanGpuName(string? name)
     {

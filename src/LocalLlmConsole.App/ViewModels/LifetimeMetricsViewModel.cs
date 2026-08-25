@@ -27,6 +27,8 @@ public sealed record LifetimeMetricsPresentation(
     string Output,
     string CacheHit,
     string CacheDetail,
+    string GpuEnergy,
+    string GpuEnergyDetail,
     string Requests,
     string RequestsDetail,
     string ActiveDays,
@@ -97,6 +99,8 @@ public sealed class LifetimeMetricsViewModel
             report.Summary.GeneratedTokens.ToString("N0"),
             Percent(report.TrackedSummary.CacheHitRate),
             CacheDetail(report.TrackedSummary),
+            Energy(report.GpuEnergy),
+            EnergyDetail(report.GpuEnergy, report.GpuElectricityCost),
             RequestCount(report.TrackedSummary),
             RequestDetail(report.TrackedSummary),
             report.Insights.ActiveDays.ToString("N0"),
@@ -116,7 +120,7 @@ public sealed class LifetimeMetricsViewModel
             Options(report.Dimensions.LaunchProfiles, Loc.T("Lifetime.Filter.AllProfiles")),
             Options(report.Dimensions.Runtimes, Loc.T("Lifetime.Filter.AllRuntimes")),
             Selection,
-            report.Models.Count > 0,
+            report.Models.Count > 0 || report.GpuEnergy?.PowerObserved == true,
             Selection.Dates.Count > 0);
     }
 
@@ -174,6 +178,30 @@ public sealed class LifetimeMetricsViewModel
         => tracked.CacheHitRate is null
             ? Loc.T("Lifetime.CacheUnavailable")
             : Loc.T("Lifetime.CacheDetail", tracked.CachedPromptTokens.ToString("N0"), tracked.InputTokens.ToString("N0"));
+
+    private static string Energy(GpuEnergyTotals? energy)
+    {
+        if (energy?.PowerObserved != true) return Loc.T("Lifetime.NotAvailable");
+        return EnergyKilowattHours(energy.KilowattHours);
+    }
+
+    private static string EnergyDetail(GpuEnergyTotals? energy, ElectricityCostTotals? cost)
+    {
+        if (energy?.PowerObserved != true) return Loc.T("Lifetime.Energy.NoSamples");
+        var coverage = Loc.T(
+            energy.CompleteCoverage ? "Lifetime.Energy.CompleteCoverage" : "Lifetime.Energy.PartialCoverage",
+            energy.ObservedGpuCount,
+            energy.DetectedGpuCount);
+        return cost is null
+            ? coverage
+            : Loc.T("Lifetime.Energy.CostDetail", ElectricityCost(cost), coverage);
+    }
+
+    private static string ElectricityCost(ElectricityCostTotals cost)
+        => $"{cost.CurrencyCode} {cost.Amount.ToString(cost.Amount < 1 ? "N4" : "N2")}";
+
+    private static string EnergyKilowattHours(double kilowattHours)
+        => $"{kilowattHours.ToString(kilowattHours < 1 ? "N4" : "N2")} kWh";
 
     private static string HistoryNote(UsageMetricsReport report)
     {

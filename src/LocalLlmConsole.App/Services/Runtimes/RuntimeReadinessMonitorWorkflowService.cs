@@ -9,7 +9,8 @@ public sealed record RuntimeReadinessMonitorWorkflowRequest(
     Func<string, LoadedModelSessionSnapshot?> SessionForModel,
     Func<AppSettings, CancellationToken, Task<bool>> IsEndpointAliveAsync,
     Func<string, bool> MarkModelLoadedIfRunning,
-    TimeSpan? PollInterval = null);
+    TimeSpan? PollInterval = null,
+    Func<AppSettings, CancellationToken, Task<RuntimeAuthenticationProbeResult>>? VerifyAuthenticationAsync = null);
 
 public sealed record RuntimeReadinessMonitorWorkflowResult(
     RuntimeReadinessStatus Status,
@@ -40,7 +41,8 @@ public sealed class RuntimeReadinessMonitorWorkflowService
             request.SessionForModel,
             request.IsEndpointAliveAsync,
             request.MarkModelLoadedIfRunning,
-            request.PollInterval),
+            request.PollInterval,
+            request.VerifyAuthenticationAsync),
             cancellationToken);
 
         var completionPlan = _completion.Build(new RuntimeReadinessCompletionRequest(
@@ -48,7 +50,8 @@ public sealed class RuntimeReadinessMonitorWorkflowService
             request.ModelName,
             request.LaunchSettings,
             request.ModelIsStillLoading,
-            request.IsOverviewPage));
+            request.IsOverviewPage,
+            result.Reason));
         return new RuntimeReadinessMonitorWorkflowResult(result.Status, completionPlan);
     }
 }

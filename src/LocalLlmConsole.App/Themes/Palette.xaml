@@ -39,6 +39,9 @@
     <SolidColorBrush x:Key="SuccessSoft" Color="#20372A"/>
     <SolidColorBrush x:Key="Warning" Color="#E8B95A"/>
     <SolidColorBrush x:Key="WarningSoft" Color="#3B3120"/>
+    <SolidColorBrush x:Key="DestructiveAction" Color="#B9A6D3"/>
+    <SolidColorBrush x:Key="DestructiveActionHover" Color="#CDBCE0"/>
+    <SolidColorBrush x:Key="DestructiveActionSoft" Color="#302C36"/>
     <SolidColorBrush x:Key="Danger" Color="#F07A82"/>
     <SolidColorBrush x:Key="DangerHover" Color="#FF969C"/>
     <SolidColorBrush x:Key="DangerSoft" Color="#3D2528"/>

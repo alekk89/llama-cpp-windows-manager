@@ -146,12 +146,10 @@ SELECT bucket_start_utc, model_id, model_name, launch_profile_id, launch_profile
        prompt_seconds, generated_seconds, timing_counter_observed,
        request_count, failed_request_count, request_counter_observed
 FROM token_usage_hourly
-WHERE ($from_utc IS NULL OR bucket_start_utc >= $from_utc)
-  AND ($to_utc IS NULL OR bucket_start_utc < $to_utc)
+""" + UtcRangeClause(fromUtc, toUtc) + """
 ORDER BY bucket_start_utc, model_name;
 """;
-            command.Parameters.AddWithValue("$from_utc", fromUtc is null ? DBNull.Value : fromUtc.Value.ToUniversalTime().ToString("O"));
-            command.Parameters.AddWithValue("$to_utc", toUtc is null ? DBNull.Value : toUtc.Value.ToUniversalTime().ToString("O"));
+            AddUtcRangeParameters(command, fromUtc, toUtc);
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
@@ -303,4 +301,24 @@ DELETE FROM token_usage_hourly WHERE model_id = $model_id;
 
     private static double FiniteNonNegative(double value)
         => double.IsFinite(value) ? Math.Max(0, value) : 0;
+
+    private static string UtcRangeClause(DateTimeOffset? fromUtc, DateTimeOffset? toUtc)
+        => (fromUtc is not null, toUtc is not null) switch
+        {
+            (true, true) => "\nWHERE bucket_start_utc >= $from_utc AND bucket_start_utc < $to_utc\n",
+            (true, false) => "\nWHERE bucket_start_utc >= $from_utc\n",
+            (false, true) => "\nWHERE bucket_start_utc < $to_utc\n",
+            _ => "\n"
+        };
+
+    private static void AddUtcRangeParameters(
+        SqliteCommand command,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc)
+    {
+        if (fromUtc is not null)
+            command.Parameters.AddWithValue("$from_utc", fromUtc.Value.ToUniversalTime().ToString("O"));
+        if (toUtc is not null)
+            command.Parameters.AddWithValue("$to_utc", toUtc.Value.ToUniversalTime().ToString("O"));
+    }
 }

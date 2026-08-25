@@ -33,6 +33,7 @@ public partial class MainWindow
                 StartRuntimeDashboardRefreshTimer,
                 RefreshOverviewModelSelectorAsync,
                 RefreshRuntimeMetricsAsync));
+        ApplyGpuEnergyTrackingBoundary();
     }
 
     private async Task MarkLoadedSessionsIfReadyAsync()
@@ -56,17 +57,18 @@ public partial class MainWindow
                 session.ModelId,
                 session.ModelName,
                 new { status = session.Status.ToString(), session.StatusReason, session.ProcessId });
+        if ((result.RemovedSessions?.Count ?? 0) > 0)
+            ApplyGpuEnergyTrackingBoundary();
     }
 
     private void RefreshOverviewSessionRows()
     {
-        var selectedSessionId = _overviewPage.SelectedLoadedSessionId;
+        var metricsSessionId = _sessions.SelectedSnapshot()?.SessionId ?? "";
         var sessions = _sessions.OverviewSnapshots();
-        if (!_viewModel.Overview.ReplaceSessionsIfChanged(sessions, OverviewGatewayRoutingStatus(sessions)))
-            return;
+        _viewModel.Overview.ReplaceSessionsIfChanged(sessions, OverviewGatewayRoutingStatus(sessions));
 
         using var selectionScope = _coreServices.Ui.SelectionReentrancy.SuppressLoadedSessionSelection();
-        _overviewPage.RestoreLoadedSessionSelection(selectedSessionId, _viewModel.Overview.SessionRows);
+        _overviewPage.RestoreLoadedSessionSelection(metricsSessionId, _viewModel.Overview.SessionRows);
     }
 
     private async Task SaveActiveRuntimeSessionsAsync()

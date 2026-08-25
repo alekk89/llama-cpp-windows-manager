@@ -12,6 +12,8 @@ namespace LocalLlmConsole;
 
 public static class SettingsGridColumnFactory
 {
+    public const int TextInputCommitDelayMilliseconds = 1000;
+
     public static DataGridTemplateColumn ValueColumn(
         RoutedEventHandler revealClick,
         RoutedEventHandler copyClick,
@@ -72,7 +74,8 @@ public static class SettingsGridColumnFactory
         textBox.SetBinding(WpfTextBox.TextProperty, new WpfBinding(nameof(EditableSettingRow.Value))
         {
             Mode = BindingMode.TwoWay,
-            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            Delay = TextInputCommitDelayMilliseconds
         });
         textBox.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
         textBox.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
@@ -98,12 +101,11 @@ public static class SettingsGridColumnFactory
             Mode = BindingMode.TwoWay,
             UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
         });
-        combo.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Right);
+        combo.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
         combo.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        combo.SetValue(FrameworkElement.WidthProperty, 148.0);
         combo.SetValue(FrameworkElement.MinHeightProperty, 28.0);
         combo.SetValue(FrameworkElement.HeightProperty, 28.0);
-        combo.SetValue(FrameworkElement.MarginProperty, new Thickness(0));
+        combo.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0));
         var comboStyle = new Style(typeof(WpfComboBox), (Style)WpfApplication.Current.Resources[typeof(WpfComboBox)]);
         comboStyle.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
         var showComboForChoice = new DataTrigger { Binding = new WpfBinding(nameof(EditableSettingRow.Type)), Value = "choice" };

@@ -12,6 +12,98 @@ namespace LocalLlmConsole.Tests;
 public sealed partial class ReleaseHardeningTests
 {
     [Fact]
+    public void GatewayThroughputUsesFullDurationForNonStreamingResponses()
+    {
+        var duration = TimeSpan.FromSeconds(5);
+        var firstData = TimeSpan.FromSeconds(4.9);
+
+        var nonStreaming = GatewayResponseThroughputPolicy.Calculate(
+            100, firstData, duration, "application/json");
+        var streaming = GatewayResponseThroughputPolicy.Calculate(
+            100, firstData, duration, "text/event-stream");
+
+        Assert.Equal(20d, nonStreaming!.Value, precision: 6);
+        Assert.Equal(1000d, streaming!.Value, precision: 6);
+        Assert.Null(GatewayResponseThroughputPolicy.Calculate(null, firstData, duration, "application/json"));
+        Assert.Null(GatewayResponseThroughputPolicy.Calculate(100, null, TimeSpan.Zero, "application/json"));
+    }
+
+    [Fact]
+    public void GatewayCompletionTokenObserverParsesLatestCounterAcrossArbitraryChunks()
+    {
+        var observer = new ModelGatewayUpstreamProxy.GatewayCompletionTokenObserver();
+        var payload = Encoding.UTF8.GetBytes("""
+            data: {"predicted_n":12}
+
+            data: {"usage":{"completion_tokens" : 24.5}}
+            """);
+
+        foreach (var value in payload)
+            observer.Observe([value]);
+
+        Assert.Equal(24.5, observer.Complete());
+        Assert.Equal(24.5, observer.Complete());
+    }
+
+    [Theory]
+    [InlineData("{\"completion_tokens\":0}", 0)]
+    [InlineData("{\"PREDICTED_N\" : 17}", 17)]
+    [InlineData("{\"completion_tokens\":8,\"predicted_n\":9}", 9)]
+    public void GatewayCompletionTokenObserverPreservesSupportedResponseShapes(string json, double expected)
+    {
+        var observer = new ModelGatewayUpstreamProxy.GatewayCompletionTokenObserver();
+
+        observer.Observe(Encoding.UTF8.GetBytes(json));
+
+        Assert.Equal(expected, observer.Complete());
+    }
+
+    [Fact]
+    public async Task GatewayRouteCatalogBulkLoadsProfilesAndRepairsDefaultsOnlyWhenNeeded()
+    {
+        var root = CreateTempRoot();
+        await using var store = new StateStore(Path.Combine(root, "state", "gateway-routes.db"));
+        await store.InitializeAsync();
+        var now = DateTimeOffset.UtcNow;
+        var settings = AppSettings.CreateDefault(root);
+        var first = new ModelRecord("first", "First", Path.Combine(root, "first.gguf"), OwnershipKind.External, "{}", now);
+        var second = new ModelRecord("second", "Second", Path.Combine(root, "second.gguf"), OwnershipKind.External, "{}", now);
+        var firstProfile = new NamedModelLaunchProfile(
+            "default:first", first.Id, "Default", ModelLaunchSettings.FromAppSettings(settings), now, IsDefault: true);
+        var secondProfile = new NamedModelLaunchProfile(
+            "tuned:second", second.Id, "Tuned", ModelLaunchSettings.FromAppSettings(settings), now, IsDefault: false);
+        await store.UpsertModelAsync(first);
+        await store.UpsertModelAsync(second);
+        await store.SaveNamedModelLaunchProfileAsync(firstProfile);
+        await store.SaveNamedModelLaunchProfileAsync(secondProfile);
+        var catalog = new ModelGatewayRouteCatalogApplicationService(store);
+        var repairs = 0;
+
+        var routes = await catalog.ListAsync(new ModelGatewayRouteCatalogActions(async (models, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            repairs++;
+            var missing = Assert.Single(models);
+            Assert.Equal(second.Id, missing.Id);
+            await store.SaveNamedModelLaunchProfileAsync(secondProfile with { IsDefault = true, UpdatedAt = DateTimeOffset.UtcNow });
+        }), TestContext.Current.CancellationToken);
+        var secondRead = await catalog.ListAsync(new ModelGatewayRouteCatalogActions((_, _) =>
+            Task.FromException(new InvalidOperationException("Default repair should not repeat."))), TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, repairs);
+        Assert.Equal(["first", "second"], routes.Select(route => route.Model.Id).Order().ToArray());
+        Assert.Equal(["first", "second"], secondRead.Select(route => route.Model.Id).Order().ToArray());
+        Assert.All(routes, route => Assert.True(route.Profile.IsDefault));
+
+        var windowSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.Gateway.cs"));
+        var catalogSource = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Gateway", "ModelGatewayRuntimeController.cs"));
+        Assert.DoesNotContain("ListNamedAsync(model)", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ListNamedModelLaunchProfilesAsync()", catalogSource, StringComparison.Ordinal);
+        Assert.Contains("GroupBy(profile => profile.ModelId", catalogSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ModelGatewayHostFactoryServiceOwnsGatewayHostAndControllerCreation()
     {
         var root = CreateTempRoot();
@@ -189,7 +281,7 @@ public sealed partial class ReleaseHardeningTests
         using var upstreamHandler = new GatewayProxyHandler();
         var proxy = new ModelGatewayUpstreamProxy(new HttpClient(upstreamHandler));
         await using var gateway = new ModelGatewayService(
-            new ModelGatewayOptions(true, "local", port, apiKey, false, ModelGatewaySwapPolicy.KeepLoaded),
+            new ModelGatewayOptions(true, "local", port, apiKey, true, ModelGatewaySwapPolicy.KeepLoaded),
             runtime,
             proxy);
         await gateway.StartAsync(TestContext.Current.CancellationToken);

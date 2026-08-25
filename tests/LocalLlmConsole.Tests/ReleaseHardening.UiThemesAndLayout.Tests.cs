@@ -72,9 +72,16 @@ public sealed partial class ReleaseHardeningTests
         var metricFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "MetricCardFactory.cs"));
         var metricRenderer = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "MetricCardRenderer.cs"));
         var overviewFactory = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewPageFactory.cs"));
+        var dashboardController = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewDashboardController.cs"))
+                                  + File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewDashboardController.Interaction.cs"))
+                                  + File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewDashboardController.Commands.cs"));
+        var dashboardCard = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewDashboardCardView.cs"));
+        var dashboardMetricRow = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewDashboardMetricRowView.cs"));
+        var metricPicker = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewDashboardMetricPicker.cs"));
 
         Assert.Contains("<DropShadowEffect", appXaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"MetricCard\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"TelemetryMetricCard\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Content, RelativeSource={RelativeSource TemplatedParent}}\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"Wrap\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"DropDownPickerButton\"", appXaml, StringComparison.Ordinal);
@@ -91,6 +98,11 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("(\"SidebarBack\", \"#E9EDF2\")", theme, StringComparison.Ordinal);
         Assert.Contains("(\"PanelBorderStrong\", \"#B8C3D0\")", theme, StringComparison.Ordinal);
         Assert.Contains("ControlTemplate TargetType=\"ContextMenu\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PART_Popup\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("IsOpen=\"{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("<ItemsPresenter KeyboardNavigation.DirectionalNavigation=\"Cycle\"/>", appXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SubmenuGlyph\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CheckGlyph\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("private static string TooltipText(string text) => text;", source, StringComparison.Ordinal);
         Assert.Contains("MetricImportantValuePattern", metricRenderer, StringComparison.Ordinal);
         Assert.Contains("SplitMetricLine", metricRenderer, StringComparison.Ordinal);
@@ -107,23 +119,54 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("=> string.Equals(label, Loc.T(\"Overview.Metric.ModelStatus\"), StringComparison.Ordinal)", metricRenderer, StringComparison.Ordinal);
         Assert.Contains("header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto })", metricFactory, StringComparison.Ordinal);
         Assert.Contains("MetricCardFactory.SetMetricText", source, StringComparison.Ordinal);
-        Assert.Contains("gpu = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T(\"Overview.Metric.Hardware\"), 0, 1)", overviewFactory, StringComparison.Ordinal);
-        Assert.Contains("slots = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T(\"Overview.Metric.Slots\"), 0, 2)", overviewFactory, StringComparison.Ordinal);
-        Assert.Contains("tokens = MetricCardFactory.AddMetricGraph(runtimeDashboard, Loc.T(\"Overview.Metric.Tokens\"), 1, 0", overviewFactory, StringComparison.Ordinal);
-        Assert.Contains("Loc.T(\"Overview.Metric.MtpTokens\")", overviewFactory, StringComparison.Ordinal);
-        Assert.Contains("Loc.T(\"Overview.Metric.KvCache\")", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("new OverviewDashboardController(", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("OverviewDashboardLayoutEngine.Place", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("new OverviewDashboardCardView", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("Style = (Style)WpfApplication.Current.Resources[\"TelemetryMetricCard\"]", dashboardCard, StringComparison.Ordinal);
+        Assert.DoesNotContain("_lastKnown", dashboardCard, StringComparison.Ordinal);
+        Assert.Contains("view.ResizeEdgeAt(args.GetPosition(view.Root))", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("view.UpdatePointer(args.GetPosition(view.Root))", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("OverviewDashboardLayoutPolicy.SetCardBounds", dashboardController, StringComparison.Ordinal);
+        Assert.DoesNotContain("PersistVisibleLayout", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("SelectionMode.Multiple", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("Root.SetResourceReference(Border.BorderBrushProperty, \"AccentBlue\")", dashboardCard, StringComparison.Ordinal);
+        Assert.DoesNotContain("calibrationAccent", dashboardCard, StringComparison.Ordinal);
+        Assert.Contains("<Style TargetType=\"ListBox\">", appXaml, StringComparison.Ordinal);
+        Assert.Contains("<Style TargetType=\"ListBoxItem\">", appXaml, StringComparison.Ordinal);
+        Assert.Contains("WindowStyle = WindowStyle.None", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("Background = ResourceBrush(\"PanelBack\")", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("BorderBrush = ResourceBrush(\"PanelBorderStrong\")", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) })", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetColumn(add, 2)", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("nameof(OverviewDashboardMetricDefinition.Tooltip)", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("ItemContainerStyle = MetricItemStyle()", metricPicker, StringComparison.Ordinal);
+        Assert.DoesNotContain("Margin = new Thickness(0, 0, 8, 0)", metricPicker, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.Background", dashboardController, StringComparison.Ordinal);
+        Assert.DoesNotContain("item.IsSubmenuOpen = true", dashboardController, StringComparison.Ordinal);
+        Assert.DoesNotContain("MetricCardFactory.SetMetricText", dashboardCard, StringComparison.Ordinal);
+        Assert.Contains("Value, unit, detail, and optional chart", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("Typography.SetNumeralAlignment", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("Cascadia Mono, Consolas, Segoe UI", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("Background = ResourceBrush(\"PanelBorder\")", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("GridRowAlt", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("InfoSoft", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("Width = GridLength.Auto, MaxWidth = 36", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.DoesNotContain("new GridLength(36)", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("SetVisualPosition", dashboardCard, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping = TextWrapping.Wrap", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("ToolTip = definition.Tooltip", dashboardMetricRow, StringComparison.Ordinal);
+        Assert.Contains("_resizeView.MinimumHeight", dashboardController, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dashboard.CustomCardTitle", dashboardCard, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetEditing", dashboardController, StringComparison.Ordinal);
         Assert.Contains("public sealed class MetricSparkline", File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Common", "MetricSparkline.cs")), StringComparison.Ordinal);
         Assert.DoesNotContain("\"Tokens (Live)\"", overviewFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Tokens (Total)\"", overviewFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Runtime build\", 0, 1", overviewFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("SetLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown", source, StringComparison.Ordinal);
-        Assert.Contains("ClearLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown)", source, StringComparison.Ordinal);
-        Assert.Contains("SetMetricText(_runtimeDashboardPage.TokensMetric, summary.Tokens)", source, StringComparison.Ordinal);
-        Assert.Contains("SetMetricText(_runtimeDashboardPage.MtpTokensMetric, summary.MtpTokens)", source, StringComparison.Ordinal);
-        Assert.Contains("SetMetricText(_runtimeDashboardPage.SlotsMetric, summary.Slots)", source, StringComparison.Ordinal);
-        Assert.Contains("_runtimeDashboardPage.TokensGraph?.Push(", source, StringComparison.Ordinal);
-        Assert.Contains("_runtimeDashboardPage.MtpTokensGraph?.Push(", source, StringComparison.Ordinal);
-        Assert.Contains("_runtimeDashboardPage.KvCacheGraph?.Push(", source, StringComparison.Ordinal);
+        Assert.Contains("_runtimeDashboardPage.ApplyMetricSummary(summary)", source, StringComparison.Ordinal);
+        Assert.Contains("graph.GenerationRate", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("graph.SpeculativeGeneratedRate", dashboardController, StringComparison.Ordinal);
+        Assert.Contains("graph.KvCacheUsagePercent", dashboardController, StringComparison.Ordinal);
         Assert.Contains("_sessions.SelectedSnapshot()?.LogPath", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_runtimeDashboardTotalTokensLastKnown", source, StringComparison.Ordinal);
         Assert.Contains("string.Equals(label, \"Overview.Metric.ModelStatus\", StringComparison.Ordinal)", metricRenderer, StringComparison.Ordinal);
@@ -142,6 +185,20 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("(\"PanelBorderStrong\", \"#B8C3D0\")", theme, StringComparison.Ordinal);
         Assert.Contains("(\"GridRowAlt\", \"#F6F8FA\")", theme, StringComparison.Ordinal);
         Assert.Contains("(\"Accent\", \"#263545\")", theme, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DestructiveActionsUseAThemeSpecificAccentWithoutRecoloringErrors()
+    {
+        var appXaml = ReadApplicationResourceSources();
+        var themeSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Infrastructure", "ApplicationThemeService.cs"));
+
+        Assert.Contains("x:Key=\"DestructiveAction\" Color=\"#B9A6D3\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{DynamicResource DestructiveActionSoft}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{DynamicResource DestructiveActionHover}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{DynamicResource AccentForeground}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("(\"DestructiveAction\", \"#66527A\")", themeSource, StringComparison.Ordinal);
+        Assert.Contains("(\"Danger\", \"#B4233A\")", themeSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -232,8 +289,10 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("public ModelRecord? SelectedModel", overviewPageState, StringComparison.Ordinal);
         Assert.Contains("public UiRow? SelectedLoadedSessionRow", overviewPageState, StringComparison.Ordinal);
         Assert.Contains("public void RestoreLoadedSessionSelection", overviewPageState, StringComparison.Ordinal);
+        Assert.Contains("_sessions.SelectedSnapshot()?.SessionId ?? \"\"", source, StringComparison.Ordinal);
+        Assert.Contains("LoadedSessionsGrid.SelectedItem = string.IsNullOrWhiteSpace(sessionId)", overviewPageState, StringComparison.Ordinal);
         Assert.Contains("public sealed class RuntimeDashboardPageState", runtimeDashboardState, StringComparison.Ordinal);
-        Assert.Contains("public Grid? ModelMetric", runtimeDashboardState, StringComparison.Ordinal);
+        Assert.Contains("public OverviewDashboardController? DashboardController", runtimeDashboardState, StringComparison.Ordinal);
         Assert.Contains("public DataGrid? RuntimeMetricsGrid", runtimeDashboardState, StringComparison.Ordinal);
         Assert.Contains("public WpfTextBox? RuntimeLogBox", runtimeDashboardState, StringComparison.Ordinal);
         Assert.Contains("Overview.SessionsCol.Model", overviewFactory, StringComparison.Ordinal);
@@ -304,7 +363,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("(Loc.T(\"HfSearch.Col.Signals\"), \"C6\", 1.4)", huggingFaceGridModeFactory, StringComparison.Ordinal);
         Assert.Contains("Loc.T(\"Overview.LiveRuntimeLogTitle\")", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("Loc.T(\"Overview.RuntimeMetricsTitle\")", overviewFactory, StringComparison.Ordinal);
-        Assert.Contains("model = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T(\"Overview.Metric.ModelStatus\"), 0, 0, labelKey:", overviewFactory, StringComparison.Ordinal);
+        Assert.Contains("new OverviewDashboardController(", overviewFactory, StringComparison.Ordinal);
         Assert.DoesNotContain("gatewayStatusText", overviewFactory, StringComparison.OrdinalIgnoreCase);
         var gatewayRuntimeApplication = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "Gateway", "GatewayRuntimeApplicationService.cs"));
 
@@ -321,7 +380,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("GatewayServices.GatewayRuntimeApplication.EnsureModelLoadedAsync", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_modelWorkflowServices", source, StringComparison.Ordinal);
         Assert.Contains("_workflow.EnsureLoadedAsync", gatewayRuntimeApplication, StringComparison.Ordinal);
-        Assert.True(normalizedOverviewFactory.IndexOf("Loc.T(\"Overview.LoadedSessionsTitle\")", StringComparison.Ordinal) < normalizedOverviewFactory.IndexOf("Loc.T(\"Overview.ModelStatusLabel\")", StringComparison.Ordinal));
+        Assert.True(normalizedOverviewFactory.IndexOf("Loc.T(\"Overview.LoadedSessionsTitle\")", StringComparison.Ordinal) < normalizedOverviewFactory.IndexOf("new OverviewDashboardController", StringComparison.Ordinal));
         Assert.Contains("(\"Profile\", \"C2\"", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("(Loc.T(\"Overview.SessionsCol.Size\"), \"C3\"", overviewFactory, StringComparison.Ordinal);
         Assert.Contains("SessionStatusLabel", overviewViewModel, StringComparison.Ordinal);

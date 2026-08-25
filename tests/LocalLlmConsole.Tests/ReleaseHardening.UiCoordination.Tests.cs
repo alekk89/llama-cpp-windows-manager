@@ -85,6 +85,7 @@ public sealed partial class ReleaseHardeningTests
             _ => Task.CompletedTask,
             _ => "",
             _ => Task.CompletedTask,
+            _ => Task.CompletedTask,
             async action =>
             {
                 try { await action(); }
@@ -180,6 +181,32 @@ public sealed partial class ReleaseHardeningTests
         controller.Stop();
         Assert.False(controller.IsRunning);
         Assert.False(timerFactory.Timers[1].Started);
+    }
+
+    [Fact]
+    public async Task UiAsyncRefreshTimerControllerCoalescesOverlappingTicks()
+    {
+        var timerFactory = new ManualUiTimerFactory();
+        var controller = new UiAsyncRefreshTimerController(timerFactory);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        controller.Start(
+            TimeSpan.FromSeconds(1),
+            async () =>
+            {
+                Interlocked.Increment(ref calls);
+                await release.Task;
+            },
+            _ => { });
+
+        timerFactory.Timers[0].Fire();
+        timerFactory.Timers[0].Fire();
+        Assert.Equal(1, calls);
+
+        release.SetResult();
+        await Task.Delay(10, TestContext.Current.CancellationToken);
+        await timerFactory.Timers[0].FireAsync();
+        Assert.Equal(2, calls);
     }
 
 

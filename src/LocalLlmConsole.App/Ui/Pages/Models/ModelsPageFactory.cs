@@ -11,6 +11,7 @@ namespace LocalLlmConsole;
 
 public sealed record ModelsPageActions(
     Func<Task> ScanModelsFolderAsync,
+    Func<Task> ImportModelFileAsync,
     Func<Task> ChooseModelsFolderAsync,
     Action OpenModelsFolder,
     Func<Task> ManageModelGroupsAsync,
@@ -56,6 +57,7 @@ public static class ModelsPageFactory
             request.ModelsRoot,
             out var modelsFolderText,
             (Loc.T("Models.ScanButton"), request.Actions.ScanModelsFolderAsync),
+            (Loc.T("Models.ImportFileButton"), request.Actions.ImportModelFileAsync),
             (Loc.T("Common.ChooseButton"), request.Actions.ChooseModelsFolderAsync),
             (Loc.T("Common.OpenButton"), () => OpenModelsFolder(request.Actions)),
             ("Groups…", request.Actions.ManageModelGroupsAsync)
@@ -341,6 +343,7 @@ public static class ModelsPageFactory
     {
         var t = (text ?? "").Trim();
         if (string.Equals(t, Loc.T("Models.ScanButton"))) return Loc.T("Tooltip.ScanModelsFolder");
+        if (string.Equals(t, Loc.T("Models.ImportFileButton"))) return Loc.T("Tooltip.ChooseGgufFile");
         if (string.Equals(t, Loc.T("Common.ChooseButton"))) return Loc.T("Tooltip.ChooseFolder");
         if (string.Equals(t, Loc.T("Common.OpenButton"))) return Loc.T("Tooltip.OpenFolder");
         if (string.Equals(t, "Groups…")) return "Create launch-profile retention groups, assign profiles, and set eviction priorities.";

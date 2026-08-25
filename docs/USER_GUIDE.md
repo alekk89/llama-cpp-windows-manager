@@ -10,15 +10,32 @@ provides direct or shared OpenAI-compatible endpoints.
    CPU/GPU backend. CUDA is for NVIDIA, Vulkan commonly serves AMD and other
    Vulkan GPUs, and SYCL targets Intel Arc.
 2. In **Models**, download a GGUF from Hugging Face. Alternatively copy `.gguf`
-   files under the configured models folder and scan, or register a file kept
-   elsewhere.
+   files under the configured models folder and choose **Scan Models Folder**,
+   or choose **Add model file…** to select one valid GGUF anywhere on disk.
+   Metadata classification identifies main models before narrow filename
+   fallbacks. Ambiguous or companion-like files require an explicit role
+   confirmation; unreadable or invalid GGUFs are rejected.
 3. Select the model and runtime, adjust launch settings, and save a named
    profile. Profiles let one model keep several ports, contexts, or backends.
 4. In **Overview**, choose the model/profile and select **Load**. Use the shown
    direct `/v1` endpoint, or enable the shared gateway in **Settings**.
 
-The model API key in **Settings** is required for inference. It is separate from
-the Manager's process-local control token used automatically by `llwmctl`.
+Model API-key authentication is enabled by default and is separate from the
+Manager's process-local control token used automatically by `llwmctl`. For an
+unauthenticated local browser or client, set **API key auth** to **Disable**.
+The Manager changes LAN exposure to **Local only**, clears the active serving
+key, and shows an information prompt. The protected key is restored when
+authentication is enabled again. Every LAN exposure mode requires API-key
+authentication.
+
+## Settings and automatic saving
+
+Settings save automatically. Choice controls apply quickly. Ordinary text
+fields, including electricity prices, wait until typing has paused before they
+enter the save debounce, so an intermediate value is not saved between normal
+keystrokes. Leaving a field also commits the edit naturally. Validation keeps
+an invalid value visible for correction and does not replace the last valid
+persisted setting.
 
 ## Runtime trust
 
@@ -53,6 +70,19 @@ Model files offer **Open Folder**, **Save New Profile**, and **Delete**; saved
 profiles offer **Load**, group assignment, and **Remove**. Runtime, log, and
 Metrics rows also expose their applicable row actions this way.
 
+## Overview dashboard
+
+The Overview dashboard is a responsive free-form card surface. Add, remove,
+move, resize, and title cards; combine several atomic metrics in one card; and
+enable charts only for curated time-varying readings. Card sizes can be locked
+across window resizing. The metric picker groups current readings under Core,
+Hardware, Energy, Gateway, Advanced, and Raw. Saved layouts are versioned and
+migrated without discarding unrelated customization.
+
+Optional hardware readings appear only after a finite host sensor value is
+observed. Cumulative counters cannot be charted. Legacy rows remain renderable
+in saved layouts but are not offered when adding new metrics.
+
 ## Metrics
 
 **Metrics** shows token activity by local calendar day, cache reuse, average
@@ -86,6 +116,17 @@ Existing lifetime totals are preserved during upgrade. Accurate daily history
 begins with the first token activity after this feature is installed, so older
 totals are never assigned to invented dates. Resetting a model removes both its
 legacy total and its daily history.
+
+When a supported GPU power sensor is observed, Metrics also reports host-wide
+GPU-board energy in Wh/kWh and per-device energy where identity remains stable.
+By default, historical energy is persisted while a model session is active;
+Settings can enable continuous idle tracking. Observed versus detected GPU
+coverage is shown rather than estimating missing adapters or app downtime.
+
+Configure the display currency, day/night prices per kWh, and local night
+boundary in Settings to show estimated electricity cost for the measured hourly
+GPU energy. The current tariff is applied when reporting history; this is not a
+billing ledger and does not represent whole-host electricity use.
 
 ## Endpoints and automation
 
@@ -124,8 +165,10 @@ automation around consequential operations.
 - Try a CPU runtime to separate a model issue from GPU driver/backend issues.
 - Confirm the profile port is unused and the selected runtime executable still
   exists.
-- A `401` from model inference normally means the model API key is missing or
-  wrong. `llwmctl` uses a different automatically discovered credential.
+- With API-key authentication enabled, a `401` from model inference normally
+  means the model API key is missing or wrong. In explicitly unauthenticated
+  Local-only mode, omit credentials. `llwmctl` uses a different automatically
+  discovered credential.
 - On **Logs**, select **Create Diagnostics Bundle** to collect versions,
   inventory, session state, runtime trust details, WSL/GPU summaries, and up to
   ten sanitized recent log tails. The ZIP excludes keys, control tokens,

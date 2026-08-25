@@ -8,20 +8,99 @@ public sealed partial class ModelCatalogService
     public ModelCatalogService(StateStore store) => _store = store;
 
     public async Task<int> ScanAsync(string modelsRoot)
+        => (await ScanDetailedAsync(modelsRoot)).RegisteredCount;
+
+    public async Task<ModelScanResult> ScanDetailedAsync(string modelsRoot)
     {
         Directory.CreateDirectory(modelsRoot);
-        var modelPaths = await FindModelFilesAsync(modelsRoot);
+        var ggufPaths = await FindGgufFilesAsync(modelsRoot);
+        var existing = await _store.ListModelsAsync();
+        var confirmedIdentities = existing
+            .OrderByDescending(model => model.UpdatedAt)
+            .Select(model => (Path: NormalizePath(model.ModelPath), Identity: ConfirmedMainModelIdentity(model)))
+            .Where(item => !string.IsNullOrWhiteSpace(item.Identity))
+            .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().Identity!, StringComparer.OrdinalIgnoreCase);
+        var classifications = await Task.Run(() => ggufPaths
+            .Select(ClassifyGguf)
+            .Select(classification => ConfirmedClassification(classification, confirmedIdentities))
+            .ToArray());
+        var modelPaths = classifications
+            .Where(classification => classification.Role == GgufFileRole.MainModel)
+            .Select(classification => classification.Path)
+            .ToArray();
         var registered = await RegisterExternalModelsAsync(modelsRoot, modelPaths);
-        return registered.Count;
+        return new ModelScanResult(registered, classifications);
     }
 
     public async Task<ModelRecord> ImportFolderAsync(string folder)
     {
         var full = Path.GetFullPath(folder);
-        var modelPaths = await FindModelFilesAsync(full);
-        if (modelPaths.Length == 0) throw new InvalidOperationException("No GGUF model files were found in that folder.");
-        var registered = await RegisterExternalModelsAsync(full, modelPaths);
-        return registered.First();
+        var result = await ScanDetailedAsync(full);
+        if (result.RegisteredModels.Count == 0)
+        {
+            var first = result.Files.FirstOrDefault();
+            var detail = first is null ? "No GGUF files were found." : $"{Path.GetFileName(first.Path)}: {first.Reason}";
+            throw new InvalidOperationException($"No main GGUF models were found in that folder. {detail} Use explicit file import to confirm an ambiguous model.");
+        }
+        return result.RegisteredModels.First();
+    }
+
+    public async Task<ModelRecord> ImportFileAsync(string path, bool confirmRole = false)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var classification = await Task.Run(() => ClassifyGguf(fullPath));
+        if (classification.Role == GgufFileRole.Invalid)
+            throw new InvalidOperationException(classification.Reason);
+        if (classification.Role != GgufFileRole.MainModel && !confirmRole)
+            throw new InvalidOperationException(
+                $"The selected GGUF was classified as {classification.Role}: {classification.Reason} "
+                + "Retry with explicit role confirmation only when this file should be treated as a main model.");
+
+        var existing = (await _store.ListModelsAsync())
+            .Where(model => model.Ownership != OwnershipKind.RegistryOnly)
+            .FirstOrDefault(model => string.Equals(NormalizePath(model.ModelPath), fullPath, StringComparison.OrdinalIgnoreCase));
+        var folder = Path.GetDirectoryName(fullPath) ?? Directory.GetCurrentDirectory();
+        var discovered = CreateExternalRecord(folder, folder, fullPath);
+        var metadata = ExistingMetadataOrEmpty(existing);
+        var discoveredMetadata = JsonNode.Parse(discovered.MetadataJson)?.AsObject() ?? new JsonObject();
+        foreach (var property in discoveredMetadata)
+            if (!metadata.ContainsKey(property.Key)) metadata[property.Key] = property.Value?.DeepClone();
+        metadata["registrationSource"] = "manual-file";
+        if (classification.Role != GgufFileRole.MainModel && confirmRole)
+        {
+            metadata["userConfirmedMainModel"] = true;
+            metadata["confirmedMainModelIdentity"] = ClassificationIdentity(classification);
+        }
+        else
+        {
+            metadata.Remove("userConfirmedMainModel");
+            metadata.Remove("confirmedMainModelIdentity");
+        }
+        metadata["detectedRole"] = classification.Role.ToString();
+        metadata["detectedRoleConfidence"] = classification.Confidence.ToString();
+        metadata["detectedRoleReason"] = classification.Reason;
+        metadata["manuallyRegisteredAt"] = DateTimeOffset.UtcNow;
+
+        var record = discovered with
+        {
+            Id = existing?.Id ?? discovered.Id,
+            Name = existing?.Name ?? discovered.Name,
+            Ownership = existing?.Ownership ?? OwnershipKind.External,
+            MetadataJson = metadata.ToJsonString(),
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        await _store.UpsertModelAsync(record);
+        await RemoveDuplicateModelRecordsForPathAsync(record);
+        await SeedLegacyLaunchSettingsAsync(record);
+        return record;
+    }
+
+    private static JsonObject ExistingMetadataOrEmpty(ModelRecord? model)
+    {
+        if (model is null) return new JsonObject();
+        try { return JsonNode.Parse(model.MetadataJson)?.AsObject() ?? new JsonObject(); }
+        catch { return new JsonObject { ["rawMetadata"] = model.MetadataJson }; }
     }
 
     public async Task<ModelRecord> RegisterDownloadedAsync(string modelsRoot, string modelName, string modelPath, string metadataJson)
@@ -114,12 +193,17 @@ public sealed partial class ModelCatalogService
         foreach (var modelPath in modelPaths.Select(NormalizePath).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             existingByPath.TryGetValue(modelPath, out var existingForPath);
-            var appOwned = existingForPath?.FirstOrDefault(model => model.Ownership == OwnershipKind.AppOwned);
-            if (appOwned is not null)
+            var canonicalExisting = existingForPath?
+                .Where(model => model.Ownership != OwnershipKind.RegistryOnly)
+                .OrderBy(model => model.Ownership == OwnershipKind.AppOwned ? 0 : 1)
+                .ThenByDescending(IsUserConfirmedMainModel)
+                .ThenByDescending(model => model.UpdatedAt)
+                .FirstOrDefault();
+            if (canonicalExisting is not null)
             {
-                await RemoveDuplicateModelRecordsForPathAsync(appOwned);
-                await SeedLegacyLaunchSettingsAsync(appOwned);
-                records.Add(appOwned);
+                await RemoveDuplicateModelRecordsForPathAsync(canonicalExisting);
+                await SeedLegacyLaunchSettingsAsync(canonicalExisting);
+                records.Add(canonicalExisting);
                 continue;
             }
 
@@ -208,7 +292,7 @@ public sealed partial class ModelCatalogService
         }
     }
 
-    private static IEnumerable<string> FindModelFiles(string root)
+    private static IEnumerable<string> FindGgufFiles(string root)
     {
         if (!Directory.Exists(root)) yield break;
         var options = new EnumerationOptions
@@ -218,24 +302,18 @@ public sealed partial class ModelCatalogService
             AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint
         };
         foreach (var file in Directory.EnumerateFiles(root, "*", options)
-            .Where(IsModelGguf)
+            .Where(file => file.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase))
             .OrderBy(file => file, StringComparer.OrdinalIgnoreCase))
         {
             yield return file;
         }
     }
 
-    private static async Task<string[]> FindModelFilesAsync(string root)
-        => await Task.Run(() => FindModelFiles(root).ToArray());
+    private static async Task<string[]> FindGgufFilesAsync(string root)
+        => await Task.Run(() => FindGgufFiles(root).ToArray());
 
     private static bool IsModelGguf(string file)
-    {
-        var name = Path.GetFileName(file);
-        return name.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase)
-            && !LooksLikeVisionProjectorName(name)
-            && !LooksLikeDraftOrMtpHeadName(name)
-            && !HasStandaloneSpeculativeArchitecture(file);
-    }
+        => ClassifyGguf(file).Role == GgufFileRole.MainModel;
 
     private static string? FindLegacyModelJson(string modelPath)
     {

@@ -29,7 +29,7 @@ public static class RuntimeLaunchRequestFactory
             Host = context.Host,
             AllowNetworkAccess = context.AllowNetworkAccess,
             ApiKey = settings.ModelApiKey,
-            RequireApiKeyAuth = true,
+            RequireApiKeyAuth = settings.RequireApiKeyAuth,
             Port = settings.Port,
             ContextSize = settings.ContextSize,
             GpuLayers = settings.GpuLayers,
@@ -97,8 +97,7 @@ public static class RuntimeLaunchRequestFactory
     {
         var previewSettings = settings with
         {
-            RequireApiKeyAuth = true,
-            ModelApiKey = new string('x', 32)
+            ModelApiKey = settings.RequireApiKeyAuth ? new string('x', 32) : ""
         };
         var custom = CustomLaunchParameterParser.Parse(previewSettings.CustomParameters);
         RuntimeLaunchOptionPolicy.ValidateCustomArguments(custom);

@@ -3,6 +3,7 @@ namespace LocalLlmConsole.Services;
 public sealed record AppShutdownCleanupActions(
     Action StopDownloadHistoryRefreshTimer,
     Action StopRuntimeDashboardRefreshTimer,
+    Action StopGpuEnergyTrackingTimer,
     Action CancelLaunchSettingsRefresh,
     Action StopRuntimeReadinessMonitor,
     Action DisposeTrayIcon,
@@ -28,6 +29,7 @@ public sealed class AppShutdownCleanupApplicationService
 
         actions.StopDownloadHistoryRefreshTimer();
         actions.StopRuntimeDashboardRefreshTimer();
+        actions.StopGpuEnergyTrackingTimer();
         actions.CancelLaunchSettingsRefresh();
         actions.StopRuntimeReadinessMonitor();
         actions.DisposeTrayIcon();
@@ -51,6 +53,7 @@ public sealed class AppShutdownCleanupApplicationService
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(actions.StopDownloadHistoryRefreshTimer);
         ArgumentNullException.ThrowIfNull(actions.StopRuntimeDashboardRefreshTimer);
+        ArgumentNullException.ThrowIfNull(actions.StopGpuEnergyTrackingTimer);
         ArgumentNullException.ThrowIfNull(actions.CancelLaunchSettingsRefresh);
         ArgumentNullException.ThrowIfNull(actions.StopRuntimeReadinessMonitor);
         ArgumentNullException.ThrowIfNull(actions.DisposeTrayIcon);

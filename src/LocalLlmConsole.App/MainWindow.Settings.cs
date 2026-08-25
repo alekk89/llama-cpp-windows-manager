@@ -32,7 +32,8 @@ public partial class MainWindow
         _settingsPage.Apply(
             page,
             _viewModel.Settings.Rows,
-            ScheduleSettingsApply);
+            ScheduleSettingsApply,
+            NotifyApiKeyAuthenticationDisabled);
         PageHost.Content = page.Root;
 
         if (_viewModel.Settings.CacheRow is { } cacheRow)
@@ -77,6 +78,13 @@ public partial class MainWindow
         ApplicationThemeService.Apply(mode);
         SetStatus(Loc.T("Status.ThemePreviewApplied"));
     }
+
+    private void NotifyApiKeyAuthenticationDisabled()
+        => _coreServices.App.Dialogs.Notify(
+            this,
+            Loc.T("Settings.ApiKeyAuthDisabledMessage"),
+            Loc.T("Settings.ApiKeyAuthDisabledTitle"),
+            MessageBoxImage.Information);
 
     private async Task RunSettingsRowActionAsync(EditableSettingRow? row)
         => await _coreServices.App.SettingsRowActions.RunActionAsync(row, SettingsRowActionActions());

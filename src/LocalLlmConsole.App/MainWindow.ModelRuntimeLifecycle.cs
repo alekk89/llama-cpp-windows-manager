@@ -55,6 +55,8 @@ public partial class MainWindow
                 UpdateOverviewModelActions,
                 SetStatus));
         if (result is { Launched: true, Session: { } session })
+        {
+            ApplyGpuEnergyTrackingBoundary();
             await RecordRuntimeLifecycleAsync(
                 "started",
                 session.SessionId,
@@ -69,6 +71,7 @@ public partial class MainWindow
                     session.ProcessId,
                     port = session.LaunchSettings.Port
                 });
+        }
         return result.Launched;
     }
 
@@ -117,9 +120,7 @@ public partial class MainWindow
     {
         if (!plan.ShouldRender) return;
 
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.ModelMetric, plan.MetricText);
-        if (plan.UpdateProgress)
-            UpdateRuntimeModelProgress();
+        _runtimeDashboardPage.SetMetricValue(OverviewDashboardMetricIds.ModelStatus, plan.MetricText);
         if (!string.IsNullOrWhiteSpace(plan.StatusText))
             SetStatus(plan.StatusText);
     }
@@ -157,15 +158,21 @@ public partial class MainWindow
         => new(
             id => _sessions.SessionForModel(id),
             (settings, token) => _coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync(settings, token),
+            (settings, token) => _coreServices.Runtime.RuntimeEndpointProbe.VerifyAuthenticationAsync(settings, token),
             id => _sessions.MarkModelLoadedIfRunning(id),
             new RuntimeReadinessCompletionActions(
                 showLoadedDuration => StopModelLoadingTimer(showLoadedDuration, modelName),
                 () => selectLoadedOverviewModel ? SelectOverviewLoadedModelAsync(modelId) : Task.CompletedTask,
                 SaveActiveRuntimeSessionsAsync,
                 SetStatus,
-                UpdateRuntimeModelProgress,
                 UpdateOverviewModelActions,
-                RefreshRuntimeMetricsAsync),
+                RefreshRuntimeMetricsAsync,
+                async () =>
+                {
+                    var session = _sessions.SessionForModel(modelId);
+                    if (session is not null)
+                        await _sessions.StopAsync(session.SessionId, "Runtime authentication enforcement failed.");
+                }),
             (modelId, source) => _coreServices.Ui.RuntimeReadinessMonitors.Complete(modelId, source));
 
     private async Task StopLoadedRuntimeAsync()
@@ -176,6 +183,7 @@ public partial class MainWindow
                 selectedSession,
                 _coreServices.Models.ModelRuntimeStatus.IsLoadingModel(selectedSession?.ModelId ?? "")),
             RuntimeStopActions());
+        ApplyGpuEnergyTrackingBoundary();
         if (selectedSession is not null)
             await RecordRuntimeLifecycleAsync("unloaded", selectedSession.SessionId, selectedSession.ModelId, selectedSession.ModelName);
     }
@@ -190,6 +198,7 @@ public partial class MainWindow
                 IsModelActive(model),
                 _coreServices.Models.ModelRuntimeStatus.IsLoadingModel(model.Id)),
             RuntimeStopActions());
+        ApplyGpuEnergyTrackingBoundary();
         if (stoppedSession is not null)
             await RecordRuntimeLifecycleAsync("unloaded", stoppedSession.SessionId, stoppedSession.ModelId, stoppedSession.ModelName);
     }

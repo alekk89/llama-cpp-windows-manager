@@ -53,6 +53,9 @@ public sealed class LifetimePageState
             Controls.CacheValue.Text = presentation.CacheHit;
             Controls.CacheDetail.Text = presentation.CacheDetail;
             Controls.CacheDetail.ToolTip = presentation.CacheDetail;
+            Controls.GpuEnergyValue.Text = presentation.GpuEnergy;
+            Controls.GpuEnergyDetail.Text = presentation.GpuEnergyDetail;
+            Controls.GpuEnergyDetail.ToolTip = presentation.GpuEnergyDetail;
             Controls.Insights.Requests.Text = presentation.Requests;
             Controls.Insights.RequestsDetail.Text = presentation.RequestsDetail;
             Controls.Insights.RequestsDetail.ToolTip = presentation.RequestsDetail;
@@ -76,7 +79,7 @@ public sealed class LifetimePageState
                 ? Loc.T("Lifetime.ResetAll")
                 : Loc.T("Lifetime.ResetSelectedModel");
             Controls.ResetVisibleButton.ToolTip = string.IsNullOrWhiteSpace(presentation.Selection.ModelId)
-                ? Loc.T("Lifetime.ResetAllTooltip")
+                ? Loc.T("Lifetime.ResetAllMetricsTooltip")
                 : Loc.T("Lifetime.ResetSelectedModelTooltip");
         }
         finally

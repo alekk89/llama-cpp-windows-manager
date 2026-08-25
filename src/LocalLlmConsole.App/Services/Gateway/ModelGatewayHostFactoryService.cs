@@ -7,11 +7,18 @@ public sealed class ModelGatewayHostFactoryService
 
     public ModelGatewayHostFactoryService(
         Func<ModelGatewayRuntimeControllerActions, IModelGatewayRuntimeController>? createRuntimeController = null,
-        Func<ModelGatewayOptions, IModelGatewayRuntimeController, IModelGatewayHost>? createGatewayHost = null)
+        Func<ModelGatewayOptions, IModelGatewayRuntimeController, IModelGatewayHost>? createGatewayHost = null,
+        GatewayPerformanceTracker? performance = null)
     {
+        Performance = performance ?? new GatewayPerformanceTracker();
         _createRuntimeController = createRuntimeController ?? DefaultRuntimeControllerFactory;
-        _createGatewayHost = createGatewayHost ?? DefaultGatewayHostFactory;
+        _createGatewayHost = createGatewayHost
+            ?? ((options, runtime) => new ModelGatewayService(options, runtime,
+                upstreamProxy: new ModelGatewayUpstreamProxy(performance: Performance),
+                performance: Performance));
     }
+
+    public GatewayPerformanceTracker Performance { get; }
 
     public IModelGatewayRuntimeController CreateRuntimeController(ModelGatewayRuntimeControllerActions actions)
     {
@@ -32,8 +39,4 @@ public sealed class ModelGatewayHostFactoryService
         ModelGatewayRuntimeControllerActions actions)
         => new(actions);
 
-    private static IModelGatewayHost DefaultGatewayHostFactory(
-        ModelGatewayOptions options,
-        IModelGatewayRuntimeController runtime)
-        => new ModelGatewayService(options, runtime);
 }

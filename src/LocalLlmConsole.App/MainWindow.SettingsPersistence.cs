@@ -46,9 +46,18 @@ public partial class MainWindow
         => new(
             settings =>
             {
+                var runtimeLogOrderChanged = !string.Equals(
+                    _settings.RuntimeLogOrder,
+                    settings.RuntimeLogOrder,
+                    StringComparison.OrdinalIgnoreCase);
                 _settings = settings;
+                if (_viewModel.CurrentPage == "Settings")
+                    _settingsPage.Synchronize(() => _viewModel.Settings.ApplyPersistedSettings(settings));
+                ApplyGpuEnergyTrackingBoundary();
                 _overviewPage.ApplyUiPreferences(settings);
                 _modelsPage.ApplyUiPreferences(settings);
+                if (runtimeLogOrderChanged)
+                    RunBackground(RefreshRuntimeLogOrderAsync, "Runtime log order refresh failed");
             },
             ApplicationThemeService.Apply,
             () => ApplyLaunchSettingsToControls(),

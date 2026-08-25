@@ -124,6 +124,7 @@ public partial class MainWindow : Window
             await RefreshAllAsync();
             await RecoverActiveRuntimeSessionAsync();
             await StartModelGatewaySafelyAsync();
+            StartGpuEnergyTrackingTimer();
             RunBackground(AutoSelectDetectedWslDistroAsync, "WSL distro auto-select failed");
         });
         await ShowCompletedAppUpdateNoticeAsync();
@@ -213,6 +214,7 @@ public partial class MainWindow : Window
         => await _coreServices.App.ShutdownCleanupApplication.CleanupAsync(new AppShutdownCleanupActions(
             _coreServices.Ui.DownloadHistoryRefreshTimer.Stop,
             _coreServices.Ui.RuntimeDashboardRefreshTimer.Stop,
+            _coreServices.Ui.GpuEnergyTrackingTimer.Stop,
             CancelLaunchSettingsRefresh,
             StopRuntimeReadinessMonitor,
             DisposeTrayIcon,

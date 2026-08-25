@@ -287,13 +287,18 @@ public sealed partial class ReleaseHardeningTests
         await store.InitializeAsync();
         var service = new LifetimeMetricsApplicationService(store);
 
+        Assert.Equal(0, service.DataVersion);
         await service.AddUsageAsync(new TokenUsageDelta("empty", "Empty", 0, 0));
+        Assert.Equal(0, service.DataVersion);
         await service.AddUsageAsync(new TokenUsageDelta("model-a", "Model A", 3, 7));
         await service.AddUsageAsync(new TokenUsageDelta("model-b", "Model B", 11, 13));
+        Assert.Equal(2, service.DataVersion);
         await service.DeleteModelUsageAsync("model-a");
+        Assert.Equal(3, service.DataVersion);
         var afterModelDelete = await service.ListAsync();
 
         await service.DeleteAllUsageAsync();
+        Assert.Equal(4, service.DataVersion);
         var afterAllDelete = await service.ListAsync();
 
         var row = Assert.Single(afterModelDelete);

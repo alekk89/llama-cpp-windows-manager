@@ -7,6 +7,40 @@ namespace LocalLlmConsole.Tests;
 public sealed partial class ReleaseHardeningTests
 {
     [Fact]
+    public void ControlSettingsMutationNormalizesElectricityTariff()
+    {
+        var current = AppSettings.CreateDefault(CreateTempRoot());
+        var patch = JsonNode.Parse("""
+            {
+              "electricityCurrencyCode": " eur ",
+              "electricityDayRatePerKwh": 0.31,
+              "electricityNightRatePerKwh": 0.12,
+              "electricityNightStartLocal": "7:05",
+              "electricityNightEndLocal": "23:30",
+              "trackGpuEnergyWhileIdle": true
+            }
+            """)!.AsObject();
+
+        var updated = new ControlAppSettingsMutationService().Patch(current, patch, []);
+
+        Assert.Equal("EUR", updated.ElectricityCurrencyCode);
+        Assert.Equal("07:05", updated.ElectricityNightStartLocal);
+        Assert.Equal("23:30", updated.ElectricityNightEndLocal);
+        Assert.True(updated.TrackGpuEnergyWhileIdle);
+    }
+
+    [Theory]
+    [InlineData("{\"electricityCurrencyCode\":\"UK\"}")]
+    [InlineData("{\"electricityDayRatePerKwh\":-1}")]
+    [InlineData("{\"electricityNightStartLocal\":\"noon\"}")]
+    public void ControlSettingsMutationRejectsInvalidElectricityTariffs(string json)
+    {
+        var current = AppSettings.CreateDefault(CreateTempRoot());
+        Assert.Throws<InvalidOperationException>(() =>
+            new ControlAppSettingsMutationService().Patch(current, JsonNode.Parse(json)!.AsObject(), []));
+    }
+
+    [Fact]
     public void ControlSettingsMutationNormalizesSafeValuesAndPreservesProtectedState()
     {
         var current = AppSettings.CreateDefault(CreateTempRoot());
@@ -34,7 +68,6 @@ public sealed partial class ReleaseHardeningTests
     }
 
     [Theory]
-    [InlineData("{\"requireApiKeyAuth\":false}", "authentication is required")]
     [InlineData("{\"workspaceRoot\":\"D:/other\"}", "cannot be changed")]
     [InlineData("{\"modelApiKey\":\"replacement\"}", "cannot be changed")]
     [InlineData("{\"port\":0}", "Default model port")]
@@ -46,6 +79,27 @@ public sealed partial class ReleaseHardeningTests
             new ControlAppSettingsMutationService().Patch(current, JsonNode.Parse(json)!.AsObject(), []));
 
         Assert.Contains(expectedError, error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ControlSettingsMutationAllowsLocalOnlyAuthenticationOptOutAndRejectsLanCombination()
+    {
+        var current = AppSettings.CreateDefault(CreateTempRoot()) with
+        {
+            ModelApiKey = new string('a', 32),
+            ModelApiKeyBackup = new string('a', 32)
+        };
+        var service = new ControlAppSettingsMutationService();
+
+        var disabled = service.Patch(current, JsonNode.Parse("""{"requireApiKeyAuth":false}""")!.AsObject(), []);
+
+        Assert.False(disabled.RequireApiKeyAuth);
+        Assert.Equal("", disabled.ModelApiKey);
+        Assert.Equal(current.ModelApiKey, disabled.ModelApiKeyBackup);
+        var error = Assert.Throws<InvalidOperationException>(() => service.Patch(
+            disabled,
+            JsonNode.Parse("""{"modelAccessMode":"both"}""")!.AsObject(), []));
+        Assert.Contains("Local only", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

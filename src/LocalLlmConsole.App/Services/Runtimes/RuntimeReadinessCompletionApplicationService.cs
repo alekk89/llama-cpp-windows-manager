@@ -5,9 +5,9 @@ public sealed record RuntimeReadinessCompletionActions(
     Func<Task> SelectLoadedOverviewModelAsync,
     Func<Task> SaveActiveRuntimeSessionsAsync,
     Action<string> SetStatus,
-    Action UpdateRuntimeProgress,
     Action UpdateActionButtons,
-    Func<Task> RefreshRuntimeMetricsAsync);
+    Func<Task> RefreshRuntimeMetricsAsync,
+    Func<Task>? StopUnsafeRuntimeAsync = null);
 
 public sealed class RuntimeReadinessCompletionApplicationService
 {
@@ -18,6 +18,9 @@ public sealed class RuntimeReadinessCompletionApplicationService
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(actions);
 
+        if (plan.StopUnsafeRuntime)
+            await (actions.StopUnsafeRuntimeAsync
+                   ?? throw new InvalidOperationException("Unsafe runtime stop action is required."))();
         if (plan.StopLoadingStatus)
             actions.StopLoadingStatus(plan.ShowLoadedDuration);
         if (plan.SelectLoadedOverviewModel)
@@ -26,8 +29,6 @@ public sealed class RuntimeReadinessCompletionApplicationService
             await actions.SaveActiveRuntimeSessionsAsync();
         if (!string.IsNullOrWhiteSpace(plan.StatusMessage))
             actions.SetStatus(plan.StatusMessage);
-        if (plan.UpdateRuntimeProgress)
-            actions.UpdateRuntimeProgress();
         if (plan.UpdateActionButtons)
             actions.UpdateActionButtons();
         if (plan.RefreshRuntimeMetrics)

@@ -34,22 +34,48 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
 
         if (segments.Length == 4 && segments[3].Equals("scan", StringComparison.OrdinalIgnoreCase) && method == "POST")
         {
-            var count = await _deps.ModelCatalog.ScanAsync(_deps.Actions.GetSettings().ModelsRoot);
+            var result = await _deps.ModelCatalog.ScanDetailedAsync(_deps.Actions.GetSettings().ModelsRoot);
             await _deps.Actions.RefreshAsync(cancellationToken);
-            return Ok(new { ok = true, registered = count });
+            return Ok(new
+            {
+                ok = true,
+                registered = result.RegisteredCount,
+                discovered = result.DiscoveredCount,
+                companions = result.CompanionCount,
+                ambiguous = result.AmbiguousCount,
+                invalid = result.InvalidCount,
+                files = result.Files.Select(ClassificationView).ToArray()
+            });
         }
 
         if (segments.Length == 4 && segments[3].Equals("import", StringComparison.OrdinalIgnoreCase) && method == "POST")
         {
-            var folder = RequiredString(request.Body, "folder");
-            if (!Directory.Exists(folder))
-                throw new InvalidOperationException($"Model folder '{folder}' was not found.");
-            var importedModel = await _deps.ModelCatalog.ImportFolderAsync(folder);
+            var file = request.Body?["file"]?.ToString().Trim() ?? "";
+            var folder = request.Body?["folder"]?.ToString().Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(file) == string.IsNullOrWhiteSpace(folder))
+                throw new InvalidOperationException("Specify exactly one of 'file' or 'folder'.");
+
+            GgufFileClassification? classification = null;
+            ModelRecord importedModel;
+            if (!string.IsNullOrWhiteSpace(file))
+            {
+                classification = ModelCatalogService.ClassifyGguf(file);
+                var confirmRole = request.Body?["confirmRole"]?.GetValue<bool>() ?? false;
+                importedModel = await _deps.ModelCatalog.ImportFileAsync(file, confirmRole);
+            }
+            else
+            {
+                if (!Directory.Exists(folder))
+                    throw new InvalidOperationException($"Model folder '{folder}' was not found.");
+                importedModel = await _deps.ModelCatalog.ImportFolderAsync(folder);
+            }
             await _deps.LaunchProfiles.EnsureDefaultAsync(importedModel, _deps.Actions.GetSettings());
             await _deps.Actions.RefreshAsync(cancellationToken);
             return Ok(new
             {
                 ok = true,
+                source = classification is null ? "folder" : "file",
+                classification = classification is null ? null : ClassificationView(classification),
                 model = ModelView(
                     importedModel,
                     await _deps.LaunchProfiles.ListNamedAsync(importedModel),
@@ -269,5 +295,17 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
         }
         throw new InvalidOperationException($"Timed out after {timeout.TotalSeconds:N0} seconds waiting for {model.Name} to become ready.");
     }
+
+    private static object ClassificationView(GgufFileClassification classification)
+        => new
+        {
+            path = classification.Path,
+            role = classification.Role.ToString(),
+            confidence = classification.Confidence.ToString(),
+            reason = classification.Reason,
+            architecture = classification.Architecture,
+            generalType = classification.GeneralType,
+            embeddedDraftMtp = classification.EmbeddedDraftMtp
+        };
 
 }

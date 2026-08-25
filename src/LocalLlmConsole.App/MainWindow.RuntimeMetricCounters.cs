@@ -14,7 +14,9 @@ namespace LocalLlmConsole;
 
 public partial class MainWindow
 {
-    private async Task TrackLifetimeTokenDeltasAsync(IReadOnlyList<RuntimeMetricPollResult> pollResults)
+    private async Task TrackLifetimeTokenDeltasAsync(
+        IReadOnlyList<RuntimeMetricPollResult> pollResults,
+        bool renderUiFrame = true)
     {
         var lifetimeMetrics = AppServices.LifetimeMetricsApplication;
         if (lifetimeMetrics is null)
@@ -26,7 +28,15 @@ public partial class MainWindow
         foreach (var delta in _coreServices.Runtime.RuntimeTelemetryApplication.ObserveLifetimeTokenDeltas(pollResults))
             await lifetimeMetrics.AddUsageAsync(delta);
 
-        if (_viewModel.CurrentPage == "Metrics") await RefreshLifetimeMetricsAsync();
+        var now = DateTimeOffset.UtcNow;
+        if (LifetimeMetricsRefreshPolicy.ShouldRefresh(
+                renderUiFrame,
+                _viewModel.CurrentPage == "Metrics",
+                lifetimeMetrics.DataVersion,
+                _lastLifetimeReportDataVersion,
+                now,
+                _nextLifetimeReportRefreshAt))
+            await RefreshLifetimeMetricsAsync();
     }
 
     private void ResetLifetimeCounters()
@@ -41,6 +51,11 @@ public partial class MainWindow
 
     private async Task ApplyIdleUnloadPoliciesAsync(IReadOnlyList<RuntimeMetricPollResult> pollResults)
     {
+        if (pollResults.Count == 0)
+        {
+            ResetIdleCounters();
+            return;
+        }
         var now = DateTimeOffset.UtcNow;
         var groupSnapshot = await ModelServices.ModelGroups.PolicySnapshotAsync(now);
         await _coreServices.Runtime.RuntimeTelemetryApplication.ApplyIdleUnloadPoliciesAsync(

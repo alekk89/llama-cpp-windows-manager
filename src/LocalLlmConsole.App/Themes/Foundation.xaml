@@ -93,10 +93,10 @@
                 <Setter Property="Foreground" Value="{DynamicResource AccentForeground}"/>
               </Trigger>
               <Trigger Property="local:VisualRole.ButtonRole" Value="Danger">
-                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DangerSoft}"/>
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Danger}"/>
-                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource Danger}"/>
-                <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DestructiveActionSoft}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DestructiveAction}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource DestructiveAction}"/>
+                <Setter Property="Foreground" Value="{DynamicResource DestructiveAction}"/>
               </Trigger>
               <Trigger Property="local:VisualRole.ButtonRole" Value="Quiet">
                 <Setter TargetName="Chrome" Property="Background" Value="Transparent"/>
@@ -127,10 +127,10 @@
                   <Condition Property="local:VisualRole.ButtonRole" Value="Danger"/>
                   <Condition Property="IsMouseOver" Value="True"/>
                 </MultiTrigger.Conditions>
-                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Danger}"/>
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DangerHover}"/>
-                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="White"/>
-                <Setter Property="Foreground" Value="White"/>
+                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DestructiveAction}"/>
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource DestructiveActionHover}"/>
+                <Setter TargetName="ButtonContent" Property="TextElement.Foreground" Value="{DynamicResource AccentForeground}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AccentForeground}"/>
               </MultiTrigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource DisabledControlBack}"/>

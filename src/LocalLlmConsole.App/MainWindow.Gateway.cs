@@ -41,23 +41,13 @@ public partial class MainWindow
 
     private IModelGatewayRuntimeController CreateGatewayRuntimeController()
         => _coreServices.Models.ModelGatewayHostFactory.CreateRuntimeController(new ModelGatewayRuntimeControllerActions(
-            cancellationToken => RunOnUiThreadAsync(async () =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var modelLookup = AppServices.ModelLookupApplication;
-                var models = await modelLookup.ListAsync();
-                await EnsureDefaultModelLaunchProfilesAsync(models);
-                var routes = new List<ModelGatewayModelRoute>();
-                foreach (var model in models)
+            cancellationToken => GatewayServices.ModelGatewayRouteCatalog.ListAsync(
+                new ModelGatewayRouteCatalogActions((models, token) => RunOnUiThreadAsync(async () =>
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var profiles = ModelServices.LaunchProfiles is null
-                        ? []
-                        : await ModelServices.LaunchProfiles.ListNamedAsync(model);
-                    routes.AddRange(profiles.Select(profile => new ModelGatewayModelRoute(model, profile)));
-                }
-                return ModelGatewayRouteId.EnsureUnique(routes);
-            }),
+                    token.ThrowIfCancellationRequested();
+                    await EnsureDefaultModelLaunchProfilesAsync(models);
+                })),
+                cancellationToken),
             cancellationToken => RunOnUiThreadAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -68,6 +58,14 @@ public partial class MainWindow
             (route, policy, cancellationToken) => RunOnUiThreadAsync(() => EnsureGatewayModelLoadedAsync(route, policy, cancellationToken))));
 
     private Task<T> RunOnUiThreadAsync<T>(Func<Task<T>> action)
+    {
+        if (Dispatcher.CheckAccess())
+            return action();
+
+        return Dispatcher.InvokeAsync(action).Task.Unwrap();
+    }
+
+    private Task RunOnUiThreadAsync(Func<Task> action)
     {
         if (Dispatcher.CheckAccess())
             return action();

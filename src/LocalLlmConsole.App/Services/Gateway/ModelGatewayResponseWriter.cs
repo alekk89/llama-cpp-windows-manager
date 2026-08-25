@@ -4,7 +4,7 @@ public static class ModelGatewayResponseWriter
 {
     public static async Task WriteJsonAsync(HttpListenerContext context, int status, object value, CancellationToken cancellationToken)
     {
-        var json = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(value);
         var bytes = Encoding.UTF8.GetBytes(json);
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/json; charset=utf-8";

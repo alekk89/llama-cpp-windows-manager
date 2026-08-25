@@ -17,6 +17,7 @@ public sealed record RuntimeReadinessMonitorApplicationRequest(
 public sealed record RuntimeReadinessMonitorApplicationActions(
     Func<string, LoadedModelSessionSnapshot?> SessionForModel,
     Func<AppSettings, CancellationToken, Task<bool>> IsEndpointAliveAsync,
+    Func<AppSettings, CancellationToken, Task<RuntimeAuthenticationProbeResult>> VerifyAuthenticationAsync,
     Func<string, bool> MarkModelLoadedIfRunning,
     RuntimeReadinessCompletionActions CompletionActions,
     Action<string, CancellationTokenSource> CompleteMonitor);
@@ -52,7 +53,8 @@ public sealed class RuntimeReadinessMonitorApplicationService
                 request.IsOverviewPage,
                 actions.SessionForModel,
                 actions.IsEndpointAliveAsync,
-                actions.MarkModelLoadedIfRunning),
+                actions.MarkModelLoadedIfRunning,
+                VerifyAuthenticationAsync: actions.VerifyAuthenticationAsync),
                 cancellationToken);
 
             await _completionApplication.ApplyAsync(result.CompletionPlan, actions.CompletionActions);
@@ -73,6 +75,7 @@ public sealed class RuntimeReadinessMonitorApplicationService
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(actions.SessionForModel);
         ArgumentNullException.ThrowIfNull(actions.IsEndpointAliveAsync);
+        ArgumentNullException.ThrowIfNull(actions.VerifyAuthenticationAsync);
         ArgumentNullException.ThrowIfNull(actions.MarkModelLoadedIfRunning);
         ArgumentNullException.ThrowIfNull(actions.CompletionActions);
         ArgumentNullException.ThrowIfNull(actions.CompleteMonitor);

@@ -150,10 +150,10 @@ public sealed partial class ReleaseHardeningTests
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
         var iconPath = FindRepositoryFile("src", "LocalLlmConsole.App", "Assets", "AppIcon.ico");
 
-        Assert.Contains("Title=\"llama.cpp Windows Manager v2.3.0\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"v2.3.0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Title=\"llama.cpp Windows Manager v2.4.0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"v2.4.0\"", xaml, StringComparison.Ordinal);
 
-        Assert.Contains("AppVersionLabel = \"v2.3.0\"", source, StringComparison.Ordinal);
+        Assert.Contains("AppVersionLabel = \"v2.4.0\"", source, StringComparison.Ordinal);
         Assert.Contains("<AssemblyName>LlamaCppWindowsManager</AssemblyName>", project, StringComparison.Ordinal);
         Assert.Contains("<ApplicationIcon>Assets\\AppIcon.ico</ApplicationIcon>", project, StringComparison.Ordinal);
         Assert.True(new FileInfo(iconPath).Length > 1024);

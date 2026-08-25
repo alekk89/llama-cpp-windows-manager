@@ -4,7 +4,8 @@ public sealed record RuntimeLogTailRequest(
     string LogPath,
     bool IsRuntimeRunning,
     RuntimeSlotSnapshot? SlotSnapshot,
-    int MaxCharacters = 16000);
+    int MaxCharacters = 16000,
+    bool NewestFirst = true);
 
 public sealed record RuntimeLogTailResult(
     string Text,
@@ -19,6 +20,10 @@ public sealed record RuntimeLogTailCapture(
 
 public sealed class RuntimeLogTailService
 {
+    private const int MaximumCachedTails = 8;
+    private readonly object _captureCacheGate = new();
+    private readonly Dictionary<RuntimeLogTailCacheKey, RuntimeLogTailCacheEntry> _captureCache = [];
+
     public Task<RuntimeLogTailCapture> CaptureAsync(
         string logPath,
         int maxCharacters = 16000,
@@ -32,13 +37,37 @@ public sealed class RuntimeLogTailService
 
         try
         {
+            var fullPath = Path.GetFullPath(logPath);
+            var file = new FileInfo(fullPath);
+            file.Refresh();
+            if (!file.Exists)
+                return new RuntimeLogTailCapture(logPath, Exists: false, "", null, "");
+            var cacheKey = new RuntimeLogTailCacheKey(fullPath, maxCharacters);
+            lock (_captureCacheGate)
+            {
+                if (_captureCache.TryGetValue(cacheKey, out var cached)
+                    && cached.Length == file.Length
+                    && cached.LastWriteTimeUtc == file.LastWriteTimeUtc)
+                    return cached.Capture;
+            }
+
             var rawTail = LogFileService.Tail(logPath, maxCharacters);
-            return new RuntimeLogTailCapture(
+            var capture = new RuntimeLogTailCapture(
                 logPath,
                 Exists: true,
                 rawTail,
                 RuntimeDashboardService.ParseMtpTokenStats(rawTail),
                 "");
+            lock (_captureCacheGate)
+            {
+                if (_captureCache.Count >= MaximumCachedTails && !_captureCache.ContainsKey(cacheKey))
+                    _captureCache.Clear();
+                _captureCache[cacheKey] = new RuntimeLogTailCacheEntry(
+                    file.Length,
+                    file.LastWriteTimeUtc,
+                    capture);
+            }
+            return capture;
         }
         catch (Exception ex)
         {
@@ -75,7 +104,9 @@ public sealed class RuntimeLogTailService
                 ? $"Live log: {request.LogPath}"
                 : $"Last runtime log: {request.LogPath}";
             var slotStatus = SlotStatus(request.SlotSnapshot);
-            var logTail = LogFileService.CollapseIdleSlotNoise(capture.RawTail);
+            var logTail = OrderedLogText(
+                LogFileService.CollapseIdleSlotNoise(capture.RawTail),
+                request.NewestFirst);
             var text = string.IsNullOrWhiteSpace(slotStatus)
                 ? $"{heading}{Environment.NewLine}{Environment.NewLine}{logTail}"
                 : $"{heading}{Environment.NewLine}{slotStatus}{Environment.NewLine}{Environment.NewLine}{logTail}";
@@ -97,4 +128,22 @@ public sealed class RuntimeLogTailService
         var promptTotal = slotSnapshot.PromptTokens?.ToString("N0") ?? "?";
         return $"Slot status: processing | Prompt {slotSnapshot.PromptTokensProcessed:N0}/{promptTotal} | Gen {slotSnapshot.GeneratedTokens:N0}";
     }
+
+    private static string OrderedLogText(string value, bool newestFirst)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return value;
+        var lines = value.TrimEnd('\r', '\n')
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n');
+        if (newestFirst) Array.Reverse(lines);
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private readonly record struct RuntimeLogTailCacheKey(string FullPath, int MaxCharacters);
+
+    private sealed record RuntimeLogTailCacheEntry(
+        long Length,
+        DateTime LastWriteTimeUtc,
+        RuntimeLogTailCapture Capture);
 }

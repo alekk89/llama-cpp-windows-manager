@@ -73,13 +73,19 @@ public sealed class UsageMetricsService
         UsageMetricDimensions dimensions,
         DateTimeOffset now,
         TimeZoneInfo timeZone,
-        DateTimeOffset? trackingStartedAtOverride = null)
+        DateTimeOffset? trackingStartedAtOverride = null,
+        IReadOnlyList<GpuEnergyBucket>? energyBuckets = null,
+        DateTimeOffset? energyTrackingStartedAt = null,
+        IReadOnlyList<GpuEnergyDeviceBucket>? energyDeviceBuckets = null,
+        ElectricityTariff? electricityTariff = null)
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(buckets);
         ArgumentNullException.ThrowIfNull(lifetime);
         ArgumentNullException.ThrowIfNull(dimensions);
         ArgumentNullException.ThrowIfNull(timeZone);
+        energyBuckets ??= [];
+        energyDeviceBuckets ??= [];
 
         var selectedDates = NormalizeDates(query.Dates);
         var selectedDateSet = selectedDates.ToHashSet();
@@ -91,6 +97,16 @@ public sealed class UsageMetricsService
             .Where(bucket => Matches(bucket.ModelId, query.ModelId))
             .Where(bucket => Matches(bucket.LaunchProfileId, query.LaunchProfileId))
             .Where(bucket => Matches(bucket.RuntimeId, query.RuntimeId))
+            .ToArray();
+        var filteredEnergy = energyBuckets
+            .Where(bucket => WithinWindow(bucket, window))
+            .Where(bucket => selectedDateSet.Count == 0
+                || selectedDateSet.Contains(LocalDate(bucket.BucketStartUtc, timeZone)))
+            .ToArray();
+        var filteredDeviceEnergy = energyDeviceBuckets
+            .Where(bucket => WithinWindow(bucket.BucketStartUtc, window))
+            .Where(bucket => selectedDateSet.Count == 0
+                || selectedDateSet.Contains(LocalDate(bucket.BucketStartUtc, timeZone)))
             .ToArray();
 
         var trackedSummary = Totals(filtered);
@@ -105,7 +121,7 @@ public sealed class UsageMetricsService
         var summary = canUseLifetime ? lifetimeSummary : trackedSummary;
         DateTimeOffset? trackingStartedAt = trackingStartedAtOverride
             ?? (buckets.Count == 0 ? null : buckets.Min(bucket => bucket.BucketStartUtc));
-        var days = BuildDays(filtered, window, timeZone, trackingStartedAt, now, selectedDates);
+        var days = BuildDays(filtered, filteredEnergy, window, timeZone, trackingStartedAt, now, selectedDates);
         var calendarWindow = ResolveCalendarWindow(now, timeZone);
         var calendarBuckets = buckets
             .Where(bucket => WithinWindow(bucket, calendarWindow))
@@ -113,7 +129,8 @@ public sealed class UsageMetricsService
             .Where(bucket => Matches(bucket.LaunchProfileId, query.LaunchProfileId))
             .Where(bucket => Matches(bucket.RuntimeId, query.RuntimeId))
             .ToArray();
-        var calendarDays = BuildDays(calendarBuckets, calendarWindow, timeZone, trackingStartedAt, now, []);
+        var calendarEnergy = energyBuckets.Where(bucket => WithinWindow(bucket, calendarWindow)).ToArray();
+        var calendarDays = BuildDays(calendarBuckets, calendarEnergy, calendarWindow, timeZone, trackingStartedAt, now, []);
         var modelRows = BuildModelRows(filtered, lifetimeRows, canUseLifetime);
         var insights = BuildInsights(days, trackedSummary);
         var includesLegacy = canUseLifetime && summary.TotalTokens > trackedSummary.TotalTokens;
@@ -130,7 +147,13 @@ public sealed class UsageMetricsService
             dimensions,
             insights,
             trackingStartedAt,
-            includesLegacy);
+            includesLegacy,
+            GpuEnergyTotals.Sum(filteredEnergy),
+            energyTrackingStartedAt,
+            BuildDeviceEnergyTotals(filteredDeviceEnergy),
+            electricityTariff is null
+                ? null
+                : ElectricityTariffPolicy.Cost(filteredEnergy, timeZone, electricityTariff));
     }
 
     public static UsageMetricsRange ParseRange(string? value)
@@ -150,6 +173,7 @@ public sealed class UsageMetricsService
 
     private static IReadOnlyList<UsageMetricDay> BuildDays(
         IReadOnlyList<UsageMetricBucket> buckets,
+        IReadOnlyList<GpuEnergyBucket> energyBuckets,
         UsageMetricsWindow window,
         TimeZoneInfo timeZone,
         DateTimeOffset? trackingStartedAt,
@@ -159,6 +183,9 @@ public sealed class UsageMetricsService
         var grouped = buckets
             .GroupBy(bucket => LocalDate(bucket.BucketStartUtc, timeZone))
             .ToDictionary(group => group.Key, Totals);
+        var energyByDate = energyBuckets
+            .GroupBy(bucket => LocalDate(bucket.BucketStartUtc, timeZone))
+            .ToDictionary(group => group.Key, group => GpuEnergyTotals.Sum(group));
         var localToday = LocalDate(now, timeZone);
         var firstTrackedDate = trackingStartedAt is null
             ? (DateOnly?)null
@@ -168,11 +195,13 @@ public sealed class UsageMetricsService
                 .Select(date => new UsageMetricDay(
                     date,
                     grouped.GetValueOrDefault(date, UsageMetricTotals.Empty),
-                    IsTracked(date, firstTrackedDate, localToday)))
+                    IsTracked(date, firstTrackedDate, localToday),
+                    energyByDate.GetValueOrDefault(date, GpuEnergyTotals.Empty)))
                 .ToArray();
 
+        var availableDates = grouped.Keys.Concat(energyByDate.Keys).ToArray();
         var firstDate = window.FirstLocalDate
-            ?? (grouped.Count == 0 ? null : grouped.Keys.Min());
+            ?? (availableDates.Length == 0 ? null : availableDates.Min());
         if (firstDate is null) return [];
 
         var result = new List<UsageMetricDay>();
@@ -180,7 +209,8 @@ public sealed class UsageMetricsService
             result.Add(new UsageMetricDay(
                 date,
                 grouped.GetValueOrDefault(date, UsageMetricTotals.Empty),
-                IsTracked(date, firstTrackedDate, localToday)));
+                IsTracked(date, firstTrackedDate, localToday),
+                energyByDate.GetValueOrDefault(date, GpuEnergyTotals.Empty)));
         return result;
     }
 
@@ -267,6 +297,32 @@ public sealed class UsageMetricsService
     private static bool WithinWindow(UsageMetricBucket bucket, UsageMetricsWindow window)
         => (window.FromUtc is null || bucket.BucketStartUtc >= window.FromUtc.Value)
            && bucket.BucketStartUtc < window.ToUtc;
+
+    private static bool WithinWindow(GpuEnergyBucket bucket, UsageMetricsWindow window)
+        => (window.FromUtc is null || bucket.BucketStartUtc >= window.FromUtc.Value)
+           && bucket.BucketStartUtc < window.ToUtc;
+
+    private static bool WithinWindow(DateTimeOffset bucketStartUtc, UsageMetricsWindow window)
+        => (window.FromUtc is null || bucketStartUtc >= window.FromUtc.Value)
+           && bucketStartUtc < window.ToUtc;
+
+    private static IReadOnlyList<GpuEnergyDeviceTotals> BuildDeviceEnergyTotals(
+        IEnumerable<GpuEnergyDeviceBucket> buckets)
+        => buckets
+            .GroupBy(bucket => bucket.SensorKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var latest = group.OrderByDescending(bucket => bucket.UpdatedAt).First();
+                return new GpuEnergyDeviceTotals(
+                    latest.SensorKey,
+                    latest.GpuIndex,
+                    latest.GpuName,
+                    group.Sum(bucket => Math.Max(0, bucket.WattHours)),
+                    group.Sum(bucket => Math.Max(0, bucket.SampledSeconds)));
+            })
+            .OrderBy(total => total.GpuIndex)
+            .ThenBy(total => total.GpuName, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
 
     private static DateOnly LocalDate(DateTimeOffset value, TimeZoneInfo timeZone)
         => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(value, timeZone).Date);

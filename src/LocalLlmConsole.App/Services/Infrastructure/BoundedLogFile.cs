@@ -4,24 +4,96 @@ namespace LocalLlmConsole.Services;
 
 public sealed class BoundedLogWriter : IDisposable
 {
+    private const int FlushThresholdBytes = 64 * 1024;
+    private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(1);
     private readonly FileStream _stream;
     private readonly long _maxBytes;
     private readonly object _gate = new();
+    private readonly System.Threading.Timer _flushTimer;
+    private int _pendingBytes;
+    private bool _disposed;
 
     public BoundedLogWriter(string path, long maxBytes)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         _stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
         _maxBytes = Math.Max(0, maxBytes);
+        _flushTimer = new System.Threading.Timer(
+            _ => FlushFromTimer(),
+            null,
+            FlushInterval,
+            FlushInterval);
     }
 
     public void WriteLine(string line)
     {
         lock (_gate)
-            BoundedLogFile.WriteToStream(_stream, line + Environment.NewLine, _maxBytes);
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var text = line + Environment.NewLine;
+            BoundedLogFile.WriteToStream(_stream, text, _maxBytes, flush: false);
+            _pendingBytes += Encoding.UTF8.GetByteCount(text);
+            if (_pendingBytes >= FlushThresholdBytes)
+                FlushCore();
+        }
     }
 
-    public void Dispose() => _stream.Dispose();
+    public void Flush()
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            FlushCore();
+        }
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            lock (_gate)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _flushTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                try
+                {
+                    FlushCore();
+                }
+                finally
+                {
+                    _stream.Dispose();
+                }
+            }
+        }
+        finally
+        {
+            _flushTimer.Dispose();
+        }
+    }
+
+    private void FlushFromTimer()
+    {
+        lock (_gate)
+        {
+            if (_disposed || _pendingBytes == 0) return;
+            try
+            {
+                FlushCore();
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceWarning($"Could not flush runtime log buffer: {ex.Message}");
+            }
+        }
+    }
+
+    private void FlushCore()
+    {
+        if (_pendingBytes == 0) return;
+        _stream.Flush();
+        _pendingBytes = 0;
+    }
 }
 
 public static class BoundedLogFile
@@ -49,12 +121,12 @@ public static class BoundedLogFile
         }
     }
 
-    internal static void WriteToStream(FileStream stream, string text, long maxBytes)
+    internal static void WriteToStream(FileStream stream, string text, long maxBytes, bool flush = true)
     {
         if (maxBytes <= 0)
         {
             stream.Seek(0, SeekOrigin.End);
-            WriteUtf8(stream, text);
+            WriteUtf8(stream, text, flush);
             return;
         }
 
@@ -63,7 +135,7 @@ public static class BoundedLogFile
         {
             stream.SetLength(0);
             stream.Position = 0;
-            WriteBytes(stream, TailBytes(text, maxBytes));
+            WriteBytes(stream, TailBytes(text, maxBytes), flush);
             return;
         }
 
@@ -75,12 +147,12 @@ public static class BoundedLogFile
                 : TailBytes(resetText, maxBytes);
             stream.SetLength(0);
             stream.Position = 0;
-            WriteBytes(stream, resetBytes);
+            WriteBytes(stream, resetBytes, flush);
             return;
         }
 
         stream.Seek(0, SeekOrigin.End);
-        WriteBytes(stream, bytes);
+        WriteBytes(stream, bytes, flush);
     }
 
     private static byte[] TailBytes(string text, long maxBytes)
@@ -99,12 +171,13 @@ public static class BoundedLogFile
         return Utf8.GetBytes(text[low..]);
     }
 
-    private static void WriteUtf8(FileStream stream, string text)
-        => WriteBytes(stream, Utf8.GetBytes(text));
+    private static void WriteUtf8(FileStream stream, string text, bool flush)
+        => WriteBytes(stream, Utf8.GetBytes(text), flush);
 
-    private static void WriteBytes(FileStream stream, byte[] bytes)
+    private static void WriteBytes(FileStream stream, byte[] bytes, bool flush)
     {
         stream.Write(bytes, 0, bytes.Length);
-        stream.Flush();
+        if (flush)
+            stream.Flush();
     }
 }

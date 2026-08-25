@@ -128,6 +128,7 @@ internal static class MetricCardRenderer
     internal static double MetricLabelColumnWidth(string label)
         => string.Equals(label, Loc.T("Overview.Metric.ModelStatus"), StringComparison.Ordinal)
             || string.Equals(label, "Overview.Metric.ModelStatus", StringComparison.Ordinal)
+            || string.Equals(label, OverviewDashboardMetricIds.ModelStatus, StringComparison.Ordinal)
             ? 82
             : 64;
 
@@ -213,7 +214,8 @@ internal static class MetricCardRenderer
 
     private static bool IsStatusNameMetricLabel(string tag)
         => string.Equals(tag, Loc.T("Overview.Metric.ModelStatus"), StringComparison.Ordinal)
-           || string.Equals(tag, "Overview.Metric.ModelStatus", StringComparison.Ordinal);
+           || string.Equals(tag, "Overview.Metric.ModelStatus", StringComparison.Ordinal)
+           || string.Equals(tag, OverviewDashboardMetricIds.ModelStatus, StringComparison.Ordinal);
 
     private static bool IsGraphMetricTarget(Grid target)
         => target.Tag is string label

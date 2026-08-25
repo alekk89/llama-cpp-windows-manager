@@ -44,6 +44,7 @@ public sealed record MainWindowCoreUiServices(
     MainWindowUiState UiState,
     UiAsyncRefreshTimerController DownloadHistoryRefreshTimer,
     UiAsyncRefreshTimerController RuntimeDashboardRefreshTimer,
+    UiAsyncRefreshTimerController GpuEnergyTrackingTimer,
     GatewayActivityStatusController GatewayActivity,
     SelectedModelCapabilityController SelectedCapabilities,
     AdvancedSectionStateController AdvancedSections,
@@ -136,6 +137,7 @@ public sealed record MainWindowCoreModelServices(
     ModelRuntimeUnloadApplicationService ModelRuntimeUnloadApplication,
     LaunchRuntimeSelectionService LaunchRuntimeSelection,
     ModelFolderApplicationService ModelFolderApplication,
+    ModelImportApplicationService ModelImportApplication,
     ModelDeletionApplicationService ModelDeletionApplication,
     ModelGatewayHostFactoryService ModelGatewayHostFactory,
     ModelGatewayLifecycleApplicationService ModelGatewayLifecycleApplication,
@@ -192,6 +194,7 @@ public sealed record MainWindowLoadedModelServices(
     ModelLaunchSettingsWorkflowService ModelLaunchSettingsWorkflow);
 
 public sealed record MainWindowLoadedGatewayServices(
+    ModelGatewayRouteCatalogApplicationService ModelGatewayRouteCatalog,
     GatewayModelLoadWorkflowService GatewayModelLoadWorkflow,
     GatewayRuntimeApplicationService GatewayRuntimeApplication);
 

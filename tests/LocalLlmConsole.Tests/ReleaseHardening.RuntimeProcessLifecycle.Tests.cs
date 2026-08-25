@@ -269,6 +269,47 @@ public sealed partial class ReleaseHardeningTests
         Assert.DoesNotContain("secret-key", log, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task BoundedLogWriterFlushesOnTimerThresholdExplicitFlushAndDispose()
+    {
+        var root = CreateTempRoot();
+        var logPath = Path.Combine(root, "logs", "buffered-runtime.log");
+        var writer = new BoundedLogWriter(logPath, maxBytes: 0);
+        try
+        {
+            writer.WriteLine("timer-line");
+            var timerDeadline = Stopwatch.GetTimestamp() + (long)(Stopwatch.Frequency * 3d);
+            while (!ReadShared(logPath).Contains("timer-line", StringComparison.Ordinal)
+                   && Stopwatch.GetTimestamp() < timerDeadline)
+                await Task.Delay(25, TestContext.Current.CancellationToken);
+            Assert.Contains("timer-line", ReadShared(logPath), StringComparison.Ordinal);
+
+            writer.WriteLine(new string('x', 64 * 1024));
+            Assert.True(new FileInfo(logPath).Length >= 64 * 1024);
+
+            writer.WriteLine("explicit-line");
+            writer.Flush();
+            Assert.Contains("explicit-line", ReadShared(logPath), StringComparison.Ordinal);
+        }
+        finally
+        {
+            writer.Dispose();
+        }
+
+        Assert.Contains("explicit-line", File.ReadAllText(logPath), StringComparison.Ordinal);
+
+        static string ReadShared(string path)
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+    }
+
 
     [Fact]
     public void LlamaProcessSupervisorStopsRecoveredNativeProcessByProcessId()

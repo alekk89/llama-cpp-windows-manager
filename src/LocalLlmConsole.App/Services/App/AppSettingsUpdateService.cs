@@ -22,23 +22,26 @@ public sealed class AppSettingsUpdateService
         string V(string key, string fallback) => values.TryGetValue(key, out var value) ? value : fallback;
 
         var accessMode = AppPreferenceService.ModelAccessMode(V("modelAccessMode", current.ModelAccessMode));
-        if (values.TryGetValue("requireApiKeyAuth", out var requestedAuth)
-            && !AppPreferenceService.YesNoValue(requestedAuth, fallback: true))
-            return Fail(current, "API-key authentication is required for all model-serving endpoints.");
+        var requireApiKeyAuth = AppPreferenceService.EnableDisableValue(
+            V("requireApiKeyAuth", AppPreferenceService.EnableDisableLabel(current.RequireApiKeyAuth)),
+            current.RequireApiKeyAuth);
+        if (!requireApiKeyAuth && !ModelAccessPolicy.AllowsUnauthenticatedAccess(accessMode))
+            return Fail(current, "API-key authentication can be disabled only when LAN exposure is Local only.");
 
         var requestedApiKey = (V("modelApiKey", current.ModelApiKey) ?? "").Trim();
-        if (values.ContainsKey("modelApiKey")
+        if (requireApiKeyAuth
+            && values.ContainsKey("modelApiKey")
             && requestedApiKey.Length > 0
             && !ApiSecurity.IsStrongBearerSecret(requestedApiKey))
             return Fail(current, "Model API key must be at least 32 non-whitespace characters.");
 
         var hadStrongApiKey = new[] { requestedApiKey, current.ModelApiKey, current.ModelApiKeyBackup }
             .Any(ApiSecurity.IsStrongBearerSecret);
-        var apiKey = ApiSecurity.StrongBearerSecretOrNew(
+        var preservedApiKey = ApiSecurity.StrongBearerSecretOrNew(
             requestedApiKey,
             current.ModelApiKey,
             current.ModelApiKeyBackup);
-        var generatedApiKey = !hadStrongApiKey;
+        var generatedApiKey = requireApiKeyAuth && !hadStrongApiKey;
 
         if (!AppPreferenceService.TryIntValue(V("autoLoadGatewayPort", current.AutoLoadGatewayPort.ToString(CultureInfo.InvariantCulture)), out var autoLoadGatewayPort))
             return Fail(current, "Gateway port must be a whole number.");
@@ -58,6 +61,19 @@ public sealed class AppSettingsUpdateService
         if (!AppPreferenceService.TryIntValue(V("maxLogFileSizeMb", current.MaxLogFileSizeMb.ToString(CultureInfo.InvariantCulture)), out var maxLogFileSizeMb))
             return Fail(current, "Max log file MB must be a whole number.");
 
+        if (!TryRate(V("electricityDayRatePerKwh", current.ElectricityDayRatePerKwh.ToString(CultureInfo.InvariantCulture)), out var electricityDayRate)
+            || !TryRate(V("electricityNightRatePerKwh", current.ElectricityNightRatePerKwh.ToString(CultureInfo.InvariantCulture)), out var electricityNightRate))
+            return Fail(current, "Electricity rates must be numbers in currency units per kWh.");
+        if (!ElectricityTariffPolicy.TryCreate(
+                V("electricityCurrencyCode", current.ElectricityCurrencyCode),
+                electricityDayRate,
+                electricityNightRate,
+                V("electricityNightStartLocal", current.ElectricityNightStartLocal),
+                V("electricityNightEndLocal", current.ElectricityNightEndLocal),
+                out var electricityTariff,
+                out var electricityTariffError))
+            return Fail(current, electricityTariffError);
+
         var updated = current with
         {
             WorkspaceRoot = request.WorkspaceRoot,
@@ -76,9 +92,9 @@ public sealed class AppSettingsUpdateService
             AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(
                 V("autoLoadGatewayPolicy", AppPreferenceService.GatewaySwapPolicyLabel(current.AutoLoadGatewayPolicy))),
             Host = AppPreferenceService.RuntimeHostForAccessMode(accessMode),
-            RequireApiKeyAuth = true,
-            ModelApiKey = apiKey,
-            ModelApiKeyBackup = apiKey,
+            RequireApiKeyAuth = requireApiKeyAuth,
+            ModelApiKey = requireApiKeyAuth ? preservedApiKey : "",
+            ModelApiKeyBackup = preservedApiKey,
             ShowOverviewModelStatus = Visibility("showOverviewModelStatus", current.ShowOverviewModelStatus),
             ShowOverviewHardware = Visibility("showOverviewHardware", current.ShowOverviewHardware),
             ShowOverviewSlots = Visibility("showOverviewSlots", current.ShowOverviewSlots),
@@ -86,10 +102,27 @@ public sealed class AppSettingsUpdateService
             ShowOverviewMtpTokens = Visibility("showOverviewMtpTokens", current.ShowOverviewMtpTokens),
             ShowOverviewKvCache = Visibility("showOverviewKvCache", current.ShowOverviewKvCache),
             ShowOverviewLiveRuntimeLog = Visibility("showOverviewLiveRuntimeLog", current.ShowOverviewLiveRuntimeLog),
+            RuntimeLogOrder = AppPreferenceService.RuntimeLogOrder(V("runtimeLogOrder", current.RuntimeLogOrder)),
             ShowOverviewAllMetrics = Visibility("showOverviewAllMetrics", current.ShowOverviewAllMetrics),
             ShowModelsHuggingFace = Visibility("showModelsHuggingFace", current.ShowModelsHuggingFace),
-            MaxLogFileSizeMb = Math.Clamp(maxLogFileSizeMb, 1, 4096)
+            MaxLogFileSizeMb = Math.Clamp(maxLogFileSizeMb, 1, 4096),
+            ElectricityCurrencyCode = electricityTariff.CurrencyCode,
+            ElectricityDayRatePerKwh = electricityTariff.DayRatePerKwh,
+            ElectricityNightRatePerKwh = electricityTariff.NightRatePerKwh,
+            ElectricityNightStartLocal = ElectricityTariffPolicy.TimeText(electricityTariff.NightStartLocal),
+            ElectricityNightEndLocal = ElectricityTariffPolicy.TimeText(electricityTariff.NightEndLocal),
+            TrackGpuEnergyWhileIdle = AppPreferenceService.YesNoValue(
+                V("trackGpuEnergyWhileIdle", AppPreferenceService.YesNoLabel(current.TrackGpuEnergyWhileIdle)),
+                current.TrackGpuEnergyWhileIdle)
         };
+
+        var previousVisibility = OverviewDashboardLayoutPolicy.LegacyVisibility(current);
+        var requestedVisibility = OverviewDashboardLayoutPolicy.LegacyVisibility(updated);
+        var dashboardLayout = OverviewDashboardLayoutPolicy.ApplyLegacyVisibilityChanges(
+            current.OverviewDashboardLayout,
+            previousVisibility,
+            requestedVisibility);
+        updated = OverviewDashboardLayoutPolicy.WithLayout(updated, dashboardLayout);
 
         return new AppSettingsUpdateResult(true, updated, "", generatedApiKey);
 
@@ -99,4 +132,9 @@ public sealed class AppSettingsUpdateService
 
     private static AppSettingsUpdateResult Fail(AppSettings current, string message)
         => new(false, current, message, GeneratedApiKey: false);
+
+    private static bool TryRate(string? value, out double result)
+        => double.TryParse(value, NumberStyles.Float, CultureInfo.CurrentCulture, out result)
+           || double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
+
 }

@@ -1,6 +1,6 @@
 # Release Readiness Checklist
 
-Last updated: 2026-08-20
+Last updated: 2026-08-25
 
 ## Automated Gate
 
@@ -44,7 +44,7 @@ companions, and be described as unsigned.
 ## Release Gate
 
 - Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.3.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
@@ -137,16 +137,64 @@ companions, and be described as unsigned.
   duration after the model becomes ready.
 - At the default window size, confirm Overview uses two metric-card columns with
   no clipped card content and the loaded-session Runtime column remains readable;
-  maximize the window and confirm the cards reflow to three columns.
-- Confirm Overview token monitors use two compact rows in the form
-  `0.0 t/s (Gen) | 0.0 t/s (Avg) | 0 t (Total)`, with matching Prompt and
-  Accepted rows, live rates falling back to `0.0 t/s` when idle, and average or
-  total segments omitted when those values are unavailable. Run two parallel
+  maximize the window and confirm the cards reflow to three columns. Enter
+  drag cards directly and resize the visible outer card from the top, bottom,
+  left, right, and all four corners without entering an edit mode. Confirm each
+  edge and corner shows the corresponding Windows resize cursor, no overlay
+  handles exist, and only the visible card border highlights on hover.
+  Confirm idle cards have no decorative blue line in their upper-left corner.
+  Confirm nearby cards snap together, cannot overlap, and retain a minimum gap.
+  Select **Lock** beside **Add card**, resize the application wider and narrower,
+  and confirm card dimensions remain fixed while cards wrap to new rows. Confirm
+  border resize cursors are disabled while locked, **Unlock** restores responsive
+  sizing and manual resizing, and the lock state survives an application restart.
+  With two cards snapped side by side, drag one card's top and bottom borders
+  near the matching neighbor edges and confirm the corresponding edges align;
+  confirm the card still respects the minimum height required by its rows.
+  Confirm cards stop shrinking when
+  their wrapped labels, values, details, or inline chart need the space. Confirm exact bounds survive
+  restart and horizontal positions scale with the window width. Resize the window
+  narrowly and add charts/details that increase card height; confirm measured
+  outer cards are separated again before rendering.
+- Open another page, wait for at least one hardware polling interval, and return
+  to Overview. Confirm the existing cards and charts appear immediately without
+  an empty rebuild phase, and hardware readings update without switching pages twice.
+- Confirm each Overview metric uses its predetermined row presentation with
+  label, value, unit, and optional detail kept in separate fields. Confirm rates,
+  token counts, percentages, active/capacity slots, CPU, RAM, and each GPU do not
+  depend on the legacy free-form metric-line parser. Confirm numeric values use
+  aligned tabular figures, row rules stay subtle, telemetry cards match the
+  surrounding raised surfaces, and plot grids remain legible without dominating
+  the values. Run two parallel
   requests and confirm totals continue increasing after either slot is reused.
 - Confirm Tokens, Speculative Tokens, and KV Cache show compact trend graphs on
   the bottom row, retain at most 60 samples, and reset when the selected runtime
   changes. Confirm Slots appears on the top row and shows active/total capacity,
   queued requests, and busy decode slots.
+- Right-click a card and confirm metrics can be added or removed, the card can be
+  given an optional title or returned to a headerless state, removed, and only
+  chart-capable metrics are offered in the Chart submenu.
+  Confirm there is no Size submenu, one separator remains immediately above
+  Remove card, and direct side/corner dragging remains the only resize control.
+  Click Remove metric and Chart, select a child command, and confirm the card
+  updates after the popup closes. Enable and disable charts for multiple metrics
+  in the same card independently. Right-click open dashboard space to add a card.
+  Open Add metrics and confirm Cancel and Add selected have identical rendered
+  width and height in every supported language.
+  Confirm token, speculative, and KV-cache labels remain on one line whenever
+  the combined label, measured value, and unit fit, with values still aligned to
+  the card's right edge and no reserved half-row gap.
+  Confirm the searchable picker exposes CPU load, temperature, and clock; RAM
+  load, used capacity, and clock; and every observed GPU's load, VRAM, draw power,
+  core clock, and temperature when provided by the host probe, plus individual
+  slot/request counters, average token rates and totals, average speculative
+  rates and totals, but no unreliable generation/prompt/speculative live rates,
+  KV-cache values, and currently visible raw Prometheus metrics. Mix unrelated
+  metrics in one card, confirm cards have no fixed type, reset restores the default
+  layout, and confirm all choices survive restart.
+- With multiple models loaded, switch the Overview telemetry source and confirm
+  the matching Loaded Model Sessions row remains highlighted across refreshes.
+  Unload all models and confirm the grid has no highlighted row.
 - Generate requests with prompt-cache reuse, open **Metrics**, and confirm the
   7-day, current-month, 90-day, and all-time ranges show evaluated input, cached input, output,
   totals, and cache hit rate. Confirm model/profile/runtime filters update the
@@ -159,6 +207,28 @@ companions, and be described as unsigned.
   range. Confirm selected dates drive every summary card and model row. Confirm the compact
   7D/Month/90D/All selector updates the calendar in one click, and Month includes
   every calendar day through the end of the current month.
+- On a host with a supported GPU power sensor, leave the Manager running through
+  at least two 10-second samples. Confirm the Metrics page displays combined
+  historical energy in its summary and calendar without per-GPU cards. Before
+  loading a model, confirm the optional observed-energy live total and each
+  power-reporting GPU energy row are available to add to an Overview card. Add them and
+  an Overview card; confirm they increase independently of model selection and
+  continue across model load/unload. Confirm they reset after the Manager restarts. Compare the
+  live per-GPU sum with its live combined row. Compare the observed
+  GPU count with installed adapters. On mixed hardware where only some adapters
+  expose power, confirm the summary says partial coverage. Suspend the machine or
+  stop sampling for more than 30 seconds and confirm the gap is not backfilled.
+  Verify `llwmctl metrics usage --range 1d` retains historical
+  `gpuEnergy.wattHours`, `gpuEnergyDevices`, per-day energy, sampled seconds,
+  and coverage counts for later automation use.
+- Configure distinct day/night electricity rates, a currency code, and a tariff
+  boundary that crosses an hourly bucket. Confirm invalid currency/rate/time
+  values are rejected, Settings normalizes times to `HH:mm`, Metrics shows the
+  selected historical estimated cost beside combined energy, and the control
+  response exposes `gpuElectricityCost`. Add combined and per-GPU observed live
+  cost rows before loading a model; confirm their sum matches, a tariff edit
+  recalculates them, a Manager restart resets them, and no cost is invented across a power
+  telemetry gap.
 - Confirm active days, average tokens per active day, peak day, tracked-token
   share, and prompt/generation throughput match the persisted facts. Confirm
   request totals remain unavailable for runtimes without a compatible counter
@@ -167,10 +237,14 @@ companions, and be described as unsigned.
   them as predating daily tracking, and does not fabricate historical days.
   Verify `llwmctl metrics usage --range month` matches the page totals.
   Verify repeated `--date YYYY-MM-DD` values match the same multi-day UI selection.
-- Confirm the Overview Hardware card shows CPU temperature for CPU-backed
-  sessions, uses NVIDIA metrics for CUDA when available, falls back to Windows
-  GPU performance counters for AMD/Intel/Vulkan-backed sessions, and does not
-  show stale cached hardware data after switching runtimes.
+- Confirm the independent CPU, RAM, and indexed GPU metrics remain available
+  regardless of which card contains them. CPU temperature/current clock and RAM
+  used capacity/configured clock should appear when available. NVIDIA GPU VRAM,
+  draw-power, core-clock, and temperature metrics should be independently
+  chartable. NVIDIA SMI should be used for CUDA when available; installed AMD SMI
+  and Intel XPU-SMI tools should enrich matching adapters with power telemetry,
+  with Windows GPU performance-counter fallback for unsupported fields and no
+  stale cached hardware data after switching runtimes.
 - Confirm the Settings API key Generate action creates a new model API key.
 - Confirm the gateway `/v1/models` response lists every saved launch profile,
   reports each profile's configured `context_length`, exposes accurate GGUF
@@ -184,17 +258,27 @@ companions, and be described as unsigned.
   right-aligned dropdowns, no Save Settings button, and a visible automatic-apply
   hint. Confirm Network has no blanket Action column and API-key Show, Copy, and
   Generate controls appear only inside the API-key value row.
-- Confirm Settings includes a **UI** category with
+- Confirm Settings includes a **UI** category with compatibility switches for
   independent switches for Model status, Hardware, Slots, Tokens, Speculative
   tokens, KV cache, Live Runtime Log, All llama.cpp Metrics, and the Models
   Hugging Face section. Confirm these choices read **Show/Hide**, each switch applies automatically, hidden rows
   leave no blank splitter/space, card layout reflows, and choices persist after
-  restart.
+  restart. Confirm a switch adds or removes that metric from the customizable
+  dashboard without discarding unrelated cards, grouping, sizes, or charts.
 - Confirm a workspace without stored UI visibility keys defaults the six status
   cards and live log to `Show`, and raw metrics and Hugging Face to `Hide`. Use
   `llwmctl settings set` followed by `llwmctl settings get` to verify the same
   nine fields can be changed and read back through the live Manager without
   restarting it.
+- Confirm the Overview live runtime log remains a compact 24-line viewport and
+  scrolls to older captured lines. Change **Runtime log order** between **Latest
+  on top** and **Latest on bottom**, confirm the viewport follows the selected
+  edge immediately and after restart, and confirm the persisted log file and
+  control-API log output remain chronological.
+- On a GPU whose driver reports a finite VRAM temperature, confirm the per-GPU
+  **VRAM temperature** row appears in Add metrics, updates independently of core
+  temperature, and can be charted. Confirm it is absent rather than shown as
+  unavailable on GPUs that do not expose the sensor.
 - Confirm the compact title-bar menu icon collapses the full navigation sidebar,
   expands the current page without navigating away, and restores the sidebar on
   the next activation.
@@ -241,6 +325,9 @@ companions, and be described as unsigned.
   `/v1/chat/completions` rejects missing or invalid credentials, and the gateway
   rejects unauthenticated `/v1/models` requests. Upstream direct health or model
   catalog metadata may be public and is not an inference-authentication test.
+- Confirm readiness performs the protected-route authentication check before a
+  session is marked loaded, and that a stub runtime accepting the unauthenticated
+  request is stopped with a visible status instead of remaining available.
 - Run the deterministic fake-runtime integration tests and confirm supervised
   startup, bearer-authenticated health/model probes, served-model discovery,
   redacted logs, deliberate crash reporting, and verified process termination.
@@ -250,11 +337,17 @@ companions, and be described as unsigned.
   the same authenticated behavior through the shared gateway.
 - Confirm the persisted model API key is protected at rest for the current Windows user.
 - Confirm ports outside `1..65535` are rejected on Settings save.
-- Confirm model serving cannot launch without a strong model API key in any
-  local-only or LAN exposure mode.
-- Confirm control-API settings patches cannot disable API-key authentication,
-  replace protected secrets/workspace paths, use invalid ports, or enable the
-  gateway on a port occupied by a running model.
+- Confirm protected model serving cannot launch without a strong model API key.
+  Confirm explicitly unauthenticated Local-only serving launches with an empty
+  active key, and every LAN exposure mode rejects disabled authentication.
+- Install a runtime package and confirm `local-llm-runtime.json` records its
+  release tag, published target, selected asset hashes, and installed-file hash
+  manifest. Download source from a moving branch and confirm the downloaded
+  source/build records the resolved commit used by that installation.
+- Confirm control-API settings patches can disable API-key authentication only
+  with Local-only exposure, cannot replace protected secrets/workspace paths,
+  cannot use invalid ports, and cannot enable the gateway on a port occupied by
+  a running model.
 - At 100%, 125%, 150%, and 200% display scale, confirm the initial window fits
   the monitor work area and the Overview model/profile/load bar reflows without
   clipping at narrow widths.
@@ -284,6 +377,25 @@ companions, and be described as unsigned.
 - Confirm Hugging Face downloads cannot write outside the configured models folder.
 - Confirm completed downloads are not registered when the final byte count mismatches the expected size or no expected size/SHA-256 metadata exists.
 - Confirm imported external model deletion removes only app registration files.
+- Confirm Settings exposes **API key auth**. With **LAN exposure = Local only**,
+  set it to **Disable**, verify the information prompt explains that the Manager
+  changed exposure to **Local only**, verify the displayed active key is empty,
+  load a model, and
+  access the llama.cpp WebUI and inference without credentials. Re-enable it and
+  verify the preserved key returns.
+- Confirm every LAN exposure mode rejects **API key auth = Disable**, while rotating
+  the model key re-enables authentication. The Manager control API must remain
+  authenticated in either model-serving mode.
+- Type multi-character values into the electricity price and other ordinary
+  Settings text fields at a normal pace. Confirm no intermediate value saves
+  between keystrokes, the final value applies after typing pauses, leaving the
+  field commits naturally, and choice controls still apply quickly.
+- Confirm **Scan Models Folder** registers a readable main GGUF whose filename
+  contains a generic interior `-MTP-` token, reports standalone assistant and
+  projector GGUFs as companions, and explains ambiguous or invalid files.
+- Confirm **Add model file…** can register a valid GGUF outside the configured
+  models root, requires confirmation for an ambiguous/companion role, rejects an
+  unreadable `.gguf`, and preserves the confirmed registration after rescanning.
 - Confirm app-owned downloaded model deletion cannot escape the configured model root.
 - Confirm vision-capable model settings persist image min/max token allowances and launch `llama-server` with `--image-min-tokens` / `--image-max-tokens` when set.
 - Confirm per-model Vision head choices persist for auto-detect,
@@ -335,31 +447,31 @@ companions, and be described as unsigned.
 
 ## Latest Local Verification
 
-Current local check on 2026-08-20:
+Current local check on 2026-08-25:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
 ```
 
 Result: the platform-neutral .NET 10 Core library, Windows Release app, and CLI
-builds succeeded with zero warnings; service/unit tests passed (`581/581`) and
-the WPF smoke test passed (`1/1`) with no skips; service coverage was 81.9% and
-model/view-model coverage was 96.8%;
-formatting, diff whitespace, and the vulnerability, deprecation, and
-direct-package currency audit passed. The portable publish and embedded
-operator/control sidecar packaging succeeded, including SHA-256 verification,
-sidecar bootstrap, ZIP content checks, and the SPDX 2.3 SBOM. Inno Setup is not
-installed on this workstation, so the local installer smoke step was skipped;
-the pinned Windows CI job builds the installer and tests silent install, repair,
-and uninstall. The current local portable artifacts remain unsigned test builds.
-The next release notes draft is tracked in
-the GitHub release draft.
+builds succeeded with zero warnings; service/unit tests passed (`701/701`) and
+the WPF smoke tests passed (`2/2`) with no skips; service coverage was 83.0% and
+model/view-model coverage was 97.2%. Formatting, diff whitespace, and the
+vulnerability, deprecation, and direct-package currency audit passed. The
+portable publish and Inno Setup 6.7.2 installer build both passed artifact
+verification, including embedded operator/control sidecars, SHA-256 companions,
+sidecar bootstrap, ZIP content checks, and the SPDX 2.3 SBOM. The pinned Windows
+CI job remains responsible for clean-machine silent install, repair, and
+uninstall checks. The current local portable and installer artifacts are
+unsigned test builds.
+The v2.4.0 GitHub release must describe the artifacts as unsigned unless the
+protected signed-release workflow is used. Keep the release notes in GitHub
+rather than adding copy/paste working notes here.
 
 ## Manual Clean-Machine Test
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.3.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.
@@ -383,10 +495,11 @@ the GitHub release draft.
     direct model ports; then enable Direct models LAN only and confirm the
     inverse.
 23. Import an external model folder, delete the registration, and verify GGUF files remain.
-24. Add a downloaded app-owned model, delete it, and verify only app-owned paths are removed.
-25. Verify `GET /v1/models` lists each saved profile as a separate model id and reports its configured `context_length` plus available GGUF `meta` values.
-26. Verify app update checks can reach the GitHub release feed, and that update install works from a copied portable exe folder.
-27. Create a diagnostics bundle from Logs, review its contents, and confirm it contains no credentials, private paths, model data, or sensitive launch arguments.
+24. Select an external GGUF with **Add model file…**, confirm an intentionally ambiguous role, rescan, and verify the registration remains; repeat with an unreadable `.gguf` and verify it is rejected.
+25. Add a downloaded app-owned model, delete it, and verify only app-owned paths are removed.
+26. Verify `GET /v1/models` lists each saved profile as a separate model id and reports its configured `context_length` plus available GGUF `meta` values.
+27. Verify app update checks can reach the GitHub release feed, and that update install works from a copied portable exe folder.
+28. Create a diagnostics bundle from Logs, review its contents, and confirm it contains no credentials, private paths, model data, or sensitive launch arguments.
 
 ## Repository Settings After Merge
 

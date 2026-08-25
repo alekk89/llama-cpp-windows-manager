@@ -21,6 +21,10 @@ public sealed class OverviewPageState
 
     public string SelectedLoadedSessionId => SelectedLoadedSessionRow?.Data["SessionId"]?.ToString() ?? "";
 
+    public bool IsAvailable => _controls is not null;
+
+    public ScrollViewer? Scroller => _controls?.Scroller;
+
     public void Apply(OverviewPageControls controls)
     {
         ArgumentNullException.ThrowIfNull(controls);
@@ -37,48 +41,53 @@ public sealed class OverviewPageState
         ArgumentNullException.ThrowIfNull(settings);
         if (_controls is not { } controls) return;
 
-        SetMetricCardVisibility(controls.RuntimeDashboardModel, settings.ShowOverviewModelStatus);
-        SetMetricCardVisibility(controls.RuntimeDashboardGpu, settings.ShowOverviewHardware);
-        SetMetricCardVisibility(controls.RuntimeDashboardSlots, settings.ShowOverviewSlots);
-        SetMetricCardVisibility(controls.RuntimeDashboardTokens, settings.ShowOverviewTokens);
-        SetMetricCardVisibility(controls.RuntimeDashboardMtpTokens, settings.ShowOverviewMtpTokens);
-        SetMetricCardVisibility(controls.RuntimeDashboardKvCache, settings.ShowOverviewKvCache);
-
-        var showModelStatusSection = settings.ShowOverviewModelStatus
-            || settings.ShowOverviewHardware
-            || settings.ShowOverviewSlots
-            || settings.ShowOverviewTokens
-            || settings.ShowOverviewMtpTokens
-            || settings.ShowOverviewKvCache;
-        controls.ModelStatusSection.Visibility = VisibilityFor(showModelStatusSection);
+        if (!LayoutsMatch(controls.DashboardController.Layout, settings.OverviewDashboardLayout))
+            controls.DashboardController.ApplyLayout(settings.OverviewDashboardLayout);
 
         controls.RuntimeLogSection.Visibility = VisibilityFor(settings.ShowOverviewLiveRuntimeLog);
         controls.MetricsSection.Visibility = VisibilityFor(settings.ShowOverviewAllMetrics);
-        controls.RuntimeSectionsSplitter.Visibility = VisibilityFor(
-            settings.ShowOverviewLiveRuntimeLog && settings.ShowOverviewAllMetrics);
+        controls.RuntimeSectionsSplitter.Visibility = Visibility.Collapsed;
 
         var root = controls.Root;
-        ConfigureOverviewDetailRow(root.RowDefinitions[2], settings.ShowOverviewLiveRuntimeLog, 1.08, 150);
-        root.RowDefinitions[3].Height = settings.ShowOverviewLiveRuntimeLog && settings.ShowOverviewAllMetrics
-            ? new GridLength(8)
-            : new GridLength(0);
+        ConfigureOverviewDetailRow(root.RowDefinitions[2], settings.ShowOverviewLiveRuntimeLog, 0, 0, autoSize: true);
+        root.RowDefinitions[3].Height = new GridLength(0);
         ConfigureOverviewDetailRow(root.RowDefinitions[4], settings.ShowOverviewAllMetrics, .92, 130);
     }
 
-    private static void SetMetricCardVisibility(Grid content, bool visible)
-    {
-        if (content.Parent is StackPanel { Parent: Border card })
-            card.Visibility = VisibilityFor(visible);
-    }
-
-    private static void ConfigureOverviewDetailRow(RowDefinition row, bool visible, double weight, double minimum)
+    private static void ConfigureOverviewDetailRow(
+        RowDefinition row,
+        bool visible,
+        double weight,
+        double minimum,
+        bool autoSize = false)
     {
         row.MinHeight = visible ? minimum : 0;
-        row.Height = visible ? new GridLength(weight, GridUnitType.Star) : new GridLength(0);
+        row.Height = visible
+            ? autoSize ? GridLength.Auto : new GridLength(weight, GridUnitType.Star)
+            : new GridLength(0);
     }
 
     private static Visibility VisibilityFor(bool visible)
         => visible ? Visibility.Visible : Visibility.Collapsed;
+
+    private static bool LayoutsMatch(OverviewDashboardLayout current, OverviewDashboardLayout? requested)
+    {
+        var normalized = OverviewDashboardLayoutPolicy.Normalize(requested);
+        return current.Version == normalized.Version
+               && current.CardSizesLocked == normalized.CardSizesLocked
+               && current.LockedSurfaceWidth.Equals(normalized.LockedSurfaceWidth)
+               && current.Cards.Count == normalized.Cards.Count
+               && current.Cards.Zip(normalized.Cards).All(pair => CardsMatch(pair.First, pair.Second));
+    }
+
+    private static bool CardsMatch(OverviewDashboardCardLayout first, OverviewDashboardCardLayout second)
+        => string.Equals(first.Id, second.Id, StringComparison.OrdinalIgnoreCase)
+           && first.ColumnSpan == second.ColumnSpan
+           && first.Height == second.Height
+           && first.Bounds == second.Bounds
+           && string.Equals(first.Title, second.Title, StringComparison.Ordinal)
+           && first.MetricIds.SequenceEqual(second.MetricIds, StringComparer.Ordinal)
+           && (first.ChartMetricIds ?? []).SequenceEqual(second.ChartMetricIds ?? [], StringComparer.Ordinal);
 
     public void FocusLoadedSessionsGrid()
         => LoadedSessionsGrid?.Focus();
@@ -168,10 +177,9 @@ public sealed class OverviewPageState
         ArgumentNullException.ThrowIfNull(sessionRows);
         if (LoadedSessionsGrid is null) return;
 
-        if (!string.IsNullOrWhiteSpace(sessionId))
-        {
-            LoadedSessionsGrid.SelectedItem = sessionRows.FirstOrDefault(row =>
+        LoadedSessionsGrid.SelectedItem = string.IsNullOrWhiteSpace(sessionId)
+            ? null
+            : sessionRows.FirstOrDefault(row =>
                 string.Equals(row.Data["SessionId"]?.ToString(), sessionId, StringComparison.OrdinalIgnoreCase));
-        }
     }
 }

@@ -80,11 +80,24 @@ public partial class MainWindow
     {
         var lifetimeMetrics = AppServices.LifetimeMetricsApplication;
         if (lifetimeMetrics is null) return;
-        var selection = _lifetimePage.Selection;
-        _viewModel.LifetimeMetrics.SetSelection(selection);
-        var report = await lifetimeMetrics.GetReportAsync(selection.Query);
-        var presentation = _viewModel.LifetimeMetrics.ReplaceReport(report);
-        _lifetimePage.ApplyPresentation(presentation);
+        await _lifetimeMetricsRefreshGate.WaitAsync();
+        try
+        {
+            var version = lifetimeMetrics.DataVersion;
+            var selection = _lifetimePage.Selection;
+            _viewModel.LifetimeMetrics.SetSelection(selection);
+            var report = await lifetimeMetrics.GetReportAsync(
+                selection.Query,
+                electricityTariff: ElectricityTariffPolicy.FromSettings(_settings));
+            var presentation = _viewModel.LifetimeMetrics.ReplaceReport(report);
+            _lifetimePage.ApplyPresentation(presentation);
+            _lastLifetimeReportDataVersion = version;
+            _nextLifetimeReportRefreshAt = DateTimeOffset.UtcNow.AddSeconds(5);
+        }
+        finally
+        {
+            _lifetimeMetricsRefreshGate.Release();
+        }
     }
 
     private async Task LifetimeFiltersChangedAsync()

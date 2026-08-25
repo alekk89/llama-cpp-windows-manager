@@ -65,6 +65,9 @@ public sealed class ModelLaunchProfileService
     {
         ArgumentNullException.ThrowIfNull(models);
         var allProfiles = (await _stateStore.ListNamedModelLaunchProfilesAsync()).ToList();
+        var profilesByModel = allProfiles
+            .GroupBy(profile => profile.ModelId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
         var usedPorts = allProfiles.Select(profile => profile.Settings.Port)
             .Concat(_sessions.Snapshots().Select(session => session.LaunchSettings.Port))
             .Where(RuntimePortAllocator.IsValidPort)
@@ -75,8 +78,7 @@ public sealed class ModelLaunchProfileService
         var ensured = new List<NamedModelLaunchProfile>(models.Count);
         foreach (var model in models)
         {
-            var modelProfiles = allProfiles.Where(profile =>
-                string.Equals(profile.ModelId, model.Id, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var modelProfiles = profilesByModel.GetValueOrDefault(model.Id) ?? [];
             var existing = modelProfiles.FirstOrDefault(profile => profile.IsDefault)
                 ?? modelProfiles.FirstOrDefault(profile =>
                     string.Equals(profile.Name, DefaultProfileName, StringComparison.OrdinalIgnoreCase))
@@ -107,6 +109,7 @@ public sealed class ModelLaunchProfileService
                 IsDefault: true);
             await SaveNamedAsync(created);
             allProfiles.Add(created);
+            profilesByModel[model.Id] = [created];
             ensured.Add(created);
         }
 

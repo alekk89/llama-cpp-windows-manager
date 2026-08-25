@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json.Nodes;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 using Microsoft.Data.Sqlite;
@@ -93,6 +94,7 @@ public sealed partial class ReleaseHardeningTests
 
         Assert.Equal("hf-402c91005e37", release.TagName);
         Assert.Equal("402c91005e37c8b42a3159c5b0f5f7d062095ba6", release.TargetCommit);
+        Assert.Equal(release.TargetCommit, windows.TargetCommit);
         Assert.Equal(RuntimePackageSourceCatalog.AtomicTurboQuantHuggingFacePageUrl, release.HtmlUrl);
         Assert.Equal("llama-turboquant-triattention-win-cu13-x64.zip", windows.PrimaryAsset.Name);
         Assert.Contains("/resolve/402c91005e37c8b42a3159c5b0f5f7d062095ba6/llama-turboquant-triattention-win-cu13-x64.zip?download=true", windows.PrimaryAsset.DownloadUrl, StringComparison.Ordinal);
@@ -353,6 +355,9 @@ public sealed partial class ReleaseHardeningTests
         var log = await File.ReadAllTextAsync(logPath, TestContext.Current.CancellationToken);
         var verification = await RuntimeInstallationVerificationService.VerifyAsync(registered, TestContext.Current.CancellationToken);
         var provenance = RuntimeInstallationVerificationService.Describe(registered);
+        var metadata = JsonNode.Parse(await File.ReadAllTextAsync(
+            Path.Combine(result.RuntimeFolder, "local-llm-runtime.json"),
+            TestContext.Current.CancellationToken));
 
         Assert.Equal(Path.Combine(settings.RuntimeRoot, "official-prebuilt-windows-cpu-b9354"), result.InstallDir);
         Assert.Equal(result.InstallDir, result.RuntimeFolder);
@@ -371,6 +376,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.True(provenance.CanReverify);
         Assert.Equal("Hash verified", provenance.TrustStatus);
         Assert.Equal("b9354", provenance.ReleaseTag);
+        Assert.Equal("9777256c3130", metadata?["targetCommit"]?.ToString());
         Assert.Contains("llama-b9354-bin-win-cpu-x64.zip", provenance.Assets, StringComparison.Ordinal);
 
         await File.AppendAllTextAsync(

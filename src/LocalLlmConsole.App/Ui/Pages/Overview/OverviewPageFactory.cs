@@ -20,31 +20,25 @@ public sealed record OverviewPageActions(
     Func<Task> SelectLoadedSessionRowAsync,
     Func<Task> InspectSelectedEndpointAsync,
     RoutedEventHandler InspectEndpointRowClick,
-    RoutedEventHandler UnloadLoadedSessionRowClick);
+    RoutedEventHandler UnloadLoadedSessionRowClick,
+    Func<OverviewDashboardLayout, Task> PersistDashboardLayoutAsync,
+    Func<Func<Task>, Task> RunEventAsync,
+    Func<Func<Task>, Task>? DispatchDashboardMenuActionAsync = null);
 
 public sealed record OverviewPageRequest(
     MainWindowViewModel ViewModel,
     OverviewPageActions Actions,
-    Action<DataGrid> ConfigureRuntimeMetricsGrid);
+    Action<DataGrid> ConfigureRuntimeMetricsGrid,
+    OverviewDashboardLayout? DashboardLayout);
 
 public sealed record OverviewPageControls(
     Grid Root,
+    ScrollViewer Scroller,
     WpfComboBox ModelCombo,
     WpfComboBox LaunchProfileCombo,
     WpfButton LoadButton,
     DataGrid LoadedSessionsGrid,
-    StackPanel ModelStatusSection,
-    Grid RuntimeDashboard,
-    Grid RuntimeDashboardModel,
-    Grid RuntimeDashboardGpu,
-    Grid RuntimeDashboardKvCache,
-    Grid RuntimeDashboardTokens,
-    TextBlock RuntimeDashboardTokensLastKnown,
-    Grid RuntimeDashboardMtpTokens,
-    Grid RuntimeDashboardSlots,
-    MetricSparkline RuntimeDashboardTokensGraph,
-    MetricSparkline RuntimeDashboardMtpTokensGraph,
-    MetricSparkline RuntimeDashboardKvCacheGraph,
+    OverviewDashboardController DashboardController,
     Grid RuntimeLogSection,
     GridSplitter RuntimeSectionsSplitter,
     WpfTextBox RuntimeLogBox,
@@ -58,10 +52,19 @@ public static class OverviewPageFactory
     public static OverviewPageControls Create(OverviewPageRequest request)
     {
         var root = new Grid { Margin = new Thickness(16) };
+        var scroller = new ScrollViewer
+        {
+            Content = root,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            PanningMode = PanningMode.VerticalOnly,
+            CanContentScroll = false
+        };
+        scroller.SizeChanged += (_, args) => root.MinHeight = Math.Max(0, args.NewSize.Height);
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1.08, GridUnitType.Star), MinHeight = 150 });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(8) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(.92, GridUnitType.Star), MinHeight = 130 });
 
         var modelBar = ModelBar(request, out var modelCombo, out var launchProfileCombo, out var loadButton);
@@ -97,22 +100,13 @@ public static class OverviewPageFactory
             tooltipProvider: _ => Loc.T("Tooltip.Unload"),
             visualRole: VisualRole.Danger);
         dashboardSection.Children.Add(PageSectionFactory.GridSection(Loc.T("Overview.LoadedSessionsTitle"), loadedSessionsGrid));
-        var modelStatusSection = Stack();
-        modelStatusSection.Children.Add(Text(Loc.T("Overview.ModelStatusLabel"), 18, true));
-
-        var runtimeDashboard = RuntimeDashboard(
-            out var runtimeDashboardModel,
-            out var runtimeDashboardGpu,
-            out var runtimeDashboardKvCache,
-            out var runtimeDashboardTokens,
-            out var runtimeDashboardTokensLastKnown,
-            out var runtimeDashboardMtpTokens,
-            out var runtimeDashboardSlots,
-            out var runtimeDashboardTokensGraph,
-            out var runtimeDashboardMtpTokensGraph,
-            out var runtimeDashboardKvCacheGraph);
-        modelStatusSection.Children.Add(runtimeDashboard);
-        dashboardSection.Children.Add(modelStatusSection);
+        var dashboardController = new OverviewDashboardController(
+            request.DashboardLayout,
+            new OverviewDashboardControllerActions(
+                request.Actions.PersistDashboardLayoutAsync,
+                request.Actions.RunEventAsync,
+                request.Actions.DispatchDashboardMenuActionAsync));
+        dashboardSection.Children.Add(dashboardController.Root);
         Grid.SetRow(dashboardSection, 1);
         root.Children.Add(dashboardSection);
 
@@ -138,22 +132,12 @@ public static class OverviewPageFactory
 
         return new OverviewPageControls(
             root,
+            scroller,
             modelCombo,
             launchProfileCombo,
             loadButton,
             loadedSessionsGrid,
-            modelStatusSection,
-            runtimeDashboard,
-            runtimeDashboardModel,
-            runtimeDashboardGpu,
-            runtimeDashboardKvCache,
-            runtimeDashboardTokens,
-            runtimeDashboardTokensLastKnown,
-            runtimeDashboardMtpTokens,
-            runtimeDashboardSlots,
-            runtimeDashboardTokensGraph,
-            runtimeDashboardMtpTokensGraph,
-            runtimeDashboardKvCacheGraph,
+            dashboardController,
             runtimeLogSection,
             runtimeSectionsSplitter,
             runtimeLogBox,
@@ -281,45 +265,6 @@ public static class OverviewPageFactory
         };
     }
 
-    private static Grid RuntimeDashboard(
-        out Grid model,
-        out Grid gpu,
-        out Grid kvCache,
-        out Grid tokens,
-        out TextBlock tokensLastKnown,
-        out Grid mtpTokens,
-        out Grid slots,
-        out MetricSparkline tokensGraph,
-        out MetricSparkline mtpTokensGraph,
-        out MetricSparkline kvCacheGraph)
-    {
-        var runtimeDashboard = new Grid { Margin = new Thickness(0, 2, 0, 8) };
-
-        model = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T("Overview.Metric.ModelStatus"), 0, 0, labelKey: "Overview.Metric.ModelStatus");
-        gpu = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T("Overview.Metric.Hardware"), 0, 1);
-        slots = MetricCardFactory.AddMetric(runtimeDashboard, Loc.T("Overview.Metric.Slots"), 0, 2);
-        tokens = MetricCardFactory.AddMetricGraph(runtimeDashboard, Loc.T("Overview.Metric.Tokens"), 1, 0, out tokensGraph, out tokensLastKnown);
-        mtpTokens = MetricCardFactory.AddMetricGraph(
-            runtimeDashboard,
-            Loc.T("Overview.Metric.MtpTokens"),
-            1,
-            1,
-            out mtpTokensGraph,
-            out _,
-            primaryBrushKey: "Warning",
-            secondaryBrushKey: "Accent");
-        kvCache = MetricCardFactory.AddMetricGraph(
-            runtimeDashboard,
-            Loc.T("Overview.Metric.KvCache"),
-            1,
-            2,
-            out kvCacheGraph,
-            out _,
-            fixedMaximum: 100);
-        OverviewPageResponsiveCoordinator.ConfigureMetricLayout(runtimeDashboard);
-        return runtimeDashboard;
-    }
-
     private static WpfTextBox RuntimeLogBox()
         => new()
         {
@@ -328,6 +273,10 @@ public static class OverviewPageFactory
             Text = Loc.T("Overview.NoRuntimeLog"),
             BorderThickness = new Thickness(0),
             Margin = new Thickness(0),
+            Height = 320,
+            MaxLines = 24,
+            FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas, Segoe UI"),
+            FontSize = 11,
             TextWrapping = TextWrapping.NoWrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,

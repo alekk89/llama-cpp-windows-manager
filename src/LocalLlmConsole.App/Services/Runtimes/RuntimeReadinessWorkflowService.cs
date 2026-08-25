@@ -4,10 +4,11 @@ public enum RuntimeReadinessStatus
 {
     Loaded,
     NoLongerLoading,
-    SessionChanged
+    SessionChanged,
+    AuthenticationFailed
 }
 
-public sealed record RuntimeReadinessResult(RuntimeReadinessStatus Status);
+public sealed record RuntimeReadinessResult(RuntimeReadinessStatus Status, string Reason = "");
 
 public sealed record RuntimeReadinessWorkflowRequest(
     string ModelId,
@@ -15,7 +16,8 @@ public sealed record RuntimeReadinessWorkflowRequest(
     Func<string, LoadedModelSessionSnapshot?> SessionForModel,
     Func<AppSettings, CancellationToken, Task<bool>> IsEndpointAliveAsync,
     Func<string, bool> MarkModelLoadedIfRunning,
-    TimeSpan? PollInterval = null);
+    TimeSpan? PollInterval = null,
+    Func<AppSettings, CancellationToken, Task<RuntimeAuthenticationProbeResult>>? VerifyAuthenticationAsync = null);
 
 public sealed class RuntimeReadinessWorkflowService
 {
@@ -41,6 +43,17 @@ public sealed class RuntimeReadinessWorkflowService
 
             if (!await request.IsEndpointAliveAsync(request.LaunchSettings, cancellationToken))
                 continue;
+
+            if (request.VerifyAuthenticationAsync is not null)
+            {
+                var authentication = await request.VerifyAuthenticationAsync(request.LaunchSettings, cancellationToken);
+                if (authentication.Status == RuntimeAuthenticationProbeStatus.Unavailable)
+                    continue;
+                if (!authentication.IsVerified)
+                    return new RuntimeReadinessResult(
+                        RuntimeReadinessStatus.AuthenticationFailed,
+                        authentication.Message);
+            }
 
             return request.MarkModelLoadedIfRunning(request.ModelId)
                 ? new RuntimeReadinessResult(RuntimeReadinessStatus.Loaded)

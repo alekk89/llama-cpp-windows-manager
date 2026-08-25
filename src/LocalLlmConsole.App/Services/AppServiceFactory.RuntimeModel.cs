@@ -96,6 +96,9 @@ public sealed partial class AppServiceFactory
     public ModelFolderApplicationService CreateModelFolderApplicationService()
         => new();
 
+    public ModelImportApplicationService CreateModelImportApplicationService()
+        => new();
+
     public ModelDeletionApplicationService CreateModelDeletionApplicationService()
         => new();
 
@@ -104,6 +107,10 @@ public sealed partial class AppServiceFactory
 
     public ModelGatewayLifecycleApplicationService CreateModelGatewayLifecycleApplicationService()
         => new();
+
+    public ModelGatewayRouteCatalogApplicationService CreateModelGatewayRouteCatalogApplicationService(
+        StateStore stateStore)
+        => new(stateStore);
 
     public LaunchSettingsControlStateService CreateLaunchSettingsControlStateService()
         => new();

@@ -1,15 +1,13 @@
 namespace LocalLlmConsole.Services;
 
-public sealed class GpuStatusProbeService
+public sealed partial class GpuStatusProbeService
 {
     private const string WindowsCpuStatusProbeScript = """
         $ErrorActionPreference = 'SilentlyContinue'
-
         $processors = @()
         try {
-            $processors = @(Get-CimInstance Win32_Processor | Select-Object Name, LoadPercentage, NumberOfCores, NumberOfLogicalProcessors)
+            $processors = @(Get-CimInstance Win32_Processor | Select-Object Name, LoadPercentage, NumberOfCores, NumberOfLogicalProcessors, CurrentClockSpeed)
         } catch {}
-
         $readings = @()
         try {
             $samples = Get-CimInstance -Namespace root\wmi -ClassName MSAcpi_ThermalZoneTemperature
@@ -28,11 +26,13 @@ public sealed class GpuStatusProbeService
             $loadSamples = @($processors | Where-Object { $null -ne $_.LoadPercentage } | ForEach-Object { [double]$_.LoadPercentage })
             $physicalCores = @($processors | Where-Object { $null -ne $_.NumberOfCores } | Measure-Object NumberOfCores -Sum).Sum
             $logicalProcessors = @($processors | Where-Object { $null -ne $_.NumberOfLogicalProcessors } | Measure-Object NumberOfLogicalProcessors -Sum).Sum
+            $clockSamples = @($processors | Where-Object { $null -ne $_.CurrentClockSpeed } | ForEach-Object { [double]$_.CurrentClockSpeed })
             [pscustomobject]@{
                 Name = if ($processors.Count -gt 0) { [string]$processors[0].Name } else { '' }
                 Utilization = if ($loadSamples.Count -gt 0) { [Math]::Round(($loadSamples | Measure-Object -Average).Average, 1) } else { $null }
                 PhysicalCores = if ($physicalCores -gt 0) { [int]$physicalCores } else { $null }
                 LogicalProcessors = if ($logicalProcessors -gt 0) { [int]$logicalProcessors } else { $null }
+                CurrentClockMHz = if ($clockSamples.Count -gt 0) { [Math]::Round(($clockSamples | Measure-Object -Average).Average, 0) } else { $null }
                 TemperatureCelsius = if ($readings.Count -gt 0) { ($readings | Measure-Object -Maximum).Maximum } else { $null }
                 TemperatureSource = if ($readings.Count -gt 0) { 'ACPI thermal zone' } else { '' }
             } | ConvertTo-Json -Compress
@@ -57,7 +57,7 @@ public sealed class GpuStatusProbeService
                 $_.Name -and
                 $_.Name -notmatch 'Microsoft Basic|Remote Display|Virtual Display|Parsec|RDP|Citrix'
             } |
-            Select-Object -First 4 Name, AdapterRAM)
+            Select-Object Name, AdapterRAM)
 
         $utilization = @{}
         $memoryUsed = @{}
@@ -97,21 +97,49 @@ public sealed class GpuStatusProbeService
         if ($rows.Count -eq 0) { '[]' } else { $rows | ConvertTo-Json -Compress }
         """;
 
+    private const string WindowsMemoryProbeScript = """
+        $ErrorActionPreference = 'SilentlyContinue'
+        try {
+            $os = Get-CimInstance Win32_OperatingSystem
+            $total = [double]$os.TotalVisibleMemorySize * 1024.0
+            $free = [double]$os.FreePhysicalMemory * 1024.0
+            $used = [Math]::Max(0.0, $total - $free)
+            $modules = @(Get-CimInstance Win32_PhysicalMemory)
+            $clockSamples = @($modules | ForEach-Object {
+                if ($null -ne $_.ConfiguredClockSpeed -and [double]$_.ConfiguredClockSpeed -gt 0) { [double]$_.ConfiguredClockSpeed }
+                elseif ($null -ne $_.Speed -and [double]$_.Speed -gt 0) { [double]$_.Speed }
+            })
+            [pscustomobject]@{
+                UsedBytes = $used
+                TotalBytes = $total
+                UsagePercent = if ($total -gt 0) { [Math]::Round(100.0 * $used / $total, 1) } else { $null }
+                ClockMHz = if ($clockSamples.Count -gt 0) { [Math]::Round(($clockSamples | Measure-Object -Maximum).Maximum, 0) } else { $null }
+            } | ConvertTo-Json -Compress
+        } catch { '{}' }
+        """;
+
     private readonly IProcessRunner _processRunner;
-    private readonly Func<string> _findWindowsSyclLs;
-    private readonly Func<string> _findNvidiaSmi;
-    private readonly Func<string> _findWindowsPowerShell;
+    private readonly RefreshableExecutableResolver _windowsSyclLs;
+    private readonly RefreshableExecutableResolver _nvidiaSmi;
+    private readonly RefreshableExecutableResolver _windowsPowerShell;
+    private readonly RefreshableExecutableResolver _amdSmi;
+    private readonly RefreshableExecutableResolver _intelXpuSmi;
 
     public GpuStatusProbeService(
         IProcessRunner processRunner,
         Func<string>? findWindowsSyclLs = null,
         Func<string>? findNvidiaSmi = null,
-        Func<string>? findWindowsPowerShell = null)
+        Func<string>? findWindowsPowerShell = null,
+        Func<string>? findAmdSmi = null,
+        Func<string>? findIntelXpuSmi = null,
+        Func<DateTimeOffset>? resolverUtcNow = null)
     {
         _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
-        _findWindowsSyclLs = findWindowsSyclLs ?? FindWindowsSyclLs;
-        _findNvidiaSmi = findNvidiaSmi ?? HostExecutableResolver.NvidiaSmiExe;
-        _findWindowsPowerShell = findWindowsPowerShell ?? HostExecutableResolver.WindowsPowerShellExe;
+        _windowsSyclLs = new(findWindowsSyclLs ?? FindWindowsSyclLs, resolverUtcNow);
+        _nvidiaSmi = new(findNvidiaSmi ?? HostExecutableResolver.NvidiaSmiExe, resolverUtcNow);
+        _windowsPowerShell = new(findWindowsPowerShell ?? HostExecutableResolver.WindowsPowerShellExe, resolverUtcNow);
+        _amdSmi = new(findAmdSmi ?? (() => FindVendorExecutable("amd-smi.exe", "amd-smi")), resolverUtcNow);
+        _intelXpuSmi = new(findIntelXpuSmi ?? (() => FindVendorExecutable("xpu-smi.exe", "xpu-smi")), resolverUtcNow);
     }
 
     public async Task<VramMemorySnapshot?> MemoryAsync(CancellationToken cancellationToken = default)
@@ -144,31 +172,8 @@ public sealed class GpuStatusProbeService
         }
     }
 
-    public async Task<string> SummaryAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var result = await _processRunner.RunAsync(
-                NvidiaSmiStartInfo(
-                    "--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total",
-                    "--format=csv,noheader,nounits"),
-                TimeSpan.FromSeconds(2),
-                cancellationToken);
-            if (result.ExitCode != 0) return "Unavailable";
-
-            var lines = result.Output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-                .Select(GpuStatusService.FormatNvidiaSmiCsvLine)
-                .Where(line => !string.IsNullOrWhiteSpace(line))
-                .Take(4)
-                .ToArray();
-            return lines.Length == 0 ? "Unavailable" : string.Join(Environment.NewLine, lines);
-        }
-        catch (Exception ex)
-        {
-            Trace.TraceInformation($"NVIDIA GPU summary unavailable: {ex.Message}");
-            return "Unavailable";
-        }
-    }
+    public Task<string> SummaryAsync(CancellationToken cancellationToken = default)
+        => FullNvidiaSummaryAsync(cancellationToken);
 
     public async Task<string> SummaryForProcessAsync(int processId, CancellationToken cancellationToken = default)
     {
@@ -197,7 +202,7 @@ public sealed class GpuStatusProbeService
 
             var gpuResult = await _processRunner.RunAsync(
                 NvidiaSmiStartInfo(
-                    "--query-gpu=uuid,index,name,utilization.gpu,temperature.gpu,memory.used,memory.total",
+                    "--query-gpu=uuid,index,name,utilization.gpu,temperature.gpu,memory.used,memory.total,power.draw,clocks.gr",
                     "--format=csv,noheader,nounits"),
                 TimeSpan.FromSeconds(2),
                 cancellationToken);
@@ -206,10 +211,9 @@ public sealed class GpuStatusProbeService
             var lines = gpuResult.Output
                 .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => line.Split(',').Select(part => part.Trim()).ToArray())
-                .Where(parts => parts.Length >= 7 && usedGpuUuids.Contains(parts[0]))
+                .Where(parts => parts.Length >= 9 && usedGpuUuids.Contains(parts[0]))
                 .Select(parts => GpuStatusService.FormatNvidiaSmiCsvLine(string.Join(",", parts.Skip(1))))
                 .Where(line => !string.IsNullOrWhiteSpace(line))
-                .Take(4)
                 .ToArray();
             return lines.Length == 0 ? "Unavailable" : string.Join(Environment.NewLine, lines);
         }
@@ -232,7 +236,6 @@ public sealed class GpuStatusProbeService
 
             var lines = GpuStatusService.FormatWindowsGpuStatusJson(result.Output)
                 .Where(line => !string.IsNullOrWhiteSpace(line))
-                .Take(4)
                 .ToArray();
             return lines.Length == 0 ? "Unavailable" : string.Join(Environment.NewLine, lines);
         }
@@ -283,9 +286,29 @@ public sealed class GpuStatusProbeService
         }
     }
 
+    public async Task<string> SystemMemorySummaryAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _processRunner.RunAsync(
+                WindowsPowerShellStartInfo(WindowsMemoryProbeScript),
+                TimeSpan.FromSeconds(3),
+                cancellationToken);
+            if (result.ExitCode != 0) return "Unavailable";
+
+            var summary = GpuStatusService.FormatWindowsMemoryStatusJson(result.Output);
+            return string.IsNullOrWhiteSpace(summary) ? "Unavailable" : summary;
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceInformation($"Windows memory summary unavailable: {ex.Message}");
+            return "Unavailable";
+        }
+    }
+
     public async Task<string> WindowsIntelArcSummaryAsync(CancellationToken cancellationToken = default)
     {
-        var syclLs = _findWindowsSyclLs();
+        var syclLs = _windowsSyclLs.Resolve();
         if (string.IsNullOrWhiteSpace(syclLs)) return "Unavailable";
         try
         {
@@ -336,7 +359,7 @@ public sealed class GpuStatusProbeService
 
     private ProcessStartInfo WindowsPowerShellStartInfo(string script)
     {
-        var psi = new ProcessStartInfo(_findWindowsPowerShell());
+        var psi = new ProcessStartInfo(_windowsPowerShell.Resolve());
         foreach (var arg in new[]
         {
             "-NoProfile",
@@ -352,33 +375,10 @@ public sealed class GpuStatusProbeService
 
     private ProcessStartInfo NvidiaSmiStartInfo(params string[] args)
     {
-        var psi = new ProcessStartInfo(_findNvidiaSmi());
+        var psi = new ProcessStartInfo(_nvidiaSmi.Resolve());
         foreach (var arg in args)
             psi.ArgumentList.Add(arg);
         return psi;
     }
 
-    private static string FindWindowsSyclLs()
-    {
-        foreach (var directory in WindowsEnvironmentService.OneApiPathEntries().Concat(PathEntries()))
-        {
-            if (string.IsNullOrWhiteSpace(directory)) continue;
-            var candidate = Path.Combine(directory, "sycl-ls.exe");
-            if (File.Exists(candidate)) return Path.GetFullPath(candidate);
-        }
-
-        return "";
-    }
-
-    private static IEnumerable<string> PathEntries()
-    {
-        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-        foreach (var part in path.Split(Path.PathSeparator))
-        {
-            if (string.IsNullOrWhiteSpace(part)) continue;
-            var expanded = Environment.ExpandEnvironmentVariables(part.Trim().Trim('"'));
-            if (!Path.IsPathFullyQualified(expanded) || !Directory.Exists(expanded)) continue;
-            yield return Path.GetFullPath(expanded);
-        }
-    }
 }

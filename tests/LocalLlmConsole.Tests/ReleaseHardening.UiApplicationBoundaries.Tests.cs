@@ -63,7 +63,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("_coreServices.App.LifetimeMetricResetApplication.ResetAsync", lifetime, StringComparison.Ordinal);
         Assert.Contains("LifetimeMetricResetActions()", lifetime, StringComparison.Ordinal);
         Assert.Contains("AppServices.LifetimeMetricsApplication", lifetime, StringComparison.Ordinal);
-        Assert.Contains("lifetimeMetrics.GetReportAsync(selection.Query)", lifetime, StringComparison.Ordinal);
+        Assert.Contains("electricityTariff: ElectricityTariffPolicy.FromSettings(_settings)", lifetime, StringComparison.Ordinal);
         Assert.Contains("lifetimeMetrics.DeleteModelUsageAsync(modelId)", lifetime, StringComparison.Ordinal);
         Assert.Contains("lifetimeMetrics.DeleteAllUsageAsync()", lifetime, StringComparison.Ordinal);
         Assert.Contains("Reset usage metrics for all models?", application, StringComparison.Ordinal);

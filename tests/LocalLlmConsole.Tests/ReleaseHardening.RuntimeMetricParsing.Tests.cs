@@ -10,6 +10,24 @@ namespace LocalLlmConsole.Tests;
 public sealed partial class ReleaseHardeningTests
 {
     [Fact]
+    public void PrometheusMatchingCachesNormalizedNamesWithoutChangingJson()
+    {
+        var sample = new PrometheusSample(
+            "LLAMACPP::Tokens-Predicted Total",
+            "",
+            42,
+            "42",
+            "counter",
+            "");
+
+        Assert.Equal(42, RuntimeMetrics.Sum([sample], ["tokens", "predicted", "total"], []));
+        Assert.DoesNotContain(
+            "NormalizedName",
+            System.Text.Json.JsonSerializer.Serialize(sample),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RuntimeMetricsParseAndAggregatePrometheusSamples()
     {
         const string raw = """
@@ -218,6 +236,11 @@ public sealed partial class ReleaseHardeningTests
             path,
             IsRuntimeRunning: false,
             new RuntimeSlotSnapshot(0, 0, IsProcessing: false, null, null, null)));
+        var chronological = service.Build(new RuntimeLogTailRequest(
+            path,
+            IsRuntimeRunning: true,
+            SlotSnapshot: null,
+            NewestFirst: false));
 
         Assert.False(missingLive.HasActiveLog);
         Assert.Equal("Runtime log file has not been created yet.", missingLive.Text);
@@ -227,11 +250,17 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains($"Live log: {path}", processing.Text, StringComparison.Ordinal);
         Assert.Contains("Slot status: processing | Prompt 12/20 | Gen 8", processing.Text, StringComparison.Ordinal);
         Assert.Contains("start", processing.Text, StringComparison.Ordinal);
+        Assert.True(
+            processing.Text.IndexOf("done", StringComparison.Ordinal)
+            < processing.Text.IndexOf("start", StringComparison.Ordinal));
         Assert.Contains("omitted 2 repeated 'all slots are idle' lines", processing.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("ALL SLOTS ARE IDLE", processing.Text, StringComparison.Ordinal);
         Assert.True(idle.HasActiveLog);
         Assert.Contains($"Last runtime log: {path}", idle.Text, StringComparison.Ordinal);
         Assert.Contains("Slot status: idle", idle.Text, StringComparison.Ordinal);
+        Assert.True(
+            chronological.Text.IndexOf("start", StringComparison.Ordinal)
+            < chronological.Text.IndexOf("done", StringComparison.Ordinal));
     }
 
 

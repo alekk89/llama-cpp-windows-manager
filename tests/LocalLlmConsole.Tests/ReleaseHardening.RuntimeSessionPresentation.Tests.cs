@@ -51,13 +51,9 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("Loaded Model: Qwen\nLoading Time: 5s", loadedAfterRedundantStop.MetricText);
         Assert.Equal(ModelRuntimeStatusKind.Fallback, cleared.Kind);
         Assert.True(loadingPlan.ShouldRender);
-        Assert.True(loadingPlan.UpdateProgress);
         Assert.Equal("Loading Qwen at http://127.0.0.1:8083.", loadingPlan.StatusText);
         Assert.True(fallbackPlan.ShouldRender);
-        Assert.False(fallbackPlan.UpdateProgress);
         Assert.Equal("", fallbackPlan.StatusText);
-        Assert.True(loadedPlan.UpdateProgress);
-        Assert.False(loadedTimerPlan.UpdateProgress);
         Assert.False(nonePlan.ShouldRender);
         Assert.Contains("_coreServices.Models.ModelRuntimeStatus.StartLoading", source, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Models.ModelRuntimeStatus.IsLoadingModel", source, StringComparison.Ordinal);

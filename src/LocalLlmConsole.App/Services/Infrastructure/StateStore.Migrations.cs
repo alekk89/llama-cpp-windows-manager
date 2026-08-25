@@ -157,6 +157,33 @@ ALTER TABLE token_usage_hourly ADD COLUMN timing_counter_observed INTEGER NOT NU
 ALTER TABLE token_usage_hourly ADD COLUMN request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0);
 ALTER TABLE token_usage_hourly ADD COLUMN failed_request_count INTEGER NOT NULL DEFAULT 0 CHECK (failed_request_count >= 0);
 ALTER TABLE token_usage_hourly ADD COLUMN request_counter_observed INTEGER NOT NULL DEFAULT 0 CHECK (request_counter_observed IN (0, 1));
+"""),
+        new(8, "hourly-host-gpu-energy", """
+CREATE TABLE IF NOT EXISTS gpu_energy_hourly (
+  bucket_start_utc TEXT PRIMARY KEY,
+  watt_hours REAL NOT NULL DEFAULT 0 CHECK (watt_hours >= 0),
+  sampled_seconds REAL NOT NULL DEFAULT 0 CHECK (sampled_seconds >= 0),
+  complete_coverage INTEGER NOT NULL DEFAULT 1 CHECK (complete_coverage IN (0, 1)),
+  observed_gpu_count INTEGER NOT NULL DEFAULT 0 CHECK (observed_gpu_count >= 0),
+  detected_gpu_count INTEGER NOT NULL DEFAULT 0 CHECK (detected_gpu_count >= 0),
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_gpu_energy_hourly_time
+ON gpu_energy_hourly(bucket_start_utc);
+"""),
+        new(9, "hourly-per-gpu-energy", """
+CREATE TABLE IF NOT EXISTS gpu_energy_device_hourly (
+  bucket_start_utc TEXT NOT NULL,
+  sensor_key TEXT NOT NULL,
+  gpu_index INTEGER NOT NULL CHECK (gpu_index >= 0),
+  gpu_name TEXT NOT NULL,
+  watt_hours REAL NOT NULL DEFAULT 0 CHECK (watt_hours >= 0),
+  sampled_seconds REAL NOT NULL DEFAULT 0 CHECK (sampled_seconds >= 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (bucket_start_utc, sensor_key)
+);
+CREATE INDEX IF NOT EXISTS ix_gpu_energy_device_hourly_time
+ON gpu_energy_device_hourly(bucket_start_utc);
 """)
     ];
 

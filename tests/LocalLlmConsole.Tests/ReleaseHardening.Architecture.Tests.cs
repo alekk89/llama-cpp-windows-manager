@@ -343,7 +343,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.DoesNotContain("private void ValidateAppSettings", api, StringComparison.Ordinal);
         Assert.DoesNotContain("private static AppSettings NormalizeAppSettings", api, StringComparison.Ordinal);
         Assert.Contains("ControlJsonPatch.Apply", mutations, StringComparison.Ordinal);
-        Assert.Contains("RequireApiKeyAuth = true", mutations, StringComparison.Ordinal);
+        Assert.Contains("ModelAccessPolicy.AllowsUnauthenticatedAccess", mutations, StringComparison.Ordinal);
         Assert.Contains("Gateway port", mutations, StringComparison.Ordinal);
     }
 

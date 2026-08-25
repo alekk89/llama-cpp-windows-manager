@@ -89,6 +89,42 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal(RuntimeReadinessStatus.SessionChanged, result.Status);
     }
 
+    [Fact]
+    public async Task RuntimeReadinessWorkflowStopsBeforeLoadedWhenAuthenticationIsNotEnforced()
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot()) with { Port = 8084 };
+        var session = RuntimeSession(CreateTempRoot(), settings, LoadedModelSessionStatus.Loading, isRunning: true);
+        var markedLoaded = false;
+
+        var result = await new RuntimeReadinessWorkflowService().WaitUntilReadyAsync(
+            new RuntimeReadinessWorkflowRequest(
+                session.ModelId,
+                settings,
+                _ => session,
+                (_, _) => Task.FromResult(true),
+                _ => markedLoaded = true,
+                TimeSpan.Zero,
+                (_, _) => Task.FromResult(new RuntimeAuthenticationProbeResult(
+                    RuntimeAuthenticationProbeStatus.NotEnforced,
+                    "Authentication is not enforced."))),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(RuntimeReadinessStatus.AuthenticationFailed, result.Status);
+        Assert.Contains("not enforced", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.False(markedLoaded);
+
+        var plan = new RuntimeReadinessCompletionService().Build(new RuntimeReadinessCompletionRequest(
+            result.Status,
+            session.ModelName,
+            settings,
+            ModelIsStillLoading: true,
+            IsOverviewPage: true,
+            result.Reason));
+        Assert.True(plan.StopUnsafeRuntime);
+        Assert.True(plan.SaveActiveRuntimeSessions);
+        Assert.Contains("Stopped", plan.StatusMessage, StringComparison.Ordinal);
+    }
+
 
     [Fact]
     public async Task RuntimeReadinessMonitorWorkflowCombinesPollingAndCompletionPlan()
@@ -155,7 +191,6 @@ public sealed partial class ReleaseHardeningTests
                 "select",
                 "save",
                 "status:Loaded Qwen at http://127.0.0.1:8084/v1.",
-                "progress",
                 "actions",
                 "metrics",
                 $"complete:{loading.ModelId}:False"
@@ -192,6 +227,9 @@ public sealed partial class ReleaseHardeningTests
                     calls.Add($"alive:{launchSettings.Port}");
                     return Task.FromResult(endpointAlive);
                 },
+                (_, _) => Task.FromResult(new RuntimeAuthenticationProbeResult(
+                    RuntimeAuthenticationProbeStatus.Verified,
+                    "verified")),
                 modelId =>
                 {
                     calls.Add($"mark:{modelId}");
@@ -210,7 +248,6 @@ public sealed partial class ReleaseHardeningTests
                         return Task.CompletedTask;
                     },
                     status => calls.Add($"status:{status}"),
-                    () => calls.Add("progress"),
                     () => calls.Add("actions"),
                     () =>
                     {
@@ -286,7 +323,6 @@ public sealed partial class ReleaseHardeningTests
         Assert.True(loaded.ShowLoadedDuration);
         Assert.True(loaded.SelectLoadedOverviewModel);
         Assert.True(loaded.SaveActiveRuntimeSessions);
-        Assert.True(loaded.UpdateRuntimeProgress);
         Assert.True(loaded.UpdateActionButtons);
         Assert.True(loaded.RefreshRuntimeMetrics);
         Assert.Contains("Loaded Qwen at http://127.0.0.1:8084/v1.", loaded.StatusMessage, StringComparison.Ordinal);
@@ -311,7 +347,6 @@ public sealed partial class ReleaseHardeningTests
                 ShowLoadedDuration: true,
                 SelectLoadedOverviewModel: true,
                 SaveActiveRuntimeSessions: true,
-                UpdateRuntimeProgress: true,
                 UpdateActionButtons: true,
                 RefreshRuntimeMetrics: true,
                 StatusMessage: "loaded"),
@@ -320,11 +355,10 @@ public sealed partial class ReleaseHardeningTests
                 () => { calls.Add("select"); return Task.CompletedTask; },
                 () => { calls.Add("save"); return Task.CompletedTask; },
                 status => calls.Add($"status:{status}"),
-                () => calls.Add("progress"),
                 () => calls.Add("actions"),
                 () => { calls.Add("metrics"); return Task.CompletedTask; }));
 
-        Assert.Equal(["stop-loading:True", "select", "save", "status:loaded", "progress", "actions", "metrics"], calls);
+        Assert.Equal(["stop-loading:True", "select", "save", "status:loaded", "actions", "metrics"], calls);
 
         calls.Clear();
         await service.ApplyAsync(
@@ -333,7 +367,6 @@ public sealed partial class ReleaseHardeningTests
                 ShowLoadedDuration: false,
                 SelectLoadedOverviewModel: false,
                 SaveActiveRuntimeSessions: false,
-                UpdateRuntimeProgress: false,
                 UpdateActionButtons: false,
                 RefreshRuntimeMetrics: false,
                 StatusMessage: ""),
@@ -342,11 +375,32 @@ public sealed partial class ReleaseHardeningTests
                 () => { calls.Add("select"); return Task.CompletedTask; },
                 () => { calls.Add("save"); return Task.CompletedTask; },
                 status => calls.Add($"status:{status}"),
-                () => calls.Add("progress"),
                 () => calls.Add("actions"),
                 () => { calls.Add("metrics"); return Task.CompletedTask; }));
 
         Assert.Empty(calls);
+
+        calls.Clear();
+        await service.ApplyAsync(
+            new RuntimeReadinessCompletionPlan(
+                StopLoadingStatus: true,
+                ShowLoadedDuration: false,
+                SelectLoadedOverviewModel: false,
+                SaveActiveRuntimeSessions: true,
+                UpdateActionButtons: true,
+                RefreshRuntimeMetrics: false,
+                StatusMessage: "stopped",
+                StopUnsafeRuntime: true),
+            new RuntimeReadinessCompletionActions(
+                showLoaded => calls.Add($"stop-loading:{showLoaded}"),
+                () => { calls.Add("select"); return Task.CompletedTask; },
+                () => { calls.Add("save"); return Task.CompletedTask; },
+                status => calls.Add($"status:{status}"),
+                () => calls.Add("actions"),
+                () => { calls.Add("metrics"); return Task.CompletedTask; },
+                () => { calls.Add("stop-unsafe"); return Task.CompletedTask; }));
+
+        Assert.Equal(["stop-unsafe", "stop-loading:False", "save", "status:stopped", "actions"], calls);
     }
 
 

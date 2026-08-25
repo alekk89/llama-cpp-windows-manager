@@ -8,6 +8,7 @@ public sealed class SettingsPageState
 {
     private readonly List<EditableSettingRow> _rows = [];
     private Action? _preferencesChanged;
+    private Action? _apiKeyAuthenticationDisabled;
 
     public DataGrid? SettingsGrid { get; private set; }
 
@@ -19,7 +20,8 @@ public sealed class SettingsPageState
     public void Apply(
         SettingsPageControls controls,
         IEnumerable<EditableSettingRow> rows,
-        Action preferencesChanged)
+        Action preferencesChanged,
+        Action? apiKeyAuthenticationDisabled = null)
     {
         ArgumentNullException.ThrowIfNull(controls);
         ArgumentNullException.ThrowIfNull(rows);
@@ -31,10 +33,28 @@ public sealed class SettingsPageState
         SettingsGrid = controls.SettingsGrid;
         _rows.AddRange(rows);
         _preferencesChanged = preferencesChanged;
+        _apiKeyAuthenticationDisabled = apiKeyAuthenticationDisabled;
 
         ThemeCombo.SelectionChanged += ThemeSelectionChanged;
         foreach (var row in _rows)
             row.PropertyChanged += SettingRowPropertyChanged;
+    }
+
+    public void Synchronize(Action update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+
+        foreach (var row in _rows)
+            row.PropertyChanged -= SettingRowPropertyChanged;
+        try
+        {
+            update();
+        }
+        finally
+        {
+            foreach (var row in _rows)
+                row.PropertyChanged += SettingRowPropertyChanged;
+        }
     }
 
     private void ThemeSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -44,7 +64,12 @@ public sealed class SettingsPageState
     {
         if (sender is EditableSettingRow { Type: "readonly" }) return;
         if (e.PropertyName == nameof(EditableSettingRow.Value))
+        {
+            if (sender is EditableSettingRow { Key: "requireApiKeyAuth" } authenticationRow
+                && !AppPreferenceService.EnableDisableValue(authenticationRow.Value, true))
+                _apiKeyAuthenticationDisabled?.Invoke();
             _preferencesChanged?.Invoke();
+        }
     }
 
     private void DetachChangeHandlers()
@@ -55,5 +80,6 @@ public sealed class SettingsPageState
             row.PropertyChanged -= SettingRowPropertyChanged;
         _rows.Clear();
         _preferencesChanged = null;
+        _apiKeyAuthenticationDisabled = null;
     }
 }

@@ -4,6 +4,7 @@ namespace LocalLlmConsole;
 
 public sealed record ModelsPageActionControllerActions(
     Func<Task> ScanModelsFolderAsync,
+    Func<Task> ImportModelFileAsync,
     Func<Task> ChooseModelsFolderAsync,
     Action OpenModelsFolder,
     Func<Task> ManageModelGroupsAsync,
@@ -29,6 +30,7 @@ public sealed class ModelsPageActionController
     public ModelsPageActions Build()
         => new(
             _actions.ScanModelsFolderAsync,
+            _actions.ImportModelFileAsync,
             _actions.ChooseModelsFolderAsync,
             _actions.OpenModelsFolder,
             _actions.ManageModelGroupsAsync,

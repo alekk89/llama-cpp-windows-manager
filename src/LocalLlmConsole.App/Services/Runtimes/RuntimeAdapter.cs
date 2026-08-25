@@ -23,8 +23,15 @@ public static class RuntimeAdapter
             errors.Add("Runtime host must default to localhost. Enable LAN model access before exposing a model on the network.");
         else if (!IsLocalHost(host) && !IsBindableHost(host))
             errors.Add("Runtime host must be a valid host name or IP address.");
-        if (string.IsNullOrWhiteSpace(request.ApiKey))
-            errors.Add("Model serving requires a model API key, including local-only mode.");
+        if (!request.RequireApiKeyAuth)
+        {
+            if (!IsLocalHost(host) || request.AllowNetworkAccess)
+                errors.Add("API key authentication can be disabled only for a localhost runtime without LAN access.");
+            if (!string.IsNullOrWhiteSpace(request.ApiKey))
+                errors.Add("The model API key must be empty when API key authentication is disabled.");
+        }
+        else if (string.IsNullOrWhiteSpace(request.ApiKey))
+            errors.Add("Model serving requires a model API key when API key authentication is enabled.");
         else if (!ApiSecurity.IsStrongBearerSecret(request.ApiKey))
             errors.Add("Model API key must be at least 32 non-whitespace characters.");
         if (string.IsNullOrWhiteSpace(request.ExecutablePath))

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LocalLlmConsole"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="llama.cpp Windows Manager v2.3.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
+        Title="llama.cpp Windows Manager v2.4.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" ResizeMode="CanResize"
         Background="{DynamicResource AppBack}"
@@ -58,7 +58,7 @@
                   CornerRadius="4"
                   VerticalAlignment="Center">
             <TextBlock x:Name="AppVersionText"
-                       Text="v2.3.0"
+                       Text="v2.4.0"
                        Foreground="{DynamicResource TextMuted}"
                        FontSize="10.5"
                        FontWeight="SemiBold"/>

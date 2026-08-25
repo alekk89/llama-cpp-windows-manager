@@ -38,33 +38,40 @@ public partial class MainWindow
 
     private async Task RefreshRuntimeMetricsAsync()
     {
+        var renderUiFrame = _minimizedUiRefreshPolicy.ShouldRender(
+            WindowState == WindowState.Minimized || !IsVisible,
+            DateTimeOffset.UtcNow);
+        var renderOverview = _viewModel.CurrentPage == "Overview" && renderUiFrame;
+        using var dashboardUpdate = _runtimeDashboardPage.DeferDashboardUpdates();
         await _coreServices.Runtime.RuntimeDashboardRefreshApplication.RefreshAsync(
             new RuntimeDashboardRefreshApplicationRequest(
                 new RuntimeDashboardRefreshTarget(
                     _sessions.HasRunningSessions,
-                    _runtimeDashboardPage.ModelMetric is not null,
+                    _runtimeDashboardPage.IsAvailable,
                     _runtimeDashboardPage.RuntimeMetricsGrid is not null,
                     _runtimeDashboardPage.RuntimeLogBox is not null),
-                _viewModel.CurrentPage == "Overview",
+                renderOverview,
                 _settings,
                 _llama.ActiveModelId,
                 _llama.ActiveRuntimeId,
                 _llama.State,
                 _llama.IsRunning),
-            RuntimeDashboardRefreshActions());
+            RuntimeDashboardRefreshActions(renderOverview, renderUiFrame));
+        if (renderOverview)
+            ApplyObservedGpuEnergy();
     }
 
-    private async Task RenderStoppedSelectedOverviewModelAsync(ModelRecord? selectedOverviewModel, bool renderOverview)
+    private Task RenderStoppedSelectedOverviewModelAsync(ModelRecord? selectedOverviewModel, bool renderOverview)
     {
         ResetMetricCounters();
-        if (!renderOverview || selectedOverviewModel is null) return;
+        if (!renderOverview || selectedOverviewModel is null) return Task.CompletedTask;
 
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.ModelMetric, $"Stopped: {selectedOverviewModel.Name}");
-        SetRuntimeModelProgress(LlamaRuntimeState.Stopped);
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.GpuMetric, await CachedGpuSummaryAsync());
+        _runtimeDashboardPage.SetMetricValue(OverviewDashboardMetricIds.ModelStatus, $"Stopped: {selectedOverviewModel.Name}");
         _runtimeDashboardPage.SetRuntimeLogText("No runtime is loaded for the selected model.", followTail: false);
         ApplyRuntimeMetricRows(new RuntimeMetricRowsRenderPlan([], null));
         ApplyRuntimeMetricSummary(RuntimeMetricSummaryPresentation.NoRuntime);
+        ApplyObservedGpuEnergy();
+        return Task.CompletedTask;
     }
 
     private RuntimeDashboardMetricsApplicationActions RuntimeDashboardMetricsActions()
@@ -73,13 +80,15 @@ public partial class MainWindow
             ApplyRuntimeMetricRows,
             ApplyRuntimeMetricSummary);
 
-    private RuntimeDashboardRefreshApplicationActions RuntimeDashboardRefreshActions()
+    private RuntimeDashboardRefreshApplicationActions RuntimeDashboardRefreshActions(
+        bool renderOverview,
+        bool renderUiFrame)
         => new(
             MarkLoadedSessionsIfReadyAsync,
             RefreshOverviewSessionRows,
             () => _sessions.Snapshots(),
             ApplyRuntimeEndpointHealthAsync,
-            TrackLifetimeTokenDeltasAsync,
+            pollResults => TrackLifetimeTokenDeltasAsync(pollResults, renderUiFrame),
             ApplyIdleUnloadPoliciesAsync,
             SelectedOverviewModel,
             IsModelActive,
@@ -93,12 +102,11 @@ public partial class MainWindow
             ActiveRuntimeLabelsAsync,
             RefreshModelStatusMetric,
             SaveActiveRuntimeSessionsAsync,
-            UpdateRuntimeModelProgress,
             CachedGpuSummaryAsync,
-            summary => MetricCardFactory.SetMetricText(_runtimeDashboardPage.GpuMetric, summary),
+            _runtimeDashboardPage.ApplyHardwareSummaryAsync,
             RenderStoppedSelectedOverviewModelAsync,
             RuntimeDashboardMetricsActions(),
-            UpdateOverviewModelActions);
+            renderOverview ? UpdateOverviewModelActions : () => { });
 
     private async Task ApplyRuntimeEndpointHealthAsync(IReadOnlyList<RuntimeMetricPollResult> pollResults)
     {

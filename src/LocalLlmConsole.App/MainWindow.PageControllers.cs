@@ -51,6 +51,7 @@ public partial class MainWindow
         => new(
             new ModelsPageActionControllerActions(
                 ScanModelsFolderAsync,
+                ImportModelFileAsync,
                 async () => await ChooseModelsFolderAsync(scanAfter: true),
                 () => _coreServices.App.ShellIntegration.OpenFolder(_settings.ModelsRoot),
                 ManageModelGroupsAsync,
@@ -154,6 +155,7 @@ public partial class MainWindow
                 InspectOverviewEndpointRowAsync,
                 LoadedSessionIdFromRowButton,
                 UnloadLoadedSessionAsync,
+                PersistOverviewDashboardLayoutAsync,
                 RunEventAsync));
 
     private WslPageActionController CreateWslPageActionController()

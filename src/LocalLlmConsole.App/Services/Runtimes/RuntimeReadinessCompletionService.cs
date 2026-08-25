@@ -5,17 +5,18 @@ public sealed record RuntimeReadinessCompletionRequest(
     string ModelName,
     AppSettings LaunchSettings,
     bool ModelIsStillLoading,
-    bool IsOverviewPage);
+    bool IsOverviewPage,
+    string FailureReason = "");
 
 public sealed record RuntimeReadinessCompletionPlan(
     bool StopLoadingStatus,
     bool ShowLoadedDuration,
     bool SelectLoadedOverviewModel,
     bool SaveActiveRuntimeSessions,
-    bool UpdateRuntimeProgress,
     bool UpdateActionButtons,
     bool RefreshRuntimeMetrics,
-    string StatusMessage);
+    string StatusMessage,
+    bool StopUnsafeRuntime = false);
 
 public sealed class RuntimeReadinessCompletionService
 {
@@ -30,7 +31,6 @@ public sealed class RuntimeReadinessCompletionService
                 ShowLoadedDuration: false,
                 SelectLoadedOverviewModel: false,
                 SaveActiveRuntimeSessions: false,
-                UpdateRuntimeProgress: false,
                 UpdateActionButtons: false,
                 RefreshRuntimeMetrics: false,
                 StatusMessage: ""),
@@ -39,16 +39,23 @@ public sealed class RuntimeReadinessCompletionService
                 ShowLoadedDuration: request.ModelIsStillLoading,
                 SelectLoadedOverviewModel: true,
                 SaveActiveRuntimeSessions: true,
-                UpdateRuntimeProgress: true,
                 UpdateActionButtons: true,
                 RefreshRuntimeMetrics: request.IsOverviewPage,
                 StatusMessage: $"Loaded {request.ModelName} at {RuntimeEndpointService.EndpointDisplay(request.LaunchSettings)}."),
+            RuntimeReadinessStatus.AuthenticationFailed => new RuntimeReadinessCompletionPlan(
+                StopLoadingStatus: request.ModelIsStillLoading,
+                ShowLoadedDuration: false,
+                SelectLoadedOverviewModel: false,
+                SaveActiveRuntimeSessions: true,
+                UpdateActionButtons: true,
+                RefreshRuntimeMetrics: request.IsOverviewPage,
+                StatusMessage: $"Stopped {request.ModelName}: {request.FailureReason}",
+                StopUnsafeRuntime: true),
             _ => new RuntimeReadinessCompletionPlan(
                 StopLoadingStatus: false,
                 ShowLoadedDuration: false,
                 SelectLoadedOverviewModel: false,
                 SaveActiveRuntimeSessions: false,
-                UpdateRuntimeProgress: false,
                 UpdateActionButtons: false,
                 RefreshRuntimeMetrics: false,
                 StatusMessage: "")

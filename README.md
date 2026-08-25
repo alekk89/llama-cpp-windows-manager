@@ -71,7 +71,11 @@ file integrity; it is not a publisher identity guarantee.
    configured runtimes folder, then scan or register it.
 2. Open **Models** to download a GGUF from Hugging Face or register an existing
    model. To add one manually, copy its `.gguf` file anywhere under the
-   configured models folder, then choose **Scan Models Folder**.
+   configured models folder, then choose **Scan Models Folder**. You can also
+   choose **Add model file…** to select a GGUF anywhere without moving it.
+   Discovery classifies readable GGUF metadata first and reports files it skips;
+   a valid ambiguous file can be confirmed once and remains registered on later
+   scans.
 3. Select a runtime, adjust the launch settings, and save a profile for the
    model.
 4. Open **Overview**, select the model/profile, and choose **Load**. The endpoint
@@ -82,11 +86,81 @@ file integrity; it is not a publisher identity guarantee.
    configured `context_length` plus available GGUF training-context, parameter,
    and file-size metadata for client discovery.
 
-Model inference always requires the API key configured in **Settings**. The key
-is protected for the current Windows user and passed to `llama-server` through
-its environment rather than its command line. Some upstream llama.cpp builds
-leave health or model-catalog metadata public; do not treat those discovery
-responses as proof that inference is unauthenticated.
+The Overview live dashboard is customizable without changing telemetry
+collection. Add or remove cards, combine metrics, drag cards directly, and
+resize the outer card from any border or corner without entering a separate edit
+mode. Resize hit areas are part of the outer border rather than overlay controls;
+the pointer uses the matching Windows side/corner cursor and the card border
+highlights on hover. Use **Lock** beside **Add card** to preserve the current
+card dimensions while the window is resized; locked cards wrap to another row
+before shrinking and manual border resizing is disabled until unlocked.
+Cards cannot overlap or be reduced below the space required for their wrapped
+labels, values, details, and inline charts. Nearby cards snap together while
+retaining a minimum gap; when side-by-side cards are snapped, resizing a top or
+bottom edge near its neighbor aligns their corresponding edges. The Overview
+surface and its latest readings are retained while navigating between pages, so
+returning does not rebuild every card and chart. Right-click a card to manage metrics and independent
+per-metric charts, set or clear an optional card title, or remove the card; resize
+directly from its sides and corners. Metric labels use the remaining row width
+after the measured value and unit, avoiding premature wrapping around an empty
+fixed-width value column.
+Right-click open dashboard space to add a card. The hardware catalog exposes
+CPU load, temperature, and clock; RAM load, used capacity, and clock; and indexed
+GPU load, VRAM, draw power, core clock, core temperature, and VRAM temperature when the host probe
+provides them; unsupported optional sensors stay out of the picker and do not
+render unavailable rows. Charts are limited to curated time-varying readings,
+so static capacities, configured clocks, slot counters, and raw runtime values
+remain readable without creating dead plots. The runtime catalog exposes averages and totals when llama.cpp does not provide
+a dependable per-poll live rate, avoiding permanently empty live-rate rows.
+Responsive horizontal bounds, vertical positions, exact sizes, and chart choices
+persist across restarts. The telemetry presentation uses the application theme's
+existing surfaces and accents, with tabular measurement typography, restrained
+row rules, and compact scientific-style plotting grids.
+
+The Manager integrates observed host GPU power into combined and per-device
+hourly energy buckets while a model session is active. Metrics displays the combined historical total and
+calendar history; per-device history remains available through the control API.
+Settings provides a currency code, day/night prices per kWh, and local night
+start/end times. The current tariff is applied to the measured hourly history,
+so Metrics displays estimated cost beside combined energy without storing a
+second mutable billing ledger. Overview offers combined and per-GPU app-live
+cost rows alongside energy rows. Costs cover observed GPU board energy only,
+not whole-system wall consumption, and telemetry gaps are never estimated.
+The Overview metric picker exposes optional cumulative observed-energy
+energy rows for the combined observed GPUs and each power-reporting GPU; these
+reset when the Manager restarts. Power-reporting GPUs are offered in
+the picker before a model session starts. NVIDIA power is discovered through
+`nvidia-smi`; AMD SMI and Intel XPU-SMI are used when their official CLI is
+installed and the adapter exposes a power sensor. A dedicated sampler runs every
+10 seconds while a session is active, reusing a recent full hardware snapshot or
+falling back to a smaller power-only probe that skips CPU and RAM discovery.
+With no active session, historical persistence stops and idle power detection
+backs off to five minutes. Settings can enable continuous idle tracking to retain
+the previous 10-second behavior.
+Long polling gaps and app downtime are never
+estimated, and mixed systems identify partial sensor coverage instead of
+presenting an incomplete sum as total machine GPU energy. Host energy is kept
+separate from model token accounting because it cannot be attributed reliably
+when models overlap or the GPU is used by another process.
+Per-GPU history begins when a version that supports device-level buckets first
+observes that adapter; older combined energy remains in the host total and is
+not assigned retroactively to individual devices.
+
+Model inference requires the API key configured in **Settings** by default. For
+local browser or client testing, set **API key auth** to **Disable**. The Manager
+changes LAN exposure to **Local only**, the active key becomes empty, and no `LLAMA_API_KEY`
+is passed to `llama-server`; the previous strong key remains protected for the
+current Windows user and is restored when authentication is re-enabled. Every
+LAN exposure mode requires authentication and cannot be saved with an empty
+active key. Before a session is marked loaded, the Manager verifies the expected
+policy: protected endpoints must reject an unauthenticated request and accept
+the configured credential, while explicitly open Local-only endpoints must
+accept the unauthenticated readiness probe.
+
+Settings continue to save automatically. Choice controls apply quickly, while
+ordinary text fields wait for a short pause in typing before saving so partial
+electricity prices, ports, paths, and other text values are not committed
+between normal keystrokes.
 
 ## Profiles, groups, and companions
 

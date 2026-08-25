@@ -213,7 +213,7 @@ internal static partial class Program
             "list" => Get("/api/v1/models"),
             "get" => Get($"/api/v1/models/{Segment(ModelArg(args, 2))}"),
             "scan" => Post("/api/v1/models/scan"),
-            "import" => Post("/api/v1/models/import", new JsonObject { ["folder"] = Required(args, "folder") }),
+            "import" => ModelImportRequest(args),
             "companions" or "heads" => Get($"/api/v1/models/{Segment(ModelArg(args, 2))}/companions"),
             "load" => LoadRequest("load", args, 2),
             "restart" => LoadRequest("restart", args, 2),
@@ -221,6 +221,26 @@ internal static partial class Program
             "delete" => Delete($"/api/v1/models/{Segment(ModelArg(args, 2))}?confirm={args.Has("confirm").ToString().ToLowerInvariant()}"),
             _ => throw new InvalidOperationException($"Unknown model action '{action}'.")
         };
+
+    private static ControlRequest ModelImportRequest(Arguments args)
+    {
+        var file = args.Value("file")?.Trim() ?? "";
+        var folder = args.Value("folder")?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(file) == string.IsNullOrWhiteSpace(folder))
+            throw new InvalidOperationException("Specify exactly one of --file PATH or --folder PATH.");
+
+        var body = new JsonObject();
+        if (!string.IsNullOrWhiteSpace(file))
+        {
+            body["file"] = file;
+            body["confirmRole"] = args.Has("confirm-role");
+        }
+        else
+        {
+            body["folder"] = folder;
+        }
+        return Post("/api/v1/models/import", body);
+    }
 
     private static ControlRequest ProfileRequest(string action, Arguments args)
     {

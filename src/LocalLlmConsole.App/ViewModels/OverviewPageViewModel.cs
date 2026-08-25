@@ -47,6 +47,9 @@ public sealed record OverviewModelChoice(
 
 public sealed class OverviewPageViewModel
 {
+    private GatewayRoutingOverviewStatus _lastSessionGateway = GatewayRoutingOverviewStatus.Hidden;
+    private SessionRowSource[] _lastSessionRowSources = [];
+
     public ObservableCollection<OverviewModelChoice> ModelChoices { get; } = new();
     public ObservableCollection<OverviewLaunchProfileChoice> LaunchProfileChoices { get; } = new();
     public ObservableCollection<UiRow> SessionRows { get; } = new();
@@ -131,12 +134,21 @@ public sealed class OverviewPageViewModel
     public bool ReplaceSessionsIfChanged(IEnumerable<LoadedModelSessionSnapshot> sessions, GatewayRoutingOverviewStatus gateway)
     {
         var sessionRows = sessions.ToArray();
-        var rows = BuildSessionRows(sessionRows, gateway).ToArray();
-        if (RowsEqual(SessionRows, rows)) return false;
+        var sources = sessionRows
+            .OrderByDescending(session => session.IsSelected)
+            .ThenBy(session => session.ModelName, StringComparer.OrdinalIgnoreCase)
+            .Select(SessionRowSource.FromSnapshot)
+            .ToArray();
+        if (gateway == _lastSessionGateway
+            && sources.SequenceEqual(_lastSessionRowSources))
+            return false;
 
+        var rows = BuildSessionRows(sessionRows, gateway).ToArray();
         SessionRows.Clear();
         foreach (var row in rows)
             SessionRows.Add(row);
+        _lastSessionGateway = gateway;
+        _lastSessionRowSources = sources;
         return true;
     }
 
@@ -183,39 +195,37 @@ public sealed class OverviewPageViewModel
             Data = JsonSerializer.SerializeToNode(new { Kind = "Gateway" }) as JsonObject ?? new JsonObject()
         };
 
-    private static bool RowsEqual(IReadOnlyList<UiRow> left, IReadOnlyList<UiRow> right)
+    private sealed record SessionRowSource(
+        string SessionId,
+        string ModelId,
+        string ModelName,
+        string LaunchProfileName,
+        long ModelSizeBytes,
+        LoadedModelSessionStatus Status,
+        string StatusReason,
+        bool IsRunning,
+        bool IsSelected,
+        string Endpoint,
+        string RuntimeName,
+        RuntimeBackend Backend,
+        RuntimeMode Mode)
     {
-        if (left.Count != right.Count) return false;
-        for (var i = 0; i < left.Count; i++)
-        {
-            if (!RowEquals(left[i], right[i])) return false;
-        }
-
-        return true;
+        public static SessionRowSource FromSnapshot(LoadedModelSessionSnapshot session)
+            => new(
+                session.SessionId,
+                session.ModelId,
+                session.ModelName,
+                session.LaunchProfileName,
+                session.ModelSizeBytes,
+                session.Status,
+                session.StatusReason,
+                session.IsRunning,
+                session.IsSelected,
+                session.Endpoint,
+                session.RuntimeName,
+                session.Backend,
+                session.Mode);
     }
-
-    private static bool RowEquals(UiRow left, UiRow right)
-        => string.Equals(left.C1, right.C1, StringComparison.Ordinal)
-           && string.Equals(left.C2, right.C2, StringComparison.Ordinal)
-           && string.Equals(left.C3, right.C3, StringComparison.Ordinal)
-           && string.Equals(left.C4, right.C4, StringComparison.Ordinal)
-           && string.Equals(left.C5, right.C5, StringComparison.Ordinal)
-           && string.Equals(left.C6, right.C6, StringComparison.Ordinal)
-           && string.Equals(left.C7, right.C7, StringComparison.Ordinal)
-           && string.Equals(left.C8, right.C8, StringComparison.Ordinal)
-           && string.Equals(left.C9, right.C9, StringComparison.Ordinal)
-           && string.Equals(left.C10, right.C10, StringComparison.Ordinal)
-           && string.Equals(left.T1, right.T1, StringComparison.Ordinal)
-           && string.Equals(left.T2, right.T2, StringComparison.Ordinal)
-           && string.Equals(left.T3, right.T3, StringComparison.Ordinal)
-           && string.Equals(left.T4, right.T4, StringComparison.Ordinal)
-           && string.Equals(left.T5, right.T5, StringComparison.Ordinal)
-           && left.B1 == right.B1
-           && left.B2 == right.B2
-           && left.B3 == right.B3
-           && left.B4 == right.B4
-           && left.B5 == right.B5
-           && JsonNode.DeepEquals(left.Data, right.Data);
 
     private static string SessionStatusLabel(LoadedModelSessionSnapshot session) => session.Status switch
     {

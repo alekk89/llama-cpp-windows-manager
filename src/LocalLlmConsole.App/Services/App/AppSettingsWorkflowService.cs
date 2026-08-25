@@ -51,6 +51,10 @@ public sealed class AppSettingsWorkflowService
         AppSettings targetSettings,
         CancellationToken cancellationToken = default)
     {
+        if (!targetSettings.RequireApiKeyAuth
+            && !ModelAccessPolicy.AllowsUnauthenticatedAccess(targetSettings.ModelAccessMode))
+            throw new InvalidOperationException("API-key authentication can be disabled only when LAN exposure is Local only.");
+
         var hadStrongApiKey = new[]
         {
             targetSettings.ModelApiKey,
@@ -65,14 +69,13 @@ public sealed class AppSettingsWorkflowService
             persistedSettings.ModelApiKeyBackup);
         var normalizedTarget = targetSettings with
         {
-            RequireApiKeyAuth = true,
-            ModelApiKey = apiKey,
+            ModelApiKey = targetSettings.RequireApiKeyAuth ? apiKey : "",
             ModelApiKeyBackup = apiKey
         };
         var normalizedPersisted = persistedSettings with
         {
-            RequireApiKeyAuth = true,
-            ModelApiKey = apiKey,
+            RequireApiKeyAuth = targetSettings.RequireApiKeyAuth,
+            ModelApiKey = targetSettings.RequireApiKeyAuth ? apiKey : "",
             ModelApiKeyBackup = apiKey
         };
         if (normalizedPersisted != persistedSettings)
@@ -86,7 +89,9 @@ public sealed class AppSettingsWorkflowService
 
     public async Task<AppSettings> PersistAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        var persisted = settings with { WorkspaceRoot = _workspaceRoot };
+        var persisted = OverviewDashboardLayoutPolicy.WithLayout(
+            settings with { WorkspaceRoot = _workspaceRoot },
+            settings.OverviewDashboardLayout);
         Directory.CreateDirectory(_workspaceRoot);
         Directory.CreateDirectory(persisted.ModelsRoot);
         Directory.CreateDirectory(persisted.RuntimeRoot);

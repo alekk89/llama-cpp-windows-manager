@@ -29,6 +29,7 @@ public sealed partial class AppServiceFactory
         var launchProfiles = CreateModelLaunchProfileService(stateStore, request.Sessions);
         var launchVariants = CreateModelLaunchVariantWorkflowService(launchProfiles);
         var modelLaunchSettingsWorkflow = CreateModelLaunchSettingsWorkflowService(launchProfiles);
+        var gatewayRouteCatalog = CreateModelGatewayRouteCatalogApplicationService(stateStore);
         var gatewayModelLoadWorkflow = CreateGatewayModelLoadWorkflowService(stateStore, launchProfiles, core.Runtime.RuntimeSessions);
         var gatewayRuntimeApplication = CreateGatewayRuntimeApplicationService(gatewayModelLoadWorkflow);
         var runtimeDeletion = CreateRuntimeDeletionPlanner(stateStore, launchProfiles, request.Sessions);
@@ -107,6 +108,7 @@ public sealed partial class AppServiceFactory
                 launchVariants,
                 modelLaunchSettingsWorkflow),
             new MainWindowLoadedGatewayServices(
+                gatewayRouteCatalog,
                 gatewayModelLoadWorkflow,
                 gatewayRuntimeApplication),
             new MainWindowLoadedRuntimeServices(

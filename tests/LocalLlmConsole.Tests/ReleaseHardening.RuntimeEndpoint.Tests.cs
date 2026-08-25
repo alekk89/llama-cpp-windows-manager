@@ -109,6 +109,34 @@ public sealed partial class ReleaseHardeningTests
         Assert.Empty(failed);
     }
 
+    [Fact]
+    public async Task RuntimeEndpointProbeServiceVerifiesEnforcementAndConfiguredCredential()
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot()) with
+        {
+            Port = 8081,
+            ModelApiKey = "secret-token"
+        };
+        using var enforcingHandler = new CapturingHttpHandler(request =>
+            request.Headers.Authorization?.Parameter == settings.ModelApiKey
+                ? new HttpResponseMessage(System.Net.HttpStatusCode.MethodNotAllowed)
+                : new HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized));
+        using var enforcingHttp = new HttpClient(enforcingHandler);
+        using var openHandler = new CapturingHttpHandler(_ =>
+            new HttpResponseMessage(System.Net.HttpStatusCode.MethodNotAllowed));
+        using var openHttp = new HttpClient(openHandler);
+
+        var verified = await new RuntimeEndpointProbeService(enforcingHttp)
+            .VerifyAuthenticationAsync(settings, TestContext.Current.CancellationToken);
+        var notEnforced = await new RuntimeEndpointProbeService(openHttp)
+            .VerifyAuthenticationAsync(settings, TestContext.Current.CancellationToken);
+
+        Assert.Equal(RuntimeAuthenticationProbeStatus.Verified, verified.Status);
+        Assert.Equal(RuntimeAuthenticationProbeStatus.NotEnforced, notEnforced.Status);
+        Assert.DoesNotContain(settings.ModelApiKey, verified.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(settings.ModelApiKey, notEnforced.Message, StringComparison.Ordinal);
+    }
+
 
     [Fact]
     public void MainWindowDelegatesRuntimeEndpointProbesToService()
@@ -121,6 +149,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Contains("_coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync", runtimeSession, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Runtime.RuntimeEndpointProbe.IsRespondingAsync", runtimeSession, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Runtime.RuntimeEndpointProbe.IsRespondingAsync", runtimeLifecycle, StringComparison.Ordinal);
+        Assert.Contains("_coreServices.Runtime.RuntimeEndpointProbe.VerifyAuthenticationAsync", runtimeLifecycle, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync", gateway, StringComparison.Ordinal);
         Assert.DoesNotContain("new HttpClient", runtimeSession, StringComparison.Ordinal);
         Assert.DoesNotContain("RuntimeEndpointAliveAsync", runtimeSession + runtimeLifecycle + gateway, StringComparison.Ordinal);

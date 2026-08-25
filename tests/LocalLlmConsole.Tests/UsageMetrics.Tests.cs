@@ -133,6 +133,55 @@ INSERT INTO token_usage VALUES ('legacy', 'Legacy Model', 120, 30, '2026-01-01T0
     }
 
     [Fact]
+    public async Task StateStoreUsageAndEnergyRangesUseInclusiveFromAndExclusiveToBounds()
+    {
+        var root = CreateTempRoot();
+        var database = Path.Combine(root, "state", "local-llm-console.db");
+        await using var store = new StateStore(database);
+        await store.InitializeAsync();
+        var first = new DateTimeOffset(2026, 8, 20, 10, 0, 0, TimeSpan.Zero);
+        var hours = new[] { first, first.AddHours(1), first.AddHours(2) };
+        foreach (var hour in hours)
+            await store.RecordTokenUsageAsync(new TokenUsageDelta(
+                "model", "Model", 1, 1, CapturedAt: hour));
+        await store.RecordGpuEnergyAsync(
+            hours.Select(hour => new GpuEnergyDelta(hour, 1, 10, true, 1, 1, hour)),
+            hours.Select(hour => new GpuEnergyDeviceDelta(hour, "GPU 0", 0, "GPU", 1, 10, hour)));
+
+        Assert.Equal(3, (await store.ListTokenUsageBucketsAsync()).Count);
+        Assert.Equal(2, (await store.ListTokenUsageBucketsAsync(hours[1])).Count);
+        Assert.Equal(2, (await store.ListTokenUsageBucketsAsync(toUtc: hours[2])).Count);
+        Assert.Single(await store.ListTokenUsageBucketsAsync(hours[1], hours[2]));
+        Assert.Single(await store.ListGpuEnergyBucketsAsync(hours[1], hours[2]));
+        Assert.Single(await store.ListGpuEnergyDeviceBucketsAsync(hours[1], hours[2]));
+
+        var usageSource = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Infrastructure", "StateStore.UsageMetrics.cs"));
+        var energySource = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Infrastructure", "StateStore.GpuEnergy.cs"));
+        Assert.DoesNotContain("$from_utc IS NULL", usageSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("$from_utc IS NULL", energySource, StringComparison.Ordinal);
+
+        await using var connection = new SqliteConnection($"Data Source={database};Mode=ReadOnly");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+EXPLAIN QUERY PLAN
+SELECT bucket_start_utc
+FROM token_usage_hourly
+WHERE bucket_start_utc >= $from_utc AND bucket_start_utc < $to_utc
+ORDER BY bucket_start_utc;
+""";
+        command.Parameters.AddWithValue("$from_utc", hours[1].ToString("O"));
+        command.Parameters.AddWithValue("$to_utc", hours[2].ToString("O"));
+        var plans = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+            plans.Add(reader.GetString(3));
+        Assert.Contains(plans, plan => plan.Contains("SEARCH token_usage_hourly", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void UsageMetricsAggregateIntoLocalCalendarDaysAndFillEmptyDates()
     {
         var service = new UsageMetricsService();

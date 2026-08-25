@@ -186,7 +186,7 @@ public sealed class LocalAppService : ILocalAppServiceHost
 
     private static async Task WriteJsonAsync(HttpListenerContext context, int status, object value)
     {
-        var json = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(value);
         var bytes = Encoding.UTF8.GetBytes(json);
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/json; charset=utf-8";
@@ -201,27 +201,14 @@ public sealed class LocalAppService : ILocalAppServiceHost
         CancellationToken cancellationToken)
     {
         const int maxBodyBytes = 1024 * 1024;
-        if (request.ContentLength64 > maxBodyBytes)
-            throw new InvalidOperationException("Control API request bodies are limited to 1 MiB.");
-
-        JsonObject? body = null;
-        if (request.HasEntityBody)
-        {
-            using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-            var buffer = new char[8192];
-            var text = new StringBuilder();
-            while (true)
-            {
-                var count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
-                if (count == 0) break;
-                text.Append(buffer, 0, count);
-                if (Encoding.UTF8.GetByteCount(text.ToString()) > maxBodyBytes)
-                    throw new InvalidOperationException("Control API request bodies are limited to 1 MiB.");
-            }
-            if (!string.IsNullOrWhiteSpace(text.ToString()))
-                body = JsonNode.Parse(text.ToString()) as JsonObject
-                    ?? throw new InvalidOperationException("Control API request body must be a JSON object.");
-        }
+        var body = request.HasEntityBody
+            ? await ControlRequestBodyReader.ReadJsonObjectAsync(
+                request.InputStream,
+                request.ContentEncoding ?? Encoding.UTF8,
+                request.ContentLength64,
+                maxBodyBytes,
+                cancellationToken)
+            : null;
 
         var query = request.QueryString.AllKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))

@@ -40,6 +40,8 @@ public sealed record LifetimePageControls(
     TextBlock OutputValue,
     TextBlock CacheValue,
     TextBlock CacheDetail,
+    TextBlock GpuEnergyValue,
+    TextBlock GpuEnergyDetail,
     LifetimeInsightControls Insights,
     TextBlock HistoryNote,
     TextBlock DateSelectionSummary,
@@ -70,7 +72,15 @@ public static partial class LifetimePageFactory
 
         var toolbar = BuildToolbar(request, out var range, out var model, out var profile, out var runtime, out var resetVisible);
         content.Children.Add(toolbar);
-        content.Children.Add(BuildSummary(out var total, out var input, out var inputDetail, out var output, out var cache, out var cacheDetail));
+        content.Children.Add(BuildSummary(
+            out var total,
+            out var input,
+            out var inputDetail,
+            out var output,
+            out var cache,
+            out var cacheDetail,
+            out var gpuEnergy,
+            out var gpuEnergyDetail));
         content.Children.Add(LifetimeInsightsPanel.Create(out var insights));
 
         var calendar = new LifetimeUsageCalendar();
@@ -123,6 +133,8 @@ public static partial class LifetimePageFactory
                 output,
                 cache,
                 cacheDetail,
+                gpuEnergy,
+                gpuEnergyDetail,
                 insights,
                 historyNote,
                 dateSelectionSummary,
@@ -225,19 +237,27 @@ public static partial class LifetimePageFactory
         out TextBlock inputDetail,
         out TextBlock output,
         out TextBlock cache,
-        out TextBlock cacheDetail)
+        out TextBlock cacheDetail,
+        out TextBlock gpuEnergy,
+        out TextBlock gpuEnergyDetail)
     {
         var grid = new Grid { Margin = new Thickness(0, 0, 0, 2) };
-        for (var index = 0; index < 4; index++)
+        for (var index = 0; index < 5; index++)
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.Total"), 0, out total, out _));
-        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.Input"), 1, out input, out inputDetail));
-        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.Output"), 2, out output, out _));
-        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.CacheHit"), 3, out cache, out cacheDetail));
+        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.Total"), 0, out total, out _, 5));
+        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.Input"), 1, out input, out inputDetail, 5));
+        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.Output"), 2, out output, out _, 5));
+        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.CacheHit"), 3, out cache, out cacheDetail, 5));
+        grid.Children.Add(SummaryCard(Loc.T("Lifetime.Summary.GpuEnergy"), 4, out gpuEnergy, out gpuEnergyDetail, 5));
         return grid;
     }
 
-    private static Border SummaryCard(string label, int column, out TextBlock value, out TextBlock detail)
+    private static Border SummaryCard(
+        string label,
+        int column,
+        out TextBlock value,
+        out TextBlock detail,
+        int columnCount = 4)
     {
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock
@@ -269,7 +289,7 @@ public static partial class LifetimePageFactory
         {
             Style = (Style)WpfApplication.Current.Resources["MetricCard"],
             MinHeight = 88,
-            Margin = new Thickness(column == 0 ? 0 : 5, 0, column == 3 ? 0 : 5, 8),
+            Margin = new Thickness(column == 0 ? 0 : 5, 0, column == columnCount - 1 ? 0 : 5, 8),
             Child = stack
         };
         Grid.SetColumn(card, column);

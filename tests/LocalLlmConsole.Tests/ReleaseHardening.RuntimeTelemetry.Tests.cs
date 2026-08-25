@@ -483,13 +483,16 @@ public sealed partial class ReleaseHardeningTests
                     calls.Add("save");
                     return Task.CompletedTask;
                 },
-                () => calls.Add("progress"),
                 () =>
                 {
                     calls.Add("gpu-read");
-                    return Task.FromResult("GPU summary");
+                    return Task.FromResult(HostHardwareSnapshotParser.Parse("GPU summary"));
                 },
-                gpu => calls.Add($"gpu:{gpu}"),
+                gpu =>
+                {
+                    calls.Add($"gpu:{gpu.Summary}");
+                    return Task.CompletedTask;
+                },
                 (_, _) =>
                 {
                     calls.Add("stopped");
@@ -516,13 +519,12 @@ public sealed partial class ReleaseHardeningTests
                 "health:1",
                 "lifetime:1",
                 "idle:1",
+                "gpu-read",
+                "gpu:GPU summary",
                 $"select:{model.Id}",
                 "active:8081",
                 "labels",
                 "model:Model label",
-                "progress",
-                "gpu-read",
-                "gpu:GPU summary",
                 "metrics-log",
                 "metrics-rows",
                 "metrics-summary",
@@ -602,6 +604,19 @@ public sealed partial class ReleaseHardeningTests
         var sessionRowsIndex = refreshApplication.IndexOf("actions.RefreshOverviewSessionRows();", readinessIndex, StringComparison.Ordinal);
         Assert.True(readinessIndex >= 0 && sessionRowsIndex > readinessIndex);
         Assert.Contains("ReplaceSessionsIfChanged", session, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InitialOverviewActivationStartsAndImmediatelyRefreshesHostTelemetry()
+    {
+        var pages = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.Pages.cs"));
+        var navigation = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "MainWindow.Navigation.cs"));
+        var pageReady = pages.IndexOf("PageHost.Content = _overviewPage.Scroller;", StringComparison.Ordinal);
+        var timerStart = pages.IndexOf("StartRuntimeDashboardRefreshTimer();", pageReady, StringComparison.Ordinal);
+        var optionalRefresh = pages.IndexOf("if (refresh)", pageReady, StringComparison.Ordinal);
+
+        Assert.True(pageReady >= 0 && timerStart > pageReady && timerStart < optionalRefresh);
+        Assert.Contains("if (_viewModel.CurrentPage == \"Overview\") await RefreshRuntimeMetricsAsync();", navigation, StringComparison.Ordinal);
     }
 
 

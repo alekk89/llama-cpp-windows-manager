@@ -6,6 +6,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
     private readonly IModelGatewayRuntimeController _runtime;
     private readonly ModelGatewayRequestAccessPolicy _accessPolicy;
     private readonly ModelGatewayUpstreamProxy _upstreamProxy;
+    private readonly GatewayPerformanceTracker? _performance;
     private readonly HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _loadGate = new(1, 1);
@@ -18,7 +19,8 @@ public sealed class ModelGatewayService : IModelGatewayHost
     public ModelGatewayService(
         ModelGatewayOptions options,
         IModelGatewayRuntimeController runtime,
-        ModelGatewayUpstreamProxy? upstreamProxy = null)
+        ModelGatewayUpstreamProxy? upstreamProxy = null,
+        GatewayPerformanceTracker? performance = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(runtime);
@@ -27,6 +29,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
         _runtime = runtime;
         _accessPolicy = new(options);
         _upstreamProxy = upstreamProxy ?? new ModelGatewayUpstreamProxy();
+        _performance = performance;
         _listener.Prefixes.Add(options.ListenerPrefix);
     }
 
@@ -39,8 +42,13 @@ public sealed class ModelGatewayService : IModelGatewayHost
             throw new InvalidOperationException("The model gateway is disabled.");
         if (_options.Port is < 1 or > 65535)
             throw new InvalidOperationException("Gateway port must be between 1 and 65535.");
-        if (string.IsNullOrWhiteSpace(_options.ApiKey) || !ApiSecurity.IsStrongBearerSecret(_options.ApiKey))
+        if (!_options.RequireApiKeyAuth && _options.AllowLanAccess)
+            throw new InvalidOperationException("API-key authentication can be disabled only for a local-only model gateway.");
+        if (_options.RequireApiKeyAuth
+            && (string.IsNullOrWhiteSpace(_options.ApiKey) || !ApiSecurity.IsStrongBearerSecret(_options.ApiKey)))
             throw new InvalidOperationException("The model gateway requires a strong API key.");
+        if (!_options.RequireApiKeyAuth && !string.IsNullOrWhiteSpace(_options.ApiKey))
+            throw new InvalidOperationException("The model gateway API key must be empty when authentication is disabled.");
         if (_options.MaxRequestBodyBytes <= 0)
             throw new InvalidOperationException("Gateway request body limit must be greater than zero.");
 
@@ -216,6 +224,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
 
     private async Task ProxyModelRequestAsync(HttpListenerContext context, CancellationToken cancellationToken)
     {
+        var started = Stopwatch.StartNew();
         byte[] body;
         try
         {
@@ -223,6 +232,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
         }
         catch (ModelGatewayRequestBodyTooLargeException ex)
         {
+            ObserveRejectedRequest(started);
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 413, new { error = new { message = ex.Message, type = "request_too_large" } }, cancellationToken);
             return;
         }
@@ -230,6 +240,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
         var requestedModel = ModelGatewayRequestResolver.ExtractRequestedModel(body);
         if (string.IsNullOrWhiteSpace(requestedModel))
         {
+            ObserveRejectedRequest(started);
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 400, new { error = new { message = "Request body must include a model value.", type = "invalid_request_error" } }, cancellationToken);
             return;
         }
@@ -237,6 +248,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
         var route = ModelGatewayRequestResolver.ResolveModel(await _runtime.ListModelsAsync(cancellationToken), requestedModel);
         if (route is null)
         {
+            ObserveRejectedRequest(started);
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 404, new { error = new { message = $"Unknown model '{requestedModel}'.", type = "model_not_found" } }, cancellationToken);
             return;
         }
@@ -252,6 +264,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            ObserveRejectedRequest(started);
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 503, ModelGatewayResponseWriter.GatewayError(
                 ModelGatewayResponseWriter.GatewayClientLoadError(route, requestedModel, ex),
                 "model_load_failed",
@@ -261,7 +274,7 @@ public sealed class ModelGatewayService : IModelGatewayHost
 
         try
         {
-            await _upstreamProxy.ForwardAsync(context, session, body, cancellationToken);
+            await _upstreamProxy.ForwardAsync(context, session, body, cancellationToken, started.Elapsed);
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or IOException)
         {
@@ -271,6 +284,9 @@ public sealed class ModelGatewayService : IModelGatewayHost
                 "upstream_unavailable"), cancellationToken);
         }
     }
+
+    private void ObserveRejectedRequest(Stopwatch started)
+        => _performance?.Observe(false, started.Elapsed, null, null);
 
     private async Task<LoadedModelSessionSnapshot> EnsureLoadedAsync(ModelGatewayModelRoute route, CancellationToken cancellationToken)
     {

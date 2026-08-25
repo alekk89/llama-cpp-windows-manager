@@ -21,69 +21,108 @@ public partial class MainWindow
 
     private void ApplyRuntimeMetricSummary(RuntimeMetricSummaryPresentation summary)
     {
-        MetricCardFactory.ClearLastKnownMetricText(_runtimeDashboardPage.TokensLastKnown);
-
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.TokensMetric, summary.Tokens);
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.MtpTokensMetric, summary.MtpTokens);
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.SlotsMetric, summary.Slots);
-        MetricCardFactory.SetMetricText(_runtimeDashboardPage.KvCacheMetric, summary.KvCache);
-        _runtimeDashboardPage.TokensGraph?.Push(
-            summary.GraphSample.RuntimeKey,
-            summary.GraphSample.GenerationRate,
-            summary.GraphSample.PromptRate);
-        _runtimeDashboardPage.MtpTokensGraph?.Push(
-            summary.GraphSample.RuntimeKey,
-            summary.GraphSample.SpeculativeGeneratedRate,
-            summary.GraphSample.SpeculativeAcceptedRate);
-        _runtimeDashboardPage.KvCacheGraph?.Push(
-            summary.GraphSample.RuntimeKey,
-            summary.GraphSample.KvCacheUsagePercent);
+        _runtimeDashboardPage.ApplyMetricSummary(summary);
+        _runtimeDashboardPage.DashboardController?.ApplyGatewayPerformance(
+            _coreServices.Models.ModelGatewayHostFactory.Performance.Snapshot());
     }
 
-    private void UpdateRuntimeModelProgress()
-        => SetRuntimeModelProgress(_llama.State);
-
-    private void SetRuntimeModelProgress(LlamaRuntimeState state)
+    private async Task<HostHardwareSnapshot> CachedGpuSummaryAsync()
     {
-        if (_runtimeDashboardPage.ModelProgress is null) return;
-
-        switch (state)
-        {
-            case LlamaRuntimeState.Loading:
-                _runtimeDashboardPage.ModelProgress.Visibility = Visibility.Visible;
-                _runtimeDashboardPage.ModelProgress.IsIndeterminate = true;
-                _runtimeDashboardPage.ModelProgress.Value = 0;
-                break;
-            case LlamaRuntimeState.Loaded:
-                _runtimeDashboardPage.ModelProgress.Visibility = Visibility.Visible;
-                _runtimeDashboardPage.ModelProgress.IsIndeterminate = false;
-                _runtimeDashboardPage.ModelProgress.Value = 100;
-                break;
-            default:
-                _runtimeDashboardPage.ModelProgress.Visibility = Visibility.Collapsed;
-                _runtimeDashboardPage.ModelProgress.IsIndeterminate = false;
-                _runtimeDashboardPage.ModelProgress.Value = 0;
-                break;
-        }
+        var now = DateTimeOffset.UtcNow;
+        var selected = _sessions.SelectedSnapshot();
+        var hostTask = _coreServices.Ui.RuntimeGpuSummaryApplication.SnapshotAsync(null, now);
+        if (selected is null || !selected.IsRunning) return await hostTask;
+        var processTask = _coreServices.App.GpuStatus.ProcessSummaryAsync(selected.ProcessId);
+        await Task.WhenAll(hostTask, processTask);
+        var host = await hostTask;
+        var process = await processTask;
+        return string.Equals(process, "Unavailable", StringComparison.OrdinalIgnoreCase)
+            ? host
+            : HostHardwareSnapshotParser.Parse(
+                $"{host.Summary}{Environment.NewLine}{process}",
+                now);
     }
 
-    private async Task<string> CachedGpuSummaryAsync()
+    private void StartGpuEnergyTrackingTimer()
     {
-        var active = _sessions.SelectedSnapshot();
-        return await _coreServices.Ui.RuntimeGpuSummaryApplication.SummaryAsync(active, DateTimeOffset.UtcNow);
+        _coreServices.Ui.GpuEnergyTrackingTimer.Start(
+            TimeSpan.FromSeconds(10),
+            CaptureGpuEnergySampleAsync,
+            ex => Trace.TraceWarning($"GPU energy sample was not persisted: {ex.Message}"),
+            runImmediately: true);
     }
+
+    private async Task CaptureGpuEnergySampleAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var lifetimeMetrics = AppServices.LifetimeMetricsApplication;
+        if (lifetimeMetrics is null) return;
+        var plan = CurrentGpuEnergySamplingPlan();
+        lifetimeMetrics.SetGpuEnergyPersistenceActive(plan.PersistHistory);
+        if (!lifetimeMetrics.ReserveGpuEnergySample(now, plan.Interval)) return;
+        var powerSnapshot = await _coreServices.Ui.RuntimeGpuSummaryApplication.PowerSnapshotAsync(now);
+        await lifetimeMetrics.ObserveGpuPowerAsync(powerSnapshot, now, plan.PersistHistory);
+        if (_viewModel.CurrentPage == "Overview"
+            && WindowState != WindowState.Minimized
+            && IsVisible)
+            ApplyObservedGpuEnergy();
+        if (LifetimeMetricsRefreshPolicy.ShouldRefresh(
+                WindowState != WindowState.Minimized && IsVisible,
+                _viewModel.CurrentPage == "Metrics",
+                lifetimeMetrics.DataVersion,
+                _lastLifetimeReportDataVersion,
+                now,
+                _nextLifetimeReportRefreshAt))
+            await RefreshLifetimeMetricsAsync();
+    }
+
+    private GpuEnergySamplingPlan CurrentGpuEnergySamplingPlan()
+        => GpuEnergySamplingPolicy.Decide(
+            _sessions.HasRunningSessions,
+            _settings.TrackGpuEnergyWhileIdle);
+
+    private void ApplyGpuEnergyTrackingBoundary()
+    {
+        var lifetimeMetrics = AppServices.LifetimeMetricsApplication;
+        if (lifetimeMetrics is null) return;
+        lifetimeMetrics.SetGpuEnergyPersistenceActive(
+            CurrentGpuEnergySamplingPlan().PersistHistory);
+    }
+
+    private void ApplyObservedGpuEnergy()
+        => _runtimeDashboardPage.ApplyObservedGpuEnergy(
+            AppServices.LifetimeMetricsApplication?.ObservedGpuEnergySnapshot(
+                ElectricityTariffPolicy.FromSettings(_settings),
+                TimeZoneInfo.Local));
 
     private async Task<RuntimeMtpTokenSnapshot?> RefreshRuntimeLogTailAsync(RuntimeSlotSnapshot? slotSnapshot = null)
+        => await RefreshRuntimeLogTailAsync(slotSnapshot, forceOrderPosition: false);
+
+    private async Task<RuntimeMtpTokenSnapshot?> RefreshRuntimeLogTailAsync(
+        RuntimeSlotSnapshot? slotSnapshot,
+        bool forceOrderPosition)
     {
         if (_runtimeDashboardPage.RuntimeLogBox is null) return null;
 
         var selectedLogPath = _sessions.SelectedSnapshot()?.LogPath;
         var logPath = string.IsNullOrWhiteSpace(selectedLogPath) ? _llama.LogPath : selectedLogPath;
         var capture = await _coreServices.Runtime.RuntimeLogTail.CaptureAsync(logPath);
-        var tail = _coreServices.Runtime.RuntimeLogTail.Build(new RuntimeLogTailRequest(logPath, _llama.IsRunning, slotSnapshot), capture);
-        _runtimeDashboardPage.SetRuntimeLogText(tail.Text, tail.HasActiveLog);
+        var newestFirst = AppPreferenceService.RuntimeLogNewestFirst(_settings.RuntimeLogOrder);
+        var tail = _coreServices.Runtime.RuntimeLogTail.Build(new RuntimeLogTailRequest(
+            logPath,
+            _llama.IsRunning,
+            slotSnapshot,
+            NewestFirst: newestFirst), capture);
+        _runtimeDashboardPage.SetRuntimeLogText(
+            tail.Text,
+            followTail: !newestFirst,
+            forceFollowTail: forceOrderPosition && !newestFirst,
+            forceTop: forceOrderPosition && newestFirst);
         return capture.MtpTokenStats;
     }
+
+    private async Task RefreshRuntimeLogOrderAsync()
+        => await RefreshRuntimeLogTailAsync(null, forceOrderPosition: true);
 
     private void ResetMetricCounters()
     {

@@ -202,6 +202,16 @@ public static class RuntimeDashboardService
         => RuntimeMetrics.Sum(samples, ["requests", "failed", "total"], [])
            ?? RuntimeMetrics.Sum(samples, ["requests", "error", "total"], []);
 
+    public static double? PeakContextTokenCounter(IReadOnlyList<PrometheusSample> samples)
+        => RuntimeMetrics.First(samples, ["n", "tokens", "max"], [])
+           ?? RuntimeMetrics.First(samples, ["context", "tokens", "max"], [])
+           ?? RuntimeMetrics.First(samples, ["context", "peak"], []);
+
+    public static double? ContextShiftCounter(IReadOnlyList<PrometheusSample> samples)
+        => RuntimeMetrics.Sum(samples, ["context", "shifts", "total"], [])
+           ?? RuntimeMetrics.Sum(samples, ["context", "shift", "total"], [])
+           ?? RuntimeMetrics.Sum(samples, ["ctx", "shifts"], []);
+
     public static double? PromptActivityTokenCounter(IReadOnlyList<PrometheusSample> samples)
         => SumNullable(PromptTokensProcessedCounter(samples), PromptCachedTokenCounter(samples));
 

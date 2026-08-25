@@ -11,6 +11,7 @@ public sealed record OverviewPageActionControllerActions(
     Func<UiRow, Task> InspectEndpointRowAsync,
     Func<object, string> SessionIdFromRowButton,
     Func<string, Task> UnloadLoadedSessionAsync,
+    Func<OverviewDashboardLayout, Task> PersistDashboardLayoutAsync,
     Func<Func<Task>, Task> RunEventAsync);
 
 public sealed class OverviewPageActionController
@@ -32,7 +33,9 @@ public sealed class OverviewPageActionController
             SelectLoadedSessionRowAsync,
             InspectSelectedEndpointAsync,
             InspectEndpointRow_Click,
-            UnloadLoadedSessionRow_Click);
+            UnloadLoadedSessionRow_Click,
+            _actions.PersistDashboardLayoutAsync,
+            _actions.RunEventAsync);
 
     public void CancelPendingSelections()
     {

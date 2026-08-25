@@ -1,6 +1,6 @@
 # Schema-driven launch settings
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-25
 
 ## Goal
 

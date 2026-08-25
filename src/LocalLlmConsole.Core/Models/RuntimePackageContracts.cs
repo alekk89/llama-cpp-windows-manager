@@ -32,7 +32,8 @@ public sealed record RuntimePackageSelection(
     string ReleaseUrl,
     DateTimeOffset PublishedAt,
     RuntimePackageAsset PrimaryAsset,
-    IReadOnlyList<RuntimePackageAsset> AdditionalAssets)
+    IReadOnlyList<RuntimePackageAsset> AdditionalAssets,
+    string TargetCommit = "")
 {
     public IReadOnlyList<RuntimePackageAsset> AllAssets => [PrimaryAsset, .. AdditionalAssets];
     public string AssetSummary => string.Join(", ", AllAssets.Select(asset => asset.Name));

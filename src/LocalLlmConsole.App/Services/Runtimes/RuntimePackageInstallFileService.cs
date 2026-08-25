@@ -112,6 +112,7 @@ public static class RuntimePackageInstallFileService
             ["repoUrl"] = RuntimePackageSourceCatalog.RepositoryUrlFor(selection.Preset),
             ["releaseApiUrl"] = RuntimePackageSourceCatalog.ReleaseApiUrlFor(selection.Preset),
             ["releaseTag"] = selection.ReleaseTag,
+            ["targetCommit"] = selection.TargetCommit,
             ["releaseUrl"] = selection.ReleaseUrl,
             ["publishedAt"] = selection.PublishedAt.ToString("O"),
             ["downloadedAt"] = DateTimeOffset.UtcNow.ToString("O"),

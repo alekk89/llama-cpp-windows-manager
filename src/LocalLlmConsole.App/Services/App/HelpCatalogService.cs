@@ -66,7 +66,7 @@ public sealed partial class HelpCatalogService
             [
                 "Models: copy a .gguf anywhere under the configured models folder, then choose Scan Models Folder.",
                 "Runtimes: put a folder containing llama-server.exe or llama-server under the configured runtimes folder, then scan it.",
-                "Models or runtimes kept elsewhere can be registered without moving their files."
+                "Models kept elsewhere can be selected with Add model file without moving them. Valid ambiguous files require one explicit confirmation that persists across future scans; external runtimes can also be registered in place."
             ],
             [Action("Open Models", "models"), Action("Open Runtimes", "runtime-download")],
             ["copy gguf", "manual model", "manual runtime", "scan folder", "register folder"]),
@@ -113,11 +113,12 @@ public sealed partial class HelpCatalogService
             "metrics",
             "overview",
             "Read live metrics",
-            "Tokens, speculative tokens, slots, hardware, and KV cache describe the active workload.",
+            "Customizable cards combine live status, runtime summaries, and available raw metrics.",
             [
-                "Token cards aggregate active slots and show recent throughput plus cumulative totals.",
-                "Slots reports active capacity, queued work, and busy decode slots.",
-                "If loading stalls or throughput collapses, inspect the live runtime log first."
+                "Right-click a card to add or remove metrics, set an optional title, manage charts, remove it, or restore the default layout; drag or resize its visible border directly. Choose Lock beside Add card to keep the current card dimensions while resizing the window; cards wrap before shrinking and border resizing returns when you unlock them.",
+                "Cards keep a minimum gap, and matching top or bottom edges align when adjacent cards are resized. Overview retains its cards, charts, and latest readings while you visit another page, so returning does not wait for a full dashboard rebuild.",
+                "Charts are offered for compatible averages, totals, and raw gauges. Optional sensors such as VRAM temperature appear only when the GPU driver reports them. Unreliable per-poll generation, prompt, and speculative live rates are intentionally omitted.",
+                "If loading stalls or throughput collapses, inspect the live runtime log first. Settings can place its latest entry at the top or bottom without changing the stored log."
             ],
             [Action("Open Overview", "overview"), Action("Open Logs", "logs")],
             ["tokens per second", "gpu", "kv cache", "slow", "telemetry"]),
@@ -126,15 +127,15 @@ public sealed partial class HelpCatalogService
             "usage-history",
             "overview",
             "Understand usage metrics",
-            "Metrics shows daily token activity, cache reuse, throughput, request counts when available, and model-level totals.",
+            "Metrics shows daily token activity, cache reuse, throughput, request counts, and combined historical GPU energy and estimated cost.",
             [
                 "Input is evaluated prompt tokens plus prompt tokens reused from cache; output is generated tokens.",
                 "Cache hit rate is cached input divided by all tracked input. Prompt and generation speeds use llama.cpp active-processing time. Request counts appear only when a runtime exposes compatible counters; unsupported values remain unavailable.",
                 "Daily history starts after this feature is installed. Older lifetime totals are preserved but are not assigned to invented dates.",
-                "Day boxes stay fixed in size while resizing the window reveals more or less history, up to the latest 24 calendar months. Choose Total, Input, Output, Cached, or Requests, then click a tracked day to inspect or clear it, Control-click to toggle dates, and Shift-click to select a range; pre-tracking and future dates remain unavailable."
+                "Day boxes stay fixed in size while resizing the window reveals up to 24 calendar months. Choose Total, Input, Output, Cached, Requests, or GPU energy, then click tracked days to filter. Metrics shows combined historical GPU energy and its estimated cost; per-device history remains available to automation. Configure currency, day/night prices per kWh, and local night times in Settings. Optional Overview rows can be added before loading a model and show cumulative energy and estimated cost observed during the selected live runtime session. Cost covers measured GPU board energy only."
             ],
             [Action("Open Metrics", "lifetime")],
-            ["lifetime", "daily usage", "token history", "cache hit", "cached prompt", "metrics"]),
+            ["lifetime", "daily usage", "token history", "cache hit", "cached prompt", "gpu energy", "electricity cost", "day rate", "night rate", "watts", "kwh", "metrics"]),
 
         Article(
             "add-models",
@@ -143,8 +144,8 @@ public sealed partial class HelpCatalogService
             "The Models page supports Manager-owned downloads and external model registrations.",
             [
                 "Hugging Face downloads are verified and registered automatically.",
-                "Scan Models Folder registers GGUF files under the configured models root.",
-                "Import keeps external model files in place; removing the registration does not delete them.",
+                "Scan Models Folder reads GGUF metadata before narrow filename conventions and explains every ambiguous or invalid file it skips.",
+                "Add model file selects a model anywhere, keeps it in place, and can persistently confirm a valid ambiguous main model; removing an external registration does not delete the file.",
                 "Deleting a Manager-owned download can remove its managed model folder."
             ],
             [Action("Open Models", "model-download")],
@@ -241,7 +242,7 @@ public sealed partial class HelpCatalogService
                 "llwmctl uses the authenticated loopback Manager control API at /api/v1/*.",
                 "The control token is generated per Manager process, discovered automatically, and is not a user setting.",
                 "The gateway and direct model endpoints expose OpenAI-compatible /v1/* routes.",
-                "Model-serving routes use the model API key configured in Settings."
+                "Model-serving routes use the model API key configured in Settings unless authentication is explicitly disabled in Local-only mode."
             ],
             [Action("Open Settings", "settings")],
             ["control api", "llwmctl", "model api", "credential", "token", "difference"]),
@@ -253,7 +254,7 @@ public sealed partial class HelpCatalogService
             "Use the shared gateway for one stable address or a loaded model's direct endpoint.",
             [
                 "Read GET /v1/models from the gateway, send the returned profile route as the model id, and use context_length plus meta to discover its configured context and available GGUF details.",
-                "Send the Settings model API key as Authorization: Bearer <key>; the gateway also accepts x-api-key.",
+                "When API key auth is enabled, send the Settings model API key as Authorization: Bearer <key>; the gateway also accepts x-api-key. Omit credentials only for an explicitly unauthenticated Local-only endpoint.",
                 "A direct endpoint serves only its loaded model; the gateway can load the requested saved profile on demand."
             ],
             [Action("Open Settings", "gateway-settings"), Action("Open Overview", "loaded-sessions")],
@@ -263,11 +264,11 @@ public sealed partial class HelpCatalogService
             "network-and-key",
             "settings",
             "API key and LAN exposure",
-            "All model-serving modes require a strong API key; LAN access is always explicit.",
+            "LAN serving always requires a strong API key; Local only can explicitly allow unauthenticated access.",
             [
-                "Set or generate a key of at least 32 non-whitespace characters in Settings.",
-                "Local only binds serving endpoints to 127.0.0.1.",
-                "Gateway LAN, Direct models LAN, and Gateway + direct LAN expose only the selected model-serving surfaces.",
+                "Set authentication to Disable for local browser or client testing. LAN exposure changes to Local only, the active key becomes empty, and the preserved key is restored when authentication is re-enabled.",
+                "Local only binds serving endpoints to 127.0.0.1 and is the only mode that permits authentication to be disabled.",
+                "Gateway LAN, Direct models LAN, and Gateway + direct LAN require authentication and expose only the selected model-serving surfaces.",
                 "The Manager control API remains loopback-only."
             ],
             [Action("Open Settings", "settings")],
@@ -279,12 +280,13 @@ public sealed partial class HelpCatalogService
             "App behavior and data",
             "Settings apply automatically and the workspace remains fixed for the running process.",
             [
-                "UI switches hide Overview cards, logs, metrics, or Hugging Face controls without disabling their services.",
+                "The customizable Overview dashboard and UI switches change presentation without disabling telemetry, logs, metrics, or downloads.",
+                "Use a card's right-click menu for metrics, an optional title, charts, and removal; resize from any visible side or corner, or use the dashboard Lock button to preserve every card's current dimensions. Hardware rows include independent CPU, RAM, VRAM, power, clock, core-temperature, and VRAM-temperature sensors when Windows or the GPU driver exposes them.",
                 "Portable installs normally keep models, runtimes, state, cache, and logs under data beside the executable.",
                 "Start with Windows and minimize behavior apply to the current Windows user."
             ],
             [Action("Open Settings", "settings")],
-            ["workspace", "portable data", "hide metrics", "startup", "tray"]),
+            ["workspace", "portable data", "hide metrics", "dashboard", "vram", "power", "temperature", "startup", "tray"]),
 
         Article(
             "model-will-not-load",
@@ -306,7 +308,7 @@ public sealed partial class HelpCatalogService
             "401, connection, or gateway errors",
             "Check the endpoint, credential type, gateway state, and requested model route in that order.",
             [
-                "A 401 from /v1/* means the model API key is missing or invalid.",
+                "With API key auth enabled, a 401 from /v1/* means the model API key is missing or invalid. In Local-only unauthenticated mode, clients omit the credential and readiness verifies that the open endpoint responds as configured.",
                 "Do not use the llwmctl control token as the model API key; they are different credentials.",
                 "Use the exact model id returned by the gateway's GET /v1/models response.",
                 "If the port refuses connections, confirm the gateway or direct session is listed on Overview."

@@ -20,13 +20,56 @@ public sealed class RuntimeGpuSummaryApplicationService
         LoadedModelSessionSnapshot? activeSession,
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
+        => (await SnapshotAsync(activeSession, now, cancellationToken)).Summary;
+
+    public async Task<HostHardwareSnapshot> SnapshotAsync(
+        LoadedModelSessionSnapshot? activeSession,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
     {
         var cacheKey = CacheKey(activeSession);
-        if (_cache.TryGet(cacheKey, now, out var cachedSummary))
-            return cachedSummary;
+        return await _cache.GetOrCreateSnapshotAsync(
+            cacheKey,
+            now,
+            async () => HostHardwareSnapshotParser.Parse(
+                await ProbeSummaryAsync(activeSession, CancellationToken.None),
+                DateTimeOffset.UtcNow),
+            cancellationToken);
+    }
 
-        var summary = await ProbeSummaryAsync(activeSession, cancellationToken);
-        return _cache.Store(cacheKey, summary, now);
+    public async Task<string> PowerSummaryAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+        => (await PowerSnapshotAsync(now, cancellationToken)).Summary;
+
+    public async Task<HostHardwareSnapshot> PowerSnapshotAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        if (_cache.TryGetSnapshot("host", now, out var hostSnapshot)
+            && hostSnapshot.Gpus.Any(gpu => gpu.PowerWatts is >= 0 and <= 2000))
+            return hostSnapshot;
+        return await _cache.GetOrCreateSnapshotAsync(
+            "host-power",
+            now,
+            async () => HostHardwareSnapshotParser.Parse(
+                await ProbePowerSummaryAsync(CancellationToken.None),
+                DateTimeOffset.UtcNow),
+            cancellationToken);
+    }
+
+    private async Task<string> ProbePowerSummaryAsync(CancellationToken cancellationToken)
+    {
+        var nvidiaProbe = _gpuStatus.NvidiaPowerSummaryAsync(cancellationToken);
+        var amdProbe = _gpuStatus.AmdSmiSummaryAsync(cancellationToken);
+        var intelProbe = _gpuStatus.IntelXpuSmiSummaryAsync(cancellationToken);
+        var windowsProbe = _gpuStatus.WindowsSummaryAsync(cancellationToken);
+        await Task.WhenAll(nvidiaProbe, amdProbe, intelProbe, windowsProbe);
+        return MergeHostAccelerators(
+            await windowsProbe,
+            await nvidiaProbe,
+            await amdProbe,
+            await intelProbe);
     }
 
     private async Task<string> ProbeSummaryAsync(
@@ -34,22 +77,50 @@ public sealed class RuntimeGpuSummaryApplicationService
         CancellationToken cancellationToken)
     {
         if (activeSession is null)
-            return "No loaded model";
+            return await ProbeHostSummaryAsync(cancellationToken);
 
-        var usesAccelerator = activeSession.Backend is RuntimeBackend.Cuda
-            or RuntimeBackend.Vulkan
-            or RuntimeBackend.Metal
-            or RuntimeBackend.Sycl;
-        if (!usesAccelerator || activeSession.LaunchSettings.GpuLayers == 0)
-            return await _gpuStatus.CpuSummaryAsync(cancellationToken);
+        var cpuProbe = _gpuStatus.CpuSummaryAsync(cancellationToken);
+        var memoryProbe = _gpuStatus.SystemMemorySummaryAsync(cancellationToken);
+        var processProbe = activeSession is null
+            ? Task.FromResult("Unavailable")
+            : _gpuStatus.ProcessSummaryAsync(activeSession.ProcessId, cancellationToken);
+        Task<string> acceleratorProbe;
+        if (activeSession is null)
+            acceleratorProbe = HostAcceleratorSummaryAsync(cancellationToken);
+        else
+        {
+            var usesAccelerator = activeSession.Backend is RuntimeBackend.Cuda
+                or RuntimeBackend.Vulkan
+                or RuntimeBackend.Metal
+                or RuntimeBackend.Sycl;
+            acceleratorProbe = !usesAccelerator || activeSession.LaunchSettings.GpuLayers == 0
+                ? HostAcceleratorSummaryAsync(cancellationToken)
+                : AcceleratorSummaryAsync(activeSession, cancellationToken);
+        }
 
-        var acceleratorSummary = await AcceleratorSummaryAsync(activeSession, cancellationToken);
-        if (activeSession.LaunchSettings.GpuLayers < 0
-            || activeSession.LaunchSettings.GpuLayers >= AppSettings.DefaultGpuLayers)
-            return acceleratorSummary;
+        await Task.WhenAll(cpuProbe, memoryProbe, acceleratorProbe, processProbe);
+        return CombinedHardwareSummary(await cpuProbe, await memoryProbe, await acceleratorProbe, await processProbe);
+    }
 
-        var cpuSummary = await _gpuStatus.CpuSummaryAsync(cancellationToken);
-        return CombinedHardwareSummary(cpuSummary, acceleratorSummary);
+    private async Task<string> ProbeHostSummaryAsync(CancellationToken cancellationToken)
+    {
+        var windowsProbe = _gpuStatus.WindowsHostSummaryAsync(cancellationToken);
+        var nvidiaProbe = _gpuStatus.SummaryAsync(cancellationToken);
+        var amdProbe = _gpuStatus.AmdSmiSummaryAsync(cancellationToken);
+        var intelProbe = _gpuStatus.IntelXpuSmiSummaryAsync(cancellationToken);
+        await Task.WhenAll(windowsProbe, nvidiaProbe, amdProbe, intelProbe);
+
+        var windows = await windowsProbe;
+        var accelerators = MergeHostAccelerators(
+            windows.GpuSummary,
+            await nvidiaProbe,
+            await amdProbe,
+            await intelProbe);
+        return CombinedHardwareSummary(
+            windows.CpuSummary,
+            windows.MemorySummary,
+            accelerators,
+            "Unavailable");
     }
 
     private async Task<string> AcceleratorSummaryAsync(
@@ -62,26 +133,134 @@ public sealed class RuntimeGpuSummaryApplicationService
             if (!IsUnavailable(processSummary)) return processSummary;
 
             return FilterConfiguredAccelerators(
-                await FirstAvailableAsync(
-                [() => _gpuStatus.SummaryAsync(cancellationToken),
-                    () => _gpuStatus.WindowsSummaryAsync(cancellationToken)]),
+                await HostAcceleratorSummaryAsync(cancellationToken),
                 activeSession.LaunchSettings);
         }
 
         if (activeSession.Backend == RuntimeBackend.Sycl)
             return FilterConfiguredAccelerators(
                 await FirstAvailableAsync(
-                [() => _gpuStatus.WindowsSummaryAsync(cancellationToken),
-                    () => activeSession.Mode == RuntimeMode.Wsl
+                [() => activeSession.Mode == RuntimeMode.Wsl
                         ? _gpuStatus.WslIntelArcSummaryAsync(_wslExe(), activeSession.LaunchSettings.WslDistro, cancellationToken)
-                        : _gpuStatus.WindowsIntelArcSummaryAsync(cancellationToken)]),
+                        : _gpuStatus.IntelXpuSmiSummaryAsync(cancellationToken),
+                    () => _gpuStatus.WindowsSummaryAsync(cancellationToken),
+                    () => _gpuStatus.WindowsIntelArcSummaryAsync(cancellationToken)]),
                 activeSession.LaunchSettings);
 
         return FilterConfiguredAccelerators(
-            await FirstAvailableAsync(
-                [() => _gpuStatus.WindowsSummaryAsync(cancellationToken),
-                    () => _gpuStatus.SummaryAsync(cancellationToken)]),
+            await HostAcceleratorSummaryAsync(cancellationToken),
             activeSession.LaunchSettings);
+    }
+
+    private async Task<string> HostAcceleratorSummaryAsync(CancellationToken cancellationToken)
+    {
+        var nvidiaProbe = _gpuStatus.SummaryAsync(cancellationToken);
+        var amdProbe = _gpuStatus.AmdSmiSummaryAsync(cancellationToken);
+        var intelProbe = _gpuStatus.IntelXpuSmiSummaryAsync(cancellationToken);
+        var windowsProbe = _gpuStatus.WindowsSummaryAsync(cancellationToken);
+        await Task.WhenAll(nvidiaProbe, amdProbe, intelProbe, windowsProbe);
+        return MergeHostAccelerators(
+            await windowsProbe,
+            await nvidiaProbe,
+            await amdProbe,
+            await intelProbe);
+    }
+
+    private static string MergeHostAccelerators(string windowsSummary, params string[] vendorSummaries)
+    {
+        var rich = vendorSummaries.Where(summary => !IsUnavailable(summary))
+            .SelectMany(AcceleratorLines)
+            .ToList();
+        if (rich.Count == 0) return windowsSummary;
+
+        var merged = new List<(int Index, string Line)>();
+        var usedIndices = new HashSet<int>();
+        foreach (var line in rich)
+        {
+            var index = AcceleratorIdentity(line).Index;
+            while (usedIndices.Contains(index)) index++;
+            merged.Add((index, WithAcceleratorIndex(line, index)));
+            usedIndices.Add(index);
+        }
+
+        if (IsUnavailable(windowsSummary))
+            return JoinAcceleratorLines(merged);
+
+        var matchedRich = new bool[merged.Count];
+        foreach (var windowsLine in AcceleratorLines(windowsSummary))
+        {
+            var windows = AcceleratorIdentity(windowsLine);
+            var richIndex = -1;
+            for (var candidateIndex = 0; candidateIndex < matchedRich.Length; candidateIndex++)
+            {
+                if (matchedRich[candidateIndex]
+                    || !AcceleratorsMatch(windows, AcceleratorIdentity(merged[candidateIndex].Line)))
+                    continue;
+                richIndex = candidateIndex;
+                break;
+            }
+            if (richIndex >= 0)
+            {
+                var selected = merged[richIndex];
+                merged[richIndex] = (selected.Index,
+                    WithAcceleratorIndex(WithAcceleratorIdentity(selected.Line, windowsLine), selected.Index));
+                matchedRich[richIndex] = true;
+                continue;
+            }
+
+            var nextIndex = usedIndices.Count == 0 ? 0 : usedIndices.Max() + 1;
+            merged.Add((nextIndex, WithAcceleratorIndex(windowsLine, nextIndex)));
+            usedIndices.Add(nextIndex);
+        }
+
+        return JoinAcceleratorLines(merged);
+    }
+
+    private static string JoinAcceleratorLines(IEnumerable<(int Index, string Line)> lines)
+        => string.Join(Environment.NewLine, lines.OrderBy(item => item.Index).Select(item => item.Line));
+
+    private static IEnumerable<string> AcceleratorLines(string summary)
+        => summary.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => Regex.IsMatch(line, @"^GPU\s+\d+\s*:",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+
+    private static (int Index, string NameKey) AcceleratorIdentity(string line)
+    {
+        var match = Regex.Match(line, @"^GPU\s+(\d+)\s*:\s*([^|]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        var index = match.Success
+                    && int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : 0;
+        var name = match.Success ? match.Groups[2].Value : line;
+        var key = Regex.Replace(name, @"[\s®™]+", " ").Trim().ToUpperInvariant();
+        return (index, key);
+    }
+
+    private static string WithAcceleratorIndex(string line, int index)
+        => Regex.Replace(line, @"^GPU\s+\d+\s*:", $"GPU {index}:",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static bool AcceleratorsMatch((int Index, string NameKey) host, (int Index, string NameKey) candidate)
+        => string.Equals(host.NameKey, candidate.NameKey, StringComparison.Ordinal)
+           || (host.Index == candidate.Index
+               && !string.IsNullOrWhiteSpace(Vendor(host.NameKey))
+               && string.Equals(Vendor(host.NameKey), Vendor(candidate.NameKey), StringComparison.Ordinal));
+
+    private static string Vendor(string name)
+        => name.Contains("NVIDIA", StringComparison.Ordinal) ? "NVIDIA"
+            : name.Contains("AMD", StringComparison.Ordinal) || name.Contains("RADEON", StringComparison.Ordinal) ? "AMD"
+            : name.Contains("INTEL", StringComparison.Ordinal) || name.Contains("ARC", StringComparison.Ordinal) ? "INTEL"
+            : "";
+
+    private static string WithAcceleratorIdentity(string richLine, string hostLine)
+    {
+        var host = Regex.Match(hostLine, @"^GPU\s+\d+\s*:\s*([^|]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return host.Success
+            ? Regex.Replace(richLine, @"^(GPU\s+\d+\s*:)\s*[^|]+", $"$1 {host.Groups[1].Value.Trim()} ",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+            : richLine;
     }
 
     private static async Task<string> FirstAvailableAsync(IReadOnlyList<Func<Task<string>>> probes)
@@ -99,13 +278,22 @@ public sealed class RuntimeGpuSummaryApplicationService
         => string.IsNullOrWhiteSpace(summary)
            || string.Equals(summary.Trim(), "Unavailable", StringComparison.OrdinalIgnoreCase);
 
-    private static string CombinedHardwareSummary(string cpu, string accelerator)
+    private static string CombinedHardwareSummary(string cpu, string memory, string accelerator, string process)
     {
         var lines = new List<string>();
         if (!IsUnavailable(cpu))
-            lines.AddRange(cpu.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Take(2));
+            lines.AddRange(cpu.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+        if (!IsUnavailable(memory))
+            lines.AddRange(memory.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Take(1));
+        if (!IsUnavailable(process))
+            lines.AddRange(process.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Take(1));
         if (!IsUnavailable(accelerator))
-            lines.AddRange(accelerator.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Take(2));
+            lines.AddRange(accelerator
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select((line, index) => Regex.IsMatch(line, @"^GPU\s+\d+\s*:",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
+                    ? line
+                    : $"GPU {index}: {line.Trim()}"));
         return lines.Count == 0 ? "Unavailable" : string.Join(Environment.NewLine, lines);
     }
 

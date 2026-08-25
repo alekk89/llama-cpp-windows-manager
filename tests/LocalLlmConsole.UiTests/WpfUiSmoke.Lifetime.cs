@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using LocalLlmConsole.Models;
+using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
 
 namespace LocalLlmConsole.UiTests;
@@ -30,7 +31,31 @@ public sealed partial class WpfUiSmokeTests
         Assert.Equal(
             ["1D", "7D", "30D", "All"],
             page.Controls.RangeSelector.Children.OfType<Button>().Select(button => button.Content).ToArray());
-        Assert.Equal(5, page.Controls.CalendarMetric.Items.Count);
+        Assert.Equal(6, page.Controls.CalendarMetric.Items.Count);
+        Assert.NotNull(page.Controls.GpuEnergyValue);
+        Assert.NotNull(page.Controls.GpuEnergyDetail);
+        var energyReport = new UsageMetricsService().BuildReport(
+            new UsageMetricsQuery(UsageMetricsRange.OneDay),
+            [],
+            [],
+            UsageMetricDimensions.Empty,
+            DateTimeOffset.UtcNow,
+            TimeZoneInfo.Utc,
+            energyBuckets:
+            [
+                new GpuEnergyBucket(DateTimeOffset.UtcNow.AddMinutes(-10), 1250, 600, true, 2, 2, DateTimeOffset.UtcNow)
+            ],
+            energyDeviceBuckets:
+            [
+                new GpuEnergyDeviceBucket(DateTimeOffset.UtcNow.AddMinutes(-10), "GPU 0: NVIDIA", 0, "NVIDIA", 750, 600, DateTimeOffset.UtcNow),
+                new GpuEnergyDeviceBucket(DateTimeOffset.UtcNow.AddMinutes(-10), "GPU 1: AMD", 1, "AMD", 500, 600, DateTimeOffset.UtcNow)
+            ],
+            electricityTariff: new ElectricityTariff("GBP", .30, .30, new TimeOnly(0, 0), new TimeOnly(7, 0)));
+        var lifetimeState = new LifetimePageState();
+        lifetimeState.Apply(page.Controls);
+        lifetimeState.ApplyPresentation(new LifetimeMetricsViewModel().ReplaceReport(energyReport));
+        Assert.Contains("kWh", page.Controls.GpuEnergyValue.Text, StringComparison.Ordinal);
+        Assert.Contains("GBP", page.Controls.GpuEnergyDetail.Text, StringComparison.Ordinal);
         Assert.Equal(UsageCalendarMetric.TotalTokens, page.Controls.HistoryCalendar.Metric);
         page.Controls.ClearDateSelectionButton.Visibility = Visibility.Visible;
         page.Content.UpdateLayout();
@@ -69,6 +94,14 @@ public sealed partial class WpfUiSmokeTests
         Assert.True(page.Controls.HistoryCalendar.ApplySelection(days[6].Date, UsageDateSelectionMode.Range));
         Assert.Equal(days[4..7].Select(day => day.Date), page.Controls.HistoryCalendar.SelectedDates);
         Assert.Equal(5, dateSelectionChanges);
+        var energyDay = days[0] with
+        {
+            GpuEnergy = new GpuEnergyTotals(1250, 3600, true, true, 1, 1)
+        };
+        page.Controls.HistoryCalendar.SetData([energyDay]);
+        page.Controls.CalendarMetric.SelectedIndex = 5;
+        Assert.Equal(UsageCalendarMetric.GpuEnergy, page.Controls.HistoryCalendar.Metric);
+        Assert.True(page.Controls.HistoryCalendar.ApplySelection(energyDay.Date, UsageDateSelectionMode.Replace));
         Assert.Contains("calendar", AutomationProperties.GetName(page.Controls.HistoryCalendar), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(ScrollBarVisibility.Disabled, page.Controls.HistoryScroller.HorizontalScrollBarVisibility);
         Assert.Equal(System.Windows.HorizontalAlignment.Stretch, page.Controls.HistoryScroller.HorizontalContentAlignment);

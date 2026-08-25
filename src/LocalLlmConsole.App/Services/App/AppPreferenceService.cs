@@ -43,6 +43,35 @@ public static class AppPreferenceService
         Loc.T("Pref.TrayAndTaskbar")
     ];
 
+    public static string RuntimeLogOrder(string text)
+    {
+        if (LocalizedEquals(text, "Pref.RuntimeLogLatestBottom")) return "oldestFirst";
+        if (LocalizedEquals(text, "Pref.RuntimeLogLatestTop")) return "newestFirst";
+
+        var value = (text ?? "").Trim()
+            .Replace("-", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("_", "", StringComparison.OrdinalIgnoreCase)
+            .Replace(" ", "", StringComparison.OrdinalIgnoreCase)
+            .ToLowerInvariant();
+        return value is "oldestfirst" or "latestbottom" or "latestonbottom" or "newestbottom"
+            ? "oldestFirst"
+            : "newestFirst";
+    }
+
+    public static bool RuntimeLogNewestFirst(string text)
+        => RuntimeLogOrder(text) == "newestFirst";
+
+    public static string RuntimeLogOrderLabel(string text)
+        => RuntimeLogNewestFirst(text)
+            ? Loc.T("Pref.RuntimeLogLatestTop")
+            : Loc.T("Pref.RuntimeLogLatestBottom");
+
+    public static IEnumerable<string> RuntimeLogOrderOptions() =>
+    [
+        Loc.T("Pref.RuntimeLogLatestTop"),
+        Loc.T("Pref.RuntimeLogLatestBottom")
+    ];
+
     public static string ModelAccessMode(string text)
     {
         if (LocalizedEquals(text, "Pref.GatewayLanOnly")) return "gateway";
@@ -121,6 +150,28 @@ public static class AppPreferenceService
         Loc.T("Pref.Yes"),
         Loc.T("Pref.No")
     ];
+
+    public static string EnableDisableLabel(bool value) => value ? Loc.T("Pref.Enable") : Loc.T("Pref.Disable");
+
+    public static IEnumerable<string> EnableDisableOptions() =>
+    [
+        Loc.T("Pref.Enable"),
+        Loc.T("Pref.Disable")
+    ];
+
+    public static bool EnableDisableValue(string text, bool fallback)
+    {
+        if (LocalizedEquals(text, "Pref.Enable")) return true;
+        if (LocalizedEquals(text, "Pref.Disable")) return false;
+
+        var value = (text ?? "").Trim().ToLowerInvariant();
+        return value switch
+        {
+            "enable" or "enabled" => true,
+            "disable" or "disabled" => false,
+            _ => YesNoValue(text ?? "", fallback)
+        };
+    }
 
     public static string ShowHideLabel(bool value) => value ? Loc.T("Pref.Show") : Loc.T("Pref.Hide");
 

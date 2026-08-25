@@ -162,7 +162,7 @@ public sealed partial class ReleaseHardeningTests
         var root = CreateTempRoot();
         var models = Path.Combine(root, "models");
         Directory.CreateDirectory(models);
-        var qwenMain = Path.Combine(models, "Qwen3.8-27B-Q4_K_M.gguf");
+        var qwenMain = Path.Combine(models, "Ornith-Qwen3.5-35B-A3B-MTP-APEX-4.0-UD-Q4_K_XL.gguf");
         var gemmaAssistant = Path.Combine(models, "Gemma-4-12B-it-assistant-Q8_0.gguf");
         WriteMinimalGguf(qwenMain, "qwen35", ("qwen35.nextn_predict_layers", 1u));
         WriteMinimalGguf(gemmaAssistant, "gemma4-assistant", ("gemma4.nextn_predict_layers", 4u));
@@ -170,10 +170,13 @@ public sealed partial class ReleaseHardeningTests
         await store.InitializeAsync();
         var catalog = new ModelCatalogService(store);
 
-        var registered = await catalog.ScanAsync(models);
+        var result = await catalog.ScanDetailedAsync(models);
         var saved = await store.ListModelsAsync();
 
-        Assert.Equal(1, registered);
+        Assert.Equal(1, result.RegisteredCount);
+        Assert.Equal(GgufFileRole.MainModel, result.Files.Single(file => file.Path == qwenMain).Role);
+        Assert.True(result.Files.Single(file => file.Path == qwenMain).EmbeddedDraftMtp);
+        Assert.Equal(GgufFileRole.SpeculativeAssistant, result.Files.Single(file => file.Path == gemmaAssistant).Role);
         Assert.Equal(qwenMain, Assert.Single(saved).ModelPath);
     }
 
@@ -186,9 +189,9 @@ public sealed partial class ReleaseHardeningTests
         var main = Path.Combine(models, "Gemma-main.gguf");
         var visionHead = Path.Combine(models, "Gemma-mtp-vision-f16.gguf");
         var draft = Path.Combine(models, "Gemma-MTP-draft.gguf");
-        await File.WriteAllTextAsync(main, "main", TestContext.Current.CancellationToken);
-        await File.WriteAllTextAsync(visionHead, "vision", TestContext.Current.CancellationToken);
-        await File.WriteAllTextAsync(draft, "draft", TestContext.Current.CancellationToken);
+        WriteMinimalGguf(main, "gemma");
+        WriteMinimalGguf(visionHead, "clip");
+        WriteMinimalGguf(draft, "gemma");
         await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
         await store.InitializeAsync();
         var catalog = new ModelCatalogService(store);

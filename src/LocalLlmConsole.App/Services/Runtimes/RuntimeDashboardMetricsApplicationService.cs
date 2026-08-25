@@ -6,7 +6,9 @@ public sealed record RuntimeMetricSummaryPresentation(
     string Slots,
     string KvCache,
     DateTimeOffset? LastKnownCapturedAt,
-    RuntimeMetricGraphSample GraphSample)
+    RuntimeMetricGraphSample GraphSample,
+    IReadOnlyList<PrometheusSample> Samples,
+    RuntimeMetricAtomicSnapshot? Atomic = null)
 {
     public static RuntimeMetricSummaryPresentation NoRuntime { get; } = new(
         "No runtime",
@@ -14,7 +16,9 @@ public sealed record RuntimeMetricSummaryPresentation(
         "Active 0/0 | Queued 0\nBusy/decode 0.0",
         "Used Unknown\nCapacity Unknown",
         LastKnownCapturedAt: null,
-        new RuntimeMetricGraphSample("", null, null, null, null, null));
+        new RuntimeMetricGraphSample("", null, null, null, null, null),
+        [],
+        RuntimeMetricAtomicSnapshot.Empty);
 }
 
 public sealed record RuntimeDashboardMetricsApplicationRequest(
@@ -104,7 +108,10 @@ public sealed class RuntimeDashboardMetricsApplicationService
             actions.ApplyMetricRows(_rowsRender.Unavailable(
                 decision.Error,
                 _telemetry.LastKnownSamples(request.RuntimeKey)));
-            actions.ApplyMetricSummary(unavailableSummary);
+            actions.ApplyMetricSummary(unavailableSummary with
+            {
+                Samples = _telemetry.LastKnownSamples(request.RuntimeKey)
+            });
         }
         return decision.Kind;
     }
@@ -123,7 +130,9 @@ public sealed class RuntimeDashboardMetricsApplicationService
             summary.Slots,
             summary.KvCache,
             summary.UsedLastKnown ? summary.LastKnownCapturedAt : null,
-            summary.GraphSample);
+            summary.GraphSample,
+            samples,
+            summary.Atomic);
     }
 
     private static void Validate(RuntimeDashboardMetricsApplicationActions actions)

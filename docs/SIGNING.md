@@ -1,6 +1,6 @@
 # Signing Windows Releases
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-25
 
 Trusted Windows releases should be Authenticode-signed and timestamped before
 upload. Unsigned community releases should be described as unsigned wherever

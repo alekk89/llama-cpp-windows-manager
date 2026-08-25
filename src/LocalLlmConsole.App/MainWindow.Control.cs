@@ -56,8 +56,10 @@ public partial class MainWindow
     private async Task<AppSettings> ApplyControlSettingsOnUiAsync(AppSettings settings, CancellationToken cancellationToken)
     {
         var previousCulture = _settings.UiCulture;
+        var previousRuntimeLogOrder = _settings.RuntimeLogOrder;
         var persisted = await AppServices.SettingsApplication.PersistAsync(settings, cancellationToken);
         _settings = persisted;
+        ApplyGpuEnergyTrackingBoundary();
         _serviceFactory.CreateWindowsStartupRegistrationService().Apply(persisted.StartWithWindows);
         ApplicationThemeService.Apply(persisted.ThemeMode);
         if (!string.Equals(previousCulture, persisted.UiCulture, StringComparison.OrdinalIgnoreCase))
@@ -71,6 +73,8 @@ public partial class MainWindow
         if (_viewModel.CurrentPage == "Settings")
             ShowSettings();
         await RefreshAllAsync();
+        if (!string.Equals(previousRuntimeLogOrder, persisted.RuntimeLogOrder, StringComparison.OrdinalIgnoreCase))
+            await RefreshRuntimeLogOrderAsync();
         SetStatus("Settings updated through the local control API.");
         return persisted;
     }

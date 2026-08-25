@@ -35,10 +35,10 @@ public sealed partial class ReleaseHardeningTests
     {
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
 
-        Assert.Contains("<Version>2.3.0</Version>", project, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>2.3.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>2.3.0.0</FileVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>v2.3.0</InformationalVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<Version>2.4.0</Version>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>2.4.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>2.4.0.0</FileVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>v2.4.0</InformationalVersion>", project, StringComparison.Ordinal);
     }
 
     [Fact]

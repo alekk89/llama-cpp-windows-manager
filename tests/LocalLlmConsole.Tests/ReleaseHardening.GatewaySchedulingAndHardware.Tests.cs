@@ -140,9 +140,9 @@ public sealed partial class ReleaseHardeningTests
     [Fact]
     public void GpuStatusServiceFormatsNvidiaSmiCsvLine()
     {
-        var formatted = GpuStatusService.FormatNvidiaSmiCsvLine("0, NVIDIA RTX, 76, 62, 12288, 24576");
+        var formatted = GpuStatusService.FormatNvidiaSmiCsvLine("0, NVIDIA RTX, 76, 62, 12288, 24576, 205.4, 1695");
 
-        Assert.Equal("GPU 0: NVIDIA RTX | 76% | 62C | 12.0/24.0 GiB", formatted);
+        Assert.Equal("GPU 0: NVIDIA RTX | 76% load | 62 °C | 12.0/24.0 GiB VRAM | 205.4 W | 1695 MHz core", formatted);
         Assert.Equal("GPU 0: 76% | 62C | 12.0/24.0 GiB", GpuStatusService.NormalizeMetricSeparators("GPU 0: 76%|62C|12.0/24.0 GiB"));
     }
 
@@ -166,9 +166,9 @@ public sealed partial class ReleaseHardeningTests
 
         var formatted = GpuStatusService.FormatWindowsGpuStatusJson(json);
 
-        Assert.Equal(["GPU 0: AMD Radeon RX 7900 XTX | 53.4% | 8.0/24.0 GiB"], formatted);
+        Assert.Equal(["GPU 0: AMD Radeon RX 7900 XTX | 53.4% load | 8.0/24.0 GiB VRAM"], formatted);
         Assert.Equal(
-            ["GPU 0: Intel(R) Graphics | 12% | 1.5 GiB used"],
+            ["GPU 0: Intel(R) Graphics | 12% load | 1.5 GiB VRAM used"],
             GpuStatusService.FormatWindowsGpuStatusJson("[{\"Index\":0,\"Name\":\"Intel(R) Graphics\",\"Utilization\":12,\"MemoryUsedBytes\":1610612736}]"));
     }
 
@@ -179,8 +179,11 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal("CPU: 42C", GpuStatusService.FormatWindowsCpuTemperatureJson("[{\"CurrentTemperature\":3151.5},{\"TemperatureCelsius\":36.4}]"));
         Assert.Equal("", GpuStatusService.FormatWindowsCpuTemperatureJson("{}"));
         Assert.Equal(
-            $"CPU: AMD Ryzen 9 7950X{Environment.NewLine}Telemetry: 18.5% load | 16C/32T | 57.2 °C thermal",
-            GpuStatusService.FormatWindowsCpuStatusJson("{\"Name\":\"AMD Ryzen 9 7950X 16-Core Processor\",\"Utilization\":18.5,\"PhysicalCores\":16,\"LogicalProcessors\":32,\"TemperatureCelsius\":57.2}"));
+            $"CPU: AMD Ryzen 9 7950X{Environment.NewLine}Telemetry: 18.5% load | 16C/32T | 57.2 °C thermal | 5200 MHz core",
+            GpuStatusService.FormatWindowsCpuStatusJson("{\"Name\":\"AMD Ryzen 9 7950X 16-Core Processor\",\"Utilization\":18.5,\"PhysicalCores\":16,\"LogicalProcessors\":32,\"TemperatureCelsius\":57.2,\"CurrentClockMHz\":5200}"));
+        Assert.Equal(
+            "RAM: 12.0/32.0 GiB | 37.5% | 6000 MHz",
+            GpuStatusService.FormatWindowsMemoryStatusJson("{\"UsedBytes\":12884901888,\"TotalBytes\":34359738368,\"UsagePercent\":37.5,\"ClockMHz\":6000}"));
     }
 
 
@@ -195,14 +198,16 @@ public sealed partial class ReleaseHardeningTests
             if (string.Equals(Path.GetFileName(psi.FileName), "powershell.exe", StringComparison.OrdinalIgnoreCase))
             {
                 var script = DecodePowerShellCommand(psi);
+                if (script.Contains("Win32_OperatingSystem", StringComparison.Ordinal))
+                    return new ProcessRunResult(0, "{\"UsedBytes\":12884901888,\"TotalBytes\":34359738368,\"UsagePercent\":37.5}", "");
                 return script.Contains("MSAcpi_ThermalZoneTemperature", StringComparison.Ordinal)
                     ? new ProcessRunResult(0, "{\"TemperatureCelsius\":57.2}", "")
                     : new ProcessRunResult(0, "[{\"Index\":0,\"Name\":\"AMD Radeon RX 7900 XTX\",\"Utilization\":53.4,\"MemoryUsedBytes\":8589934592,\"MemoryTotalBytes\":25769803776}]", "");
             }
             if (psi.ArgumentList.Contains("--query-gpu=memory.free,memory.total"))
                 return new ProcessRunResult(0, "1024, 24576\n8192, 24576", "");
-            if (psi.ArgumentList.Contains("--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total"))
-                return new ProcessRunResult(0, "0, NVIDIA RTX, 76, 62, 12288, 24576", "");
+            if (psi.ArgumentList.Contains("--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total,power.draw,clocks.gr"))
+                return new ProcessRunResult(0, "0, NVIDIA RTX, 76, 62, 12288, 24576, 205.4, 1695", "");
             return new ProcessRunResult(0, "[level_zero:gpu][level_zero:0] Intel(R) Arc(TM) A770 Graphics", "");
         });
         var service = new GpuStatusProbeService(runner, () => "sycl-ls.exe", () => "nvidia-smi.exe", () => "powershell.exe");
@@ -212,20 +217,22 @@ public sealed partial class ReleaseHardeningTests
         var windows = await service.WindowsSummaryAsync(TestContext.Current.CancellationToken);
         var cpu = await service.CpuTemperatureAsync(TestContext.Current.CancellationToken);
         var cpuSummary = await service.CpuSummaryAsync(TestContext.Current.CancellationToken);
+        var memorySummary = await service.SystemMemorySummaryAsync(TestContext.Current.CancellationToken);
         var sycl = await service.WindowsIntelArcSummaryAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(memory);
         Assert.Equal(9, memory.FreeGiB);
         Assert.Equal(48, memory.TotalGiB);
-        Assert.Equal("GPU 0: NVIDIA RTX | 76% | 62C | 12.0/24.0 GiB", summary);
-        Assert.Equal("GPU 0: AMD Radeon RX 7900 XTX | 53.4% | 8.0/24.0 GiB", windows);
+        Assert.Equal("GPU 0: NVIDIA RTX | 76% load | 62 °C | 12.0/24.0 GiB VRAM | 205.4 W | 1695 MHz core", summary);
+        Assert.Equal("GPU 0: AMD Radeon RX 7900 XTX | 53.4% load | 8.0/24.0 GiB VRAM", windows);
         Assert.Equal("CPU: 57.2C", cpu);
         Assert.Equal("Telemetry: 57.2 °C thermal", cpuSummary);
+        Assert.Equal("RAM: 12.0/32.0 GiB | 37.5%", memorySummary);
         Assert.Equal("Intel(R) Arc(TM) A770 Graphics", sycl);
         Assert.Contains(commands, command => command.StartsWith("powershell", StringComparison.OrdinalIgnoreCase)
             && command.Contains("-EncodedCommand", StringComparison.Ordinal));
         Assert.Contains(commands, command => command.Contains("--query-gpu=memory.free,memory.total", StringComparison.Ordinal));
-        Assert.Contains(commands, command => command.Contains("--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total", StringComparison.Ordinal));
+        Assert.Contains(commands, command => command.Contains("--query-gpu=index,name,utilization.gpu,temperature.gpu,memory.used,memory.total,power.draw,clocks.gr", StringComparison.Ordinal));
         Assert.Contains(commands, command => command.StartsWith("sycl-ls", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("Process.Start(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("new GpuStatusProbeService", source, StringComparison.Ordinal);

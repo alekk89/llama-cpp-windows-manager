@@ -35,9 +35,8 @@ public sealed record RuntimeDashboardRefreshApplicationActions(
     Func<Task<(string Model, string Runtime)>> ActiveRuntimeLabelsAsync,
     Action<string> RefreshModelStatusMetric,
     Func<Task> SaveActiveRuntimeSessionsAsync,
-    Action UpdateRuntimeModelProgress,
-    Func<Task<string>> CachedGpuSummaryAsync,
-    Action<string> SetGpuMetric,
+    Func<Task<HostHardwareSnapshot>> CachedGpuSummaryAsync,
+    Func<HostHardwareSnapshot, Task> SetGpuMetricAsync,
     Func<ModelRecord?, bool, Task> RenderStoppedSelectedOverviewModelAsync,
     RuntimeDashboardMetricsApplicationActions MetricsActions,
     Action UpdateOverviewModelActions);
@@ -83,6 +82,9 @@ public sealed class RuntimeDashboardRefreshApplicationService
             await actions.TrackLifetimeTokenDeltasAsync(pollResults);
             await actions.ApplyIdleUnloadPoliciesAsync(pollResults);
 
+            if (request.RenderOverview)
+                await actions.SetGpuMetricAsync(await actions.CachedGpuSummaryAsync());
+
             var selectedOverviewModel = actions.SelectedOverviewModel();
             var selectedOverviewModelSession = selectedOverviewModel is null
                 ? null
@@ -119,12 +121,6 @@ public sealed class RuntimeDashboardRefreshApplicationService
 
             if (request.RuntimeState == LlamaRuntimeState.Failed)
                 await actions.SaveActiveRuntimeSessionsAsync();
-
-            if (request.RenderOverview)
-            {
-                actions.UpdateRuntimeModelProgress();
-                actions.SetGpuMetric(await actions.CachedGpuSummaryAsync());
-            }
 
             await _metricsApplication.ApplyAsync(
                 new RuntimeDashboardMetricsApplicationRequest(
@@ -163,9 +159,8 @@ public sealed class RuntimeDashboardRefreshApplicationService
         ArgumentNullException.ThrowIfNull(actions.ActiveRuntimeLabelsAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshModelStatusMetric);
         ArgumentNullException.ThrowIfNull(actions.SaveActiveRuntimeSessionsAsync);
-        ArgumentNullException.ThrowIfNull(actions.UpdateRuntimeModelProgress);
         ArgumentNullException.ThrowIfNull(actions.CachedGpuSummaryAsync);
-        ArgumentNullException.ThrowIfNull(actions.SetGpuMetric);
+        ArgumentNullException.ThrowIfNull(actions.SetGpuMetricAsync);
         ArgumentNullException.ThrowIfNull(actions.RenderStoppedSelectedOverviewModelAsync);
         ArgumentNullException.ThrowIfNull(actions.MetricsActions);
         ArgumentNullException.ThrowIfNull(actions.UpdateOverviewModelActions);

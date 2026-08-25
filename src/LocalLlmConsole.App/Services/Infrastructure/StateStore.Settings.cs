@@ -50,6 +50,20 @@ public sealed partial class StateStore
             return fallback;
         }
 
+        OverviewDashboardLayout? DashboardLayoutValue(string key)
+        {
+            if (!values.TryGetValue(key, out var value)) return null;
+            try
+            {
+                return JsonSerializer.Deserialize<OverviewDashboardLayout>(value);
+            }
+            catch
+            {
+                corrupt[key] = value;
+                return null;
+            }
+        }
+
         var settings = defaults with
         {
             WorkspaceRoot = StringValue("workspaceRoot", defaults.WorkspaceRoot),
@@ -64,8 +78,16 @@ public sealed partial class StateStore
             ShowOverviewMtpTokens = BoolValue("showOverviewMtpTokens", defaults.ShowOverviewMtpTokens),
             ShowOverviewKvCache = BoolValue("showOverviewKvCache", defaults.ShowOverviewKvCache),
             ShowOverviewLiveRuntimeLog = BoolValue("showOverviewLiveRuntimeLog", defaults.ShowOverviewLiveRuntimeLog),
+            RuntimeLogOrder = AppPreferenceService.RuntimeLogOrder(StringValue("runtimeLogOrder", defaults.RuntimeLogOrder)),
             ShowOverviewAllMetrics = BoolValue("showOverviewAllMetrics", defaults.ShowOverviewAllMetrics),
             ShowModelsHuggingFace = BoolValue("showModelsHuggingFace", defaults.ShowModelsHuggingFace),
+            OverviewDashboardLayout = DashboardLayoutValue("overviewDashboardLayout"),
+            ElectricityCurrencyCode = StringValue("electricityCurrencyCode", defaults.ElectricityCurrencyCode),
+            ElectricityDayRatePerKwh = DoubleValue("electricityDayRatePerKwh", defaults.ElectricityDayRatePerKwh),
+            ElectricityNightRatePerKwh = DoubleValue("electricityNightRatePerKwh", defaults.ElectricityNightRatePerKwh),
+            ElectricityNightStartLocal = StringValue("electricityNightStartLocal", defaults.ElectricityNightStartLocal),
+            ElectricityNightEndLocal = StringValue("electricityNightEndLocal", defaults.ElectricityNightEndLocal),
+            TrackGpuEnergyWhileIdle = BoolValue("trackGpuEnergyWhileIdle", defaults.TrackGpuEnergyWhileIdle),
             MinimizeBehavior = StringValue("minimizeBehavior", defaults.MinimizeBehavior),
             StartWithWindows = BoolValue("startWithWindows", defaults.StartWithWindows),
             ModelAccessMode = AppPreferenceService.ModelAccessMode(StringValue("modelAccessMode", defaults.ModelAccessMode)),
@@ -73,7 +95,7 @@ public sealed partial class StateStore
             AutoLoadGatewayPort = Math.Clamp(IntValue("autoLoadGatewayPort", defaults.AutoLoadGatewayPort), 1, 65535),
             AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(StringValue("autoLoadGatewayPolicy", defaults.AutoLoadGatewayPolicy)),
             Host = StringValue("host", defaults.Host),
-            RequireApiKeyAuth = true,
+            RequireApiKeyAuth = BoolValue("requireApiKeyAuth", defaults.RequireApiKeyAuth),
             ModelApiKey = SecretProtector.UnprotectSetting(StringValue("modelApiKey", defaults.ModelApiKey)),
             ModelApiKeyBackup = SecretProtector.UnprotectSetting(StringValue("modelApiKeyBackup", defaults.ModelApiKeyBackup)),
             WslDistro = StringValue("wslDistro", defaults.WslDistro),
@@ -144,16 +166,55 @@ public sealed partial class StateStore
             UiCulture = StringValue("uiCulture", defaults.UiCulture)
         };
 
-        var migratedRequiredApiKey = !BoolValue("requireApiKeyAuth", defaults.RequireApiKeyAuth)
-                                     || !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKey)
-                                     || !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKeyBackup);
-        if (migratedRequiredApiKey)
+        var legacyDashboardVisibility = OverviewDashboardLayoutPolicy.LegacyVisibility(settings);
+        var normalizedDashboardLayout = OverviewDashboardLayoutPolicy.Normalize(
+            settings.OverviewDashboardLayout,
+            legacyDashboardVisibility);
+        var migratedDashboardLayout = !values.ContainsKey("overviewDashboardLayout")
+                                      || !string.Equals(
+                                          JsonSerializer.Serialize(settings.OverviewDashboardLayout),
+                                          JsonSerializer.Serialize(normalizedDashboardLayout),
+                                          StringComparison.Ordinal);
+        settings = OverviewDashboardLayoutPolicy.WithLayout(settings, normalizedDashboardLayout);
+
+        var storedTariffIsValid = ElectricityTariffPolicy.TryCreate(
+            settings.ElectricityCurrencyCode,
+            settings.ElectricityDayRatePerKwh,
+            settings.ElectricityNightRatePerKwh,
+            settings.ElectricityNightStartLocal,
+            settings.ElectricityNightEndLocal,
+            out var normalizedTariff,
+            out _);
+        normalizedTariff = storedTariffIsValid
+            ? normalizedTariff
+            : ElectricityTariffPolicy.FromSettings(defaults);
+        var migratedElectricityTariff = !storedTariffIsValid
+                                        || !string.Equals(settings.ElectricityCurrencyCode, normalizedTariff.CurrencyCode, StringComparison.Ordinal)
+                                        || !string.Equals(settings.ElectricityNightStartLocal, ElectricityTariffPolicy.TimeText(normalizedTariff.NightStartLocal), StringComparison.Ordinal)
+                                        || !string.Equals(settings.ElectricityNightEndLocal, ElectricityTariffPolicy.TimeText(normalizedTariff.NightEndLocal), StringComparison.Ordinal);
+        settings = settings with
+        {
+            ElectricityCurrencyCode = normalizedTariff.CurrencyCode,
+            ElectricityDayRatePerKwh = normalizedTariff.DayRatePerKwh,
+            ElectricityNightRatePerKwh = normalizedTariff.NightRatePerKwh,
+            ElectricityNightStartLocal = ElectricityTariffPolicy.TimeText(normalizedTariff.NightStartLocal),
+            ElectricityNightEndLocal = ElectricityTariffPolicy.TimeText(normalizedTariff.NightEndLocal)
+        };
+
+        var unsafeUnauthenticatedAccess = !settings.RequireApiKeyAuth
+                                          && !ModelAccessPolicy.AllowsUnauthenticatedAccess(settings.ModelAccessMode);
+        var migratedApiKeyPolicy = unsafeUnauthenticatedAccess
+                                   || (settings.RequireApiKeyAuth && !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKey))
+                                   || !ApiSecurity.IsStrongBearerSecret(settings.ModelApiKeyBackup)
+                                   || (!settings.RequireApiKeyAuth && !string.IsNullOrWhiteSpace(settings.ModelApiKey));
+        if (migratedApiKeyPolicy)
         {
             var apiKey = ApiSecurity.StrongBearerSecretOrNew(settings.ModelApiKey, settings.ModelApiKeyBackup);
+            var requireApiKeyAuth = settings.RequireApiKeyAuth || unsafeUnauthenticatedAccess;
             settings = settings with
             {
-                RequireApiKeyAuth = true,
-                ModelApiKey = apiKey,
+                RequireApiKeyAuth = requireApiKeyAuth,
+                ModelApiKey = requireApiKeyAuth ? apiKey : "",
                 ModelApiKeyBackup = apiKey
             };
         }
@@ -197,7 +258,7 @@ public sealed partial class StateStore
         {
             await BackupCorruptSettingsAsync(corrupt);
         }
-        if (corrupt.Count > 0 || migratedLegacyLaunchDefaults || migratedRequiredApiKey)
+        if (corrupt.Count > 0 || migratedLegacyLaunchDefaults || migratedApiKeyPolicy || migratedDashboardLayout || migratedElectricityTariff)
         {
             await SaveAppSettingsAsync(settings);
         }
@@ -207,6 +268,16 @@ public sealed partial class StateStore
 
     public async Task SaveAppSettingsAsync(AppSettings settings)
     {
+        settings = OverviewDashboardLayoutPolicy.WithLayout(settings, settings.OverviewDashboardLayout);
+        var tariff = ElectricityTariffPolicy.FromSettings(settings);
+        settings = settings with
+        {
+            ElectricityCurrencyCode = tariff.CurrencyCode,
+            ElectricityDayRatePerKwh = tariff.DayRatePerKwh,
+            ElectricityNightRatePerKwh = tariff.NightRatePerKwh,
+            ElectricityNightStartLocal = ElectricityTariffPolicy.TimeText(tariff.NightStartLocal),
+            ElectricityNightEndLocal = ElectricityTariffPolicy.TimeText(tariff.NightEndLocal)
+        };
         var rows = new (string Key, object Value)[]
         {
             ("workspaceRoot", settings.WorkspaceRoot),
@@ -221,8 +292,16 @@ public sealed partial class StateStore
             ("showOverviewMtpTokens", settings.ShowOverviewMtpTokens),
             ("showOverviewKvCache", settings.ShowOverviewKvCache),
             ("showOverviewLiveRuntimeLog", settings.ShowOverviewLiveRuntimeLog),
+            ("runtimeLogOrder", AppPreferenceService.RuntimeLogOrder(settings.RuntimeLogOrder)),
             ("showOverviewAllMetrics", settings.ShowOverviewAllMetrics),
             ("showModelsHuggingFace", settings.ShowModelsHuggingFace),
+            ("overviewDashboardLayout", OverviewDashboardLayoutPolicy.Normalize(settings.OverviewDashboardLayout)),
+            ("electricityCurrencyCode", settings.ElectricityCurrencyCode),
+            ("electricityDayRatePerKwh", settings.ElectricityDayRatePerKwh),
+            ("electricityNightRatePerKwh", settings.ElectricityNightRatePerKwh),
+            ("electricityNightStartLocal", settings.ElectricityNightStartLocal),
+            ("electricityNightEndLocal", settings.ElectricityNightEndLocal),
+            ("trackGpuEnergyWhileIdle", settings.TrackGpuEnergyWhileIdle),
             ("minimizeBehavior", settings.MinimizeBehavior),
             ("startWithWindows", settings.StartWithWindows),
             ("modelAccessMode", AppPreferenceService.ModelAccessMode(settings.ModelAccessMode)),

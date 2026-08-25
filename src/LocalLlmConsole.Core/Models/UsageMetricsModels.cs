@@ -171,6 +171,107 @@ public sealed record UsageMetricTotals(
     }
 }
 
+public sealed record GpuPowerSensorReading(
+    string Key,
+    int GpuIndex,
+    string GpuName,
+    double Watts);
+
+public sealed record GpuPowerObservation(
+    DateTimeOffset CapturedAt,
+    double TotalWatts,
+    IReadOnlyList<string> SensorKeys,
+    int DetectedGpuCount)
+{
+    public IReadOnlyList<GpuPowerSensorReading> Sensors { get; init; } = [];
+
+    public int ObservedGpuCount => SensorKeys?.Count ?? 0;
+
+    public bool HasPower => double.IsFinite(TotalWatts) && TotalWatts >= 0 && ObservedGpuCount > 0;
+
+    public bool HasCompleteCoverage => HasPower && ObservedGpuCount == DetectedGpuCount;
+}
+
+public sealed record GpuEnergyDelta(
+    DateTimeOffset BucketStartUtc,
+    double WattHours,
+    double SampledSeconds,
+    bool CompleteCoverage,
+    int ObservedGpuCount,
+    int DetectedGpuCount,
+    DateTimeOffset CapturedAt);
+
+public sealed record GpuEnergyBucket(
+    DateTimeOffset BucketStartUtc,
+    double WattHours,
+    double SampledSeconds,
+    bool CompleteCoverage,
+    int ObservedGpuCount,
+    int DetectedGpuCount,
+    DateTimeOffset UpdatedAt);
+
+public sealed record GpuEnergyDeviceDelta(
+    DateTimeOffset BucketStartUtc,
+    string SensorKey,
+    int GpuIndex,
+    string GpuName,
+    double WattHours,
+    double SampledSeconds,
+    DateTimeOffset CapturedAt);
+
+public sealed record GpuEnergyDeviceBucket(
+    DateTimeOffset BucketStartUtc,
+    string SensorKey,
+    int GpuIndex,
+    string GpuName,
+    double WattHours,
+    double SampledSeconds,
+    DateTimeOffset UpdatedAt);
+
+public sealed record GpuEnergyDeviceTotals(
+    string SensorKey,
+    int GpuIndex,
+    string GpuName,
+    double WattHours,
+    double SampledSeconds)
+{
+    public double KilowattHours => WattHours / 1000;
+}
+
+public sealed record GpuEnergySampleResult(
+    IReadOnlyList<GpuEnergyDelta> TotalDeltas,
+    IReadOnlyList<GpuEnergyDeviceDelta> DeviceDeltas)
+{
+    public static GpuEnergySampleResult Empty { get; } = new([], []);
+}
+
+public sealed record GpuEnergyTotals(
+    double WattHours,
+    double SampledSeconds,
+    bool PowerObserved,
+    bool CompleteCoverage,
+    int ObservedGpuCount,
+    int DetectedGpuCount)
+{
+    public static GpuEnergyTotals Empty { get; } = new(0, 0, false, false, 0, 0);
+
+    public double KilowattHours => WattHours / 1000;
+
+    public static GpuEnergyTotals Sum(IEnumerable<GpuEnergyBucket> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        var buckets = values.Where(value => value.SampledSeconds > 0).ToArray();
+        if (buckets.Length == 0) return Empty;
+        return new GpuEnergyTotals(
+            buckets.Sum(value => Math.Max(0, value.WattHours)),
+            buckets.Sum(value => Math.Max(0, value.SampledSeconds)),
+            true,
+            buckets.All(value => value.CompleteCoverage),
+            buckets.Min(value => value.ObservedGpuCount),
+            buckets.Max(value => value.DetectedGpuCount));
+    }
+}
+
 public sealed record UsageMetricsQuery(
     UsageMetricsRange Range = UsageMetricsRange.All,
     string ModelId = "",
@@ -187,7 +288,8 @@ public sealed record UsageMetricsWindow(
 public sealed record UsageMetricDay(
     DateOnly Date,
     UsageMetricTotals Totals,
-    bool IsTracked = true);
+    bool IsTracked = true,
+    GpuEnergyTotals? GpuEnergy = null);
 
 public sealed record UsageMetricModelBreakdown(
     string ModelId,
@@ -217,4 +319,8 @@ public sealed record UsageMetricsReport(
     UsageMetricDimensions Dimensions,
     UsageMetricsInsights Insights,
     DateTimeOffset? TrackingStartedAt,
-    bool IncludesLegacyTotals);
+    bool IncludesLegacyTotals,
+    GpuEnergyTotals? GpuEnergy = null,
+    DateTimeOffset? GpuEnergyTrackingStartedAt = null,
+    IReadOnlyList<GpuEnergyDeviceTotals>? GpuEnergyDevices = null,
+    ElectricityCostTotals? GpuElectricityCost = null);

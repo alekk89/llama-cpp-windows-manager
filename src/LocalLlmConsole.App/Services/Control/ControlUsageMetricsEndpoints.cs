@@ -35,7 +35,10 @@ internal sealed class ControlUsageMetricsEndpoints : ControlEndpointHandler
             Query(request, "profile", ""),
             Query(request, "runtime", ""),
             dates);
-        var report = await _lifetimeMetrics.GetReportAsync(query, timeZone);
+        var report = await _lifetimeMetrics.GetReportAsync(
+            query,
+            timeZone,
+            electricityTariff: ElectricityTariffPolicy.FromSettings(_deps.Actions.GetSettings()));
         return Ok(new
         {
             ok = true,
@@ -66,6 +69,19 @@ internal sealed class ControlUsageMetricsEndpoints : ControlEndpointHandler
             },
             summary = TotalsView(report.Summary),
             trackedSummary = TotalsView(report.TrackedSummary),
+            gpuEnergy = EnergyView(report.GpuEnergy),
+            gpuElectricityCost = CostView(report.GpuElectricityCost),
+            gpuEnergyDevices = (report.GpuEnergyDevices ?? [])
+                .Select(device => new
+                {
+                    sensorKey = device.SensorKey,
+                    gpuIndex = device.GpuIndex,
+                    gpuName = device.GpuName,
+                    wattHours = device.WattHours,
+                    kilowattHours = device.KilowattHours,
+                    sampledSeconds = device.SampledSeconds
+                })
+                .ToArray(),
             days = report.Days.Select(DayView).ToArray(),
             calendarWindow = new
             {
@@ -100,6 +116,7 @@ internal sealed class ControlUsageMetricsEndpoints : ControlEndpointHandler
                 peakTotals = TotalsView(report.Insights.PeakTotals)
             },
             trackingStartedAt = report.TrackingStartedAt,
+            gpuEnergyTrackingStartedAt = report.GpuEnergyTrackingStartedAt,
             includesLegacyTotals = report.IncludesLegacyTotals
         };
 
@@ -132,7 +149,29 @@ internal sealed class ControlUsageMetricsEndpoints : ControlEndpointHandler
         {
             date = day.Date.ToString("yyyy-MM-dd"),
             totals = TotalsView(day.Totals),
+            gpuEnergy = EnergyView(day.GpuEnergy),
             isTracked = day.IsTracked
+        };
+
+    private static object EnergyView(GpuEnergyTotals? energy)
+        => new
+        {
+            wattHours = energy?.WattHours ?? 0,
+            kilowattHours = energy?.KilowattHours ?? 0,
+            sampledSeconds = energy?.SampledSeconds ?? 0,
+            powerObserved = energy?.PowerObserved ?? false,
+            completeCoverage = energy?.CompleteCoverage ?? false,
+            observedGpuCount = energy?.ObservedGpuCount ?? 0,
+            detectedGpuCount = energy?.DetectedGpuCount ?? 0
+        };
+
+    private static object? CostView(ElectricityCostTotals? cost)
+        => cost is null ? null : new
+        {
+            amount = cost.Amount,
+            currencyCode = cost.CurrencyCode,
+            dayRatePerKwh = cost.DayRatePerKwh,
+            nightRatePerKwh = cost.NightRatePerKwh
         };
 
     private static object DimensionView(UsageMetricDimension dimension)

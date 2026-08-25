@@ -10,7 +10,7 @@ namespace LocalLlmConsole;
 public partial class MainWindow
 {
     private const string AppDisplayName = "llama.cpp Windows Manager";
-    private const string AppVersionLabel = "v2.3.0";
+    private const string AppVersionLabel = "v2.4.0";
 
     private readonly string _workspaceRoot;
     private readonly AppServiceFactory _serviceFactory;
@@ -41,6 +41,10 @@ public partial class MainWindow
     private readonly RuntimesPageState _runtimesPage;
     private readonly LogsPageState _logsPage;
     private readonly LifetimePageState _lifetimePage;
+    private readonly SemaphoreSlim _lifetimeMetricsRefreshGate = new(1, 1);
+    private long _lastLifetimeReportDataVersion = -1;
+    private DateTimeOffset _nextLifetimeReportRefreshAt = DateTimeOffset.MinValue;
+    private readonly MinimizedUiRefreshPolicy _minimizedUiRefreshPolicy = new();
     private readonly SettingsPageState _settingsPage;
     private Task<long>? _settingsCacheSizeRefreshTask;
     private string _settingsCacheSizeRoot = "";

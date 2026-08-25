@@ -17,26 +17,33 @@ public partial class MainWindow
     private void ShowOverview()
         => ShowOverview(refresh: true);
 
-    private void ShowOverview(bool refresh)
+    private void ShowOverview(bool refresh, bool rebuild = false)
     {
         _pageControllers.Overview.CancelPendingSelections();
         SetPage("Overview", Loc.T("PageSubtitle.Overview"));
-        var overview = OverviewPageFactory.Create(new OverviewPageRequest(
-            _viewModel,
-            _pageControllers.Overview.Build(),
-            SetRuntimeMetricsGridColumnSizing));
+        if (rebuild || !_overviewPage.IsAvailable)
+        {
+            var overview = OverviewPageFactory.Create(new OverviewPageRequest(
+                _viewModel,
+                _pageControllers.Overview.Build(),
+                SetRuntimeMetricsGridColumnSizing,
+                _settings.OverviewDashboardLayout));
+            _overviewPage.Apply(overview);
+            _overviewPage.ApplyUiPreferences(_settings);
+            _runtimeDashboardPage.Apply(overview);
+        }
+        else
+        {
+            _overviewPage.ApplyUiPreferences(_settings);
+        }
 
-        _overviewPage.Apply(overview);
-        _overviewPage.ApplyUiPreferences(_settings);
-        _runtimeDashboardPage.Apply(overview);
-
-        PageHost.Content = overview.Root;
+        PageHost.Content = _overviewPage.Scroller;
+        StartRuntimeDashboardRefreshTimer();
         if (refresh)
         {
             RunBackground(RefreshOverviewAsync, "Overview refresh failed");
             RunBackground(RefreshOverviewModelSelectorAsync, "Overview model refresh failed");
             RunBackground(RefreshRuntimeMetricsAsync, "Runtime metrics refresh failed");
-            StartRuntimeDashboardRefreshTimer();
         }
     }
 
@@ -77,9 +84,11 @@ public partial class MainWindow
         {
             var catalog = ModelServices.Catalog;
             Require(catalog);
-            await catalog!.ScanAsync(_settings.ModelsRoot);
+            var result = await catalog!.ScanDetailedAsync(_settings.ModelsRoot);
             await RefreshModelsAsync();
             await RefreshOverviewAsync();
+            SetStatus(result.Summary);
+            ShowModelScanDiagnostics(result);
         });
     }
 
@@ -87,7 +96,7 @@ public partial class MainWindow
     {
         switch (_viewModel.CurrentPage)
         {
-            case "Overview": ShowOverview(); break;
+            case "Overview": ShowOverview(refresh: true, rebuild: true); break;
             case "Models": ShowModels(); break;
             case "Runtimes": ShowRuntimes(); break;
             case "Settings": ShowSettings(); break;

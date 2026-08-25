@@ -442,6 +442,7 @@ public sealed partial class ReleaseHardeningTests
         await service.CleanupAsync(new AppShutdownCleanupActions(
             () => calls.Add("stop-download-history"),
             () => calls.Add("stop-runtime-dashboard"),
+            () => calls.Add("stop-gpu-energy"),
             () => calls.Add("cancel-launch-settings"),
             () => calls.Add("stop-readiness"),
             () => calls.Add("dispose-tray"),
@@ -462,6 +463,7 @@ public sealed partial class ReleaseHardeningTests
         Assert.Equal([
             "stop-download-history",
             "stop-runtime-dashboard",
+            "stop-gpu-energy",
             "cancel-launch-settings",
             "stop-readiness",
             "dispose-tray",

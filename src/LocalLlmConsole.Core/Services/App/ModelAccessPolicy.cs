@@ -27,6 +27,9 @@ public static class ModelAccessPolicy
     public static bool DirectModelsAllowLanAccess(string? text)
         => Normalize(text) is "models" or "both";
 
+    public static bool AllowsUnauthenticatedAccess(string? text)
+        => Normalize(text) == "local";
+
     public static string RuntimeHost(string? accessMode)
         => DirectModelsAllowLanAccess(accessMode) ? "0.0.0.0" : "127.0.0.1";
 }

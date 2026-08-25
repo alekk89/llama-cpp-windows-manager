@@ -36,7 +36,7 @@ public static class RuntimePackageAssetSelector
         var asset = release.Assets.FirstOrDefault(asset => Regex.IsMatch(asset.Name, pattern, RegexOptions.IgnoreCase));
         if (asset is null)
             throw new RuntimePackageAssetUnavailableException($"Release {release.TagName} does not include a matching asset for {preset.Label}.");
-        return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, asset, []);
+        return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, asset, [], release.TargetCommit);
     }
 
     private static RuntimePackageSelection SelectWindowsCudaAssets(RuntimePackagePreset preset, RuntimePackageRelease release, string cudaPackagePreference)
@@ -53,7 +53,7 @@ public static class RuntimePackageAssetSelector
         foreach (var candidate in binaries.OrderByDescending(match => CudaVersionPreference(match.Version, cudaPackagePreference)))
         {
             if (runtimeDlls.TryGetValue(candidate.Version, out var dllAsset))
-                return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, candidate.Asset, [dllAsset]);
+                return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, candidate.Asset, [dllAsset], release.TargetCommit);
         }
 
         throw new InvalidOperationException($"Release {release.TagName} does not include matching CUDA binaries and runtime DLLs for Windows.");
@@ -85,11 +85,11 @@ public static class RuntimePackageAssetSelector
         foreach (var candidate in binaries.OrderByDescending(match => CudaVersionPreference(match.Version, cudaPackagePreference)))
         {
             if (!string.IsNullOrWhiteSpace(candidate.Version) && runtimeDlls.TryGetValue(candidate.Version, out var dllAsset))
-                return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, candidate.Asset, [dllAsset]);
+                return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, candidate.Asset, [dllAsset], release.TargetCommit);
         }
 
         var primary = binaries.OrderByDescending(match => CudaVersionPreference(match.Version, cudaPackagePreference)).First().Asset;
-        return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, primary, []);
+        return new RuntimePackageSelection(preset, release.TagName, release.HtmlUrl, release.PublishedAt, primary, [], release.TargetCommit);
     }
 
     private static (int FamilyScore, Version Version) CudaVersionPreference(string value, string cudaPackagePreference)
