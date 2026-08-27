@@ -89,6 +89,8 @@ More detail is available in the [User guide](docs/USER_GUIDE.md) and the
 * [Support](SUPPORT.md): troubleshooting and bug reports.
 * [Development](docs/DEVELOPMENT.md) and [Architecture](docs/ARCHITECTURE.md):
   contributor workflow and internal code boundaries.
+* [`build-installer.ps1`](scripts/build-installer.ps1): builds the Windows
+  installer after publishing the application.
 
 If something is not working, open a
 [bug report](https://github.com/alekk89/llama-cpp-windows-manager/issues/new/choose).
