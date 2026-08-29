@@ -178,7 +178,7 @@ public sealed partial class OverviewDashboardMetricRegistry
                 AddGpuReading(readings, GpuSensorDefinition(
                         OverviewDashboardMetricIds.GpuVram(index), index, "Dashboard.Metric.VramUsed"),
                     vram.Used, "0.0", "GiB", vram.Total, $"of {vram.Total:0.0} GiB · {gpuName}");
-            var powerWatts = FirstNumber(raw, @"(\d+(?:\.\d+)?)\s*W(?:\s|$)");
+            var powerWatts = FirstNumber(raw, @"(\d+(?:\.\d+)?)\s*W(?=\s*(?:/|\||$))");
             AddGpuReading(readings, GpuSensorDefinition(
                     OverviewDashboardMetricIds.GpuPower(index), index, "Dashboard.Metric.PowerDraw"),
                 powerWatts, "0.#", "W", detail: gpuName);
