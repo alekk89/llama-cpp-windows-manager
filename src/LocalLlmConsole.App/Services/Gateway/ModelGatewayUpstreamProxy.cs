@@ -27,12 +27,19 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
     };
 
     private readonly HttpClient _client;
+    private readonly bool _ownsClient;
     private readonly GatewayPerformanceTracker? _performance;
+    private readonly TimeSpan _responseHeaderTimeout;
 
-    public ModelGatewayUpstreamProxy(HttpClient? client = null, GatewayPerformanceTracker? performance = null)
+    public ModelGatewayUpstreamProxy(
+        HttpClient? client = null,
+        GatewayPerformanceTracker? performance = null,
+        TimeSpan? responseHeaderTimeout = null)
     {
-        _client = client ?? new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
+        _ownsClient = client is null;
+        _client = client ?? new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         _performance = performance;
+        _responseHeaderTimeout = responseHeaderTimeout ?? TimeSpan.FromMinutes(15);
     }
 
     public async Task ForwardAsync(
@@ -48,7 +55,9 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         var priorElapsed = elapsedBeforeUpstream ?? TimeSpan.Zero;
         try
         {
-            using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var headerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            headerCancellation.CancelAfter(_responseHeaderTimeout);
+            using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, headerCancellation.Token);
             var observation = await CopyResponseAsync(context, response, started, cancellationToken);
             _performance?.Observe(response.IsSuccessStatusCode, priorElapsed + started.Elapsed,
                 observation.TimeToFirstData is { } first ? priorElapsed + first : null,
@@ -394,23 +403,7 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
     }
 
     public void Dispose()
-        => _client.Dispose();
-}
-
-public static class GatewayResponseThroughputPolicy
-{
-    public static double? Calculate(
-        double? completionTokens,
-        TimeSpan? timeToFirstData,
-        TimeSpan responseDuration,
-        string? mediaType)
     {
-        if (completionTokens is not { } tokens || tokens < 0) return null;
-
-        var isStreaming = string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase);
-        var activeDuration = isStreaming && timeToFirstData is { } firstData
-            ? responseDuration - firstData
-            : responseDuration;
-        return activeDuration > TimeSpan.Zero ? tokens / activeDuration.TotalSeconds : null;
+        if (_ownsClient) _client.Dispose();
     }
 }

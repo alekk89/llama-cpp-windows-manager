@@ -6,14 +6,13 @@ public sealed class LocalAppService : ILocalAppServiceHost
     private readonly HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly ApiSecurity _security = new();
-    private readonly object _requestHandlersLock = new();
-    private readonly HashSet<Task> _requestHandlers = [];
+    private readonly HttpListenerRequestTracker _requestTracker = new();
     private readonly StateStore _stateStore;
     private readonly JobEngine _jobs;
     private readonly LocalControlApi? _controlApi;
     private readonly LocalControlDiscoveryService? _discovery;
     private Task? _loop;
-    private int _listenerErrorCount;
+    private int _disposed;
 
     public Uri BaseUri { get; }
     public string SessionToken => _security.SessionToken;
@@ -39,55 +38,20 @@ public sealed class LocalAppService : ILocalAppServiceHost
         await _jobs.RecoverAfterRestartAsync();
         _listener.Start();
         _discovery?.Publish(BaseUri, _security.SessionToken);
-        _loop = Task.Run(() => ListenAsync(_stop.Token));
+        _loop = ListenAsync(_stop.Token);
     }
 
-    private async Task ListenAsync(CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested && _listener.IsListening)
-        {
-            HttpListenerContext context;
-            try
-            {
-                context = await _listener.GetContextAsync();
-            }
-            catch when (cancellationToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception ex) when (!_stop.IsCancellationRequested && _listener.IsListening)
-            {
-                LastListenerError = $"Local app service listener error: {ex.Message}";
-                if (++_listenerErrorCount >= 3)
-                    return;
-                await Task.Delay(250, cancellationToken);
-                continue;
-            }
-            QueueRequest(context, cancellationToken);
-            _listenerErrorCount = 0;
-        }
-    }
+    private Task ListenAsync(CancellationToken cancellationToken)
+        => HttpListenerAcceptLoop.RunAsync(
+            _listener,
+            QueueRequest,
+            ex => LastListenerError = $"Local app service listener error: {ex.Message}",
+            cancellationToken);
 
     private void QueueRequest(HttpListenerContext context, CancellationToken cancellationToken)
     {
-        var task = Task.Run(() => HandleAsync(context, cancellationToken), cancellationToken);
-        lock (_requestHandlersLock)
-        {
-            _requestHandlers.Add(task);
-        }
-
-        task.ContinueWith(
-            completed =>
-            {
-                lock (_requestHandlersLock)
-                {
-                    _requestHandlers.Remove(completed);
-                }
-                TraceFaultedTask(completed, "Local app service request handler failed.");
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        var task = HandleAsync(context, cancellationToken);
+        _requestTracker.Track(context, task, "Local app service request handler failed.");
     }
 
     private async Task HandleAsync(HttpListenerContext context, CancellationToken cancellationToken)
@@ -221,47 +185,20 @@ public sealed class LocalAppService : ILocalAppServiceHost
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
         _discovery?.Remove();
         _stop.Cancel();
         if (_listener.IsListening) _listener.Stop();
         _listener.Close();
         if (_loop is not null)
-        {
-            var completed = await Task.WhenAny(_loop, Task.Delay(1000));
-            if (completed == _loop) await ObserveCompletionAsync(_loop);
-        }
-
-        Task[] activeHandlers;
-        lock (_requestHandlersLock)
-        {
-            activeHandlers = _requestHandlers.ToArray();
-        }
-
-        if (activeHandlers.Length > 0)
-        {
-            var allHandlers = Task.WhenAll(activeHandlers);
-            var completed = await Task.WhenAny(allHandlers, Task.Delay(1000));
-            if (completed == allHandlers) await ObserveCompletionAsync(allHandlers);
-        }
+            await HttpListenerRequestTracker.ObserveCompletionAsync(
+                _loop,
+                "Local control listener completed with an observed exception:");
+        await _requestTracker.AbortAndDrainAsync(
+            "Local control request handlers completed with an observed exception:");
 
         _stop.Dispose();
     }
 
-    private static async Task ObserveCompletionAsync(Task task)
-    {
-        try
-        {
-            await task;
-        }
-        catch (Exception ex)
-        {
-            Trace.TraceWarning($"Local app service background task completed with an observed exception: {ex}");
-        }
-    }
-
-    private static void TraceFaultedTask(Task task, string message)
-    {
-        if (!task.IsFaulted || task.Exception is null) return;
-        Trace.TraceError($"{message} {task.Exception}");
-    }
 }

@@ -15,7 +15,7 @@ public sealed record HuggingFaceModelCardApplicationActions(
 public sealed class HuggingFaceModelCardApplicationService
 {
     public HuggingFaceModelCardApplicationOutcome OpenFromRow(
-        UiRow? row,
+        HuggingFaceSearchRow? row,
         HuggingFaceModelCardApplicationActions actions)
         => Open(RepoFromSearchRow(row), actions);
 
@@ -36,20 +36,8 @@ public sealed class HuggingFaceModelCardApplicationService
         return HuggingFaceModelCardApplicationOutcome.Opened;
     }
 
-    public static string RepoFromSearchRow(UiRow? row)
-    {
-        if (row is null)
-            return "";
-
-        try
-        {
-            return row.Data.Deserialize<HuggingFaceFile>()?.Repo ?? row.C1;
-        }
-        catch
-        {
-            return row.C1;
-        }
-    }
+    public static string RepoFromSearchRow(HuggingFaceSearchRow? row)
+        => row?.Repo ?? "";
 
     private static void Validate(HuggingFaceModelCardApplicationActions actions)
     {

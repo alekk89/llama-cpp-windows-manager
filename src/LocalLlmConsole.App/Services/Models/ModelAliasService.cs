@@ -14,20 +14,6 @@ public static class ModelAliasService
     public static string SourceModelName(ModelRecord model)
         => MetadataValue(model, "sourceModelName");
 
-    public static string BaseModelName(ModelRecord alias, IReadOnlyList<ModelRecord> allModels)
-    {
-        var sourceId = SourceModelId(alias);
-        if (!string.IsNullOrWhiteSpace(sourceId))
-        {
-            var source = allModels.FirstOrDefault(model => string.Equals(model.Id, sourceId, StringComparison.OrdinalIgnoreCase));
-            if (source is not null) return source.Name;
-        }
-
-        var sourceName = SourceModelName(alias);
-        if (!string.IsNullOrWhiteSpace(sourceName)) return sourceName;
-        return ModelCatalogService.FriendlyDisplayName(Path.GetFileNameWithoutExtension(alias.ModelPath), alias.ModelPath);
-    }
-
     public static string CreateMetadata(ModelRecord source, IReadOnlyList<ModelRecord> allModels)
     {
         var sourceModel = IsLaunchAlias(source)

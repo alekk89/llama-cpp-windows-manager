@@ -4,8 +4,8 @@ namespace LocalLlmConsole.ViewModels;
 
 public sealed class HuggingFacePageViewModel
 {
-    public ObservableCollection<UiRow> SearchRows { get; } = new();
-    public ObservableCollection<UiRow> DownloadHistoryRows { get; } = new();
+    public ObservableCollection<HuggingFaceSearchRow> SearchRows { get; } = new();
+    public ObservableCollection<HuggingFaceDownloadRow> DownloadHistoryRows { get; } = new();
 
     public void ReplaceSearchResults(
         IEnumerable<HuggingFaceFile> files,
@@ -16,23 +16,21 @@ public sealed class HuggingFacePageViewModel
         foreach (var file in files)
         {
             var isInstalled = HuggingFaceInstallStateService.IsInstalled(file, installed, modelsRoot);
-            SearchRows.Add(new UiRow
+            SearchRows.Add(new HuggingFaceSearchRow
             {
-                C1 = file.Repo,
-                C2 = file.Path,
-                C3 = file.Quant,
-                C4 = DisplayFormatService.Bytes(file.SizeBytes),
-                C5 = file.Downloads.ToString("N0"),
-                C6 = SearchSignals(file),
-                C7 = isInstalled ? "Installed" : "Download",
-                C8 = "Card",
-                T1 = isInstalled
+                File = file,
+                Repo = file.Repo,
+                FilePath = file.Path,
+                Quant = file.Quant,
+                Size = DisplayFormatService.Bytes(file.SizeBytes),
+                Downloads = file.Downloads.ToString("N0"),
+                Signals = SearchSignals(file),
+                DownloadAction = isInstalled ? "Installed" : "Download",
+                DownloadToolTip = isInstalled
                     ? "This model file is already in the models folder."
                     : "Download this GGUF model file into the models folder.",
-                T2 = "Open this repository's Hugging Face model card.",
-                B1 = !isInstalled,
-                B2 = true,
-                Data = JsonSerializer.SerializeToNode(file) as JsonObject ?? new JsonObject()
+                CardToolTip = "Open this repository's Hugging Face model card.",
+                CanDownload = !isInstalled
             });
         }
     }
@@ -44,33 +42,54 @@ public sealed class HuggingFacePageViewModel
             .Select(job =>
             {
                 var payload = HuggingFaceService.ParseDownloadPayload(job.PayloadJson);
-                return new UiRow
+                return new HuggingFaceDownloadRow
                 {
-                    C1 = job.Status.ToString(),
-                    C2 = payload is null ? job.Id : $"{payload.File.Name} - {payload.File.Repo}",
-                    C3 = HuggingFaceInstallStateService.FormatDownloadProgress(payload),
-                    C4 = payload?.TotalBytes > 0 ? DisplayFormatService.Bytes(payload.TotalBytes) : "",
-                    C5 = job.UpdatedAt.ToLocalTime().ToString("g"),
-                    C6 = payload?.Destination ?? "",
-                    C7 = HuggingFaceInstallStateService.DownloadStartLabel(job.Status),
-                    C8 = "Pause",
-                    C9 = "Stop",
-                    C10 = "Delete",
-                    T1 = "Resume or restart this model download.",
-                    T2 = "Pause this active model download.",
-                    T3 = "Stop this model download and keep resumable partial data.",
-                    T4 = "Delete this download history entry and any incomplete partial file.",
-                    B1 = HuggingFaceInstallStateService.CanStartDownload(job.Status),
-                    B2 = HuggingFaceInstallStateService.CanPauseDownload(job.Status),
-                    B3 = HuggingFaceInstallStateService.CanStopDownload(job.Status),
-                    B4 = true,
-                    Data = JsonSerializer.SerializeToNode(job) as JsonObject ?? new JsonObject()
+                    Job = job,
+                    Status = job.Status.ToString(),
+                    Model = payload is null ? job.Id : $"{payload.File.Name} - {payload.File.Repo}",
+                    Progress = HuggingFaceInstallStateService.FormatDownloadProgress(payload),
+                    Size = payload?.TotalBytes > 0 ? DisplayFormatService.Bytes(payload.TotalBytes) : "",
+                    Updated = job.UpdatedAt.ToLocalTime().ToString("g"),
+                    Destination = payload?.Destination ?? "",
+                    StartAction = HuggingFaceInstallStateService.DownloadStartLabel(job.Status),
+                    CanStart = HuggingFaceInstallStateService.CanStartDownload(job.Status),
+                    CanPause = HuggingFaceInstallStateService.CanPauseDownload(job.Status),
+                    CanStop = HuggingFaceInstallStateService.CanStopDownload(job.Status)
                 };
-            });
-        UiRowCollectionUpdater.Reconcile(
-            DownloadHistoryRows,
-            rows,
-            row => row.Data["Id"]?.ToString() ?? "");
+            }).ToArray();
+        ReconcileDownloadHistory(rows);
+    }
+
+    private void ReconcileDownloadHistory(IReadOnlyList<HuggingFaceDownloadRow> rows)
+    {
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var desired = rows[index];
+            var existingIndex = index < DownloadHistoryRows.Count
+                                && DownloadHistoryRows[index].JobId.Equals(desired.JobId, StringComparison.OrdinalIgnoreCase)
+                ? index
+                : FindDownloadHistoryIndex(desired.JobId, index + 1);
+            if (existingIndex >= 0)
+            {
+                if (existingIndex != index)
+                    DownloadHistoryRows.Move(existingIndex, index);
+                DownloadHistoryRows[index].Apply(desired);
+            }
+            else
+            {
+                DownloadHistoryRows.Insert(index, desired);
+            }
+        }
+
+        while (DownloadHistoryRows.Count > rows.Count)
+            DownloadHistoryRows.RemoveAt(DownloadHistoryRows.Count - 1);
+    }
+
+    private int FindDownloadHistoryIndex(string jobId, int startIndex)
+    {
+        for (var index = Math.Max(0, startIndex); index < DownloadHistoryRows.Count; index++)
+            if (DownloadHistoryRows[index].JobId.Equals(jobId, StringComparison.OrdinalIgnoreCase)) return index;
+        return -1;
     }
 
     private static string SearchSignals(HuggingFaceFile file)

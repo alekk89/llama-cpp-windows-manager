@@ -123,7 +123,14 @@ internal sealed class ControlSessionEndpoints : ControlEndpointHandler
         }
 
         if (sessions.Length == 1)
-            return Ok(new { ok = true, identified = true, confidence = "inferred-single-running-session", matchedBy = "single-session", session = SessionView(sessions[0]) });
+            return Ok(new
+            {
+                ok = true,
+                identified = false,
+                confidence = "inferred-single-running-session",
+                message = "One managed model session is running, but no request hint proves that it serves this client. Supply sessionId, model, endpoint, port, or processId.",
+                candidates = sessions.Select(SessionView).ToArray()
+            });
 
         return Ok(new
         {

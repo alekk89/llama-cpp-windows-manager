@@ -15,7 +15,6 @@ public sealed class MainWindowViewModel : ObservableViewModel
     public WindowsPageViewModel Windows { get; } = new();
     public WslLinuxPageViewModel WslLinux { get; } = new();
     public HuggingFacePageViewModel HuggingFace { get; } = new();
-    public JobsViewModel Jobs { get; } = new();
     public LogsViewModel Logs { get; } = new();
     public RuntimeMetricsViewModel RuntimeMetrics { get; } = new();
     public SettingsPageViewModel Settings { get; } = new();

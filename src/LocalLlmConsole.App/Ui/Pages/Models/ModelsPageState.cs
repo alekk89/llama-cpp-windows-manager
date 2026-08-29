@@ -43,9 +43,9 @@ public sealed class ModelsPageState
 
     public string SelectedLaunchProfileId => SelectedLaunchProfile?.Id ?? "";
 
-    public UiRow? SelectedHuggingFaceRow => HuggingFaceGrid?.SelectedItem as UiRow;
+    public HuggingFaceSearchRow? SelectedHuggingFaceRow => HuggingFaceGrid?.SelectedItem as HuggingFaceSearchRow;
 
-    public UiRow? SelectedDownloadHistoryRow => DownloadHistoryGrid?.SelectedItem as UiRow;
+    public HuggingFaceDownloadRow? SelectedDownloadHistoryRow => DownloadHistoryGrid?.SelectedItem as HuggingFaceDownloadRow;
 
     public void Apply(ModelsPageControls controls)
     {
@@ -57,6 +57,17 @@ public sealed class ModelsPageState
         ModelVariantsGrid = controls.ModelVariantsGrid;
         HuggingFaceQueryBox = controls.HuggingFaceQueryBox;
         HuggingFaceGrid = controls.HuggingFaceGrid;
+        DownloadHistoryGrid = null;
+    }
+
+    public void ReleaseView()
+    {
+        _controls = null;
+        ModelsFolderText = null;
+        ModelsGrid = null;
+        ModelVariantsGrid = null;
+        HuggingFaceQueryBox = null;
+        HuggingFaceGrid = null;
         DownloadHistoryGrid = null;
     }
 
@@ -131,22 +142,22 @@ public sealed class ModelsPageState
         return DownloadHistoryGrid;
     }
 
-    public void RestoreDownloadHistorySelection(string? selectedId, IReadOnlyList<UiRow> rows)
+    public void RestoreDownloadHistorySelection(string? selectedId, IReadOnlyList<HuggingFaceDownloadRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
         if (DownloadHistoryGrid is null || string.IsNullOrWhiteSpace(selectedId)) return;
 
         DownloadHistoryGrid.SelectedItem = rows.FirstOrDefault(row =>
-            string.Equals(row.Data["Id"]?.ToString(), selectedId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(row.JobId, selectedId, StringComparison.OrdinalIgnoreCase));
     }
 
-    public void SelectDownloadHistoryJob(string? jobId, IReadOnlyList<UiRow> rows)
+    public void SelectDownloadHistoryJob(string? jobId, IReadOnlyList<HuggingFaceDownloadRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
         if (DownloadHistoryGrid is null || string.IsNullOrWhiteSpace(jobId)) return;
 
         DownloadHistoryGrid.SelectedItem = rows.FirstOrDefault(row =>
-            string.Equals(row.Data["Id"]?.ToString(), jobId, StringComparison.OrdinalIgnoreCase));
+            string.Equals(row.JobId, jobId, StringComparison.OrdinalIgnoreCase));
         if (DownloadHistoryGrid.SelectedItem is not null)
             DownloadHistoryGrid.ScrollIntoView(DownloadHistoryGrid.SelectedItem);
     }

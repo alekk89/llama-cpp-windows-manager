@@ -1,0 +1,6 @@
+CPU=yes
+CUDA=
+VULKAN=not-a-flag
+SYCL=2
+line-without-a-separator
+=missing-key

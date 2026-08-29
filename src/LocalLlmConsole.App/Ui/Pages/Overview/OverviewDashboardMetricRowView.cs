@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using WpfApplication = System.Windows.Application;
 using WpfBrush = System.Windows.Media.Brush;
@@ -57,8 +58,12 @@ public sealed class OverviewDashboardMetricRowView
             ToolTip = definition.Tooltip,
             Margin = new Thickness(-4, 0, -4, 0),
             Background = WpfBrushes.Transparent,
-            SnapsToDevicePixels = true
+            SnapsToDevicePixels = true,
+            Focusable = true
         };
+        KeyboardNavigation.SetIsTabStop(Root, true);
+        System.Windows.Automation.AutomationProperties.SetName(Root, definition.DisplayName);
+        System.Windows.Automation.AutomationProperties.SetHelpText(Root, definition.Tooltip);
         Root.MouseEnter += (_, _) =>
         {
             _hovered = true;

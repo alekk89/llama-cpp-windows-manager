@@ -30,6 +30,12 @@ public sealed class LifetimePageState
         Controls = controls ?? throw new ArgumentNullException(nameof(controls));
     }
 
+    public void ReleaseView()
+    {
+        Controls = null;
+        IsApplying = false;
+    }
+
     public void ClearDateSelection()
         => Controls?.HistoryCalendar.ClearSelection();
 

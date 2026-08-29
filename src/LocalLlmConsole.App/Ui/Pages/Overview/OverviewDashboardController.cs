@@ -286,6 +286,7 @@ public sealed partial class OverviewDashboardController
             view.DragSurface.PreviewMouseMove += (_, args) => TrackPointerInteraction(view, args);
             view.DragSurface.PreviewMouseLeftButtonUp += async (_, args) => await EndPointerInteractionAsync(view, args);
             view.DragSurface.MouseLeave += (_, _) => ResetPointerWhenIdle(view);
+            ConfigureKeyboardInteraction(view);
             _cardViews[card.Id] = view;
             _surface.Children.Add(view.Root);
             ReplayHistory(view);

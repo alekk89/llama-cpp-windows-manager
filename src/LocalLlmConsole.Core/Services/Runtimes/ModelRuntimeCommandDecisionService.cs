@@ -14,13 +14,24 @@ public enum ModelRuntimeUnloadCommandKind
     Stop
 }
 
+public enum ModelRuntimeCommandStatus
+{
+    None,
+    SelectModelFirst,
+    ChooseModelFirst,
+    ModelAlreadyActive,
+    LoadBeforeRestart,
+    AppStarting,
+    ChooseLoadedModelToUnload
+}
+
 public sealed record ModelRuntimeLoadCommand(
     ModelRuntimeLoadCommandKind Kind,
-    string StatusMessage = "");
+    ModelRuntimeCommandStatus Status = ModelRuntimeCommandStatus.None);
 
 public sealed record ModelRuntimeUnloadCommand(
     ModelRuntimeUnloadCommandKind Kind,
-    string StatusMessage = "");
+    ModelRuntimeCommandStatus Status = ModelRuntimeCommandStatus.None);
 
 public sealed class ModelRuntimeCommandDecisionService
 {
@@ -32,11 +43,11 @@ public sealed class ModelRuntimeCommandDecisionService
         bool launchSettingsLoaded)
     {
         if (model is null)
-            return Status("Select a model first.");
+            return Status(ModelRuntimeCommandStatus.SelectModelFirst);
         if (!restart && modelActive)
-            return Status("Selected model is already active.");
+            return Status(ModelRuntimeCommandStatus.ModelAlreadyActive);
         if (restart && !modelLoaded)
-            return Status("Load the selected model before restarting it.");
+            return Status(ModelRuntimeCommandStatus.LoadBeforeRestart);
         if (!restart && modelLoaded)
             return new ModelRuntimeLoadCommand(ModelRuntimeLoadCommandKind.SwitchLoaded);
         if (!launchSettingsLoaded)
@@ -53,25 +64,15 @@ public sealed class ModelRuntimeCommandDecisionService
         bool selectedProfileLoaded)
     {
         if (model is null)
-            return Status("Choose a model first.");
+            return Status(ModelRuntimeCommandStatus.ChooseModelFirst);
         if (modelActive && selectedProfileLoaded)
-            return Status("Selected model is already active.");
+            return Status(ModelRuntimeCommandStatus.ModelAlreadyActive);
         if (modelLoaded && selectedProfileLoaded)
             return new ModelRuntimeLoadCommand(ModelRuntimeLoadCommandKind.SwitchLoaded);
         if (!appReady)
-            return Status("App is still starting.");
+            return Status(ModelRuntimeCommandStatus.AppStarting);
 
         return new ModelRuntimeLoadCommand(ModelRuntimeLoadCommandKind.Continue);
-    }
-
-    public ModelRuntimeUnloadCommand PlanSelectedUnload(ModelRecord? model, bool modelLoaded)
-    {
-        if (model is null || !modelLoaded)
-            return new ModelRuntimeUnloadCommand(
-                ModelRuntimeUnloadCommandKind.Status,
-                "Select the loading or loaded model to unload it.");
-
-        return new ModelRuntimeUnloadCommand(ModelRuntimeUnloadCommandKind.Stop);
     }
 
     public ModelRuntimeUnloadCommand PlanOverviewUnload(ModelRecord? model, bool modelLoaded)
@@ -79,11 +80,11 @@ public sealed class ModelRuntimeCommandDecisionService
         if (model is null || !modelLoaded)
             return new ModelRuntimeUnloadCommand(
                 ModelRuntimeUnloadCommandKind.Status,
-                "Choose the loading or loaded model to unload it.");
+                ModelRuntimeCommandStatus.ChooseLoadedModelToUnload);
 
         return new ModelRuntimeUnloadCommand(ModelRuntimeUnloadCommandKind.Stop);
     }
 
-    private static ModelRuntimeLoadCommand Status(string message)
-        => new(ModelRuntimeLoadCommandKind.Status, message);
+    private static ModelRuntimeLoadCommand Status(ModelRuntimeCommandStatus status)
+        => new(ModelRuntimeLoadCommandKind.Status, status);
 }

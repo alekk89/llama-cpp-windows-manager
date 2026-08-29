@@ -77,6 +77,7 @@ public sealed partial class StateStore
             ShowOverviewTokens = BoolValue("showOverviewTokens", defaults.ShowOverviewTokens),
             ShowOverviewMtpTokens = BoolValue("showOverviewMtpTokens", defaults.ShowOverviewMtpTokens),
             ShowOverviewKvCache = BoolValue("showOverviewKvCache", defaults.ShowOverviewKvCache),
+            ShowOverviewModelSection = BoolValue("showOverviewModelSection", defaults.ShowOverviewModelSection),
             ShowOverviewLiveRuntimeLog = BoolValue("showOverviewLiveRuntimeLog", defaults.ShowOverviewLiveRuntimeLog),
             RuntimeLogOrder = AppPreferenceService.RuntimeLogOrder(StringValue("runtimeLogOrder", defaults.RuntimeLogOrder)),
             ShowOverviewAllMetrics = BoolValue("showOverviewAllMetrics", defaults.ShowOverviewAllMetrics),
@@ -88,6 +89,8 @@ public sealed partial class StateStore
             ElectricityNightStartLocal = StringValue("electricityNightStartLocal", defaults.ElectricityNightStartLocal),
             ElectricityNightEndLocal = StringValue("electricityNightEndLocal", defaults.ElectricityNightEndLocal),
             TrackGpuEnergyWhileIdle = BoolValue("trackGpuEnergyWhileIdle", defaults.TrackGpuEnergyWhileIdle),
+            BenchmarkPreventSystemSleep = BoolValue("benchmarkPreventSystemSleep", defaults.BenchmarkPreventSystemSleep),
+            BenchmarkStopActiveSessions = BoolValue("benchmarkStopActiveSessions", defaults.BenchmarkStopActiveSessions),
             MinimizeBehavior = StringValue("minimizeBehavior", defaults.MinimizeBehavior),
             StartWithWindows = BoolValue("startWithWindows", defaults.StartWithWindows),
             ModelAccessMode = AppPreferenceService.ModelAccessMode(StringValue("modelAccessMode", defaults.ModelAccessMode)),
@@ -291,6 +294,7 @@ public sealed partial class StateStore
             ("showOverviewTokens", settings.ShowOverviewTokens),
             ("showOverviewMtpTokens", settings.ShowOverviewMtpTokens),
             ("showOverviewKvCache", settings.ShowOverviewKvCache),
+            ("showOverviewModelSection", settings.ShowOverviewModelSection),
             ("showOverviewLiveRuntimeLog", settings.ShowOverviewLiveRuntimeLog),
             ("runtimeLogOrder", AppPreferenceService.RuntimeLogOrder(settings.RuntimeLogOrder)),
             ("showOverviewAllMetrics", settings.ShowOverviewAllMetrics),
@@ -302,6 +306,8 @@ public sealed partial class StateStore
             ("electricityNightStartLocal", settings.ElectricityNightStartLocal),
             ("electricityNightEndLocal", settings.ElectricityNightEndLocal),
             ("trackGpuEnergyWhileIdle", settings.TrackGpuEnergyWhileIdle),
+            ("benchmarkPreventSystemSleep", settings.BenchmarkPreventSystemSleep),
+            ("benchmarkStopActiveSessions", settings.BenchmarkStopActiveSessions),
             ("minimizeBehavior", settings.MinimizeBehavior),
             ("startWithWindows", settings.StartWithWindows),
             ("modelAccessMode", AppPreferenceService.ModelAccessMode(settings.ModelAccessMode)),
@@ -390,9 +396,8 @@ public sealed partial class StateStore
         });
     }
 
-    public async Task<Dictionary<string, string>> ListSettingsAsync()
-    {
-        return await WithConnectionAsync(async () =>
+    public Task<Dictionary<string, string>> ListSettingsAsync()
+        => WithConnectionAsync(async () =>
         {
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             await using var command = _connection.CreateCommand();
@@ -401,7 +406,6 @@ public sealed partial class StateStore
             while (await reader.ReadAsync()) values[reader.GetString(0)] = reader.GetString(1);
             return values;
         });
-    }
 
     private async Task SetSettingUnlockedAsync(string key, object value, System.Data.Common.DbTransaction? transaction = null)
     {

@@ -25,16 +25,15 @@ signing; copying edited Markdown beside an already signed executable does not
 update the embedded release contract and the next bootstrap can restore the
 embedded version.
 
-Optional trusted signed builds use `.github/workflows/release.yml` through a
-manual dispatch. Configure the protected `release` environment with
-`WINDOWS_SIGNING_PFX_BASE64` and `WINDOWS_SIGNING_PFX_PASSWORD`. The workflow
-refuses to build signed artifacts without both secrets, imports the certificate
-only for the job, runs the release gate with `-RequireSigned`, and removes the
-imported certificate afterward. Version tags do not start this optional job,
-so repositories without signing secrets can publish accurately labelled
-unsigned releases without a failing status check. Ordinary pull-request CI
-continues to use an unsigned packaging smoke test because untrusted PRs must
-never receive signing credentials.
+Trusted stable builds use `.github/workflows/release.yml`, triggered by a signed
+annotated `v*` tag (or a manual dispatch that selects an existing signed tag).
+The protected `release` environment holds the PFX, trusted tag public key, and
+release-manifest private key. The workflow verifies the tag and protected-main
+reachability, runs the complete signed gate, validates upgrade from the pinned
+previous stable installer, signs the manifest, attests artifacts, and publishes
+the GitHub release itself. It refuses missing credentials and an existing release
+instead of downgrading trust or replacing assets. Pull-request CI uses unsigned
+packaging smoke tests because untrusted changes never receive secrets.
 
 The workflow pins GitHub actions by commit and installs a fixed Inno Setup
 version before importing the signing certificate. Keep all package/tool setup
@@ -44,8 +43,9 @@ private key is available to the job.
 ## Free Options
 
 - **Free and publicly useful for qualifying OSS:** apply to SignPath Foundation
-  for open-source code signing. If accepted, use their signing workflow for
-  release artifacts.
+  for open-source code signing. The application is pending; if accepted, adapt
+  the protected workflow to SignPath's returned-artifact flow and enforce the
+  repository [code-signing policy](CODE_SIGNING_POLICY.md).
 - **Free but not publicly trusted:** self-signed certificates are useful for
   local testing and enterprise environments where the certificate is deployed to
   trusted stores. They do not remove SmartScreen or public trust warnings for
@@ -59,7 +59,10 @@ private key is available to the job.
 Do not describe a release as signed, trusted, or production-hardened unless:
 
 1. `LlamaCppWindowsManager.exe` is signed before the installer is compiled.
-2. `LlamaCppWindowsManager-Setup-<version>-win-x64.exe` is signed.
-3. `LlamaCppWindowsManager-win-x64.zip` is generated from signed contents.
-4. Each uploaded binary/archive has a matching `.sha256` companion asset generated after
+2. `llwmctl.exe` and every other shipped PE file is signed by the same publisher.
+3. `LlamaCppWindowsManager-Setup-<version>-win-x64.exe` is signed.
+4. `LlamaCppWindowsManager-win-x64.zip` is generated from signed contents.
+5. The detached signed manifest binds the tag, commit, publisher, names, sizes,
+   hashes, and SBOM, and GitHub provenance verifies.
+6. Each uploaded binary/archive has a matching `.sha256` companion asset generated after
    signing.

@@ -51,27 +51,27 @@ public partial class MainWindow : Window
             _coreServices.Ui,
             _coreServices.Models,
             new LaunchSettingsPageControllerActions(
-                () => _settings,
-                settings => _settings = settings,
-                SelectedModel,
-                SelectedModelLaunchProfileId,
-                SelectedLaunchRuntimeId,
-                () => ModelServices,
-                RunAsync,
-                RunBackground,
-                runtimeId => RefreshRuntimeSelectorAsync(runtimeId),
-                ApplyModelCapabilitiesAsync,
-                RefreshModelsAsync,
-                SelectLaunchProfileAfterRefresh,
-                RefreshOverviewModelSelectorAsync,
-                PersistSettingsAsync,
-                UpdateLaunchControlVisibility,
-                UpdateRuntimeCommandPreview,
-                UpdateContextSizeSuggestion,
-                NormalizeContextSizeBox,
-                CancelRuntimeLaunchOptionDiscovery,
-                request => _coreServices.App.FileSystemDialogs.PickOpenFile(request, this),
-                SetStatus));
+                Settings: () => _settings,
+                SetSettings: settings => _settings = settings,
+                SelectedModel: SelectedModel,
+                SelectedProfileId: SelectedModelLaunchProfileId,
+                SelectedRuntimeId: SelectedLaunchRuntimeId,
+                ModelServices: () => ModelServices,
+                RunBusyAsync: RunAsync,
+                RunBackground: RunBackground,
+                RefreshRuntimeSelectorAsync: runtimeId => RefreshRuntimeSelectorAsync(runtimeId),
+                ApplyModelCapabilitiesAsync: ApplyModelCapabilitiesAsync,
+                RefreshModelsAsync: RefreshModelsAsync,
+                SelectProfileAfterRefresh: SelectLaunchProfileAfterRefresh,
+                RefreshOverviewModelsAsync: RefreshOverviewModelSelectorAsync,
+                PersistSettingsAsync: PersistSettingsAsync,
+                UpdateControlVisibility: UpdateLaunchControlVisibility,
+                UpdateRuntimeCommandPreview: UpdateRuntimeCommandPreview,
+                UpdateContextSizeSuggestion: UpdateContextSizeSuggestion,
+                NormalizeContextSize: NormalizeContextSizeBox,
+                CancelRuntimeOptionDiscovery: CancelRuntimeLaunchOptionDiscovery,
+                PickOpenFile: request => _coreServices.App.FileSystemDialogs.PickOpenFile(request, this),
+                SetStatus: SetStatus));
         _overviewSelection = new OverviewSelectionController(
             _viewModel,
             _overviewPage,
@@ -91,7 +91,6 @@ public partial class MainWindow : Window
                 this,
                 _coreServices.App.Clipboard.SetText));
         _pageControllers = CreatePageControllers();
-        InitializeTrayIcon();
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -115,6 +114,7 @@ public partial class MainWindow : Window
                             Loc.LoadLanguage(settings.UiCulture);
                             ApplyLocalizedXamlStrings();
                             PopulateLanguageSelector();
+                            ApplyTrayIconVisibilityPreference();
                         },
                     ApplyLoadedServices,
                     service => _service = service,
@@ -199,7 +199,7 @@ public partial class MainWindow : Window
                     ShutdownAsync));
             e.Cancel = result.CancelClosingEvent;
             if (result.RequestClose)
-                Close();
+                WindowCloseScheduler.Schedule(Dispatcher, Close);
         }
         catch (Exception ex)
         {
@@ -211,29 +211,28 @@ public partial class MainWindow : Window
     }
 
     private async Task ShutdownAsync()
-        => await _coreServices.App.ShutdownCleanupApplication.CleanupAsync(new AppShutdownCleanupActions(
-            _coreServices.Ui.DownloadHistoryRefreshTimer.Stop,
-            _coreServices.Ui.RuntimeDashboardRefreshTimer.Stop,
-            _coreServices.Ui.GpuEnergyTrackingTimer.Stop,
-            CancelLaunchSettingsRefresh,
-            StopRuntimeReadinessMonitor,
-            DisposeTrayIcon,
-            async () =>
+    {
+        var cleanup = await _coreServices.App.ShutdownCleanupApplication.CleanupAsync(new AppShutdownCleanupActions(
+            StopDownloadHistoryRefreshTimer: _coreServices.Ui.DownloadHistoryRefreshTimer.Stop,
+            StopRuntimeDashboardRefreshTimer: _coreServices.Ui.RuntimeDashboardRefreshTimer.Stop,
+            StopGpuEnergyTrackingTimer: _coreServices.Ui.GpuEnergyTrackingTimer.Stop,
+            CancelPendingUiWork: CancelPendingUiWork,
+            StopRuntimeReadinessMonitor: StopRuntimeReadinessMonitor,
+            DisposeTrayIcon: DisposeTrayIcon,
+            PauseActiveDownloadsAsync: async () =>
             {
                 if (_appServices?.HuggingFace is not null)
                     await _appServices.HuggingFace.PauseActiveDownloadsAsync(TimeSpan.FromSeconds(10));
             },
-            _infrastructureServices.ProcessRunner.KillTrackedProcesses,
-            CleanupActiveWslBuildsAsync,
-            StopModelGatewayAsync,
-            _coreServices.Runtime.RuntimeSessions.StopAllAsync,
-            _sessions.Dispose,
-            _infrastructureServices.RuntimePackageClient.Dispose,
-            _infrastructureServices.MetricsClient.Dispose,
-            _infrastructureServices.RuntimeProbeClient.Dispose,
-            () => _activeRuntimeSettings = null,
-            ClearActiveRuntimeSession,
-            async () =>
+            DisposeBenchmarkServiceAsync: async () =>
+            {
+                if (_appServices?.Benchmarks.IsValueCreated == true)
+                    await _appServices.Benchmarks.Value.DisposeAsync();
+            },
+            KillTrackedProcesses: _infrastructureServices.ProcessRunner.KillTrackedProcesses,
+            CleanupActiveWslBuildsAsync: CleanupActiveWslBuildsAsync,
+            DisposeGatewayAsync: StopModelGatewayAsync,
+            DisposeLocalServiceAsync: async () =>
             {
                 if (_service is not null)
                 {
@@ -242,7 +241,17 @@ public partial class MainWindow : Window
                     _controlApi = null;
                 }
             },
-            async () =>
+            DrainBackgroundTasksAsync: _coreServices.App.BackgroundTasks.DrainAsync,
+            StopRuntimeSessionsAsync: _coreServices.Runtime.RuntimeSessions.StopAllAsync,
+            DisposeSessions: _sessions.Dispose,
+            DisposeHuggingFaceService: () => _appServices?.HuggingFace.Dispose(),
+            DisposeAppUpdateService: _infrastructureServices.AppUpdates.Dispose,
+            DisposeRuntimePackageClient: _infrastructureServices.RuntimePackageClient.Dispose,
+            DisposeMetricsClient: _infrastructureServices.MetricsClient.Dispose,
+            DisposeRuntimeProbeClient: _infrastructureServices.RuntimeProbeClient.Dispose,
+            ClearActiveRuntimeSettings: () => _activeRuntimeSettings = null,
+            ClearActiveRuntimeSession: ClearActiveRuntimeSession,
+            DisposeStateStoreAsync: async () =>
             {
                 if (_stateStore is not null)
                 {
@@ -250,5 +259,17 @@ public partial class MainWindow : Window
                     _stateStore = null;
                 }
             }));
+
+        foreach (var failure in cleanup.Failures)
+        {
+            var error = new InvalidOperationException(
+                $"Shutdown stage '{failure.Stage}' failed: {failure.Exception.Message}",
+                failure.Exception);
+            try { await WriteAppLogAsync(error); }
+            catch (Exception logError) { Trace.TraceWarning($"Could not record shutdown cleanup failure: {logError.Message}"); }
+        }
+        if (cleanup.CompletedWithWarnings)
+            Trace.TraceWarning($"Shutdown completed with {cleanup.Failures.Count} cleanup warning(s).");
+    }
 
 }

@@ -225,11 +225,11 @@ public static class WslPageFactory
     private static DataGrid DistroGrid(WslPageRequest request)
     {
         var grid = PageSectionFactory.GridFor(
-            (Loc.T("Wsl.Col.Distro"), "C2", 1.4),
-            (Loc.T("Wsl.Col.State"), "C3", .7),
-            (Loc.T("Wsl.Col.Wsl"), "C4", .45),
-            (Loc.T("Wsl.Col.Notes"), "C5", 2.3));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Wsl.ActionBtn.Action"), "C6", "B1", request.Actions.UseDistroRowClick, .55, tooltipBinding: "T1");
+            (Loc.T("Wsl.Col.Distro"), nameof(WslDistroRow.Name), 1.4),
+            (Loc.T("Wsl.Col.State"), nameof(WslDistroRow.State), .7),
+            (Loc.T("Wsl.Col.Wsl"), nameof(WslDistroRow.WslVersion), .45),
+            (Loc.T("Wsl.Col.Notes"), nameof(WslDistroRow.Notes), 2.3));
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Wsl.ActionBtn.Action"), nameof(WslDistroRow.ActionLabel), nameof(WslDistroRow.CanSelect), request.Actions.UseDistroRowClick, .55, tooltipBinding: nameof(WslDistroRow.ActionToolTip));
         grid.ItemsSource = request.ViewModel.WslLinux.Rows;
         return grid;
     }

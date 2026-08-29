@@ -19,6 +19,7 @@ public sealed record AgentSidecarBootstrapResult(
 public sealed class AgentSidecarBootstrapService
 {
     public const string ResourceName = "LocalLlmConsole.AgentBootstrap.zip";
+    public const string PackageMarker = "LLWM_AGENT_SIDECARS_V1";
 
     private const long MaximumBundleFileSize = 256L * 1024 * 1024;
     private static readonly string[] RequiredPaths =
@@ -43,17 +44,28 @@ public sealed class AgentSidecarBootstrapService
     public static int VerificationExitCode(AgentSidecarBootstrapStatus status)
         => status is AgentSidecarBootstrapStatus.Current or AgentSidecarBootstrapStatus.Installed ? 0 : 1;
 
-    public AgentSidecarBootstrapResult InstallEmbedded(
-        Assembly assembly,
+    public AgentSidecarBootstrapResult InstallPackaged(
+        string executablePath,
         string targetRoot,
         bool verifyBundleContents = false)
     {
-        ArgumentNullException.ThrowIfNull(assembly);
-
-        using var bundle = assembly.GetManifestResourceStream(ResourceName);
-        return bundle is null
-            ? new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.BundleUnavailable, [], [])
-            : Install(bundle, targetRoot, verifyBundleContents);
+        try
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
+            using var executable = new FileStream(
+                executablePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var bundle = OpenPackagedBundle(executable);
+            return bundle is null
+                ? new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.BundleUnavailable, [], [])
+                : Install(bundle, targetRoot, verifyBundleContents);
+        }
+        catch (Exception ex)
+        {
+            return new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.Failed, [], [], ex.Message);
+        }
     }
 
     public AgentSidecarBootstrapResult Install(
@@ -207,6 +219,44 @@ public sealed class AgentSidecarBootstrapService
         return entries;
     }
 
+    private static Stream? OpenPackagedBundle(FileStream executable)
+    {
+        var marker = Encoding.ASCII.GetBytes(PackageMarker);
+        var footerLength = sizeof(long) + marker.Length;
+        var actualMarker = new byte[marker.Length];
+        var packageEnd = PortableExecutableLayout.ContentEndBeforeCertificate(executable);
+        long markerEnd = 0;
+        for (var alignmentPadding = 0; alignmentPadding < 8; alignmentPadding++)
+        {
+            var candidateEnd = packageEnd - alignmentPadding;
+            if (candidateEnd < footerLength) break;
+            if (alignmentPadding > 0)
+            {
+                executable.Position = candidateEnd;
+                Span<byte> padding = stackalloc byte[alignmentPadding];
+                executable.ReadExactly(padding);
+                if (padding.ContainsAnyExcept((byte)0)) continue;
+            }
+
+            executable.Position = candidateEnd - marker.Length;
+            executable.ReadExactly(actualMarker);
+            if (!actualMarker.AsSpan().SequenceEqual(marker)) continue;
+            markerEnd = candidateEnd;
+            break;
+        }
+        if (markerEnd == 0) return null;
+
+        executable.Position = markerEnd - footerLength;
+        Span<byte> lengthBytes = stackalloc byte[sizeof(long)];
+        executable.ReadExactly(lengthBytes);
+        var bundleLength = System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(lengthBytes);
+        var bundleStart = markerEnd - footerLength - bundleLength;
+        if (bundleLength <= 0 || bundleStart < 0)
+            throw new InvalidDataException("Packaged agent sidecar bundle has an invalid length.");
+
+        return new ReadOnlySegmentStream(executable, bundleStart, bundleLength);
+    }
+
     private static AgentSidecarManifest ReadManifest(ZipArchiveEntry entry)
     {
         using var stream = entry.Open();
@@ -328,4 +378,5 @@ public sealed class AgentSidecarBootstrapService
 
     private sealed record AgentSidecarManifest(string? Version, IReadOnlyList<AgentSidecarManifestFile?>? Files);
     private sealed record AgentSidecarManifestFile(string? Path, long Size, string? Sha256);
+
 }

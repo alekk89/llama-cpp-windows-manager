@@ -16,7 +16,7 @@ public enum LogPageOpenApplicationOutcome
 }
 
 public sealed record LogPreviewApplicationRequest(
-    UiRow? Row,
+    LogFileRow? Row,
     string ApiKey,
     bool HasRows);
 
@@ -54,11 +54,11 @@ public sealed class LogPageApplicationService
         var path = LogPathFromRow(request.Row);
         return _workflow.BuildPreviewAsync(new LogPreviewRequest(
             path,
-            request.Row?.C1 ?? "Log",
+            request.Row?.Type ?? "Log",
             Path.GetFileName(path),
-            request.Row?.C3 ?? "",
-            request.Row?.C4 ?? "",
-            request.Row?.C5 ?? "",
+            request.Row?.Related ?? "",
+            request.Row?.Updated ?? "",
+            request.Row?.Size ?? "",
             request.ApiKey,
             request.HasRows),
             cancellationToken);
@@ -140,6 +140,6 @@ public sealed class LogPageApplicationService
         ArgumentNullException.ThrowIfNull(actions.SetStatus);
     }
 
-    private static string LogPathFromRow(UiRow? row)
-        => row?.Data["Path"]?.ToString() ?? "";
+    private static string LogPathFromRow(LogFileRow? row)
+        => row?.FullPath ?? "";
 }

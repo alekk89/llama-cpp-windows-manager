@@ -4,11 +4,32 @@ param(
   [string] $Configuration = "Release",
   [string] $CertificateThumbprint = "",
   [string] $TimestampServer = "https://timestamp.digicert.com",
+  [string] $ExpectedPublisher = "",
+  [string] $ReleaseManifestKeyId = "",
+  [string] $ReleaseManifestPublicKeySpki = "",
+  [string] $ReleaseManifestNextKeyId = "",
+  [string] $ReleaseManifestNextPublicKeySpki = "",
+  [string] $RepositoryCommit = "",
+  [ValidateSet("development", "stable", "preview", "nightly")]
+  [string] $ReleaseChannel = "development",
   [switch] $RequireSigned,
   [switch] $RequireCleanTree
 )
 
 $ErrorActionPreference = "Stop"
+
+function Test-CertificatePublisher {
+  param(
+    [Parameter(Mandatory = $true)] $Certificate,
+    [Parameter(Mandatory = $true)][string] $Publisher
+  )
+
+  $simpleName = $Certificate.GetNameInfo(
+    [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
+    $false)
+  return [string]::Equals($simpleName, $Publisher, [System.StringComparison]::OrdinalIgnoreCase) -or
+    [string]::Equals($Certificate.Subject, $Publisher, [System.StringComparison]::OrdinalIgnoreCase)
+}
 
 function Assert-CleanGitTree {
   param(
@@ -66,7 +87,49 @@ function Remove-DistPath {
   }
 }
 
+function Add-AgentSidecarBundle {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string] $ExecutablePath,
+    [Parameter(Mandatory = $true)]
+    [string] $BundlePath
+  )
+
+  $marker = [System.Text.Encoding]::ASCII.GetBytes("LLWM_AGENT_SIDECARS_V1")
+  $bundle = Get-Item -LiteralPath $BundlePath
+  $length = [System.BitConverter]::GetBytes([long] $bundle.Length)
+  if (-not [System.BitConverter]::IsLittleEndian) {
+    [System.Array]::Reverse($length)
+  }
+
+  $output = [System.IO.File]::Open(
+    $ExecutablePath,
+    [System.IO.FileMode]::Append,
+    [System.IO.FileAccess]::Write,
+    [System.IO.FileShare]::None)
+  try {
+    $input = [System.IO.File]::OpenRead($BundlePath)
+    try {
+      $input.CopyTo($output)
+    } finally {
+      $input.Dispose()
+    }
+    $output.Write($length, 0, $length.Length)
+    $output.Write($marker, 0, $marker.Length)
+    $output.Flush()
+  } finally {
+    $output.Dispose()
+  }
+}
+
 $AppDir = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($RepositoryCommit)) {
+  $candidateCommit = @(& git -C $AppDir rev-parse HEAD 2>$null)
+  if ($LASTEXITCODE -eq 0 -and $candidateCommit.Count -gt 0) {
+    $RepositoryCommit = $candidateCommit[0].Trim()
+  }
+}
+if ($RepositoryCommit -notmatch '^[0-9a-fA-F]{40}$') { $RepositoryCommit = "unknown" }
 if ($RequireCleanTree) {
   Assert-CleanGitTree -Path $AppDir
 }
@@ -108,10 +171,10 @@ if ($Info -match "No SDKs were found") {
   throw ".NET runtime is installed, but no SDK was found. Install the .NET 10 SDK to publish the self-contained app."
 }
 
-foreach ($publishProject in @($CliProject, $Project)) {
-  & $Dotnet restore $publishProject -r $Runtime --locked-mode -p:PublishSingleFile=true -p:SelfContained=true
-  if ($LASTEXITCODE -ne 0) { throw "Locked restore failed for $publishProject" }
-}
+& $Dotnet restore $CliProject -r $Runtime --locked-mode -p:PublishAot=true -p:SelfContained=true -p:NuGetLockFilePath=packages.publish.lock.json
+if ($LASTEXITCODE -ne 0) { throw "Locked restore failed for $CliProject" }
+& $Dotnet restore $Project -r $Runtime --locked-mode -p:PublishSingleFile=true -p:SelfContained=true
+if ($LASTEXITCODE -ne 0) { throw "Locked restore failed for $Project" }
 
 if (Test-Path -LiteralPath $PublishDir) {
   Remove-DistPath -Path $PublishDir -Label "publish folder" -Recurse
@@ -136,9 +199,8 @@ $cliPublishArgs = @(
   $Runtime,
   "--self-contained",
   "true",
-  "-p:PublishSingleFile=true",
-  "-p:IncludeNativeLibrariesForSelfExtract=true",
-  "-p:EnableCompressionInSingleFile=true",
+  "-p:PublishAot=true",
+  "-p:NuGetLockFilePath=packages.publish.lock.json",
   "-o",
   $CliPublishDir
 )
@@ -151,6 +213,10 @@ if ($CertificateThumbprint) {
     Where-Object { $_.Thumbprint -replace '\s', '' -ieq ($CertificateThumbprint -replace '\s', '') } |
     Select-Object -First 1
   if (-not $Cert) { throw "Code-signing certificate was not found in CurrentUser or LocalMachine certificate stores: $CertificateThumbprint" }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedPublisher) -and
+      -not (Test-CertificatePublisher $Cert $ExpectedPublisher)) {
+    throw "Code-signing certificate subject '$($Cert.Subject)' does not match expected publisher '$ExpectedPublisher'."
+  }
   $CliSignature = Set-AuthenticodeSignature -FilePath $CliExe -Certificate $Cert -TimestampServer $TimestampServer
   if ($CliSignature.Status -ne "Valid") { throw "llwmctl code signing failed: $($CliSignature.Status) $($CliSignature.StatusMessage)" }
 }
@@ -210,12 +276,28 @@ $publishArgs = @(
   "-p:PublishSingleFile=true",
   "-p:IncludeNativeLibrariesForSelfExtract=true",
   "-p:EnableCompressionInSingleFile=true",
-  "-p:AgentBootstrapBundlePath=$BundleZip",
   "-o",
   $PublishDir
 )
+$publishArgs += "-p:RepositoryCommit=$RepositoryCommit"
+$publishArgs += "-p:ReleaseChannel=$ReleaseChannel"
+if (-not [string]::IsNullOrWhiteSpace($ReleaseManifestKeyId)) {
+  $publishArgs += "-p:ReleaseManifestKeyId=$ReleaseManifestKeyId"
+}
+if (-not [string]::IsNullOrWhiteSpace($ReleaseManifestPublicKeySpki)) {
+  $publishArgs += "-p:ReleaseManifestPublicKeySpki=$ReleaseManifestPublicKeySpki"
+}
+if (-not [string]::IsNullOrWhiteSpace($ReleaseManifestNextKeyId)) {
+  $publishArgs += "-p:ReleaseManifestNextKeyId=$ReleaseManifestNextKeyId"
+}
+if (-not [string]::IsNullOrWhiteSpace($ReleaseManifestNextPublicKeySpki)) {
+  $publishArgs += "-p:ReleaseManifestNextPublicKeySpki=$ReleaseManifestNextPublicKeySpki"
+}
 & $Dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
+
+$Exe = Join-Path $PublishDir "LlamaCppWindowsManager.exe"
+Add-AgentSidecarBundle -ExecutablePath $Exe -BundlePath $BundleZip
 
 foreach ($BundleFile in $BundleFiles) {
   $BundleSource = Join-Path $BundleStageDir ($BundleFile.Path -replace '/', '\')
@@ -231,7 +313,6 @@ if ($LASTEXITCODE -ne 0) { throw "SPDX SBOM generation failed." }
 Get-ChildItem -Path $PublishDir -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue |
   Remove-Item -Force
 
-$Exe = Join-Path $PublishDir "LlamaCppWindowsManager.exe"
 $CliExe = Join-Path $PublishDir "llwmctl.exe"
 if ($CertificateThumbprint) {
   $Signature = Set-AuthenticodeSignature -FilePath $Exe -Certificate $Cert -TimestampServer $TimestampServer
@@ -242,9 +323,19 @@ $PublishedSignature = Get-AuthenticodeSignature -FilePath $Exe
 if ($RequireSigned -and $PublishedSignature.Status -ne "Valid") {
   throw "Published executable is not signed. Pass -CertificateThumbprint or sign $Exe before release."
 }
+if ($RequireSigned -and -not [string]::IsNullOrWhiteSpace($ExpectedPublisher) -and
+    ($null -eq $PublishedSignature.SignerCertificate -or
+     -not (Test-CertificatePublisher $PublishedSignature.SignerCertificate $ExpectedPublisher))) {
+  throw "Published executable is not signed by expected publisher '$ExpectedPublisher'."
+}
 $PublishedCliSignature = Get-AuthenticodeSignature -FilePath $CliExe
 if ($RequireSigned -and $PublishedCliSignature.Status -ne "Valid") {
   throw "Published control CLI is not signed. Pass -CertificateThumbprint or sign $CliExe before release."
+}
+if ($RequireSigned -and -not [string]::IsNullOrWhiteSpace($ExpectedPublisher) -and
+    ($null -eq $PublishedCliSignature.SignerCertificate -or
+     -not (Test-CertificatePublisher $PublishedCliSignature.SignerCertificate $ExpectedPublisher))) {
+  throw "Published control CLI is not signed by expected publisher '$ExpectedPublisher'."
 }
 if ($PublishedSignature.Status -ne "Valid") {
   Write-Warning "Published executable is not signed. Use -CertificateThumbprint and -RequireSigned for public release builds."

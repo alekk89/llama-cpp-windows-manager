@@ -101,6 +101,7 @@ public sealed class AppSettingsUpdateService
             ShowOverviewTokens = Visibility("showOverviewTokens", current.ShowOverviewTokens),
             ShowOverviewMtpTokens = Visibility("showOverviewMtpTokens", current.ShowOverviewMtpTokens),
             ShowOverviewKvCache = Visibility("showOverviewKvCache", current.ShowOverviewKvCache),
+            ShowOverviewModelSection = Visibility("showOverviewModelSection", current.ShowOverviewModelSection),
             ShowOverviewLiveRuntimeLog = Visibility("showOverviewLiveRuntimeLog", current.ShowOverviewLiveRuntimeLog),
             RuntimeLogOrder = AppPreferenceService.RuntimeLogOrder(V("runtimeLogOrder", current.RuntimeLogOrder)),
             ShowOverviewAllMetrics = Visibility("showOverviewAllMetrics", current.ShowOverviewAllMetrics),
@@ -113,7 +114,13 @@ public sealed class AppSettingsUpdateService
             ElectricityNightEndLocal = ElectricityTariffPolicy.TimeText(electricityTariff.NightEndLocal),
             TrackGpuEnergyWhileIdle = AppPreferenceService.YesNoValue(
                 V("trackGpuEnergyWhileIdle", AppPreferenceService.YesNoLabel(current.TrackGpuEnergyWhileIdle)),
-                current.TrackGpuEnergyWhileIdle)
+                current.TrackGpuEnergyWhileIdle),
+            BenchmarkPreventSystemSleep = AppPreferenceService.YesNoValue(
+                V("benchmarkPreventSystemSleep", AppPreferenceService.YesNoLabel(current.BenchmarkPreventSystemSleep)),
+                current.BenchmarkPreventSystemSleep),
+            BenchmarkStopActiveSessions = AppPreferenceService.YesNoValue(
+                V("benchmarkStopActiveSessions", AppPreferenceService.YesNoLabel(current.BenchmarkStopActiveSessions)),
+                current.BenchmarkStopActiveSessions)
         };
 
         var previousVisibility = OverviewDashboardLayoutPolicy.LegacyVisibility(current);

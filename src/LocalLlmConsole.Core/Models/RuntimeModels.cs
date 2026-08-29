@@ -67,12 +67,12 @@ public sealed record RuntimeLaunchRequest
     public string GpuDevices { get; init; } = "";
     public string GpuSplit { get; init; } = "";
     public int ParallelSlots { get; init; } = 1;
-    public int BatchSize { get; init; } = 2048;
+    public int BatchSize { get; init; } = AppSettings.DefaultBatchSize;
     public int MicroBatchSize { get; init; } = 512;
     public int Threads { get; init; }
     public string FlashAttention { get; init; } = "auto";
-    public string CacheTypeK { get; init; } = "f16";
-    public string CacheTypeV { get; init; } = "f16";
+    public string CacheTypeK { get; init; } = AppSettings.DefaultCacheType;
+    public string CacheTypeV { get; init; } = AppSettings.DefaultCacheType;
     public string KvOffload { get; init; } = "auto";
     public string KvUnified { get; init; } = "auto";
     public string PromptCacheMode { get; init; } = AppSettings.DefaultPromptCacheMode;
@@ -95,7 +95,7 @@ public sealed record RuntimeLaunchRequest
     public int VisionImageMaxTokens { get; init; }
     public string MmapMode { get; init; } = "auto";
     public string MlockMode { get; init; } = "off";
-    public double Temperature { get; init; } = 0.8;
+    public double Temperature { get; init; } = AppSettings.DefaultTemperature;
     public int TopK { get; init; } = 40;
     public double TopP { get; init; } = 0.95;
     public double MinP { get; init; } = 0.05;

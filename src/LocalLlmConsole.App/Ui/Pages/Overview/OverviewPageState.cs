@@ -17,9 +17,9 @@ public sealed class OverviewPageState
 
     public DataGrid? LoadedSessionsGrid { get; private set; }
 
-    public UiRow? SelectedLoadedSessionRow => LoadedSessionsGrid?.SelectedItem as UiRow;
+    public OverviewSessionRow? SelectedLoadedSessionRow => LoadedSessionsGrid?.SelectedItem as OverviewSessionRow;
 
-    public string SelectedLoadedSessionId => SelectedLoadedSessionRow?.Data["SessionId"]?.ToString() ?? "";
+    public string SelectedLoadedSessionId => SelectedLoadedSessionRow?.SessionId ?? "";
 
     public bool IsAvailable => _controls is not null;
 
@@ -44,11 +44,13 @@ public sealed class OverviewPageState
         if (!LayoutsMatch(controls.DashboardController.Layout, settings.OverviewDashboardLayout))
             controls.DashboardController.ApplyLayout(settings.OverviewDashboardLayout);
 
+        controls.ModelStatusSection.Visibility = VisibilityFor(settings.ShowOverviewModelSection);
         controls.RuntimeLogSection.Visibility = VisibilityFor(settings.ShowOverviewLiveRuntimeLog);
         controls.MetricsSection.Visibility = VisibilityFor(settings.ShowOverviewAllMetrics);
         controls.RuntimeSectionsSplitter.Visibility = Visibility.Collapsed;
 
         var root = controls.Root;
+        ConfigureOverviewDetailRow(root.RowDefinitions[1], settings.ShowOverviewModelSection, 0, 0, autoSize: true);
         ConfigureOverviewDetailRow(root.RowDefinitions[2], settings.ShowOverviewLiveRuntimeLog, 0, 0, autoSize: true);
         root.RowDefinitions[3].Height = new GridLength(0);
         ConfigureOverviewDetailRow(root.RowDefinitions[4], settings.ShowOverviewAllMetrics, .92, 130);
@@ -172,7 +174,7 @@ public sealed class OverviewPageState
         }
     }
 
-    public void RestoreLoadedSessionSelection(string sessionId, IReadOnlyList<UiRow> sessionRows)
+    public void RestoreLoadedSessionSelection(string sessionId, IReadOnlyList<OverviewSessionRow> sessionRows)
     {
         ArgumentNullException.ThrowIfNull(sessionRows);
         if (LoadedSessionsGrid is null) return;
@@ -180,6 +182,6 @@ public sealed class OverviewPageState
         LoadedSessionsGrid.SelectedItem = string.IsNullOrWhiteSpace(sessionId)
             ? null
             : sessionRows.FirstOrDefault(row =>
-                string.Equals(row.Data["SessionId"]?.ToString(), sessionId, StringComparison.OrdinalIgnoreCase));
+                string.Equals(row.SessionId, sessionId, StringComparison.OrdinalIgnoreCase));
     }
 }

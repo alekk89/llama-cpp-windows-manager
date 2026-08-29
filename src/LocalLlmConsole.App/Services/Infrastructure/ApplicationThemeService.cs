@@ -9,13 +9,19 @@ using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfComboBox = System.Windows.Controls.ComboBox;
 using WpfProgressBar = System.Windows.Controls.ProgressBar;
+using WpfSystemColors = System.Windows.SystemColors;
 using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public static class ApplicationThemeService
 {
+    private static string _lastMode = "system";
+    private static int _systemPreferenceHooked;
+
     public static void Apply(string mode)
     {
+        _lastMode = mode;
+        EnsureSystemPreferenceHook();
         var dark = AppPreferenceService.ThemeMode(mode) switch
         {
             "light" => false,
@@ -23,10 +29,14 @@ public static class ApplicationThemeService
             _ => IsSystemDarkTheme()
         };
 
+        var colors = SystemParameters.HighContrast
+            ? HighContrastThemeColors()
+            : (dark ? DarkThemeColors() : LightThemeColors())
+                .Select(item => (item.Key, (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(item.Color)))
+                .ToArray();
         var replacements = new Dictionary<SolidColorBrush, SolidColorBrush>(ReferenceEqualityComparer.Instance);
-        foreach (var (key, color) in dark ? DarkThemeColors() : LightThemeColors())
+        foreach (var (key, resolved) in colors)
         {
-            var resolved = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color);
             if (WpfApplication.Current.Resources[key] is SolidColorBrush brush && !brush.IsFrozen)
             {
                 brush.Color = resolved;
@@ -43,6 +53,39 @@ public static class ApplicationThemeService
         if (replacements.Count > 0)
             RefreshProgrammaticBrushReferences(replacements);
     }
+
+    private static void EnsureSystemPreferenceHook()
+    {
+        if (Interlocked.Exchange(ref _systemPreferenceHooked, 1) != 0) return;
+        SystemParameters.StaticPropertyChanged += (_, args) =>
+        {
+            if (!string.Equals(args.PropertyName, nameof(SystemParameters.HighContrast), StringComparison.Ordinal)) return;
+            var dispatcher = WpfApplication.Current?.Dispatcher;
+            if (dispatcher is null || dispatcher.HasShutdownStarted) return;
+            _ = dispatcher.BeginInvoke(() => Apply(_lastMode));
+        };
+    }
+
+    private static (string Key, System.Windows.Media.Color Color)[] HighContrastThemeColors()
+        => DarkThemeColors()
+            .Select(item => (item.Key, HighContrastColor(item.Key)))
+            .ToArray();
+
+    private static System.Windows.Media.Color HighContrastColor(string key)
+        => key switch
+        {
+            "TextMuted" or "DisabledPrimaryForeground" or "DisabledControlForeground" => WpfSystemColors.GrayTextColor,
+            "AccentForeground" => WpfSystemColors.HighlightTextColor,
+            "Accent" or "AccentStrong" or "AccentHover" or "AccentPressed" or "AccentBlue"
+                or "FocusRing" or "Success" or "Warning" or "DestructiveAction"
+                or "DestructiveActionHover" or "Danger" or "DangerHover" => WpfSystemColors.HighlightColor,
+            "PanelBorder" or "PanelBorderStrong" or "DisabledPrimaryBorder" or "DisabledControlBorder"
+                => WpfSystemColors.WindowTextColor,
+            "SelectionBack" or "AccentSoft" or "SuccessSoft" or "WarningSoft" or "DestructiveActionSoft"
+                or "DangerSoft" or "StatusRunning" or "StatusFailed" => WpfSystemColors.HighlightColor,
+            "TextMain" or "TextSoft" => WpfSystemColors.WindowTextColor,
+            _ => WpfSystemColors.WindowColor
+        };
 
     private static void RefreshProgrammaticBrushReferences(
         IReadOnlyDictionary<SolidColorBrush, SolidColorBrush> replacements)

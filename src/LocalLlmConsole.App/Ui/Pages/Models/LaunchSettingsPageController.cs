@@ -87,7 +87,7 @@ public sealed class LaunchSettingsPageController
         var selectedProfileId = _actions.SelectedProfileId();
         if (string.IsNullOrWhiteSpace(selectedProfileId))
         {
-            _actions.SetStatus("Select a named launch profile to update it, or enter a name and save a new profile.");
+            _actions.SetStatus(Loc.T("Models.Profile.SelectOrCreate"));
             return;
         }
 
@@ -157,7 +157,7 @@ public sealed class LaunchSettingsPageController
         var defaults = AppSettings.CreateDefault(_workspaceRoot);
         ApplyToControls(ModelLaunchSettings.FromAppSettings(defaults).ApplyTo(_actions.Settings()));
         UpdateSaveButtonState();
-        _actions.SetStatus("Launch settings reset in the form. Save a new profile, update the selected profile, or save them as the app default to persist them.");
+        _actions.SetStatus(Loc.T("Launch.ResetInstructions"));
     }
 
     public Task ChooseVisionProjectorAsync()

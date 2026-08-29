@@ -34,6 +34,7 @@ public sealed record OverviewPageRequest(
 public sealed record OverviewPageControls(
     Grid Root,
     ScrollViewer Scroller,
+    FrameworkElement ModelStatusSection,
     WpfComboBox ModelCombo,
     WpfComboBox LaunchProfileCombo,
     WpfButton LoadButton,
@@ -67,18 +68,16 @@ public static class OverviewPageFactory
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0) });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(.92, GridUnitType.Star), MinHeight = 130 });
 
+        var modelSessionSection = Stack();
         var modelBar = ModelBar(request, out var modelCombo, out var launchProfileCombo, out var loadButton);
-        Grid.SetRow(modelBar, 0);
-        root.Children.Add(modelBar);
-
-        var dashboardSection = Stack();
+        modelSessionSection.Children.Add(modelBar);
         var loadedSessionsGrid = PageSectionFactory.GridFor(
-            (Loc.T("Overview.SessionsCol.Model"), "C1", 1.35),
-            ("Profile", "C2", .8),
-            (Loc.T("Overview.SessionsCol.Size"), "C3", .62),
-            (Loc.T("Overview.SessionsCol.State"), "C4", .8),
-            (Loc.T("Overview.SessionsCol.Runtime"), "C6", 1.7),
-            (Loc.T("Overview.SessionsCol.Backend"), "C7", .85));
+            (Loc.T("Overview.SessionsCol.Model"), nameof(OverviewSessionRow.ModelName), 1.35),
+            ("Profile", nameof(OverviewSessionRow.ProfileName), .8),
+            (Loc.T("Overview.SessionsCol.Size"), nameof(OverviewSessionRow.Size), .62),
+            (Loc.T("Overview.SessionsCol.State"), nameof(OverviewSessionRow.State), .8),
+            (Loc.T("Overview.SessionsCol.Runtime"), nameof(OverviewSessionRow.Runtime), 1.7),
+            (Loc.T("Overview.SessionsCol.Backend"), nameof(OverviewSessionRow.Backend), .85));
         loadedSessionsGrid.Columns.Insert(4, EndpointColumn(request.Actions.InspectEndpointRowClick));
         loadedSessionsGrid.ItemsSource = request.ViewModel.Overview.SessionRows;
         loadedSessionsGrid.SelectionChanged += async (_, _) => await request.Actions.SelectLoadedSessionRowAsync();
@@ -93,22 +92,24 @@ public static class OverviewPageFactory
         PageSectionFactory.AddButtonColumn(
             loadedSessionsGrid,
             Loc.T("Common.ActionButton"),
-            "C8",
-            "B1",
+            nameof(OverviewSessionRow.ActionLabel),
+            nameof(OverviewSessionRow.CanUnload),
             request.Actions.UnloadLoadedSessionRowClick,
             .58,
             tooltipProvider: _ => Loc.T("Tooltip.Unload"),
             visualRole: VisualRole.Danger);
-        dashboardSection.Children.Add(PageSectionFactory.GridSection(Loc.T("Overview.LoadedSessionsTitle"), loadedSessionsGrid));
+        modelSessionSection.Children.Add(PageSectionFactory.GridSection(Loc.T("Overview.LoadedSessionsTitle"), loadedSessionsGrid));
+        Grid.SetRow(modelSessionSection, 0);
+        root.Children.Add(modelSessionSection);
+
         var dashboardController = new OverviewDashboardController(
             request.DashboardLayout,
             new OverviewDashboardControllerActions(
                 request.Actions.PersistDashboardLayoutAsync,
                 request.Actions.RunEventAsync,
                 request.Actions.DispatchDashboardMenuActionAsync));
-        dashboardSection.Children.Add(dashboardController.Root);
-        Grid.SetRow(dashboardSection, 1);
-        root.Children.Add(dashboardSection);
+        Grid.SetRow(dashboardController.Root, 1);
+        root.Children.Add(dashboardController.Root);
 
         var runtimeLogBox = RuntimeLogBox();
         var runtimeLogSection = PageSectionFactory.FramedSection(Loc.T("Overview.LiveRuntimeLogTitle"), runtimeLogBox);
@@ -118,11 +119,11 @@ public static class OverviewPageFactory
         root.Children.Add(runtimeSectionsSplitter);
 
         var runtimeMetricsGrid = PageSectionFactory.GridFor(
-            (Loc.T("Overview.MetricsCol.Metric"), "C1", 1.5),
-            (Loc.T("Overview.MetricsCol.Labels"), "C2", 2.2),
-            (Loc.T("Overview.MetricsCol.Value"), "C3", .9),
-            (Loc.T("Overview.MetricsCol.Type"), "C4", .7),
-            (Loc.T("Overview.MetricsCol.Help"), "C5", 3));
+            (Loc.T("Overview.MetricsCol.Metric"), nameof(RuntimeMetricRow.Name), 1.5),
+            (Loc.T("Overview.MetricsCol.Labels"), nameof(RuntimeMetricRow.Labels), 2.2),
+            (Loc.T("Overview.MetricsCol.Value"), nameof(RuntimeMetricRow.Value), .9),
+            (Loc.T("Overview.MetricsCol.Type"), nameof(RuntimeMetricRow.Type), .7),
+            (Loc.T("Overview.MetricsCol.Help"), nameof(RuntimeMetricRow.Help), 3));
         runtimeMetricsGrid.ItemsSource = request.ViewModel.RuntimeMetrics.Rows;
         runtimeMetricsGrid.VerticalAlignment = VerticalAlignment.Stretch;
         request.ConfigureRuntimeMetricsGrid(runtimeMetricsGrid);
@@ -133,6 +134,7 @@ public static class OverviewPageFactory
         return new OverviewPageControls(
             root,
             scroller,
+            dashboardController.Root,
             modelCombo,
             launchProfileCombo,
             loadButton,
@@ -246,13 +248,13 @@ public static class OverviewPageFactory
         text.SetValue(FrameworkElement.MarginProperty, new Thickness(7, 2, 7, 2));
         text.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         var link = new FrameworkElementFactory(typeof(Hyperlink));
-        link.SetBinding(Hyperlink.IsEnabledProperty, new WpfBinding("B2"));
+        link.SetBinding(Hyperlink.IsEnabledProperty, new WpfBinding(nameof(OverviewSessionRow.CanInspect)));
         link.SetBinding(FrameworkContentElement.TagProperty, new WpfBinding("."));
         link.SetResourceReference(TextElement.ForegroundProperty, "AccentBlue");
         link.SetValue(FrameworkContentElement.ToolTipProperty, "Inspect what this endpoint reports right now, including models, context, defaults, capabilities, and active slots when available.");
         link.AddHandler(Hyperlink.ClickEvent, click);
         var run = new FrameworkElementFactory(typeof(Run));
-        run.SetBinding(Run.TextProperty, new WpfBinding("T1"));
+        run.SetBinding(Run.TextProperty, new WpfBinding(nameof(OverviewSessionRow.Endpoint)));
         link.AppendChild(run);
         text.AppendChild(link);
         return new DataGridTemplateColumn

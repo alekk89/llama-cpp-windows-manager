@@ -198,7 +198,9 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
         await gate.WaitAsync(cancellationToken);
         try
         {
-            return await LoadModelCoreAsync(model, request, forceRestart, cancellationToken);
+            return await _deps.Sessions.ExecuteLifecycleAsync(
+                () => LoadModelCoreAsync(model, request, forceRestart, cancellationToken),
+                cancellationToken);
         }
         finally
         {

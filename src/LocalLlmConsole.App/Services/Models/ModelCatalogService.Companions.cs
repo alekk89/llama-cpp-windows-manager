@@ -1,5 +1,10 @@
 namespace LocalLlmConsole.Services;
 
+public sealed record EmbeddedDraftMtpInspection(
+    bool MetadataReadable,
+    bool Embedded,
+    string Error);
+
 public sealed partial class ModelCatalogService
 {
     private enum SpeculativeCompanionKind
@@ -73,10 +78,17 @@ public sealed partial class ModelCatalogService
     }
 
     public static bool HasEmbeddedDraftMtp(string modelPath)
-    {
-        if (string.IsNullOrWhiteSpace(modelPath) || !File.Exists(modelPath)) return false;
+        => InspectEmbeddedDraftMtp(modelPath).Embedded;
 
-        return HasPositiveNextNPredictLayers(GgufMetadataReader.TryRead(modelPath));
+    public static EmbeddedDraftMtpInspection InspectEmbeddedDraftMtp(string modelPath)
+    {
+        if (string.IsNullOrWhiteSpace(modelPath) || !File.Exists(modelPath))
+            return new EmbeddedDraftMtpInspection(false, false, "The main GGUF file was not found.");
+
+        var inspection = GgufMetadataReader.Inspect(modelPath);
+        return inspection.Success
+            ? new EmbeddedDraftMtpInspection(true, HasPositiveNextNPredictLayers(inspection.Values), "")
+            : new EmbeddedDraftMtpInspection(false, false, inspection.Error);
     }
 
     public static IReadOnlyList<string> FindDraftModels(string modelPath)

@@ -213,6 +213,7 @@ CREATE TABLE IF NOT EXISTS token_usage (
         }
         catch
         {
+            // Recovery must continue even when the optional diagnostic backup cannot be written.
         }
     }
 
@@ -237,12 +238,12 @@ CREATE TABLE IF NOT EXISTS token_usage (
         {
             var node = JsonNode.Parse(json);
             if (node is null) return false;
-            if (node.GetValueKind() == JsonValueKind.Number && node.GetValue<long>() is var number)
+            if (node.GetValueKind() == JsonValueKind.Number)
             {
-                value = number;
+                value = node.GetValue<long>();
                 return true;
             }
-            if (node.GetValueKind() == JsonValueKind.String && long.TryParse(node.GetValue<string>(), out number))
+            if (node.GetValueKind() == JsonValueKind.String && long.TryParse(node.GetValue<string>(), out var number))
             {
                 value = number;
                 return true;
@@ -261,13 +262,13 @@ CREATE TABLE IF NOT EXISTS token_usage (
         {
             var node = JsonNode.Parse(json);
             if (node is null) return false;
-            if (node.GetValueKind() == JsonValueKind.Number && node.GetValue<double>() is var number)
+            if (node.GetValueKind() == JsonValueKind.Number)
             {
-                value = number;
+                value = node.GetValue<double>();
                 return true;
             }
             if (node.GetValueKind() == JsonValueKind.String
-                && double.TryParse(node.GetValue<string>(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out number))
+                && double.TryParse(node.GetValue<string>(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number))
             {
                 value = number;
                 return true;

@@ -7,12 +7,24 @@ public sealed class ModelGatewayRequestBodyTooLargeException : InvalidOperationE
     }
 }
 
+public sealed class ModelGatewayRequestBodyTimeoutException : TimeoutException
+{
+    public ModelGatewayRequestBodyTimeoutException(string message) : base(message)
+    {
+    }
+}
+
 public static class ModelGatewayRequestBodyReader
 {
     private const int BufferSize = 81920;
 
-    public static byte[] ReadBodyBuffer(Stream stream, long contentLength, long maxBytes)
+    public static async Task<byte[]> ReadBodyBufferAsync(
+        Stream stream,
+        long contentLength,
+        long maxBytes,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
         if (maxBytes <= 0)
             throw new InvalidOperationException("Gateway request body limit must be greater than zero.");
         if (contentLength > maxBytes)
@@ -25,12 +37,12 @@ public static class ModelGatewayRequestBodyReader
         long total = 0;
         while (true)
         {
-            var read = stream.Read(buffer, 0, buffer.Length);
+            var read = await stream.ReadAsync(buffer, cancellationToken);
             if (read == 0) break;
             total += read;
             if (total > maxBytes)
                 throw new ModelGatewayRequestBodyTooLargeException($"Gateway request body is too large. Limit is {DisplayFormatService.Bytes(maxBytes)}.");
-            memory.Write(buffer, 0, read);
+            await memory.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
 
         return memory.ToArray();

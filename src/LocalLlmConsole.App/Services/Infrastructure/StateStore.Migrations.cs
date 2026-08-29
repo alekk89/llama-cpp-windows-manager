@@ -184,6 +184,49 @@ CREATE TABLE IF NOT EXISTS gpu_energy_device_hourly (
 );
 CREATE INDEX IF NOT EXISTS ix_gpu_energy_device_hourly_time
 ON gpu_energy_device_hourly(bucket_start_utc);
+"""),
+        new(10, "tray-profile-favorites", """
+CREATE TABLE IF NOT EXISTS tray_favorite_launch_profiles (
+  launch_profile_id TEXT PRIMARY KEY,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(launch_profile_id) REFERENCES model_launch_profiles(id) ON DELETE CASCADE
+);
+"""),
+        new(11, "llama-bench-results", """
+CREATE TABLE IF NOT EXISTS benchmark_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id TEXT NOT NULL,
+  work_item_key TEXT NOT NULL,
+  attempt INTEGER NOT NULL CHECK (attempt > 0),
+  sequence INTEGER NOT NULL CHECK (sequence > 0),
+  is_partial_attempt INTEGER NOT NULL DEFAULT 1 CHECK (is_partial_attempt IN (0, 1)),
+  classification TEXT NOT NULL,
+  workload_signature TEXT NOT NULL,
+  environment_signature TEXT NOT NULL,
+  manager_version TEXT NOT NULL,
+  operating_environment TEXT NOT NULL,
+  raw_json TEXT NOT NULL,
+  build_commit TEXT NOT NULL,
+  build_number INTEGER NOT NULL,
+  model_filename TEXT NOT NULL,
+  model_type TEXT NOT NULL,
+  n_prompt INTEGER NOT NULL,
+  n_gen INTEGER NOT NULL,
+  n_depth INTEGER NOT NULL,
+  avg_ns INTEGER NOT NULL,
+  stddev_ns INTEGER NOT NULL,
+  avg_ts REAL NOT NULL,
+  stddev_ts REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+  UNIQUE(job_id, work_item_key, attempt, sequence)
+);
+CREATE INDEX IF NOT EXISTS ix_benchmark_results_job_sequence
+ON benchmark_results(job_id, work_item_key, attempt, sequence);
+CREATE INDEX IF NOT EXISTS ix_benchmark_results_workload
+ON benchmark_results(workload_signature);
+CREATE INDEX IF NOT EXISTS ix_benchmark_results_environment
+ON benchmark_results(environment_signature);
 """)
     ];
 

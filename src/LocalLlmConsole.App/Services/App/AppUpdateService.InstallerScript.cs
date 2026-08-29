@@ -12,7 +12,8 @@ param(
   [string] $TargetCli,
   [string] $NoticeSource,
   [string] $NoticeTarget,
-  [string] $WorkingDirectory
+  [string] $WorkingDirectory,
+  [switch] $SkipRestart
 )
 $ErrorActionPreference = "Stop"
 
@@ -121,15 +122,25 @@ try {
     Remove-UpdateArtifact -Path $stage.Backup
   }
 }
-if ($ObsoleteExe -and
-    -not [string]::Equals($ObsoleteExe, $TargetExe, [System.StringComparison]::OrdinalIgnoreCase) -and
-    (Test-Path -LiteralPath $ObsoleteExe)) {
-  Remove-Item -LiteralPath $ObsoleteExe -Force
+try {
+  if ($ObsoleteExe -and
+      -not [string]::Equals($ObsoleteExe, $TargetExe, [System.StringComparison]::OrdinalIgnoreCase) -and
+      (Test-Path -LiteralPath $ObsoleteExe)) {
+    try { Remove-Item -LiteralPath $ObsoleteExe -Force }
+    catch { Write-Warning ("Could not remove obsolete executable '{0}': {1}" -f $ObsoleteExe, $_.Exception.Message) }
+  }
+  if (Test-Path -LiteralPath $NoticeSource) {
+    try {
+      New-Item -ItemType Directory -Path (Split-Path -Parent $NoticeTarget) -Force | Out-Null
+      Copy-Item -LiteralPath $NoticeSource -Destination $NoticeTarget -Force
+    } catch {
+      Write-Warning ("Could not publish the installed-update notice: {0}" -f $_.Exception.Message)
+    }
+  }
+} finally {
+  if (-not $SkipRestart) {
+    Start-Process -FilePath $TargetExe -WorkingDirectory $WorkingDirectory | Out-Null
+  }
 }
-if (Test-Path -LiteralPath $NoticeSource) {
-  New-Item -ItemType Directory -Path (Split-Path -Parent $NoticeTarget) -Force | Out-Null
-  Copy-Item -LiteralPath $NoticeSource -Destination $NoticeTarget -Force
-}
-Start-Process -FilePath $TargetExe -WorkingDirectory $WorkingDirectory | Out-Null
 """;
 }

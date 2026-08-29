@@ -13,7 +13,10 @@ public sealed record DiagnosticsBundleRequest(
     IReadOnlyList<LoadedModelSessionSnapshot> Sessions,
     WslEnvironmentReport Wsl,
     string GpuSummary,
-    string CpuSummary);
+    string CpuSummary,
+    IReadOnlyList<DiagnosticProbeRecord>? Probes = null,
+    IReadOnlyList<SessionLifecycleDiagnosticEvent>? SessionEvents = null,
+    BuildAndUpdateDiagnostics? BuildAndUpdate = null);
 
 public sealed record DiagnosticsBundleResult(string ArchivePath, int IncludedLogCount);
 
@@ -21,6 +24,9 @@ public static class DiagnosticsBundleService
 {
     private const int MaximumLogCount = 10;
     private const int MaximumLogCharacters = 256_000;
+    private const int MaximumProbeCount = 32;
+    private const int MaximumSessionEventCount = 200;
+    private const int MaximumDiagnosticFieldCharacters = 4_096;
 
     public static async Task<DiagnosticsBundleResult> CreateAsync(
         DiagnosticsBundleRequest request,
@@ -63,6 +69,9 @@ public static class DiagnosticsBundleService
             "summary.json",
             JsonSerializer.Serialize(BuildSummary(request), new JsonSerializerOptions { WriteIndented = true }),
             cancellationToken);
+        await WriteJsonEntryAsync(archive, "probes.json", BuildProbes(request), cancellationToken);
+        await WriteJsonEntryAsync(archive, "session-events.json", BuildSessionEvents(request), cancellationToken);
+        await WriteJsonEntryAsync(archive, "build-and-update.json", BuildBuildAndUpdate(request), cancellationToken);
 
         var included = 0;
         foreach (var log in logs)
@@ -95,7 +104,7 @@ public static class DiagnosticsBundleService
     private static object BuildSummary(DiagnosticsBundleRequest request)
         => new
         {
-            schemaVersion = 1,
+            schemaVersion = 2,
             createdAt = DateTimeOffset.UtcNow,
             application = new
             {
@@ -195,6 +204,82 @@ public static class DiagnosticsBundleService
             })
         };
 
+    private static object BuildProbes(DiagnosticsBundleRequest request)
+        => new
+        {
+            schemaVersion = 1,
+            maximumRecords = MaximumProbeCount,
+            records = (request.Probes ?? [])
+                .OrderByDescending(probe => probe.EndedAtUtc)
+                .Take(MaximumProbeCount)
+                .Select(probe => new
+                {
+                    name = SafeField(probe.Name, request),
+                    version = SafeField(probe.Version, request),
+                    provider = SafeField(probe.Provider, request),
+                    probe.Attempted,
+                    probe.StartedAtUtc,
+                    probe.EndedAtUtc,
+                    durationMilliseconds = Math.Max(0, Math.Min(300_000, (long)(probe.EndedAtUtc - probe.StartedAtUtc).TotalMilliseconds)),
+                    classification = SafeField(probe.Classification, request),
+                    exitCodeCategory = SafeField(probe.ExitCodeCategory, request),
+                    parserResult = SafeField(probe.ParserResult, request),
+                    standardOutputExcerpt = SafeField(probe.StandardOutputExcerpt, request),
+                    standardErrorExcerpt = SafeField(probe.StandardErrorExcerpt, request),
+                    capabilityFlags = (probe.CapabilityFlags ?? new Dictionary<string, bool>())
+                        .Take(32)
+                        .ToDictionary(pair => SafeField(pair.Key, request), pair => pair.Value, StringComparer.Ordinal),
+                    toolVersion = SafeField(probe.ToolVersion, request)
+                })
+        };
+
+    private static object BuildSessionEvents(DiagnosticsBundleRequest request)
+        => new
+        {
+            schemaVersion = 1,
+            maximumRecords = MaximumSessionEventCount,
+            records = (request.SessionEvents ?? [])
+                .OrderByDescending(item => item.TimestampUtc)
+                .Take(MaximumSessionEventCount)
+                .OrderBy(item => item.TimestampUtc)
+                .Select(item => new
+                {
+                    sessionId = SafeIdentifier(item.SessionId),
+                    modelId = SafeIdentifier(item.ModelId),
+                    runtimeId = SafeIdentifier(item.RuntimeId),
+                    previousState = SafeField(item.PreviousState, request),
+                    newState = SafeField(item.NewState, request),
+                    item.TimestampUtc,
+                    initiatingActor = SafeField(item.InitiatingActor, request),
+                    reasonCode = SafeField(item.ReasonCode, request),
+                    processExitCategory = SafeField(item.ProcessExitCategory, request),
+                    readinessResult = SafeField(item.ReadinessResult, request),
+                    stopVerificationResult = SafeField(item.StopVerificationResult, request)
+                })
+        };
+
+    private static object BuildBuildAndUpdate(DiagnosticsBundleRequest request)
+    {
+        var details = request.BuildAndUpdate ?? new BuildAndUpdateDiagnostics(
+            BuildCommit: "unknown",
+            ReleaseChannel: "development",
+            InstallMode: "unknown",
+            WindowsSignatureStatus: "unknown",
+            ManifestVerificationStatus: "not-checked",
+            LastUpdateCheckResult: "not-available");
+        return new
+        {
+            schemaVersion = 1,
+            applicationVersion = request.AppVersion,
+            buildCommit = SafeField(details.BuildCommit, request),
+            releaseChannel = SafeField(details.ReleaseChannel, request),
+            installMode = SafeField(details.InstallMode, request),
+            windowsSignatureStatus = SafeField(details.WindowsSignatureStatus, request),
+            manifestVerificationStatus = SafeField(details.ManifestVerificationStatus, request),
+            lastUpdateCheckResult = SafeField(details.LastUpdateCheckResult, request)
+        };
+    }
+
     private static string[] RecentLogs(string logsDirectory)
     {
         try
@@ -239,7 +324,27 @@ public static class DiagnosticsBundleService
             redacted,
             "(?i)(\\\"?(?:apiKey|modelApiKey|controlToken|token)\\\"?\\s*[:=]\\s*\\\"?)[^\\\"\\s,}]+",
             "$1[redacted]");
+        redacted = Regex.Replace(redacted, @"(?i)(https?://)[^/\s:@]+:[^@\s/]+@", "$1[redacted]@");
+        redacted = Regex.Replace(redacted, @"\\\\[A-Za-z0-9._-]+\\[A-Za-z0-9$._-]+(?:\\[^\s\""'<>|]+)*", "[unc-path]");
+        redacted = Regex.Replace(redacted, @"(?i)\b[A-Z]:[\\/](?:[^\s\""'<>|]+)", "[path]");
+        redacted = Regex.Replace(redacted, @"(?i)(?:/home/[^/\s]+|/mnt/[a-z]/Users/[^/\s]+)(?:/[^\s\""'<>|]+)*", "[path]");
+        redacted = Regex.Replace(redacted, @"(?i)(--prompt(?:=|\s+))\S+", "$1[excluded]");
+        redacted = Regex.Replace(redacted, "(?i)(\\\"(?:prompt|completion|messages?|requestBody)\\\"\\s*:\\s*\\\")[^\\\"]*", "$1[excluded]");
         return redacted;
+    }
+
+    private static string SafeField(string? value, DiagnosticsBundleRequest request)
+    {
+        var bounded = (value ?? "").Length <= MaximumDiagnosticFieldCharacters
+            ? value ?? ""
+            : (value ?? "")[..MaximumDiagnosticFieldCharacters];
+        return RedactDiagnosticText(bounded, request);
+    }
+
+    private static string SafeIdentifier(string? value)
+    {
+        var bounded = (value ?? "").Length <= 128 ? value ?? "" : (value ?? "")[..128];
+        return Regex.Replace(bounded, "[^A-Za-z0-9_.:-]", "_");
     }
 
     private static string ReplacePath(string text, string path, string replacement)
@@ -303,4 +408,15 @@ public static class DiagnosticsBundleService
         await using var writer = new StreamWriter(entryStream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         await writer.WriteAsync(text.AsMemory(), cancellationToken);
     }
+
+    private static async Task WriteJsonEntryAsync(
+        ZipArchive archive,
+        string entryName,
+        object value,
+        CancellationToken cancellationToken)
+        => await WriteEntryAsync(
+            archive,
+            entryName,
+            JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }),
+            cancellationToken);
 }

@@ -19,6 +19,19 @@ public static class GatewayUrlReservationService
             ? $"http://+:{port}/"
             : $"http://127.0.0.1:{port}/";
 
+    public static async Task<string> PreferredListenerPrefixAsync(
+        int port,
+        bool allowLan,
+        CancellationToken cancellationToken = default)
+    {
+        if (allowLan) return ListenerPrefixForPort(port, allowLan: true);
+
+        var wildcard = ListenerPrefixForPort(port, allowLan: true);
+        return await ReservationExistsForPrefixAsync(wildcard, cancellationToken)
+            ? wildcard
+            : ListenerPrefixForPort(port, allowLan: false);
+    }
+
     /// <summary>
     /// Checks whether a URL ACL reservation already exists for the prefix.
     /// </summary>

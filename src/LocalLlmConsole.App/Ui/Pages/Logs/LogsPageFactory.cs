@@ -52,27 +52,27 @@ public static class LogsPageFactory
         root.Children.Add(toolbar);
 
         var logsGrid = PageSectionFactory.GridFor(
-            (Loc.T("Logs.Col.Type"), "C1", .9),
-            (Loc.T("Logs.Col.File"), "C2", 2.1),
-            (Loc.T("Logs.Col.Related"), "C3", 2.5),
-            (Loc.T("Logs.Col.Updated"), "C4", 1.1),
-            (Loc.T("Logs.Col.Size"), "C5", .7));
+            (Loc.T("Logs.Col.Type"), nameof(LogFileRow.Type), .9),
+            (Loc.T("Logs.Col.File"), nameof(LogFileRow.FileName), 2.1),
+            (Loc.T("Logs.Col.Related"), nameof(LogFileRow.Related), 2.5),
+            (Loc.T("Logs.Col.Updated"), nameof(LogFileRow.Updated), 1.1),
+            (Loc.T("Logs.Col.Size"), nameof(LogFileRow.Size), .7));
         logsGrid.SelectionMode = DataGridSelectionMode.Extended;
         logsGrid.SelectionUnit = DataGridSelectionUnit.FullRow;
-        PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Open"), "C6", "B1", request.Actions.OpenRow, .55, tooltipBinding: "T1");
-        PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Delete"), "C7", "B2", request.Actions.DeleteRow, .65, tooltipBinding: "T2", visualRole: VisualRole.Danger);
+        PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Open"), nameof(LogFileRow.OpenAction), nameof(LogFileRow.CanOpen), request.Actions.OpenRow, .55, tooltipBinding: nameof(LogFileRow.OpenToolTip));
+        PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Delete"), nameof(LogFileRow.DeleteAction), nameof(LogFileRow.CanDelete), request.Actions.DeleteRow, .65, tooltipBinding: nameof(LogFileRow.DeleteToolTip), visualRole: VisualRole.Danger);
         logsGrid.ItemsSource = request.Rows;
         DataGridRowContextMenu.Attach(
             logsGrid,
-            new(row => ((UiRow)row).C6,
-                row => row is UiRow { B1: true },
+            new(row => ((LogFileRow)row).OpenAction,
+                row => row is LogFileRow { CanOpen: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.OpenRow, row),
-                ToolTip: row => ((UiRow)row).T1),
-            new(row => ((UiRow)row).C7,
-                row => row is UiRow { B2: true },
+                ToolTip: row => ((LogFileRow)row).OpenToolTip),
+            new(row => ((LogFileRow)row).DeleteAction,
+                row => row is LogFileRow { CanDelete: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.DeleteRow, row),
                 SeparatorBefore: true,
-                ToolTip: row => ((UiRow)row).T2));
+                ToolTip: row => ((LogFileRow)row).DeleteToolTip));
         logsGrid.SelectionChanged += request.Actions.SelectionChanged;
         var listFrame = PageSectionFactory.GridFrame(logsGrid);
         Grid.SetRow(listFrame, 1);
@@ -106,8 +106,8 @@ public static class LogsPageFactory
     private static Grid Toolbar(LogsPageRequest request)
     {
         var toolbar = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-        toolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         toolbar.ColumnDefinitions.Add(new ColumnDefinition());
+        toolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0) });
         toolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var leftActions = Bar();

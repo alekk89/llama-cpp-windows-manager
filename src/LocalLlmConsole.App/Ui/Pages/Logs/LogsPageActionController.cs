@@ -12,7 +12,7 @@ public sealed record LogsPageActionControllerActions(
     Func<Task> DeleteAllLogsAsync,
     Action<string> OpenLogPath,
     Func<string, Task> DeleteLogPathAsync,
-    Func<UiRow?, string> LogPathFromRow,
+    Func<LogFileRow?, string> LogPathFromRow,
     Action LoadSelectedLog,
     Func<Func<Task>, Task> RunEventAsync);
 
@@ -39,7 +39,7 @@ public sealed class LogsPageActionController
 
     private void OpenLogRow_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is UiRow row)
+        if ((sender as FrameworkElement)?.Tag is LogFileRow row)
             _actions.OpenLogPath(_actions.LogPathFromRow(row));
     }
 
@@ -47,7 +47,7 @@ public sealed class LogsPageActionController
     {
         await _actions.RunEventAsync(async () =>
         {
-            if ((sender as FrameworkElement)?.Tag is UiRow row)
+            if ((sender as FrameworkElement)?.Tag is LogFileRow row)
                 await _actions.DeleteLogPathAsync(_actions.LogPathFromRow(row));
         });
     }

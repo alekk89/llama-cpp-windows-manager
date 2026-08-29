@@ -11,7 +11,7 @@
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="CaretBrush" Value="{DynamicResource Accent}"/>
       <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="TextBox">
@@ -47,7 +47,7 @@
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="CaretBrush" Value="Transparent"/>
       <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Cursor" Value="IBeam"/>
       <Setter Property="IsReadOnly" Value="True"/>
       <Setter Property="IsReadOnlyCaretVisible" Value="False"/>
@@ -72,7 +72,7 @@
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="SnapsToDevicePixels" Value="True"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ComboBox">
@@ -194,8 +194,8 @@
             <Border Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="5"
-                    Padding="3"
+                    CornerRadius="8"
+                    Padding="4"
                     SnapsToDevicePixels="True">
               <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
             </Border>
@@ -206,9 +206,9 @@
     <Style TargetType="MenuItem">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
-      <Setter Property="Padding" Value="7,4"/>
-      <Setter Property="MinHeight" Value="26"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Padding" Value="8,4"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="MenuItem">
@@ -220,9 +220,9 @@
                       SnapsToDevicePixels="True">
                 <Grid>
                   <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition x:Name="CheckColumn" Width="0"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition x:Name="SubmenuColumn" Width="0"/>
                   </Grid.ColumnDefinitions>
                   <TextBlock x:Name="CheckGlyph"
                              Grid.Column="0"
@@ -256,8 +256,8 @@
                 <Border Background="{DynamicResource PanelBackAlt}"
                         BorderBrush="{DynamicResource PanelBorderStrong}"
                         BorderThickness="1"
-                        CornerRadius="5"
-                        Padding="3"
+                        CornerRadius="8"
+                        Padding="4"
                         SnapsToDevicePixels="True">
                   <ScrollViewer CanContentScroll="True"
                                 HorizontalScrollBarVisibility="Disabled"
@@ -268,10 +268,15 @@
               </Popup>
             </Grid>
             <ControlTemplate.Triggers>
+              <Trigger Property="IsCheckable" Value="True">
+                <Setter TargetName="CheckColumn" Property="Width" Value="20"/>
+              </Trigger>
               <Trigger Property="Role" Value="SubmenuHeader">
+                <Setter TargetName="SubmenuColumn" Property="Width" Value="16"/>
                 <Setter TargetName="SubmenuGlyph" Property="Visibility" Value="Visible"/>
               </Trigger>
               <Trigger Property="Role" Value="TopLevelHeader">
+                <Setter TargetName="SubmenuColumn" Property="Width" Value="16"/>
                 <Setter TargetName="SubmenuGlyph" Property="Visibility" Value="Visible"/>
               </Trigger>
               <Trigger Property="IsChecked" Value="True">
@@ -290,23 +295,33 @@
         </Setter.Value>
       </Setter>
     </Style>
-    <Style TargetType="Separator">
-      <Setter Property="Margin" Value="20,2,5,2"/>
+    <Style x:Key="FluentMenuSeparatorStyle" TargetType="Separator">
+      <Setter Property="Margin" Value="0,3"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Separator">
-            <Border Height="1"
+            <Border x:Name="SeparatorLine"
+                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type ItemsPresenter}}}"
+                    Height="1"
+                    HorizontalAlignment="Stretch"
                     Background="{DynamicResource PanelBorder}"
+                    Opacity="0.65"
                     SnapsToDevicePixels="True"/>
           </ControlTemplate>
         </Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}"
+           TargetType="Separator"
+           BasedOn="{StaticResource FluentMenuSeparatorStyle}"/>
+    <Style TargetType="Separator"
+           BasedOn="{StaticResource FluentMenuSeparatorStyle}"/>
     <Style TargetType="CheckBox">
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="MinHeight" Value="28"/>
       <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="CheckBox">

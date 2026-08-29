@@ -40,13 +40,9 @@ public sealed partial class AppServiceFactory
         RuntimeReadinessCompletionService completion)
         => new(readiness, completion);
 
-    public RuntimeReadinessCompletionApplicationService CreateRuntimeReadinessCompletionApplicationService()
-        => new();
-
     public RuntimeReadinessMonitorApplicationService CreateRuntimeReadinessMonitorApplicationService(
-        RuntimeReadinessMonitorWorkflowService workflow,
-        RuntimeReadinessCompletionApplicationService completionApplication)
-        => new(workflow, completionApplication);
+        RuntimeReadinessMonitorWorkflowService workflow)
+        => new(workflow);
 
     public RuntimeSessionActionDecisionService CreateRuntimeSessionActionDecisionService()
         => new();
@@ -56,16 +52,9 @@ public sealed partial class AppServiceFactory
         RuntimeSessionActionDecisionService runtimeSessionActions)
         => new(runtimeSessions, runtimeSessionActions);
 
-    public RuntimeSessionFollowupApplicationService CreateRuntimeSessionFollowupApplicationService()
-        => new();
-
     public RuntimeSessionApplicationService CreateRuntimeSessionApplicationService(
-        RuntimeSessionCommandService commands,
-        RuntimeSessionFollowupApplicationService followupApplication)
-        => new(commands, followupApplication);
-
-    public JobRowProjectionService CreateJobRowProjectionService()
-        => new();
+        RuntimeSessionCommandService commands)
+        => new(commands);
 
     public ModelRuntimeStartFollowupService CreateModelRuntimeStartFollowupService()
         => new();

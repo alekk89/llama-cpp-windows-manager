@@ -15,7 +15,7 @@ public sealed record UpdatesPageRequest(
     UpdatesPageActions Actions);
 
 public sealed record UpdatesPageBuildResult(
-    StackPanel Content);
+    ScrollViewer Content);
 
 public static class UpdatesPageFactory
 {
@@ -43,7 +43,12 @@ public static class UpdatesPageFactory
         if (request.ViewModel.LatestUpdate is { IsAvailable: true })
             root.Children.Add(PageSectionFactory.FramedSection(Loc.T("Updates.LatestReleaseSectionTitle"), SoftText(request.ViewModel.LatestReleaseText)));
 
-        return new UpdatesPageBuildResult(root);
+        return new UpdatesPageBuildResult(new ScrollViewer
+        {
+            Content = root,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        });
     }
 
     private static WrapPanel Bar() => new()

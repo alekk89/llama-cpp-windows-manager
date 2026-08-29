@@ -23,7 +23,7 @@ public sealed class WslDistroSelectionApplicationService
 {
     public async Task<WslDistroSelectionApplicationResult> SelectAsync(
         AppSettings settings,
-        UiRow? row,
+        WslDistroRow? row,
         WslDistroSelectionApplicationActions actions)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -42,12 +42,12 @@ public sealed class WslDistroSelectionApplicationService
         return new WslDistroSelectionApplicationResult(WslDistroSelectionApplicationOutcome.Applied, persisted, distro, status);
     }
 
-    public static string DistroName(UiRow? row)
-        => row?.Data["Name"]?.ToString() ?? row?.C2 ?? "";
+    public static string DistroName(WslDistroRow? row)
+        => row?.Name ?? "";
 
     public static string PreferredUbuntuDistroName(
-        UiRow? selectedRow,
-        IEnumerable<UiRow> rows,
+        WslDistroRow? selectedRow,
+        IEnumerable<WslDistroRow> rows,
         string configuredDistro)
     {
         ArgumentNullException.ThrowIfNull(rows);
@@ -65,11 +65,10 @@ public sealed class WslDistroSelectionApplicationService
         return ubuntu is null ? "" : DistroName(ubuntu);
     }
 
-    private static bool IsUbuntuDistroRow(UiRow? row)
+    private static bool IsUbuntuDistroRow(WslDistroRow? row)
     {
         if (row is null) return false;
-        var name = DistroName(row);
-        return row.Data["IsUbuntu"]?.GetValue<bool?>() ?? name.Contains("ubuntu", StringComparison.OrdinalIgnoreCase);
+        return row.IsUbuntu || row.Name.Contains("ubuntu", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void Validate(WslDistroSelectionApplicationActions actions)

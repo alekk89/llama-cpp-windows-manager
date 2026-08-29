@@ -7,10 +7,10 @@
     <AssemblyName>llwmctl</AssemblyName>
     <RootNamespace>LocalLlmConsole.ControlCli</RootNamespace>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>2.4.0</Version>
-    <AssemblyVersion>2.4.0.0</AssemblyVersion>
-    <FileVersion>2.4.0.0</FileVersion>
-    <InformationalVersion>v2.4.0</InformationalVersion>
+    <Version>2.5.0</Version>
+    <AssemblyVersion>2.5.0.0</AssemblyVersion>
+    <FileVersion>2.5.0.0</FileVersion>
+    <InformationalVersion>v2.5.0</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />

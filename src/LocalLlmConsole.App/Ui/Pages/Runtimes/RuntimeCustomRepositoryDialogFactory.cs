@@ -5,6 +5,7 @@ using WpfBorder = System.Windows.Controls.Border;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
 using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfLabel = System.Windows.Controls.Label;
 using WpfTextBox = System.Windows.Controls.TextBox;
 using WpfWindow = System.Windows.Window;
 
@@ -146,13 +147,15 @@ public static class RuntimeCustomRepositoryDialogFactory
     private static void AddDialogRow(Grid grid, int row, string label, FrameworkElement editor)
     {
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var text = new TextBlock
+        var text = new WpfLabel
         {
-            Text = label,
+            Content = label,
+            Target = editor,
             Foreground = (WpfBrush)WpfApplication.Current.Resources["TextSoft"],
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 12, 8)
         };
+        System.Windows.Automation.AutomationProperties.SetName(editor, label);
         Grid.SetRow(text, row);
         grid.Children.Add(text);
 

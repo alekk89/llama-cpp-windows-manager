@@ -48,4 +48,18 @@ public sealed class WindowsPageState
         InstallVulkanToolsButton = controls.InstallVulkanToolsButton;
         InstallSyclToolsButton = controls.InstallSyclToolsButton;
     }
+
+    public void ReleaseView()
+    {
+        StatusMetric = null;
+        CpuMetric = null;
+        CudaMetric = null;
+        VulkanMetric = null;
+        SyclMetric = null;
+        ToolsGrid = null;
+        InstallCpuToolsButton = null;
+        InstallCudaToolkitButton = null;
+        InstallVulkanToolsButton = null;
+        InstallSyclToolsButton = null;
+    }
 }

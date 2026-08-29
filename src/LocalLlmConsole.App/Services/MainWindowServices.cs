@@ -107,10 +107,8 @@ public sealed record MainWindowCoreRuntimeServices(
     RuntimeReadinessWorkflowService RuntimeReadinessWorkflow,
     RuntimeReadinessCompletionService RuntimeReadinessCompletion,
     RuntimeReadinessMonitorWorkflowService RuntimeReadinessMonitorWorkflow,
-    RuntimeReadinessCompletionApplicationService RuntimeReadinessCompletionApplication,
     RuntimeReadinessMonitorApplicationService RuntimeReadinessMonitorApplication,
     RuntimeSessionApplicationService RuntimeSessionApplication,
-    JobRowProjectionService JobRows,
     RuntimeEndpointProbeService RuntimeEndpointProbe,
     EndpointInspectionService EndpointInspection,
     RuntimeTelemetryApplicationService RuntimeTelemetryApplication,
@@ -181,6 +179,7 @@ public sealed record MainWindowLoadedAppServices(
     LifetimeMetricsApplicationService LifetimeMetricsApplication,
     ModelLookupApplicationService ModelLookupApplication,
     JobEngine Jobs,
+    Lazy<BenchmarkApplicationService> Benchmarks,
     HuggingFaceService HuggingFace,
     DownloadHistoryWorkflowService DownloadHistoryWorkflow,
     DownloadHistoryApplicationService DownloadHistoryApplication);
@@ -190,6 +189,7 @@ public sealed record MainWindowLoadedModelServices(
     ModelCatalogRefreshApplicationService ModelCatalogRefreshApplication,
     ModelGroupService ModelGroups,
     ModelLaunchProfileService LaunchProfiles,
+    TrayProfileMenuApplicationService TrayProfiles,
     ModelLaunchVariantWorkflowService LaunchVariants,
     ModelLaunchSettingsWorkflowService ModelLaunchSettingsWorkflow);
 

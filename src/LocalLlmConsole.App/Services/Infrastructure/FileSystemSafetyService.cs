@@ -35,16 +35,47 @@ public static class FileSystemSafetyService
     {
         if (!Directory.Exists(root)) return 0;
         long size = 0;
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = false,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
             try
             {
-                size += new FileInfo(file).Length;
+                foreach (var file in Directory.EnumerateFiles(current, "*", options))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        size = checked(size + new FileInfo(file).Length);
+                    }
+                    catch (OverflowException)
+                    {
+                        return long.MaxValue;
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceWarning($"Skipping file during directory size calculation: {file}. {ex.Message}");
+                    }
+                }
+
+                foreach (var directory in Directory.EnumerateDirectories(current, "*", options))
+                    pending.Push(directory);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                Trace.TraceWarning($"Skipping file during directory size calculation: {file}. {ex.Message}");
+                Trace.TraceWarning($"Skipping directory during size calculation: {current}. {ex.Message}");
             }
         }
         return size;

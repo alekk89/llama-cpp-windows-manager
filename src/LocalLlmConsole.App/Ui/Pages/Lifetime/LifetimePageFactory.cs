@@ -65,7 +65,11 @@ public static partial class LifetimePageFactory
         ArgumentNullException.ThrowIfNull(request.Actions);
 
         var root = new DockPanel();
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
         var content = new StackPanel { Margin = new Thickness(16) };
         scroll.Content = content;
         root.Children.Add(scroll);
@@ -154,6 +158,8 @@ public static partial class LifetimePageFactory
         out WpfButton reset)
     {
         var panel = new Grid();
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         for (var index = 0; index < 3; index++)
             panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -181,6 +187,8 @@ public static partial class LifetimePageFactory
         model.SelectionChanged += request.Actions.FilterChanged;
         profile.SelectionChanged += request.Actions.FilterChanged;
         runtime.SelectionChanged += request.Actions.FilterChanged;
+
+        LifetimePageResponsiveCoordinator.ConfigureToolbar(panel, range, model, profile, runtime, reset);
 
         return new Border
         {
@@ -299,15 +307,15 @@ public static partial class LifetimePageFactory
     private static DataGrid BuildModelGrid(LifetimePageRequest request)
     {
         var grid = PageSectionFactory.GridFor(
-            (Loc.T("Lifetime.Col.Model"), "C1", 2.2),
-            (Loc.T("Lifetime.Col.Requests"), "C2", .65),
-            (Loc.T("Lifetime.Col.Input"), "C3", .8),
-            (Loc.T("Lifetime.Col.Cached"), "C4", .8),
-            (Loc.T("Lifetime.Col.Output"), "C5", .8),
-            (Loc.T("Lifetime.Col.Total"), "C6", .8),
-            (Loc.T("Lifetime.Col.Share"), "C7", .65),
-            (Loc.T("Lifetime.Col.GenerationRate"), "C8", .75));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Lifetime.ResetButton"), "C9", "B1", request.Actions.ResetLifetimeRowClick, .55, tooltipBinding: "T1", visualRole: VisualRole.Danger);
+            (Loc.T("Lifetime.Col.Model"), nameof(LifetimeMetricRow.ModelName), 2.2),
+            (Loc.T("Lifetime.Col.Requests"), nameof(LifetimeMetricRow.Requests), .65),
+            (Loc.T("Lifetime.Col.Input"), nameof(LifetimeMetricRow.InputTokens), .8),
+            (Loc.T("Lifetime.Col.Cached"), nameof(LifetimeMetricRow.CachedTokens), .8),
+            (Loc.T("Lifetime.Col.Output"), nameof(LifetimeMetricRow.OutputTokens), .8),
+            (Loc.T("Lifetime.Col.Total"), nameof(LifetimeMetricRow.TotalTokens), .8),
+            (Loc.T("Lifetime.Col.Share"), nameof(LifetimeMetricRow.Share), .65),
+            (Loc.T("Lifetime.Col.GenerationRate"), nameof(LifetimeMetricRow.GenerationRate), .75));
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Lifetime.ResetButton"), nameof(LifetimeMetricRow.ResetAction), nameof(LifetimeMetricRow.CanReset), request.Actions.ResetLifetimeRowClick, .55, tooltipBinding: nameof(LifetimeMetricRow.ResetToolTip), visualRole: VisualRole.Danger);
         grid.ItemsSource = request.Rows;
         grid.MinHeight = 120;
         grid.MaxHeight = 260;
@@ -315,9 +323,9 @@ public static partial class LifetimePageFactory
             grid,
             new DataGridRowContextAction(
                 _ => Loc.T("Lifetime.ResetButton"),
-                row => row is UiRow { B1: true },
+                row => row is LifetimeMetricRow { CanReset: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.ResetLifetimeRowClick, row),
-                ToolTip: row => ((UiRow)row).T1));
+                ToolTip: row => ((LifetimeMetricRow)row).ResetToolTip));
         return grid;
     }
 

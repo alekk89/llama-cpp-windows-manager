@@ -88,6 +88,7 @@ public sealed record AppSettings(
     bool ShowOverviewTokens = true,
     bool ShowOverviewMtpTokens = true,
     bool ShowOverviewKvCache = true,
+    bool ShowOverviewModelSection = true,
     bool ShowOverviewLiveRuntimeLog = true,
     string RuntimeLogOrder = "newestFirst",
     bool ShowOverviewAllMetrics = false,
@@ -98,7 +99,9 @@ public sealed record AppSettings(
     double ElectricityNightRatePerKwh = 0,
     string ElectricityNightStartLocal = "00:00",
     string ElectricityNightEndLocal = "07:00",
-    bool TrackGpuEnergyWhileIdle = false)
+    bool TrackGpuEnergyWhileIdle = false,
+    bool BenchmarkPreventSystemSleep = true,
+    bool BenchmarkStopActiveSessions = false)
 {
     public const int DefaultContextSize = 131_072;
     public const int DefaultGpuLayers = 999;

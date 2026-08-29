@@ -3,7 +3,10 @@ namespace LocalLlmConsole.Services;
 public sealed record WindowsHostProbeSummary(
     string CpuSummary,
     string MemorySummary,
-    string GpuSummary);
+    string GpuSummary)
+{
+    public AcceleratorProbeSummary Accelerators => AcceleratorProbeSummary.Parse(GpuSummary);
+}
 
 public sealed partial class GpuStatusProbeService
 {

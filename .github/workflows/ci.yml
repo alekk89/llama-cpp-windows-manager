@@ -29,6 +29,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Check code shape
+        shell: pwsh
+        run: .\scripts\check-code-shape.ps1
+
       - name: Restore and build
         shell: pwsh
         run: .\scripts\build-app.ps1 -Restore -LockedRestore
@@ -44,6 +48,10 @@ jobs:
       - name: Check diff whitespace
         shell: pwsh
         run: git diff --check
+
+      - name: Validate documentation links and commands
+        shell: pwsh
+        run: .\scripts\test-docs.ps1
 
       - name: Package security and currency audit
         shell: pwsh

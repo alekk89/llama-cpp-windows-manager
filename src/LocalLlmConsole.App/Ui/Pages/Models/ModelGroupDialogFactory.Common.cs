@@ -6,6 +6,7 @@ using WpfBorder = System.Windows.Controls.Border;
 using WpfBinding = System.Windows.Data.Binding;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
+using WpfLabel = System.Windows.Controls.Label;
 using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
 using WpfOrientation = System.Windows.Controls.Orientation;
 using WpfWindow = System.Windows.Window;
@@ -22,16 +23,18 @@ public static partial class ModelGroupDialogFactory
         for (var row = 0; row < fields.Length; row++)
         {
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) });
-            var label = new TextBlock
+            var control = fields[row].Control;
+            var label = new WpfLabel
             {
-                Text = fields[row].Label,
+                Content = fields[row].Label,
+                Target = control,
                 Foreground = (WpfBrush)WpfApplication.Current.Resources["TextSoft"],
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 12, 0)
             };
             Grid.SetRow(label, row);
             grid.Children.Add(label);
-            var control = fields[row].Control;
+            System.Windows.Automation.AutomationProperties.SetName(control, fields[row].Label);
             control.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetRow(control, row);
             Grid.SetColumn(control, 1);

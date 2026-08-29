@@ -58,6 +58,33 @@ public sealed class WslRuntimeStopService
         }
     }
 
+    public async Task<WslRuntimeStopResult> StopByMarkerAsync(
+        string distro,
+        string processMarker,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(distro))
+            return new WslRuntimeStopResult(false, false, -1, "", "A WSL distro is required to stop the process.");
+        if (string.IsNullOrWhiteSpace(processMarker))
+            return new WslRuntimeStopResult(false, false, -1, "", "A WSL process marker is required.");
+        try
+        {
+            var result = await _processRunner.RunAsync(
+                BuildStopStartInfo(_wslExe(), distro, WslKillByMarkerCommand(processMarker)),
+                StopTimeout,
+                cancellationToken);
+            return new WslRuntimeStopResult(true, result.ExitCode == 0, result.ExitCode, result.Output, result.Error);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return new WslRuntimeStopResult(true, false, -1, "", ex.Message);
+        }
+    }
+
     private static async Task LogStopResultAsync(WslRuntimeStopRequest request, ProcessRunResult result)
     {
         if (string.IsNullOrWhiteSpace(request.LogPath) || request.MaxLogBytes <= 0) return;

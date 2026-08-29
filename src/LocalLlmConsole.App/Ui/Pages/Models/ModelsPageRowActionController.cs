@@ -43,16 +43,15 @@ public sealed class ModelsPageRowActionController
     {
         await _actions.RunEventAsync(async () =>
         {
-            if ((sender as FrameworkElement)?.Tag is not UiRow row || !row.B1) return;
-            var file = row.Data.Deserialize<HuggingFaceFile>();
-            if (file is not null) await _actions.StartHuggingFaceDownloadAsync(file);
+            if ((sender as FrameworkElement)?.Tag is not HuggingFaceSearchRow { CanDownload: true } row) return;
+            await _actions.StartHuggingFaceDownloadAsync(row.File);
         });
     }
 
     public void OpenHuggingFaceModelCardRow_Click(object sender, RoutedEventArgs e)
     {
         _modelCards.OpenFromRow(
-            (sender as FrameworkElement)?.Tag as UiRow,
+            (sender as FrameworkElement)?.Tag as HuggingFaceSearchRow,
             _actions.ModelCardActions());
     }
 }

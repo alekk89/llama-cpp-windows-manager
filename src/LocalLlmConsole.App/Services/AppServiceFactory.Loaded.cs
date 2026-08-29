@@ -23,10 +23,12 @@ public sealed partial class AppServiceFactory
         var lifetimeMetricsApplication = CreateLifetimeMetricsApplicationService(stateStore);
         var modelLookupApplication = CreateModelLookupApplicationService(stateStore);
         var jobs = CreateJobEngine(stateStore);
+        var benchmarks = CreateLazyBenchmarkApplicationService(stateStore, jobs, request.Sessions, request.ProcessRunner);
         var catalog = CreateModelCatalogService(stateStore);
         var modelCatalogRefreshApplication = CreateModelCatalogRefreshApplicationService(stateStore, catalog);
         var modelGroups = CreateModelGroupService(stateStore);
         var launchProfiles = CreateModelLaunchProfileService(stateStore, request.Sessions);
+        var trayProfiles = CreateTrayProfileMenuApplicationService(stateStore, request.Sessions);
         var launchVariants = CreateModelLaunchVariantWorkflowService(launchProfiles);
         var modelLaunchSettingsWorkflow = CreateModelLaunchSettingsWorkflowService(launchProfiles);
         var gatewayRouteCatalog = CreateModelGatewayRouteCatalogApplicationService(stateStore);
@@ -97,6 +99,7 @@ public sealed partial class AppServiceFactory
                 lifetimeMetricsApplication,
                 modelLookupApplication,
                 jobs,
+                benchmarks,
                 huggingFace,
                 downloadHistoryWorkflow,
                 downloadHistoryApplication),
@@ -105,6 +108,7 @@ public sealed partial class AppServiceFactory
                 modelCatalogRefreshApplication,
                 modelGroups,
                 launchProfiles,
+                trayProfiles,
                 launchVariants,
                 modelLaunchSettingsWorkflow),
             new MainWindowLoadedGatewayServices(

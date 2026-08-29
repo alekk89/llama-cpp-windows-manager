@@ -1,0 +1,9 @@
+CPU=1
+CPU_SUMMARY=CPU OK, CMake 3.31
+CUDA=0
+CUDA_SUMMARY=CUDA missing nvcc
+VULKAN=1
+VULKAN_SUMMARY=Vulkan OK, public adapter
+SYCL=1
+SYCL_SUMMARY=SYCL OK, public Level Zero device
+FUTURE_FIELD=ignored

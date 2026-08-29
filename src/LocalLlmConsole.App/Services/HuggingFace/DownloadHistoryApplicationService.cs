@@ -31,7 +31,6 @@ public sealed record DownloadHistoryTimerRefreshActions(
 public sealed record DownloadHistoryCommandApplicationActions(
     Func<string, Func<Task>, Task> RunBusyAsync,
     Func<Task> RefreshDownloadHistoryAsync,
-    Func<Task> RefreshJobsAsync,
     Action<string> SetStatus,
     Action<string> StartMonitor);
 
@@ -186,10 +185,7 @@ public sealed class DownloadHistoryApplicationService
         => _workflow.WaitUntilInactiveOrTerminalAsync(jobId, pollInterval, cancellationToken);
 
     private static async Task RefreshAfterCommandAsync(DownloadHistoryCommandApplicationActions actions)
-    {
-        await actions.RefreshDownloadHistoryAsync();
-        await actions.RefreshJobsAsync();
-    }
+        => await actions.RefreshDownloadHistoryAsync();
 
     private static DownloadHistoryApplicationOutcome NoSelection(DownloadHistoryCommandApplicationActions actions)
     {
@@ -229,7 +225,6 @@ public sealed class DownloadHistoryApplicationService
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(actions.RunBusyAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshDownloadHistoryAsync);
-        ArgumentNullException.ThrowIfNull(actions.RefreshJobsAsync);
         ArgumentNullException.ThrowIfNull(actions.SetStatus);
         ArgumentNullException.ThrowIfNull(actions.StartMonitor);
     }

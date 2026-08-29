@@ -131,10 +131,10 @@ public static class WindowsPageFactory
     private static DataGrid ToolsGrid(WindowsPageRequest request)
     {
         var grid = PageSectionFactory.GridFor(
-            (Loc.T("Windows.Col.Toolchain"), "C1", .75),
-            (Loc.T("Windows.Col.Status"), "C2", .6),
-            (Loc.T("Windows.Col.Details"), "C3", 2.8),
-            (Loc.T("Windows.Col.Driver"), "C4", 1.7));
+            (Loc.T("Windows.Col.Toolchain"), nameof(WindowsToolRow.Toolchain), .75),
+            (Loc.T("Windows.Col.Status"), nameof(WindowsToolRow.Status), .6),
+            (Loc.T("Windows.Col.Details"), nameof(WindowsToolRow.Details), 2.8),
+            (Loc.T("Windows.Col.Driver"), nameof(WindowsToolRow.Driver), 1.7));
         grid.ItemsSource = request.ViewModel.Windows.Rows;
         return grid;
     }

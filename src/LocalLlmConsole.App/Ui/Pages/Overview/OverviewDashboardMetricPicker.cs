@@ -38,6 +38,7 @@ internal static class OverviewDashboardMetricPicker
             Margin = new Thickness(0, 12, 0, 10),
             ToolTip = Loc.T("Dashboard.MetricSearchTooltip")
         };
+        System.Windows.Automation.AutomationProperties.SetName(search, Loc.T("Dashboard.MetricSearchTooltip"));
         Grid.SetRow(search, 1);
         root.Children.Add(search);
         var list = new System.Windows.Controls.ListBox
@@ -171,6 +172,8 @@ internal static class OverviewDashboardMetricPicker
             MinHeight = 26,
             Padding = new Thickness(2, 0, 2, 1)
         };
+        System.Windows.Automation.AutomationProperties.SetName(close, Loc.T("Accessibility.CloseDialog"));
+        close.ToolTip = Loc.T("Accessibility.CloseDialog");
         VisualRole.SetButtonRole(close, VisualRole.Quiet);
         close.Click += (_, _) => window.DialogResult = false;
         Grid.SetColumn(close, 1);

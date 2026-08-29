@@ -98,7 +98,11 @@ public sealed partial class HuggingFaceService
         }
 
         var completion = Task.WhenAll(activeDownloads.Select(active => active.Completion));
-        await Task.WhenAny(completion, Task.Delay(timeout));
+        await BoundedTaskDrain.ObserveWithinAsync(
+            completion,
+            timeout,
+            "Hugging Face downloads did not stop within the requested pause interval; continuing shutdown.",
+            "A Hugging Face download completed with an observed shutdown exception:");
     }
 
     public async Task RecoverInterruptedDownloadsAsync(AppSettings settings)
@@ -259,6 +263,8 @@ public sealed partial class HuggingFaceService
             var existing = File.Exists(partial) ? new FileInfo(partial).Length : 0;
             if (File.Exists(partial)) RejectUnsafeExistingFile(partial, "partial download");
             if (File.Exists(destination)) RejectUnsafeExistingFile(destination, "downloaded model");
+            if (file.SizeBytes > 0 && existing > file.SizeBytes)
+                throw new InvalidDataException($"Partial download exceeds the expected size of {file.SizeBytes:N0} bytes.");
             if (existing > 0 && file.SizeBytes > 0 && existing == file.SizeBytes)
             {
                 await CompletePartialDownloadAsync(job, file, settings, destination, partial, file.SizeBytes, cancellationToken);
@@ -271,8 +277,8 @@ public sealed partial class HuggingFaceService
             if (existing > 0) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existing, null);
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
+            total = RequiredDownloadBytes(file, ValidateDownloadResponse(file, response, existing));
             if (existing > 0 && (int)response.StatusCode != 206) existing = 0;
-            total = response.Content.Headers.ContentLength.GetValueOrDefault() + existing;
             EnsureDiskSpace(destination, total > existing ? total - existing : 0);
             await _jobs.UpdateAsync(job, JobStatus.Running, JsonSerializer.Serialize(new DownloadJobPayload(file, destination, existing, total), JsonOptions), cancellationToken);
             await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -282,8 +288,14 @@ public sealed partial class HuggingFaceService
             var lastProgressBytes = existing;
             var lastProgressUpdateAt = DateTimeOffset.UtcNow;
             int read;
-            while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+            while ((read = await BoundedStreamCopyService.ReadWithIdleTimeoutAsync(
+                       input,
+                       buffer,
+                       DownloadReadIdleTimeout,
+                       cancellationToken)) > 0)
             {
+                if (read > total - downloaded)
+                    throw new InvalidDataException($"Download exceeded the expected size of {total:N0} bytes.");
                 await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 downloaded += read;
                 var now = DateTimeOffset.UtcNow;

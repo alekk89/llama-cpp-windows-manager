@@ -1,0 +1,9 @@
+# The sole maintainer owns all changes today. Branch protection does not require
+# self-approval; these narrower entries become useful when another trusted
+# release/security reviewer is added.
+* @alekk89
+/.github/workflows/ @alekk89
+/scripts/ @alekk89
+/installer/ @alekk89
+/src/LocalLlmConsole.App/Services/App/AppUpdate* @alekk89
+/src/LocalLlmConsole.App/Services/Security/ @alekk89

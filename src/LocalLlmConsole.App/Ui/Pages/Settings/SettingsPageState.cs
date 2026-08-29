@@ -57,6 +57,13 @@ public sealed class SettingsPageState
         }
     }
 
+    public void ReleaseView()
+    {
+        DetachChangeHandlers();
+        ThemeCombo = null;
+        SettingsGrid = null;
+    }
+
     private void ThemeSelectionChanged(object sender, SelectionChangedEventArgs e)
         => _preferencesChanged?.Invoke();
 

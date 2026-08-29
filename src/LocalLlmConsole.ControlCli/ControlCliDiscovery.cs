@@ -17,7 +17,6 @@ internal static class ControlCliDiscovery
 {
     private const string ProtectedPrefix = "dpapi:v1:";
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("LocalLlmConsole:model-api-key:v1");
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public static DiscoveryDocument Discover(Arguments args)
     {
@@ -37,7 +36,9 @@ internal static class ControlCliDiscovery
             if (!File.Exists(path)) continue;
             try
             {
-                var document = JsonSerializer.Deserialize<DiscoveryDocument>(File.ReadAllText(path), JsonOptions);
+                var document = JsonSerializer.Deserialize(
+                    File.ReadAllText(path),
+                    ControlCliJsonContext.Default.DiscoveryDocument);
                 if (document is null || string.IsNullOrWhiteSpace(document.BaseUrl) || string.IsNullOrWhiteSpace(document.ProtectedToken)) continue;
                 if (document.ProcessId > 0)
                 {

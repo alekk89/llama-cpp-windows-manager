@@ -44,13 +44,15 @@ public sealed class TrackedProcessRunner : IProcessRunner
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
                 TryKillProcessTree(process);
-                _ = await Task.WhenAny(Task.WhenAll(outputTask, errorTask, inputTask), Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None));
+                CloseRedirectedStreams(process);
+                await ObserveIoCompletionAsync(outputTask, errorTask, inputTask);
                 throw new TimeoutException($"{Path.GetFileName(psi.FileName)} did not finish within {timeout.TotalMinutes:0.#} minutes.");
             }
             catch (OperationCanceledException)
             {
                 TryKillProcessTree(process);
-                _ = await Task.WhenAny(Task.WhenAll(outputTask, errorTask, inputTask), Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None));
+                CloseRedirectedStreams(process);
+                await ObserveIoCompletionAsync(outputTask, errorTask, inputTask);
                 throw;
             }
 
@@ -61,6 +63,25 @@ public sealed class TrackedProcessRunner : IProcessRunner
         {
             UntrackChildProcess(process);
         }
+    }
+
+    private static async Task ObserveIoCompletionAsync(params Task[] tasks)
+    {
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Child process I/O completed with an observed shutdown exception: {ex.Message}");
+        }
+    }
+
+    private static void CloseRedirectedStreams(Process process)
+    {
+        try { process.StandardInput.Close(); } catch { }
+        try { process.StandardOutput.Close(); } catch { }
+        try { process.StandardError.Close(); } catch { }
     }
 
     public void KillTrackedProcesses()

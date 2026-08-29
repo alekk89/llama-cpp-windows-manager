@@ -143,7 +143,7 @@
     <Style TargetType="DataGridRow">
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
           <Setter Property="Background" Value="{DynamicResource InfoSoft}"/>
@@ -160,7 +160,7 @@
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="Padding" Value="10,0"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Style.Triggers>
         <Trigger Property="IsSelected" Value="True">
           <Setter Property="Background" Value="Transparent"/>
@@ -174,7 +174,7 @@
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="Padding" Value="4"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
       <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
       <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
@@ -185,7 +185,7 @@
       <Setter Property="Padding" Value="10,7"/>
       <Setter Property="Margin" Value="0,1"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ListBoxItem">

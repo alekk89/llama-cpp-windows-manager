@@ -26,7 +26,7 @@ public sealed class LifetimeMetricsApplicationService
     public async Task AddUsageAsync(TokenUsageDelta delta)
     {
         ArgumentNullException.ThrowIfNull(delta);
-        if (!delta.HasTokens) return;
+        if (!delta.HasActivity) return;
         await _stateStore.RecordTokenUsageAsync(delta);
         Interlocked.Increment(ref _dataVersion);
     }

@@ -27,9 +27,11 @@ until a fix or mitigation is available and coordinated with the maintainer.
 - Model inference requires the separate model API key. Network exposure is an
   explicit setting.
 - Managed downloads validate available size and SHA-256 information before
-  installation. Managed runtime installations also record a file-hash manifest
-  for later re-verification.
-- Manually registered runtimes are user-trusted and are displayed as unverified.
+  installation. Managed runtime installations also record a local file-hash
+  baseline; later verification detects changed, missing, and unexpected files.
+  This is local change detection, not publisher authentication.
+- Manually registered runtimes have no Manager-recorded baseline and are
+  displayed as unverified custom runtimes.
 - Published binaries are unsigned unless a release explicitly states otherwise.
   Checksums verify integrity, not publisher identity.
 

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "version": "2.4.0",
+  "tag": "v2.4.0",
+  "publishedAtUtc": "2026-08-25T13:28:20Z",
+  "installer": {
+    "name": "LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe",
+    "url": "https://github.com/alekk89/llama-cpp-windows-manager/releases/download/v2.4.0/LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe",
+    "size": 135412758,
+    "sha256": "cab792c5db80246a5c668511976f348c7cae6fdc2636c3ff486053a5868b3412"
+  },
+  "portableArchive": {
+    "name": "LlamaCppWindowsManager-win-x64.zip",
+    "url": "https://github.com/alekk89/llama-cpp-windows-manager/releases/download/v2.4.0/LlamaCppWindowsManager-win-x64.zip",
+    "size": 137013593,
+    "sha256": "29476e0713116412058d3cddda7ec335a36979ec5ebe192c048fc112a5a7fa69"
+  }
+}

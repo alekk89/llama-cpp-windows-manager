@@ -1,0 +1,10 @@
+[
+  {
+    "Index": 0,
+    "Name": "Example Graphics Adapter",
+    "Utilization": 53.4,
+    "MemoryUsedBytes": 8589934592,
+    "MemoryTotalBytes": 25769803776,
+    "FutureField": "ignored"
+  }
+]
