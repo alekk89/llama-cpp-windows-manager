@@ -1,0 +1,27 @@
+{
+  "tag_name": "b9999",
+  "target_commitish": "0123456789abcdef",
+  "html_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b9999",
+  "published_at": "2026-08-01T12:00:00Z",
+  "future_contract_field": {
+    "ignored": true
+  },
+  "assets": [
+    {
+      "name": "llama-b9999-bin-win-cpu-x64.zip",
+      "browser_download_url": "https://example.invalid/llama-b9999-bin-win-cpu-x64.zip",
+      "size": 1234,
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "future_asset_field": "ignored"
+    },
+    {
+      "name": "llama-b9999-bin-win-cpu-x64.zip.sha256",
+      "browser_download_url": "https://example.invalid/llama-b9999-bin-win-cpu-x64.zip.sha256",
+      "size": 96
+    },
+    {
+      "name": "partial-asset-without-url.zip",
+      "size": 42
+    }
+  ]
+}

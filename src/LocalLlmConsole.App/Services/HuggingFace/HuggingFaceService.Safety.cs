@@ -121,8 +121,50 @@ public sealed partial class HuggingFaceService
         }
     }
 
-    private static long ExpectedBytes(HuggingFaceFile file, long total)
-        => total > 0 ? total : file.SizeBytes;
+    internal static long ExpectedBytes(HuggingFaceFile file, long responseTotal)
+        => file.SizeBytes > 0 ? file.SizeBytes : responseTotal;
+
+    internal static long RequiredDownloadBytes(HuggingFaceFile file, long responseTotal)
+    {
+        var expected = ExpectedBytes(file, responseTotal);
+        if (expected <= 0)
+            throw new InvalidDataException($"Download response for {file.Name} did not provide a trustworthy size.");
+        return expected;
+    }
+
+    internal static long ValidateDownloadResponse(
+        HuggingFaceFile file,
+        HttpResponseMessage response,
+        long requestedOffset)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        ArgumentNullException.ThrowIfNull(response);
+        if (requestedOffset < 0) throw new ArgumentOutOfRangeException(nameof(requestedOffset));
+
+        var partial = response.StatusCode == System.Net.HttpStatusCode.PartialContent;
+        if (requestedOffset == 0 && partial)
+            throw new InvalidDataException("The server returned a partial response when a complete download was requested.");
+
+        if (requestedOffset > 0 && partial)
+        {
+            var range = response.Content.Headers.ContentRange;
+            if (range?.From != requestedOffset || range.To is null || range.To < range.From)
+                throw new InvalidDataException("The resume response did not begin at the requested byte offset.");
+            if (file.SizeBytes > 0 && range.Length is { } rangeTotal && rangeTotal != file.SizeBytes)
+                throw new InvalidDataException($"The resume response reported {rangeTotal:N0} total bytes, but metadata expects {file.SizeBytes:N0} bytes.");
+            if (response.Content.Headers.ContentLength is { } responseLength &&
+                responseLength != range.To.Value - range.From.Value + 1)
+                throw new InvalidDataException("The resume response length does not match its Content-Range.");
+        }
+
+        var effectiveOffset = requestedOffset > 0 && partial ? requestedOffset : 0;
+        var responseTotal = response.Content.Headers.ContentRange?.Length
+            ?? checked(response.Content.Headers.ContentLength.GetValueOrDefault() + effectiveOffset);
+        var expected = ExpectedBytes(file, responseTotal);
+        if (file.SizeBytes > 0 && responseTotal > file.SizeBytes)
+            throw new InvalidDataException($"The response exceeds the expected size of {file.SizeBytes:N0} bytes.");
+        return expected;
+    }
 
     private static async Task<string> VerifyDownloadedFileAsync(
         string path,
@@ -155,10 +197,7 @@ public sealed partial class HuggingFaceService
         => await FileSystemSafetyService.Sha256Async(path, cancellationToken);
 
     private static string NormalizeSha256(string value)
-    {
-        var normalized = new string((value ?? "").Trim().Where(Uri.IsHexDigit).ToArray()).ToLowerInvariant();
-        return normalized.Length == 64 ? normalized : "";
-    }
+        => Sha256Digest.NormalizeLooseHex(value);
 
     private static string ExtractLicense(IEnumerable<string> tags)
     {
@@ -234,35 +273,14 @@ public sealed partial class HuggingFaceService
 
     private static void EnsureDestinationInsideModelsRoot(string destination, string modelsRoot)
     {
-        var root = Path.GetFullPath(modelsRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var target = Path.GetFullPath(destination);
-        var relative = Path.GetRelativePath(root, target);
-        if (string.IsNullOrWhiteSpace(relative)
-            || string.Equals(relative, ".", StringComparison.Ordinal)
-            || string.Equals(relative, "..", StringComparison.Ordinal)
-            || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            || relative.StartsWith(".." + Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
-            || Path.IsPathRooted(relative))
-            throw new InvalidOperationException("Refusing to download outside the configured models folder.");
-
-        RejectReparsePointAncestor(root, target);
-    }
-
-    private static void RejectReparsePointAncestor(string root, string target)
-    {
-        var current = Directory.Exists(target) ? target : Path.GetDirectoryName(target);
-        while (!string.IsNullOrWhiteSpace(current)
-            && Path.GetRelativePath(root, current) is var relative
-            && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            && !relative.StartsWith(".." + Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
-            && !Path.IsPathRooted(relative))
-        {
-            if (Directory.Exists(current) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                throw new InvalidOperationException("Refusing to download through a symlink or junction inside the models folder.");
-            if (string.Equals(Path.GetFullPath(current).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), root, StringComparison.OrdinalIgnoreCase))
-                return;
-            current = Path.GetDirectoryName(current);
-        }
+        var contained = PathContainmentGuard.ResolveDescendant(
+            modelsRoot,
+            destination,
+            "Refusing to download outside the configured models folder.");
+        PathContainmentGuard.RejectReparsePointAncestors(
+            contained,
+            includeExistingTarget: Directory.Exists(contained.Target),
+            "Refusing to download through a symlink or junction inside the models folder.");
     }
 
     private static FileStream OpenSafePartialForWrite(string partial, bool append)

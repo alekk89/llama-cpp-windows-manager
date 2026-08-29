@@ -2,10 +2,11 @@ using System.Collections.Concurrent;
 
 namespace LocalLlmConsole.Services;
 
-public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations
+public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations, IDisposable
 {
     private const long DownloadProgressUpdateBytes = 32L * 1024L * 1024L;
     private static readonly TimeSpan DownloadProgressUpdateInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan DownloadReadIdleTimeout = TimeSpan.FromSeconds(60);
 
     private sealed record RepoInfo(
         string Repo,
@@ -62,5 +63,8 @@ public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations
         _jobs = jobs;
         _catalog = catalog;
     }
+
+    public void Dispose()
+        => _http.Dispose();
 
 }

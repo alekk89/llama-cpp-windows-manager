@@ -6,7 +6,6 @@ public sealed record RuntimesPageRowActionControllerActions(
     Func<object, RuntimeRecord?> RuntimeFromRowButton,
     Func<object, RuntimeSourceEntry?> RuntimeSourceFromRowButton,
     Func<object, RuntimePackagePreset?> RuntimePackagePresetFromRowButton,
-    Func<object, JobRecord?> JobFromRowButton,
     Func<RuntimePackagePresetRow, Task> RunRuntimeSourceRowActionAsync,
     Func<RuntimePackagePreset, Task> InstallRuntimePackageAsync,
     Func<RuntimePackagePreset, RuntimePackagePresetRow?, Task> CheckRuntimePackageUpdateAsync,
@@ -14,10 +13,6 @@ public sealed record RuntimesPageRowActionControllerActions(
     Func<RuntimeSourceEntry, Task> DeleteRuntimeSourceAsync,
     Func<RuntimeRecord, Task> DeleteRuntimeBuildAsync,
     Func<RuntimeRecord, Task> VerifyRuntimeInstallationAsync,
-    Func<JobRecord, Task> CancelRuntimeBuildJobAsync,
-    Func<JobRecord, Task> RetryRuntimeBuildJobAsync,
-    Func<JobRecord, Task> ClearRuntimeBuildJobAsync,
-    Action<string> OpenLogPath,
     Func<Func<Task>, Task> RunEventAsync);
 
 public sealed class RuntimesPageRowActionController
@@ -85,21 +80,6 @@ public sealed class RuntimesPageRowActionController
         });
     }
 
-    public void OpenRuntimeJobLogRow_Click(object sender, RoutedEventArgs e)
-    {
-        var job = _actions.JobFromRowButton(sender);
-        if (job is not null) _actions.OpenLogPath(job.LogPath);
-    }
-
-    public async void CancelRuntimeJobRow_Click(object sender, RoutedEventArgs e)
-        => await RunRuntimeJobActionAsync(sender, job => _actions.CancelRuntimeBuildJobAsync(job));
-
-    public async void RetryRuntimeJobRow_Click(object sender, RoutedEventArgs e)
-        => await RunRuntimeJobActionAsync(sender, job => _actions.RetryRuntimeBuildJobAsync(job));
-
-    public async void ClearRuntimeJobRow_Click(object sender, RoutedEventArgs e)
-        => await RunRuntimeJobActionAsync(sender, job => _actions.ClearRuntimeBuildJobAsync(job));
-
     private async Task RunRuntimePackageActionAsync(object sender, Func<RuntimePackagePreset, Task> action)
     {
         await _actions.RunEventAsync(async () =>
@@ -109,12 +89,4 @@ public sealed class RuntimesPageRowActionController
         });
     }
 
-    private async Task RunRuntimeJobActionAsync(object sender, Func<JobRecord, Task> action)
-    {
-        await _actions.RunEventAsync(async () =>
-        {
-            var job = _actions.JobFromRowButton(sender);
-            if (job is not null) await action(job);
-        });
-    }
 }

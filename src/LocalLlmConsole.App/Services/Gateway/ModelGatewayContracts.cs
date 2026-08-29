@@ -13,15 +13,15 @@ public sealed record ModelGatewayOptions(
     string ApiKey,
     bool RequireApiKeyAuth,
     ModelGatewaySwapPolicy SwapPolicy,
-    long MaxRequestBodyBytes = 64L * 1024 * 1024)
+    long MaxRequestBodyBytes = 64L * 1024 * 1024,
+    int MaxConcurrentRequests = 8,
+    int RequestBodyTimeoutSeconds = 120)
 {
     public bool AllowLanAccess
         => AppPreferenceService.GatewayAllowsLanAccess(AccessMode);
 
     public string ListenerPrefix
-        => AllowLanAccess
-            ? $"http://+:{Port.ToString(CultureInfo.InvariantCulture)}/"
-            : $"http://127.0.0.1:{Port.ToString(CultureInfo.InvariantCulture)}/";
+        => GatewayUrlReservationService.ListenerPrefixForPort(Port, AllowLanAccess);
 
     public string LocalOpenAiBaseUrl
         => $"http://127.0.0.1:{Port.ToString(CultureInfo.InvariantCulture)}/v1";
@@ -116,5 +116,7 @@ public interface IModelGatewayRuntimeController
 
 public interface IModelGatewayHost : IAsyncDisposable
 {
+    bool IsListening => true;
+    string LastListenerError => "";
     Task StartAsync(CancellationToken cancellationToken = default);
 }

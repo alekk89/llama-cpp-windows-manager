@@ -37,12 +37,19 @@ public sealed partial class HuggingFaceService
             using var request = new HttpRequestMessage(HttpMethod.Get, ResolveUrl(projector.Repo, projector.Path, projector.Revision));
             using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
-            var total = response.Content.Headers.ContentLength.GetValueOrDefault();
+            var total = RequiredDownloadBytes(
+                projector,
+                ValidateDownloadResponse(projector, response, requestedOffset: 0));
             EnsureDiskSpace(destination, total);
             await using (var input = await response.Content.ReadAsStreamAsync(cancellationToken))
             await using (var output = OpenSafePartialForWrite(partial, append: false))
             {
-                await input.CopyToAsync(output, cancellationToken);
+                await BoundedStreamCopyService.CopyToAsync(
+                    input,
+                    output,
+                    total,
+                    readIdleTimeout: DownloadReadIdleTimeout,
+                    cancellationToken: cancellationToken);
             }
 
             var verificationError = await VerifyDownloadedFileAsync(

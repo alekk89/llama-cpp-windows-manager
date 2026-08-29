@@ -9,42 +9,11 @@ namespace LocalLlmConsole;
 public static class MetricCardFactory
 {
     private const double MetricCardHeight = 104;
-    private const double GraphValueBandHeight = 31;
     public static Grid AddMetric(Grid grid, string label, int row, int column)
         => AddMetric(grid, label, row, column, includeProgress: false, out _, out _);
 
     public static Grid AddMetric(Grid grid, string label, int row, int column, out TextBlock lastKnown)
         => AddMetric(grid, label, row, column, includeProgress: false, out _, out lastKnown);
-
-    public static Grid AddMetricGraph(
-        Grid grid,
-        string label,
-        int row,
-        int column,
-        out MetricSparkline graph,
-        out TextBlock lastKnown,
-        string primaryBrushKey = "AccentBlue",
-        string secondaryBrushKey = "Accent",
-        double? fixedMaximum = null)
-    {
-        var metric = AddMetric(grid, label, row, column, out lastKnown);
-        // Reserve the same two-line value band in every graph card. Without this,
-        // one-line states such as "Inactive" move the sparkline upward while the
-        // two-line KV-cache summary leaves it lower in the card.
-        metric.Height = GraphValueBandHeight;
-        graph = new MetricSparkline
-        {
-            Height = 28,
-            Margin = new Thickness(0, 2, 0, 0),
-            PrimaryBrushKey = primaryBrushKey,
-            SecondaryBrushKey = secondaryBrushKey,
-            FixedMaximum = fixedMaximum,
-            ToolTip = $"{label} history (latest 60 samples)"
-        };
-        if (metric.Parent is StackPanel stack)
-            stack.Children.Add(graph);
-        return metric;
-    }
 
     public static Grid AddMetric(Grid grid, string label, int row, int column, bool includeProgress, out WpfProgressBar? progress)
         => AddMetric(grid, label, row, column, includeProgress, out progress, out _);

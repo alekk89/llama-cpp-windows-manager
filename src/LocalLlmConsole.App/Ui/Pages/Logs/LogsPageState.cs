@@ -11,7 +11,7 @@ public sealed class LogsPageState
 
     private string PreviewIdentity { get; set; } = "";
 
-    public UiRow? SelectedLogRow => LogsGrid?.SelectedItem as UiRow;
+    public LogFileRow? SelectedLogRow => LogsGrid?.SelectedItem as LogFileRow;
 
     public string SelectedLogPath => LogPathFromRow(SelectedLogRow);
 
@@ -24,6 +24,13 @@ public sealed class LogsPageState
         PreviewIdentity = "";
     }
 
+    public void ReleaseView()
+    {
+        LogsGrid = null;
+        LogsBox = null;
+        PreviewIdentity = "";
+    }
+
     public void FocusLogsGrid()
         => LogsGrid?.Focus();
 
@@ -32,7 +39,7 @@ public sealed class LogsPageState
         if (LogsGrid is null) return [];
         var paths = LogsGrid.SelectedItems
             .Cast<object>()
-            .OfType<UiRow>()
+            .OfType<LogFileRow>()
             .Select(LogPathFromRow)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .ToArray();
@@ -41,7 +48,7 @@ public sealed class LogsPageState
         return string.IsNullOrWhiteSpace(fallback) ? [] : [fallback];
     }
 
-    public void RestoreSelection(ISet<string> selectedPaths, IReadOnlyList<UiRow> rows)
+    public void RestoreSelection(ISet<string> selectedPaths, IReadOnlyList<LogFileRow> rows)
     {
         ArgumentNullException.ThrowIfNull(selectedPaths);
         ArgumentNullException.ThrowIfNull(rows);
@@ -69,6 +76,6 @@ public sealed class LogsPageState
         TextBoxTailPresenter.SetText(LogsBox, text, scrollToEnd, forceFollowTail: identityChanged);
     }
 
-    private static string LogPathFromRow(UiRow? row)
-        => row?.Data["Path"]?.ToString() ?? "";
+    private static string LogPathFromRow(LogFileRow? row)
+        => row?.FullPath ?? "";
 }

@@ -2,27 +2,41 @@ namespace LocalLlmConsole.Localization;
 
 public static class Loc
 {
-    private static readonly Dictionary<string, string> _strings = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, string> _fallback = new(StringComparer.OrdinalIgnoreCase);
+    private sealed record LocalizationSnapshot(
+        string CurrentLanguage,
+        CultureInfo FormatCulture,
+        IReadOnlyDictionary<string, string> Strings,
+        IReadOnlyDictionary<string, string> Fallback);
+
     private static readonly HashSet<string> PreviewLanguages = new(["ar", "hi"], StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> RightToLeftLanguages = new(["ar", "fa"], StringComparer.OrdinalIgnoreCase);
-    private static string _currentLanguage = "en";
-    private static CultureInfo _formatCulture = CultureInfo.GetCultureInfo("en");
+    private static LocalizationSnapshot _snapshot = new(
+        "en",
+        CultureInfo.GetCultureInfo("en"),
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
-    public static string CurrentLanguage => _currentLanguage;
+    public static string CurrentLanguage => Volatile.Read(ref _snapshot).CurrentLanguage;
+    public static CultureInfo FormatCulture => Volatile.Read(ref _snapshot).FormatCulture;
 
     /// <summary>Lookup a localized string by key. Returns the key itself if not found.</summary>
     public static string T(string key)
     {
-        if (_strings.TryGetValue(key, out var value))
+        var snapshot = Volatile.Read(ref _snapshot);
+        return Translate(snapshot, key);
+    }
+
+    private static string Translate(LocalizationSnapshot snapshot, string key)
+    {
+        if (snapshot.Strings.TryGetValue(key, out var value))
             return value;
-        if (_fallback.TryGetValue(key, out var fb))
+        if (snapshot.Fallback.TryGetValue(key, out var fallback))
         {
 #if DEBUG
-            if (ShowMissingKeys && !string.Equals(_currentLanguage, "en", StringComparison.OrdinalIgnoreCase))
+            if (ShowMissingKeys && !string.Equals(snapshot.CurrentLanguage, "en", StringComparison.OrdinalIgnoreCase))
                 return $"«{key}»"; // Visual indicator that key is missing from translation
 #endif
-            return fb;
+            return fallback;
         }
 #if DEBUG
         if (ShowMissingKeys)
@@ -34,8 +48,9 @@ public static class Loc
     /// <summary>Lookup with String.Format placeholders. {0}, {1}, etc.</summary>
     public static string T(string key, params object[] args)
     {
-        var template = T(key);
-        return args.Length > 0 ? string.Format(_formatCulture, template, args) : template;
+        var snapshot = Volatile.Read(ref _snapshot);
+        var template = Translate(snapshot, key);
+        return args.Length > 0 ? string.Format(snapshot.FormatCulture, template, args) : template;
     }
 
 #if DEBUG
@@ -53,21 +68,26 @@ public static class Loc
             ? requested
             : "en";
 
-        _currentLanguage = resolved;
-        _formatCulture = CultureInfo.GetCultureInfo(resolved);
-        _strings.Clear();
-        _fallback.Clear();
+        var strings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var fallback = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Always load English fallback first
-        TryLoadJson("Strings.en.json", _fallback);
+        TryLoadJson("Strings.en.json", fallback);
 
         if (!string.Equals(resolved, "en", StringComparison.OrdinalIgnoreCase)
-            && !TryLoadJson($"Strings.{resolved}.json", _strings))
+            && !TryLoadJson($"Strings.{resolved}.json", strings))
         {
-            _currentLanguage = "en";
-            _formatCulture = CultureInfo.GetCultureInfo("en");
-            _strings.Clear();
+            resolved = "en";
+            strings.Clear();
         }
+
+        Volatile.Write(
+            ref _snapshot,
+            new LocalizationSnapshot(
+                resolved,
+                CultureInfo.GetCultureInfo(resolved),
+                strings,
+                fallback));
     }
 
     private static bool TryLoadJson(string resourceName, Dictionary<string, string> target)

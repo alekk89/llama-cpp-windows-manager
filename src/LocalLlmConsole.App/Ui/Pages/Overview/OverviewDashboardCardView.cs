@@ -44,8 +44,17 @@ public sealed partial class OverviewDashboardCardView
             ClipToBounds = true,
             Tag = this,
             Margin = new Thickness(0),
-            Cursor = WpfCursors.SizeAll
+            Cursor = WpfCursors.SizeAll,
+            Focusable = true
         };
+        KeyboardNavigation.SetIsTabStop(Root, true);
+        var cardName = string.IsNullOrWhiteSpace(layout.Title)
+            ? string.Join(", ", layout.MetricIds.Select(id => byId[id].DisplayName))
+            : layout.Title;
+        System.Windows.Automation.AutomationProperties.SetName(Root, cardName);
+        System.Windows.Automation.AutomationProperties.SetHelpText(
+            Root,
+            Loc.T("Dashboard.CardKeyboardHelp"));
 
         _content = new Grid();
         _values = new StackPanel();
@@ -106,6 +115,7 @@ public sealed partial class OverviewDashboardCardView
     public Border Root { get; }
     public FrameworkElement DragSurface => Root;
     public IReadOnlyDictionary<string, MetricSparkline> Graphs => _graphs;
+    public IReadOnlyDictionary<string, OverviewDashboardMetricRowView> MetricRows => _rows;
     public MetricSparkline? Graph => _graphs.Values.FirstOrDefault();
     public IReadOnlyCollection<string> MetricIds => _rows.Keys;
     public IReadOnlyList<string> CurrentMetricOrder => _values.Children

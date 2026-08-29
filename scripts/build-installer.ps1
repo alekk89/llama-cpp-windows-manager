@@ -5,12 +5,30 @@ param(
   [string] $InnoSetupPath = "",
   [string] $CertificateThumbprint = "",
   [string] $TimestampServer = "https://timestamp.digicert.com",
+  [string] $ExpectedPublisher = "",
+  [string] $ReleaseManifestKeyId = "",
+  [string] $ReleaseManifestPublicKeySpki = "",
+  [string] $ReleaseManifestNextKeyId = "",
+  [string] $ReleaseManifestNextPublicKeySpki = "",
   [switch] $RequireSigned,
   [switch] $RequireCleanTree,
   [switch] $SkipPublish
 )
 
 $ErrorActionPreference = "Stop"
+
+function Test-CertificatePublisher {
+  param(
+    [Parameter(Mandatory = $true)] $Certificate,
+    [Parameter(Mandatory = $true)][string] $Publisher
+  )
+
+  $simpleName = $Certificate.GetNameInfo(
+    [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
+    $false)
+  return [string]::Equals($simpleName, $Publisher, [System.StringComparison]::OrdinalIgnoreCase) -or
+    [string]::Equals($Certificate.Subject, $Publisher, [System.StringComparison]::OrdinalIgnoreCase)
+}
 
 function Assert-CleanGitTree {
   param(
@@ -84,13 +102,17 @@ function Read-ProjectVersion([string] $ProjectPath) {
   return $version
 }
 
-function Sign-FileIfRequested([string] $PathToSign, [string] $Thumbprint, [string] $Timestamp, [bool] $RequireValidSignature) {
+function Sign-FileIfRequested([string] $PathToSign, [string] $Thumbprint, [string] $Timestamp, [bool] $RequireValidSignature, [string] $Publisher) {
   if ($Thumbprint) {
     $cert = Get-ChildItem Cert:\CurrentUser\My, Cert:\LocalMachine\My -ErrorAction SilentlyContinue |
       Where-Object { $_.Thumbprint -replace '\s', '' -ieq ($Thumbprint -replace '\s', '') } |
       Select-Object -First 1
     if (-not $cert) {
       throw "Code-signing certificate was not found in CurrentUser or LocalMachine certificate stores: $Thumbprint"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Publisher) -and
+        -not (Test-CertificatePublisher -Certificate $cert -Publisher $Publisher)) {
+      throw "Code-signing certificate subject '$($cert.Subject)' does not match expected publisher '$Publisher'."
     }
 
     $signature = Set-AuthenticodeSignature -FilePath $PathToSign -Certificate $cert -TimestampServer $Timestamp
@@ -103,12 +125,17 @@ function Sign-FileIfRequested([string] $PathToSign, [string] $Thumbprint, [strin
   if ($RequireValidSignature -and $publishedSignature.Status -ne "Valid") {
     throw "Installer artifact is not signed: $PathToSign"
   }
+  if ($RequireValidSignature -and -not [string]::IsNullOrWhiteSpace($Publisher) -and
+      ($null -eq $publishedSignature.SignerCertificate -or
+       -not (Test-CertificatePublisher -Certificate $publishedSignature.SignerCertificate -Publisher $Publisher))) {
+    throw "Installer artifact is not signed by expected publisher '$Publisher': $PathToSign"
+  }
   if ($publishedSignature.Status -ne "Valid") {
     Write-Warning "Installer artifact is not signed. Use -CertificateThumbprint and -RequireSigned for public release builds."
   }
 }
 
-function Assert-SignedIfRequired([string] $PathToCheck, [bool] $RequireValidSignature, [string] $ArtifactLabel) {
+function Assert-SignedIfRequired([string] $PathToCheck, [bool] $RequireValidSignature, [string] $ArtifactLabel, [string] $Publisher) {
   if (-not $RequireValidSignature) {
     return
   }
@@ -116,6 +143,11 @@ function Assert-SignedIfRequired([string] $PathToCheck, [bool] $RequireValidSign
   $signature = Get-AuthenticodeSignature -FilePath $PathToCheck
   if ($signature.Status -ne "Valid") {
     throw "$ArtifactLabel is not signed: $PathToCheck"
+  }
+  if (-not [string]::IsNullOrWhiteSpace($Publisher) -and
+      ($null -eq $signature.SignerCertificate -or
+       -not (Test-CertificatePublisher -Certificate $signature.SignerCertificate -Publisher $Publisher))) {
+    throw "$ArtifactLabel is not signed by expected publisher '$Publisher': $PathToCheck"
   }
 }
 
@@ -150,6 +182,21 @@ if (-not $SkipPublish) {
     $publishArgs.CertificateThumbprint = $CertificateThumbprint
     $publishArgs.TimestampServer = $TimestampServer
   }
+  if ($ExpectedPublisher) {
+    $publishArgs.ExpectedPublisher = $ExpectedPublisher
+  }
+  if ($ReleaseManifestKeyId) {
+    $publishArgs.ReleaseManifestKeyId = $ReleaseManifestKeyId
+  }
+  if ($ReleaseManifestPublicKeySpki) {
+    $publishArgs.ReleaseManifestPublicKeySpki = $ReleaseManifestPublicKeySpki
+  }
+  if ($ReleaseManifestNextKeyId) {
+    $publishArgs.ReleaseManifestNextKeyId = $ReleaseManifestNextKeyId
+  }
+  if ($ReleaseManifestNextPublicKeySpki) {
+    $publishArgs.ReleaseManifestNextPublicKeySpki = $ReleaseManifestNextPublicKeySpki
+  }
   if ($RequireSigned) {
     $publishArgs.RequireSigned = $true
   }
@@ -166,7 +213,7 @@ if (-not $SkipPublish) {
 if (-not (Test-Path -LiteralPath $PublishedExe)) {
   throw "Published executable not found. Run publish-app.ps1 first or omit -SkipPublish: $PublishedExe"
 }
-Assert-SignedIfRequired $PublishedExe $RequireSigned.IsPresent "Published executable"
+Assert-SignedIfRequired $PublishedExe $RequireSigned.IsPresent "Published executable" $ExpectedPublisher
 
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 if (Test-Path -LiteralPath $ExpectedInstaller) {
@@ -188,7 +235,7 @@ if (-not (Test-Path -LiteralPath $ExpectedInstaller)) {
   throw "Expected installer was not created: $ExpectedInstaller"
 }
 
-Sign-FileIfRequested $ExpectedInstaller $CertificateThumbprint $TimestampServer $RequireSigned.IsPresent
+Sign-FileIfRequested $ExpectedInstaller $CertificateThumbprint $TimestampServer $RequireSigned.IsPresent $ExpectedPublisher
 
 $InstallerHash = (Get-FileHash -LiteralPath $ExpectedInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
 $InstallerHashPath = "$ExpectedInstaller.sha256"

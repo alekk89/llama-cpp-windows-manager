@@ -17,6 +17,7 @@ public sealed record ModelsPageActions(
     Func<Task> ManageModelGroupsAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> AssignLaunchProfileGroupAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> RemoveLaunchProfileGroupAsync,
+    Func<ModelRecord, NamedModelLaunchProfile, Task> ToggleTrayProfileFavoriteAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> LoadLaunchProfileAsync,
     Action BeginNewLaunchProfile,
     Action<DataGrid, DataGrid?> SelectModelGridRow,
@@ -62,10 +63,16 @@ public static class ModelsPageFactory
             (Loc.T("Common.OpenButton"), () => OpenModelsFolder(request.Actions)),
             ("Groups…", request.Actions.ManageModelGroupsAsync)
         );
-        Grid.SetRow(folderStrip, 0);
-        root.Children.Add(folderStrip);
+        var folderScroller = new ScrollViewer
+        {
+            Content = folderStrip,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        Grid.SetRow(folderScroller, 0);
+        root.Children.Add(folderScroller);
 
-        var body = new Grid();
+        var body = new Grid { MinWidth = 718 };
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star), MinWidth = 330 });
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(.95, GridUnitType.Star), MinWidth = 380 });
@@ -75,8 +82,18 @@ public static class ModelsPageFactory
         body.Children.Add(PageSectionFactory.VerticalGridSplitter(1));
         Grid.SetColumn(request.LaunchSettingsPanel, 2);
         body.Children.Add(request.LaunchSettingsPanel);
-        Grid.SetRow(body, 1);
-        root.Children.Add(body);
+        var bodyScroller = new ScrollViewer
+        {
+            Content = body,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        body.SetBinding(FrameworkElement.WidthProperty, new WpfBinding(nameof(ScrollViewer.ViewportWidth))
+        {
+            Source = bodyScroller
+        });
+        Grid.SetRow(bodyScroller, 1);
+        root.Children.Add(bodyScroller);
         var huggingFaceSplitter = PageSectionFactory.HorizontalGridSplitter(2);
         root.Children.Add(huggingFaceSplitter);
 
@@ -232,6 +249,11 @@ public static class ModelsPageFactory
                 ToolTip: row => ((ModelGridRow)row).IsMissing
                     ? Loc.T("Overview.MissingModelLoadTooltip")
                     : Loc.T("Tooltip.Load")),
+            new(row => ((ModelGridRow)row).IsTrayFavorite
+                    ? Loc.T("Tray.RemoveFavorite")
+                    : Loc.T("Tray.AddFavorite"),
+                row => row is ModelGridRow { LaunchProfile: not null },
+                row => ToggleTrayFavoriteAsync(actions, (ModelGridRow)row)),
             new(row => ((ModelGridRow)row).CanAssignGroup
                     ? Loc.T("ModelGroups.AssignAction")
                     : Loc.T("ModelGroups.ChangeGroup"),
@@ -258,6 +280,9 @@ public static class ModelsPageFactory
 
     private static Task AssignGroupAsync(ModelsPageActions actions, ModelGridRow row)
         => actions.AssignLaunchProfileGroupAsync(row.Model, row.LaunchProfile!);
+
+    private static Task ToggleTrayFavoriteAsync(ModelsPageActions actions, ModelGridRow row)
+        => actions.ToggleTrayProfileFavoriteAsync(row.Model, row.LaunchProfile!);
 
     private static Task RemoveGroupAsync(ModelsPageActions actions, ModelGridRow row)
         => actions.RemoveLaunchProfileGroupAsync(row.Model, row.LaunchProfile!);

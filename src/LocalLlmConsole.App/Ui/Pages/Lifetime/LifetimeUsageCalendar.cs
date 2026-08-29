@@ -332,8 +332,10 @@ public sealed class LifetimeUsageCalendar : FrameworkElement
     private FormattedText Formatted(string text, double size, WpfBrush brush)
         => new(
             text,
-            CultureInfo.CurrentCulture,
-            System.Windows.FlowDirection.LeftToRight,
+            Loc.FormatCulture,
+            Loc.IsRightToLeft(Loc.CurrentLanguage)
+                ? System.Windows.FlowDirection.RightToLeft
+                : System.Windows.FlowDirection.LeftToRight,
             new Typeface("Segoe UI"),
             size,
             brush,

@@ -6,7 +6,7 @@ public sealed partial class AppServiceFactory
         => new(DatabasePath);
 
     public AppUpdateService CreateAppUpdateService()
-        => new(CreateAppUpdateHttpClient(), StartProcess);
+        => new(CreateAppUpdateHttpClient(), StartProcess, ownsHttpClient: true);
 
     public HttpClient CreateAppUpdateHttpClient()
         => new();

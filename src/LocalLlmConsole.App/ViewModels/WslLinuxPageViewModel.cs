@@ -4,7 +4,7 @@ namespace LocalLlmConsole.ViewModels;
 
 public sealed class WslLinuxPageViewModel
 {
-    public ObservableCollection<UiRow> Rows { get; } = new();
+    public ObservableCollection<WslDistroRow> Rows { get; } = new();
 
     public void ReplaceDistroRows(WslEnvironmentReport report, string selectedDistroName)
     {
@@ -13,38 +13,30 @@ public sealed class WslLinuxPageViewModel
         {
             var selected = distro.Name.Equals(selectedDistroName, StringComparison.OrdinalIgnoreCase);
             var notes = distro.IsUbuntu
-                ? "Recommended for llama.cpp WSL builds."
-                : "Selectable for existing WSL runtimes.";
-            Rows.Add(new UiRow
+                ? Loc.T("Wsl.Distro.RecommendedNotes")
+                : Loc.T("Wsl.Distro.SelectableNotes");
+            Rows.Add(new WslDistroRow
             {
-                C1 = distro.IsDefault ? "Yes" : "",
-                C2 = distro.Name,
-                C3 = distro.State,
-                C4 = string.IsNullOrWhiteSpace(distro.Version) ? "" : $"WSL {distro.Version}",
-                C5 = notes,
-                C6 = selected ? "Selected" : "Use",
-                T1 = selected ? "This distro is already selected." : "Use this Linux distro for WSL launches and builds.",
-                B1 = !selected,
-                Data = new JsonObject
-                {
-                    ["Name"] = distro.Name,
-                    ["IsUbuntu"] = distro.IsUbuntu
-                }
+                IsDefault = distro.IsDefault,
+                Name = distro.Name,
+                State = distro.State,
+                WslVersion = string.IsNullOrWhiteSpace(distro.Version) ? "" : Loc.T("Wsl.Distro.Version", distro.Version),
+                Notes = notes,
+                ActionLabel = selected ? Loc.T("Wsl.Distro.Selected") : Loc.T("Wsl.Distro.Use"),
+                ActionToolTip = selected ? Loc.T("Wsl.Distro.SelectedTooltip") : Loc.T("Wsl.Distro.UseTooltip"),
+                CanSelect = !selected,
+                IsUbuntu = distro.IsUbuntu
             });
         }
 
         if (report.Distros.Count == 0)
         {
-            Rows.Add(new UiRow
+            Rows.Add(new WslDistroRow
             {
-                C1 = "",
-                C2 = "No Linux distro detected",
-                C3 = report.WslExeFound ? "Missing" : "WSL missing",
-                C4 = "",
-                C5 = report.RecommendedAction,
-                C6 = "",
-                T1 = "Install WSL and Ubuntu before selecting a distro.",
-                B1 = false
+                Name = Loc.T("Wsl.Distro.NoneDetected"),
+                State = report.WslExeFound ? Loc.T("Wsl.Distro.Missing") : Loc.T("Wsl.Distro.WslMissing"),
+                Notes = report.RecommendedAction,
+                ActionToolTip = Loc.T("Wsl.Distro.InstallTooltip")
             });
         }
     }

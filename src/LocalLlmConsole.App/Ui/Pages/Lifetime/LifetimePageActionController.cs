@@ -4,7 +4,7 @@ using System.Windows.Controls;
 namespace LocalLlmConsole;
 
 public sealed record LifetimePageActionControllerActions(
-    Func<UiRow?, Task> ResetLifetimeMetricAsync,
+    Func<LifetimeMetricRow?, Task> ResetLifetimeMetricAsync,
     Func<Task> ResetVisibleMetricsAsync,
     Func<Task> RangeChangedAsync,
     Func<Task> FiltersChangedAsync,
@@ -56,7 +56,7 @@ public sealed class LifetimePageActionController
     {
         await _actions.RunEventAsync(async () =>
         {
-            await _actions.ResetLifetimeMetricAsync((sender as FrameworkElement)?.Tag as UiRow);
+            await _actions.ResetLifetimeMetricAsync((sender as FrameworkElement)?.Tag as LifetimeMetricRow);
         });
     }
 

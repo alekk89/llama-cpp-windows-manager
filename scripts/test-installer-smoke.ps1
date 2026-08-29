@@ -1,6 +1,8 @@
 param(
   [Parameter(Mandatory = $true)]
-  [string] $InstallerPath
+  [string] $InstallerPath,
+  [switch] $RequireSigned,
+  [string] $ExpectedPublisher = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +17,37 @@ $InstallLog = Join-Path $SmokeRoot "install.log"
 $RepairLog = Join-Path $SmokeRoot "repair.log"
 $UninstallLog = Join-Path $SmokeRoot "uninstall.log"
 $SmokeRootFull = [System.IO.Path]::GetFullPath($SmokeRoot).TrimEnd('\') + '\'
+$InstallerRegistrationName = "{5C6D440C-0EE0-4FEC-8D86-6AADEAA24620}_is1"
+$InstallerRegistrationPaths = @(
+  "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerRegistrationName",
+  "Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerRegistrationName",
+  "Registry::HKEY_LOCAL_MACHINE\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerRegistrationName"
+)
+$ProductionShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\llama.cpp Windows Manager\llama.cpp Windows Manager.lnk"
+
+function Assert-NoExistingInstallerIdentity {
+  foreach ($registrationPath in $InstallerRegistrationPaths) {
+    if (Test-Path -LiteralPath $registrationPath) {
+      throw "Refusing installer smoke testing because the production installer identity is already registered. Run this test in a clean disposable Windows environment: $registrationPath"
+    }
+  }
+  if (Test-Path -LiteralPath $ProductionShortcut -PathType Leaf) {
+    throw "Refusing installer smoke testing because the production Start Menu shortcut already exists. Run this test in a clean disposable Windows environment: $ProductionShortcut"
+  }
+}
+
+function Test-CertificatePublisher {
+  param(
+    [Parameter(Mandatory = $true)] $Certificate,
+    [Parameter(Mandatory = $true)][string] $Publisher
+  )
+
+  $simpleName = $Certificate.GetNameInfo(
+    [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
+    $false)
+  return [string]::Equals($simpleName, $Publisher, [System.StringComparison]::OrdinalIgnoreCase) -or
+    [string]::Equals($Certificate.Subject, $Publisher, [System.StringComparison]::OrdinalIgnoreCase)
+}
 
 function Invoke-CheckedProcess {
   param(
@@ -46,7 +79,20 @@ function Assert-InstalledFiles {
   }
 }
 
+function Assert-TrustedSignature([string] $Path, [string] $Label) {
+  if (-not $RequireSigned) { return }
+  $signature = Get-AuthenticodeSignature -FilePath $Path
+  if ($signature.Status -ne "Valid") { throw "$Label is not Authenticode-valid: $Path" }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedPublisher) -and
+      ($null -eq $signature.SignerCertificate -or
+       -not (Test-CertificatePublisher -Certificate $signature.SignerCertificate -Publisher $ExpectedPublisher))) {
+    throw "$Label is not signed by expected publisher '$ExpectedPublisher': $Path"
+  }
+}
+
 try {
+  Assert-NoExistingInstallerIdentity
+  Assert-TrustedSignature -Path $Installer -Label "Installer"
   New-Item -ItemType Directory -Path $SmokeRoot -Force | Out-Null
   $installArgs = @(
     "/VERYSILENT",
@@ -58,6 +104,8 @@ try {
   )
   Invoke-CheckedProcess -FilePath $Installer -ArgumentList $installArgs -Label "Silent clean install"
   Assert-InstalledFiles
+  Assert-TrustedSignature -Path (Join-Path $InstallDir "LlamaCppWindowsManager.exe") -Label "Installed application"
+  Assert-TrustedSignature -Path (Join-Path $InstallDir "llwmctl.exe") -Label "Installed control CLI"
 
   $app = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   Invoke-CheckedProcess -FilePath $app -ArgumentList @("--bootstrap-agent-sidecars-only") -Label "Installed sidecar bootstrap"
@@ -77,6 +125,8 @@ try {
   )
   Invoke-CheckedProcess -FilePath $Installer -ArgumentList $repairArgs -Label "Silent repair install"
   Assert-InstalledFiles
+  Assert-TrustedSignature -Path (Join-Path $InstallDir "LlamaCppWindowsManager.exe") -Label "Repaired application"
+  Assert-TrustedSignature -Path (Join-Path $InstallDir "llwmctl.exe") -Label "Repaired control CLI"
   if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf)) {
     throw "Silent repair removed application data."
   }
@@ -103,7 +153,23 @@ finally {
   $resolvedSmokeRoot = [System.IO.Path]::GetFullPath($SmokeRoot)
   if ($resolvedSmokeRoot.StartsWith($SmokeRootFull, [System.StringComparison]::OrdinalIgnoreCase) -or
       ($resolvedSmokeRoot + '\').Equals($SmokeRootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
-    if (Test-Path -LiteralPath $resolvedSmokeRoot) {
+    $cleanupUninstallFailed = $false
+    $temporaryUninstaller = Join-Path $InstallDir "unins000.exe"
+    if (Test-Path -LiteralPath $temporaryUninstaller -PathType Leaf) {
+      try {
+        Invoke-CheckedProcess -FilePath $temporaryUninstaller -ArgumentList @(
+          "/VERYSILENT",
+          "/SUPPRESSMSGBOXES",
+          "/NORESTART"
+        ) -Label "Installer smoke cleanup uninstall"
+      } catch {
+        $cleanupUninstallFailed = $true
+        Write-Warning "The temporary installer registration may require manual cleanup: $($_.Exception.Message)"
+      }
+    }
+    if ($cleanupUninstallFailed) {
+      Write-Warning "Preserving the temporary installer test root so its uninstaller remains available: $resolvedSmokeRoot"
+    } elseif (Test-Path -LiteralPath $resolvedSmokeRoot) {
       Remove-Item -LiteralPath $resolvedSmokeRoot -Recurse -Force
     }
   } else {

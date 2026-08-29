@@ -102,13 +102,6 @@ compatible paths may be elsewhere. Profile fields are
 `visionProjectorPath`, `specDraftModelPath`, `mtpHeadPath`, and
 `speculativeType`.
 
-Model inventory scans classify readable GGUF metadata before narrow filename
-fallbacks and report per-file reasons. To register a main model anywhere on disk,
-use `llwmctl models import --file <path.gguf>`. If it is reported as ambiguous
-or as a companion, inspect the reason and use `--confirm-role` only when the user
-intends to treat that valid GGUF as a main model. The confirmation persists across
-future scans; invalid or unreadable GGUFs cannot be overridden.
-
 For upstream `draft-mtp`, leave `specDraftModelPath` empty when the main GGUF
 reports `embeddedDraftMtp: true`; the Manager then uses embedded NextN/MTP
 tensors. Use `visionProjectorPath=embedded` only when the selected runtime and
@@ -139,8 +132,7 @@ precedence.
 llwmctl sessions inspect <session>
 llwmctl gateway inspect
 llwmctl sessions metrics <session>
-llwmctl metrics usage --range month
-llwmctl metrics usage --date 2026-08-18 --date 2026-08-20
+llwmctl metrics usage --range 30d
 llwmctl sessions logs <session>
 llwmctl logs list
 llwmctl logs tail
@@ -149,31 +141,11 @@ llwmctl hf download --repo <owner/repo> --file <path.gguf>
 llwmctl jobs list
 ```
 
-The shared gateway's `GET /v1/models` response lists saved profile routes and
-reports each route's configured context size as `context_length`. A value of `0`
-means the profile uses automatic context sizing; it is not the model's inferred
-training limit or current KV-cache availability. The optional `meta.n_ctx_train`,
-`meta.n_params`, and `meta.size` values describe the underlying GGUF and are
-shared by its profiles; unavailable values remain null rather than being guessed.
-
-`metrics` without an action returns live raw samples. `metrics usage --range
-month` returns the complete current calendar month, including empty future days;
-persisted daily tokens, cache reuse, active-processing throughput, and optional
-request counters can be filtered with `--model`, `--profile`, or `--runtime`.
-The same response includes host-wide `gpuEnergy` Wh/kWh and per-day energy when
-a GPU power sensor is observed. Energy is sampled independently of model filters,
-reports observed versus detected GPU coverage, and does not estimate app downtime.
-By default, historical energy is persisted only while a model session is active;
-idle detection backs off to five minutes. Set `trackGpuEnergyWhileIdle=true` for
-continuous ten-second idle sampling and persistence.
-When a tariff is configured, `gpuElectricityCost` derives the selected historical
-cost from those measured hourly buckets. It uses the current app-level currency,
-day/night rates, and local boundary; it is GPU-board cost, not whole-host cost,
-and is not a persisted billing ledger.
-Missing cache, timing, or request statistics mean the runtime did not expose the
-optional counter and must not be interpreted as zero. Repeat `--date
-YYYY-MM-DD` to aggregate exact local dates; dates before daily tracking began
-remain unavailable and must not be inferred from legacy totals.
+`metrics` without an action returns live raw samples. `metrics usage` returns
+persisted daily token history and prompt-cache statistics; filter it with
+`--model`, `--profile`, or `--runtime`. A missing cache rate means that the
+runtime did not expose the optional cache counter and must not be interpreted as
+zero cache reuse.
 
 Pause, resume, or cancel a Hugging Face model download with `jobs
 pause|resume|cancel <job-id>`. Generic job commands reject runtime-build,
@@ -192,76 +164,15 @@ Patch settings through the running Manager, never its database:
 
 ```powershell
 llwmctl settings set --set showOverviewHardware=false --set showModelsHuggingFace=true
-llwmctl settings set --set electricityCurrencyCode=GBP --set electricityDayRatePerKwh=0.30 --set electricityNightRatePerKwh=0.10 --set electricityNightStartLocal=00:00 --set electricityNightEndLocal=07:00
-llwmctl settings set --set trackGpuEnergyWhileIdle=false
-llwmctl settings set --set modelAccessMode=local --set requireApiKeyAuth=false
 llwmctl settings get
 ```
 
-Model API-key authentication may be disabled only with Local-only access. In
-that mode the active key is empty and local browser/client requests omit
-credentials; the protected backup is restored when authentication is re-enabled.
-Every LAN access mode requires a strong key and rejects the opt-out. The Manager
-control API remains independently authenticated and loopback-only.
-
-The Settings UI auto-applies choices quickly and delays ordinary text-field
-updates until typing pauses before using the shared save debounce. The
-`llwmctl settings set` command is immediate and is not subject to the UI typing
-delay.
-
-The customizable card state is the versioned `overviewDashboardLayout` setting.
-Prefer the Overview UI for layout changes; automation replacing the structured
-object should use `settings set --settings-file <json>` and verify the result.
-The compatibility presentation fields are `showOverviewModelStatus`,
+The presentation fields are `showOverviewModelStatus`,
 `showOverviewHardware`, `showOverviewSlots`, `showOverviewTokens`,
 `showOverviewMtpTokens`, `showOverviewKvCache`,
-`showOverviewLiveRuntimeLog`, `runtimeLogOrder`, `showOverviewAllMetrics`, and
-`showModelsHuggingFace`. Cards are generic containers whose v2 contents are
-atomic metrics such as CPU load/temperature/clock, RAM load/used capacity/clock,
-indexed GPU load/VRAM/power/clock/core temperature/VRAM temperature, an average
-token rate, or a slot counter. `runtimeLogOrder` accepts `newestFirst` or
-`oldestFirst` and changes only the compact Overview projection; persisted logs
-remain chronological.
-Version 3 adds bounded free-form card positions and sizes; horizontal bounds use
-a responsive 12-unit surface and vertical bounds use device-independent pixels.
-Version 4 adds independent per-metric charts. Version 5 removes unreliable
-per-poll generation, prompt, and speculative live rates and migrates their chart
-choices to the corresponding average-rate metrics. Version 6 limits charts to
-curated time-varying readings; optional hardware sensors appear only after the
-host probe supplies a finite value.
-Version 7 migrates session-named energy rows to app-live observed-energy rows.
-They measure host GPU board energy from Manager startup, reset on Manager restart,
-and feed the separately persisted historical energy totals.
-Version 8 adds a dashboard-wide card-size lock plus the captured surface width;
-locked cards retain their dimensions across window resizing and wrap before the
-single-card viewport safety clamp is used.
-Version 9 adds an optional bounded title per card. Empty titles render no header;
-metric values and units use measured width so the label receives all remaining
-row space before wrapping.
-Version 10 curates the picker into Core, Hardware, Energy, Gateway, Advanced,
-and Raw categories. It adds cache reuse, draft acceptance, recent throughput,
-context high-water/shift, selected llama-server process, optional extended GPU,
-and observed gateway request metrics. Redundant legacy rows remain renderable in
-saved layouts but are not offered for new cards; cumulative counters cannot be
-charted, and the former draft-acceptance-rate row migrates to acceptance percent.
-The six compatibility fields add or remove their metric group from the layout
-without discarding unrelated customization. They apply automatically and
-do not disable the underlying telemetry, logs, or downloads.
-Version 11 makes the default runtime-summary, discrete-GPU, and host/energy cards
-unlocked and equal-width. Integrated graphics do not receive default GPU cards,
-and GPU core clock is omitted from the default template; both remain available
-for custom cards. Reconciliation is limited to that default layout family;
-unrelated custom layouts are preserved.
-Version 12 gives every production-default card the same compact height. GPU power
-draw remains a value in each discrete-GPU card but is no longer charted by
-default; GPU utilization remains charted. Existing custom layouts are preserved.
-Electricity rates are currency units per kWh. Currency is a three-letter display
-code; local night boundaries use `HH:mm` and must differ. App-live combined and
-per-GPU cost rows can be configured before model load and are calculated only
-from observed GPU board energy.
-`trackGpuEnergyWhileIdle` defaults to `false`. When false, session-free power
-checks run every five minutes for live detection without adding historical energy;
-when true, idle energy is sampled and persisted every ten seconds.
+`showOverviewLiveRuntimeLog`, `showOverviewAllMetrics`, and
+`showModelsHuggingFace`. They apply automatically and do not disable the
+underlying telemetry, logs, or downloads.
 
 ## Consequential operations
 
@@ -345,12 +256,6 @@ Start-Process -FilePath .\src\LocalLlmConsole.App\bin\Release\net10.0-windows\wi
 Local builds and packages are unsigned unless signing is explicitly configured.
 Do not overwrite or restart a running production installation merely to test a
 source change.
-
-Before updating a local deployment, run `llwmctl status`, `llwmctl self`, and
-`llwmctl sessions list`. If any model session is loaded or running, do not deploy,
-restart, or replace the application. Leave the tested source/package staged until
-the Manager has no model sessions; do not unload a model unless the user separately
-and explicitly requests it.
 
 ## Troubleshooting
 

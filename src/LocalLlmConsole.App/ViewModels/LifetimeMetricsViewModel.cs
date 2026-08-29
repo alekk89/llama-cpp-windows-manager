@@ -49,7 +49,7 @@ public sealed record LifetimeMetricsPresentation(
 
 public sealed class LifetimeMetricsViewModel
 {
-    public ObservableCollection<UiRow> Rows { get; } = new();
+    public ObservableCollection<LifetimeMetricRow> Rows { get; } = new();
 
     public LifetimeMetricsSelection Selection { get; private set; } = LifetimeMetricsSelection.Default;
 
@@ -63,25 +63,19 @@ public sealed class LifetimeMetricsViewModel
         foreach (var row in report.Models)
         {
             var tracked = row.CacheStatistics;
-            Rows.Add(new UiRow
+            Rows.Add(new LifetimeMetricRow
             {
-                C1 = row.ModelName,
-                C2 = RequestCount(tracked),
-                C3 = row.Totals.InputTokens.ToString("N0"),
-                C4 = row.Totals.CachedPromptTokens.ToString("N0"),
-                C5 = row.Totals.GeneratedTokens.ToString("N0"),
-                C6 = row.Totals.TotalTokens.ToString("N0"),
-                C7 = Share(tracked.TotalTokens, report.TrackedSummary.TotalTokens),
-                C8 = Rate(tracked.AverageGeneratedTokensPerSecond),
-                C9 = Loc.T("Lifetime.ResetButton"),
-                T1 = Loc.T("Lifetime.ResetModelTooltip", row.ModelName),
-                B1 = true,
-                Data = new JsonObject
-                {
-                    ["ModelId"] = row.ModelId,
-                    ["ModelName"] = row.ModelName,
-                    ["Kind"] = "model"
-                }
+                ModelId = row.ModelId,
+                ModelName = row.ModelName,
+                Requests = RequestCount(tracked),
+                InputTokens = row.Totals.InputTokens.ToString("N0"),
+                CachedTokens = row.Totals.CachedPromptTokens.ToString("N0"),
+                OutputTokens = row.Totals.GeneratedTokens.ToString("N0"),
+                TotalTokens = row.Totals.TotalTokens.ToString("N0"),
+                Share = Share(tracked.TotalTokens, report.TrackedSummary.TotalTokens),
+                GenerationRate = Rate(tracked.AverageGeneratedTokensPerSecond),
+                ResetAction = Loc.T("Lifetime.ResetButton"),
+                ResetToolTip = Loc.T("Lifetime.ResetModelTooltip", row.ModelName)
             });
         }
 

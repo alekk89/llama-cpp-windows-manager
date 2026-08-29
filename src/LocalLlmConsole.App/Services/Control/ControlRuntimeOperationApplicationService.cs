@@ -244,7 +244,6 @@ public sealed class ControlRuntimeOperationApplicationService
             NoOpAsync,
             NoOpAsync,
             NoOpAsync,
-            NoOpAsync,
             () => { },
             _actions.SetStatus,
             (_, message) => _actions.SetStatus(message),
@@ -257,7 +256,6 @@ public sealed class ControlRuntimeOperationApplicationService
             NoOpAsync,
             NoOpAsync,
             NoOpAsync,
-            NoOpAsync,
             () => { },
             _actions.SetStatus,
             (_, message) => _actions.SetStatus(message));
@@ -265,7 +263,6 @@ public sealed class ControlRuntimeOperationApplicationService
     private RuntimeBuildApplicationActions BuildActions()
         => new(
             _actions.RunBusyAsync,
-            NoOpAsync,
             NoOpAsync,
             NoOpAsync,
             _actions.SetStatus,
@@ -279,7 +276,6 @@ public sealed class ControlRuntimeOperationApplicationService
         => new(
             _ => true,
             _actions.RunBusyAsync,
-            NoOpAsync,
             retry => _dependencies.BuildApplication.BuildAsync(
                 new RuntimeBuildApplicationRequest(
                     retry.Preset!,

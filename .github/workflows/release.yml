@@ -1,21 +1,46 @@
-name: Optional signed release artifacts
+name: Trusted Windows release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing signed annotated version tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  signed-portable:
-    name: Build signed Windows release
+  release:
+    name: Verify, sign, attest, and publish
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64: ${{ secrets.RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64 }}
+      RELEASE_TAG_SIGNING_FINGERPRINT: ${{ vars.RELEASE_TAG_SIGNING_FINGERPRINT }}
+      RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64: ${{ secrets.RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64 }}
+      RELEASE_MANIFEST_KEY_ID: ${{ vars.RELEASE_MANIFEST_KEY_ID }}
+      RELEASE_MANIFEST_PUBLIC_KEY_SPKI: ${{ vars.RELEASE_MANIFEST_PUBLIC_KEY_SPKI }}
+      RELEASE_MANIFEST_NEXT_KEY_ID: ${{ vars.RELEASE_MANIFEST_NEXT_KEY_ID }}
+      RELEASE_MANIFEST_NEXT_PUBLIC_KEY_SPKI: ${{ vars.RELEASE_MANIFEST_NEXT_PUBLIC_KEY_SPKI }}
+      WINDOWS_EXPECTED_PUBLISHER: ${{ vars.WINDOWS_EXPECTED_PUBLISHER }}
 
     steps:
-      - name: Checkout
+      - name: Checkout exact tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -33,63 +58,197 @@ jobs:
           if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw "Inno Setup compiler was not found." }
           "path=$compiler" >> $env:GITHUB_OUTPUT
 
-      - name: Import code-signing certificate
+      - name: Verify signed annotated tag and release identity
+        id: identity
+        shell: pwsh
+        run: |
+          foreach ($name in @(
+            "RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64",
+            "RELEASE_TAG_SIGNING_FINGERPRINT",
+            "RELEASE_MANIFEST_KEY_ID",
+            "RELEASE_MANIFEST_PUBLIC_KEY_SPKI",
+            "RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64",
+            "WINDOWS_EXPECTED_PUBLISHER")) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "$name is required for a trusted stable release."
+            }
+          }
+
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Release tag has an invalid stable-version format: $tag" }
+          if ((git cat-file -t "refs/tags/$tag") -ne "tag") { throw "Stable releases require a signed annotated tag: $tag" }
+
+          $env:GNUPGHOME = Join-Path $env:RUNNER_TEMP "llwm-release-gnupg"
+          New-Item -ItemType Directory -Path $env:GNUPGHOME -Force | Out-Null
+          $tagKeyPath = Join-Path $env:RUNNER_TEMP "release-tag-public-key.asc"
+          [IO.File]::WriteAllBytes($tagKeyPath, [Convert]::FromBase64String($env:RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64))
+          gpg --batch --import $tagKeyPath
+          if ($LASTEXITCODE -ne 0) { throw "Could not import the trusted release-tag public key." }
+          $fingerprints = @(gpg --batch --with-colons --fingerprint | ForEach-Object {
+            if ($_ -match '^fpr:::::::::(?<value>[0-9A-F]+):$') { $Matches.value }
+          })
+          $expectedFingerprint = ($env:RELEASE_TAG_SIGNING_FINGERPRINT -replace '\s', '').ToUpperInvariant()
+          if ($fingerprints -notcontains $expectedFingerprint) { throw "The imported release-tag key does not match the configured fingerprint." }
+          git verify-tag $tag
+          if ($LASTEXITCODE -ne 0) { throw "Release tag signature verification failed: $tag" }
+
+          git fetch origin main --no-tags
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch protected main for reachability verification." }
+          $commit = (git rev-list -n 1 $tag).Trim()
+          git merge-base --is-ancestor $commit origin/main
+          if ($LASTEXITCODE -ne 0) { throw "Release commit is not reachable from protected main: $commit" }
+
+          [xml]$project = Get-Content .\src\LocalLlmConsole.App\LocalLlmConsole.App.csproj
+          $version = @($project.Project.PropertyGroup.Version | Where-Object { $_ })[0].Trim()
+          if ($tag -ne "v$version") { throw "Tag $tag does not match project version $version." }
+          $notes = Join-Path $PWD "docs\releases\$tag.md"
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) { throw "Versioned release notes are missing: $notes" }
+          if (git status --porcelain --untracked-files=all) { throw "The tagged release checkout is not clean." }
+
+          $builtAt = (git show -s --format=%cI $commit).Trim()
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+          "built_at=$builtAt" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+
+      - name: Import code-signing certificate and manifest key
         id: signing
         shell: pwsh
         env:
           SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
           SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_BASE64)) {
-            throw "WINDOWS_SIGNING_PFX_BASE64 is required for public release builds."
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_BASE64)) { throw "WINDOWS_SIGNING_PFX_BASE64 is required." }
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_PASSWORD)) { throw "WINDOWS_SIGNING_PFX_PASSWORD is required." }
+          $pfxPath = Join-Path $env:RUNNER_TEMP "llwm-windows-signing.pfx"
+          $manifestKeyPath = Join-Path $env:RUNNER_TEMP "llwm-release-manifest-private.pem"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
+          [IO.File]::WriteAllBytes($manifestKeyPath, [Convert]::FromBase64String($env:RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64))
+          $password = ConvertTo-SecureString $env:SIGNING_PFX_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          if (-not $certificate.HasPrivateKey) { throw "The imported Windows signing certificate has no private key." }
+          if ($certificate.Subject -notlike "*$env:WINDOWS_EXPECTED_PUBLISHER*") {
+            throw "The Windows signing certificate subject does not match WINDOWS_EXPECTED_PUBLISHER."
           }
-          if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_PASSWORD)) {
-            throw "WINDOWS_SIGNING_PFX_PASSWORD is required for public release builds."
-          }
-          $pfxPath = Join-Path $env:RUNNER_TEMP "llama-cpp-windows-manager-signing.pfx"
-          try {
-            [System.IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
-            $password = ConvertTo-SecureString $env:SIGNING_PFX_PASSWORD -AsPlainText -Force
-            $certificate = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password
-            if (-not $certificate.HasPrivateKey) { throw "The imported signing certificate has no private key." }
-            "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
-          } finally {
-            if (Test-Path -LiteralPath $pfxPath) { Remove-Item -LiteralPath $pfxPath -Force }
-          }
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+          "manifest_key_path=$manifestKeyPath" >> $env:GITHUB_OUTPUT
 
-      - name: Run signed release gate
+      - name: Build and test exact signed release artifacts
         shell: pwsh
         run: >-
           .\scripts\test-release-gate.ps1 -Configuration Release -Runtime win-x64
           -IncludePublish -IncludeInstaller -InnoSetupPath "${{ steps.inno.outputs.path }}"
           -CertificateThumbprint "${{ steps.signing.outputs.thumbprint }}"
+          -ExpectedPublisher "$env:WINDOWS_EXPECTED_PUBLISHER"
+          -ReleaseManifestKeyId "$env:RELEASE_MANIFEST_KEY_ID"
+          -ReleaseManifestPublicKeySpki "$env:RELEASE_MANIFEST_PUBLIC_KEY_SPKI"
+          -ReleaseManifestNextKeyId "$env:RELEASE_MANIFEST_NEXT_KEY_ID"
+          -ReleaseManifestNextPublicKeySpki "$env:RELEASE_MANIFEST_NEXT_PUBLIC_KEY_SPKI"
+          -RepositoryCommit "${{ steps.identity.outputs.commit }}"
+          -ReleaseChannel stable
+          -RequireSigned -RequireCleanTree
+
+      - name: Create signed release manifest
+        shell: pwsh
+        run: >-
+          .\scripts\new-release-manifest.ps1
+          -Version "${{ steps.identity.outputs.version }}"
+          -Tag "${{ steps.identity.outputs.tag }}"
+          -Commit "${{ steps.identity.outputs.commit }}"
+          -BuildTimestampUtc "${{ steps.identity.outputs.built_at }}"
+          -ExpectedPublisher "$env:WINDOWS_EXPECTED_PUBLISHER"
+          -KeyId "$env:RELEASE_MANIFEST_KEY_ID"
+          -SigningPrivateKeyPath "${{ steps.signing.outputs.manifest_key_path }}"
+          -ExpectedPublicKeySpki "$env:RELEASE_MANIFEST_PUBLIC_KEY_SPKI"
+          -ReleaseChannel stable
+
+      - name: Validate upgrade from pinned previous stable installer
+        shell: pwsh
+        run: >-
+          .\scripts\test-previous-version-upgrade.ps1
+          -CandidateInstallerPath "dist/installer/LlamaCppWindowsManager-Setup-${{ steps.identity.outputs.version }}-win-x64.exe"
+
+      - name: Validate portable update from pinned previous stable archive
+        shell: pwsh
+        run: >-
+          .\scripts\test-portable-update.ps1
+          -CandidateArchivePath "dist/LlamaCppWindowsManager-win-x64.zip"
+          -ManifestPath "dist/release/release-manifest.json"
+          -SignaturePath "dist/release/release-manifest.json.sig"
+          -ManifestPublicKeySpki "$env:RELEASE_MANIFEST_PUBLIC_KEY_SPKI"
+          -ExpectedPublisher "$env:WINDOWS_EXPECTED_PUBLISHER"
           -RequireSigned
 
-      - name: Upload signed release artifacts
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: |
+            dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe
+            dist/LlamaCppWindowsManager-win-x64/llwmctl.exe
+            dist/LlamaCppWindowsManager-win-x64.zip
+            dist/installer/LlamaCppWindowsManager-Setup-${{ steps.identity.outputs.version }}-win-x64.exe
+            dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json
+            dist/release/release-manifest.json
+            dist/release/release-manifest.json.sig
+
+      - name: Publish immutable GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.identity.outputs.tag }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists. Publish a new patch version instead of replacing assets." }
+          $version = "${{ steps.identity.outputs.version }}"
+          $assets = @(
+            "dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe",
+            "dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe.sha256",
+            "dist/LlamaCppWindowsManager-win-x64/llwmctl.exe",
+            "dist/LlamaCppWindowsManager-win-x64/llwmctl.exe.sha256",
+            "dist/LlamaCppWindowsManager-win-x64.zip",
+            "dist/LlamaCppWindowsManager-win-x64.zip.sha256",
+            "dist/installer/LlamaCppWindowsManager-Setup-$version-win-x64.exe",
+            "dist/installer/LlamaCppWindowsManager-Setup-$version-win-x64.exe.sha256",
+            "dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json",
+            "dist/release/release-manifest.json",
+            "dist/release/release-manifest.json.sig"
+          )
+          gh release create $tag --verify-tag --latest --title "llama.cpp Windows Manager $tag" --notes-file "${{ steps.identity.outputs.notes }}" @assets
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release publication failed." }
+
+      - name: Upload release workflow record
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: LlamaCppWindowsManager-win-x64-signed-release
+          name: LlamaCppWindowsManager-${{ steps.identity.outputs.tag }}-signed-release
           if-no-files-found: error
+          retention-days: 30
           path: |
             dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe
             dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe.sha256
             dist/LlamaCppWindowsManager-win-x64/llwmctl.exe
             dist/LlamaCppWindowsManager-win-x64/llwmctl.exe.sha256
-            dist/LlamaCppWindowsManager-win-x64/AGENTS.md
-            dist/LlamaCppWindowsManager-win-x64/agent.md
-            dist/LlamaCppWindowsManager-win-x64/docs/CONTROL_API.md
-            dist/LlamaCppWindowsManager-win-x64/LICENSE
-            dist/LlamaCppWindowsManager-win-x64/THIRD-PARTY-NOTICES.md
-            dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json
-            dist/LlamaCppWindowsManager-win-x64/licenses/**
             dist/LlamaCppWindowsManager-win-x64.zip
             dist/LlamaCppWindowsManager-win-x64.zip.sha256
             dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe
             dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe.sha256
+            dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json
+            dist/release/release-manifest.json
+            dist/release/release-manifest.json.sig
 
-      - name: Remove imported certificate
-        if: always() && steps.signing.outputs.thumbprint != ''
+      - name: Remove imported release credentials
+        if: always()
         shell: pwsh
         run: |
-          $path = "Cert:\CurrentUser\My\${{ steps.signing.outputs.thumbprint }}"
-          if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+          if ("${{ steps.signing.outputs.thumbprint }}") {
+            $certificatePath = "Cert:\CurrentUser\My\${{ steps.signing.outputs.thumbprint }}"
+            if (Test-Path -LiteralPath $certificatePath) { Remove-Item -LiteralPath $certificatePath -Force }
+          }
+          foreach ($path in @(
+            (Join-Path $env:RUNNER_TEMP "llwm-windows-signing.pfx"),
+            (Join-Path $env:RUNNER_TEMP "llwm-release-manifest-private.pem"),
+            (Join-Path $env:RUNNER_TEMP "release-tag-public-key.asc"))) {
+            if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+          }
+          $gpgHome = Join-Path $env:RUNNER_TEMP "llwm-release-gnupg"
+          if (Test-Path -LiteralPath $gpgHome) { Remove-Item -LiteralPath $gpgHome -Recurse -Force }

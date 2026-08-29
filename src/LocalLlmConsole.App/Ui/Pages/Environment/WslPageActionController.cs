@@ -20,7 +20,7 @@ public sealed record WslPageActionControllerActions(
     Func<Task> DeleteSyclRuntimeAsync,
     Func<Task> InstallSyclOneApiAsync,
     Func<Task> DeleteSyclOneApiAsync,
-    Func<UiRow?, Task> SelectDistroAsync,
+    Func<WslDistroRow?, Task> SelectDistroAsync,
     Func<Func<Task>, Task> RunEventAsync);
 
 public sealed class WslPageActionController
@@ -57,7 +57,7 @@ public sealed class WslPageActionController
     {
         await _actions.RunEventAsync(async () =>
         {
-            await _actions.SelectDistroAsync((sender as FrameworkElement)?.Tag as UiRow);
+            await _actions.SelectDistroAsync((sender as FrameworkElement)?.Tag as WslDistroRow);
         });
     }
 }

@@ -23,6 +23,12 @@ Core:
   llwmctl hf search QUERY
   llwmctl hf download --repo OWNER/REPO --file FILE.gguf [--revision REV]
   llwmctl jobs list|pause|resume|cancel JOB
+  llwmctl benchmarks schema | presets | capabilities [RUNTIME] [--wsl-distro DISTRO]
+  llwmctl benchmarks validate --plan FILE
+  llwmctl benchmarks run --plan FILE [--dry-run|--confirm] [--wait] [--timeout SECONDS]
+  llwmctl benchmarks list|inspect|wait|pause|resume|cancel|plan|clone|results|export|log [RUN]
+  llwmctl benchmarks compare BASELINE_RUN CANDIDATE_RUN [--include-partial]
+  llwmctl benchmarks delete RUN --confirm
   llwmctl operations list
   llwmctl operations run NAME [--set name=value] [--dry-run|--confirm]
 

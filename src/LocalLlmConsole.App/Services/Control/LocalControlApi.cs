@@ -1,6 +1,6 @@
 namespace LocalLlmConsole.Services;
 
-public sealed class LocalControlApi
+public sealed partial class LocalControlApi
 {
     private readonly LocalControlDependencies _deps;
     private readonly ControlRequestAdmissionService _admission;
@@ -12,7 +12,9 @@ public sealed class LocalControlApi
     private readonly ControlSettingsEndpoints _settings;
     private readonly ControlLogEndpoints _logs;
     private readonly ControlJobEndpoints _jobs;
+    private readonly ControlBenchmarkEndpoints _benchmarks;
     private readonly ControlOperationEndpoints _operations;
+    private readonly IReadOnlyDictionary<string, ControlRouteHandler> _routeHandlers;
 
     public LocalControlApi(LocalControlDependencies dependencies)
     {
@@ -30,7 +32,9 @@ public sealed class LocalControlApi
         _settings = new ControlSettingsEndpoints(context);
         _logs = new ControlLogEndpoints(context);
         _jobs = new ControlJobEndpoints(context);
+        _benchmarks = new ControlBenchmarkEndpoints(context);
         _operations = new ControlOperationEndpoints(context);
+        _routeHandlers = CreateRouteHandlers();
     }
 
     public async Task<LocalControlApiResponse> HandleAsync(
@@ -114,26 +118,9 @@ public sealed class LocalControlApi
             || !segments[1].Equals("v1", StringComparison.OrdinalIgnoreCase))
             return Error(404, "Not found.");
 
-        var route = segments[2].ToLowerInvariant();
-        return route switch
-        {
-            "status" when method == "GET" => Ok(Status()),
-            "capabilities" when method == "GET" => Ok(Capabilities()),
-            "self" when method == "GET" => await _sessions.IdentifySelfAsync(request, cancellationToken),
-            "models" => await _models.ModelsAsync(method, segments, request, cancellationToken),
-            "model-groups" => await _modelGroups.HandleAsync(method, segments, request, cancellationToken),
-            "runtimes" => await _runtime.RuntimesAsync(method, segments, request, cancellationToken),
-            "sessions" => await _sessions.SessionsAsync(method, segments, request, cancellationToken),
-            "gateway" => await _sessions.GatewayAsync(method, segments, cancellationToken),
-            "settings" => await _settings.SettingsAsync(method, segments, request, cancellationToken),
-            "logs" => await _logs.LogsAsync(method, segments, request, cancellationToken),
-            "metrics" when segments.Length == 3 && method == "GET" => await _sessions.AllMetricsAsync(cancellationToken),
-            "metrics" => await _usageMetrics.HandleAsync(method, segments, request, cancellationToken),
-            "jobs" => await _jobs.JobsAsync(method, segments, cancellationToken),
-            "huggingface" => await _jobs.HuggingFaceAsync(method, segments, request, cancellationToken),
-            "operations" => await _operations.HandleAsync(method, segments, request, cancellationToken),
-            _ => Error(404, "Not found.")
-        };
+        return _routeHandlers.TryGetValue(segments[2], out var handler)
+            ? await handler(method, segments, request, cancellationToken)
+            : NotFound();
     }
 
     private object Status()
@@ -165,31 +152,11 @@ public sealed class LocalControlApi
                 "runtime-and-app-logs", "profile-crud", "one-shot-setting-overrides", "vision-heads",
                 "draft-and-mtp-heads", "app-settings", "runtime-scan", "runtime-register",
                 "huggingface-search", "huggingface-download", "download-pause-resume-cancel", "jobs",
+                "llama-bench", "benchmark-automation", "benchmark-history", "benchmark-agent-contract", "benchmark-comparison", "benchmark-delete",
                 "runtime-packages-and-builds", "windows-and-wsl-management", "maintenance",
                 "lifetime-metrics", "daily-usage-metrics", "prompt-cache-statistics", "gateway-control", "app-updates-and-lifecycle", "dry-run-operations"
             },
-            routes = new[]
-            {
-                "GET /api/v1/status", "GET /api/v1/capabilities", "GET /api/v1/self",
-                "GET /api/v1/models", "POST /api/v1/models/scan", "POST /api/v1/models/import",
-                "GET /api/v1/models/{model}/companions", "POST /api/v1/models/{model}/load",
-                "POST /api/v1/models/{model}/restart", "POST /api/v1/models/{model}/unload",
-                "DELETE /api/v1/models/{model}?confirm=true", "GET /api/v1/models/{model}/profiles",
-                "POST /api/v1/models/{model}/profiles", "PUT /api/v1/models/{model}/profiles/{profile}",
-                "DELETE /api/v1/models/{model}/profiles/{profile}",
-                "GET|PUT|DELETE /api/v1/models/{model}/profiles/{profile}/group",
-                "GET|POST /api/v1/model-groups", "GET|PATCH|DELETE /api/v1/model-groups/{group}",
-                "GET|PATCH /api/v1/settings",
-                "POST /api/v1/settings/model-api-key/rotate",
-                "GET /api/v1/runtimes", "POST /api/v1/runtimes/scan", "POST /api/v1/runtimes/register",
-                "GET /api/v1/sessions", "GET /api/v1/sessions/{session}/logs",
-                "GET /api/v1/sessions/{session}/metrics", "GET /api/v1/sessions/{session}/inspect",
-                "GET /api/v1/gateway/inspect",
-                "GET /api/v1/logs", "GET /api/v1/logs/{file}",
-                "GET /api/v1/metrics", "GET /api/v1/metrics/usage?range=1d|7d|30d|90d|all", "GET /api/v1/jobs", "POST /api/v1/jobs/{job}/pause|resume|cancel",
-                "GET /api/v1/huggingface/search?q=...", "POST /api/v1/huggingface/download",
-                "GET /api/v1/operations", "POST /api/v1/operations/{operation}"
-            },
+            routes = ControlRouteCatalog.AdvertisedRoutes,
             operations = ControlOperationCatalog.All,
             modelGroups = new
             {
@@ -200,6 +167,7 @@ public sealed class LocalControlApi
             },
             modelLaunchSettings = ControlEndpointHandler.SettingsSchema<ModelLaunchSettings>(),
             appSettings = ControlEndpointHandler.SettingsSchema<AppSettings>(),
+            benchmarks = ControlBenchmarkContract.CapabilitySummary,
             selfIdentificationHints = new[] { "sessionId", "model", "endpoint", "port", "processId" }
         };
 

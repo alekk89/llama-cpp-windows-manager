@@ -4,10 +4,13 @@ A Windows desktop app I built to make `llama.cpp` easier to manage. It handles
 runtimes, GGUF models, launch profiles, and supervised OpenAI compatible model
 endpoints on native Windows or Ubuntu/WSL.
 
-[![Latest release](https://img.shields.io/github/v/release/alekk89/llama-cpp-windows-manager?display_name=tag&sort=semver)](https://github.com/alekk89/llama-cpp-windows-manager/releases/latest)
-[![Build/test/publish](https://github.com/alekk89/llama-cpp-windows-manager/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/alekk89/llama-cpp-windows-manager/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows)](#install)
+<p>
+  <a href="https://github.com/alekk89/llama-cpp-windows-manager/releases/latest"><img src="https://img.shields.io/github/v/release/alekk89/llama-cpp-windows-manager?display_name=tag&amp;sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/alekk89/llama-cpp-windows-manager/actions/workflows/ci.yml"><img src="https://github.com/alekk89/llama-cpp-windows-manager/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build/test/publish"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows" alt="Platform: Windows x64"></a>
+  <a href="https://buymeacoffee.com/alekkson"><img align="right" src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&amp;logoColor=000" alt="Buy me a coffee"></a>
+</p>
 
 > This is an unofficial community project. It is not affiliated with or endorsed
 > by the llama.cpp project.
@@ -16,7 +19,6 @@ endpoints on native Windows or Ubuntu/WSL.
 · [User guide](docs/USER_GUIDE.md)
 · [Getting started](docs/USER_GUIDE.md#first-model)
 · [Documentation](#documentation-and-support)
-· [Buy me a coffee](https://buymeacoffee.com/alekkson)
 
 ![llama.cpp Windows Manager product tour](docs/images/llama-cpp-windows-manager-demo.gif)
 
@@ -29,6 +31,7 @@ endpoints on native Windows or Ubuntu/WSL.
 * Runs and supervises several model servers on separate ports.
 * Provides direct endpoints and an optional shared gateway.
 * Tracks runtime health, logs, token usage, hardware metrics, and GPU energy.
+* Plans and runs unattended saved-profile serving benchmarks—including draft/MTP acceptance, concurrency, latency, and throughput—or explicit low-level `llama-bench` suites, with persisted CSV/JSON export.
 * Supports CPU, CUDA, Vulkan, and Intel Arc SYCL backends.
 * Provides authenticated local automation through `llwmctl`.
 

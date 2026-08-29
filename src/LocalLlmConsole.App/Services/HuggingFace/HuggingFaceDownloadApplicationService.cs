@@ -8,7 +8,6 @@ public enum HuggingFaceDownloadApplicationOutcome
 public sealed record HuggingFaceDownloadApplicationActions(
     Func<string, Func<Task>, Task> RunBusyAsync,
     Func<HuggingFaceFile, AppSettings, Task<JobRecord>> StartDownloadAsync,
-    Func<Task> RefreshJobsAsync,
     Func<Task> RefreshOverviewAsync,
     Func<string, Task> ShowDownloadHistoryAsync,
     Action<string> StartMonitor,
@@ -28,7 +27,6 @@ public sealed class HuggingFaceDownloadApplicationService
         await actions.RunBusyAsync("Starting download...", async () =>
         {
             var job = await actions.StartDownloadAsync(file, settings);
-            await actions.RefreshJobsAsync();
             await actions.RefreshOverviewAsync();
             await actions.ShowDownloadHistoryAsync(job.Id);
             actions.StartMonitor(job.Id);
@@ -42,7 +40,6 @@ public sealed class HuggingFaceDownloadApplicationService
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(actions.RunBusyAsync);
         ArgumentNullException.ThrowIfNull(actions.StartDownloadAsync);
-        ArgumentNullException.ThrowIfNull(actions.RefreshJobsAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshOverviewAsync);
         ArgumentNullException.ThrowIfNull(actions.ShowDownloadHistoryAsync);
         ArgumentNullException.ThrowIfNull(actions.StartMonitor);

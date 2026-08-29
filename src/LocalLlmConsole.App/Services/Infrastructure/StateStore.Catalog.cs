@@ -124,20 +124,6 @@ WHERE model_id = $model_id;
         });
     }
 
-    public async Task DeleteModelLaunchSettingsAsync(string modelId)
-    {
-        await WithConnectionAsync(async () =>
-        {
-            await using var command = _connection.CreateCommand();
-            command.CommandText = """
-DELETE FROM model_launch_profiles WHERE model_id = $model_id AND is_default = 1;
-DELETE FROM model_launch_settings WHERE model_id = $model_id;
-""";
-            command.Parameters.AddWithValue("$model_id", modelId);
-            await command.ExecuteNonQueryAsync();
-        });
-    }
-
     private async Task SaveDefaultProfileUnlockedAsync(string modelId, ModelLaunchSettings settings)
     {
         var now = DateTimeOffset.UtcNow.ToString("O");

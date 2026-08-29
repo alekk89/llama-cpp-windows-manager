@@ -123,41 +123,16 @@ public sealed partial class ModelCatalogService
 
     private static void EnsurePathInsideRoot(string path, string root)
     {
-        var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fullPath = Path.GetFullPath(path);
-        var relative = Path.GetRelativePath(fullRoot, fullPath);
-        if (string.IsNullOrWhiteSpace(relative)
-            || string.Equals(relative, ".", StringComparison.Ordinal)
-            || string.Equals(relative, "..", StringComparison.Ordinal)
-            || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            || relative.StartsWith(".." + Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
-            || Path.IsPathRooted(relative))
-            throw new InvalidOperationException("Refusing to register an app-owned download outside the configured models folder.");
-
-        RejectReparsePointPath(fullRoot, fullPath);
-    }
-
-    private static void RejectReparsePointPath(string root, string path)
-    {
+        var contained = PathContainmentGuard.ResolveDescendant(
+            root,
+            path,
+            "Refusing to register an app-owned download outside the configured models folder.");
         try
         {
-            if ((File.Exists(path) || Directory.Exists(path))
-                && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                throw new InvalidOperationException("Refusing to register an app-owned download through a symlink or junction.");
-
-            var current = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
-            while (!string.IsNullOrWhiteSpace(current)
-                && Path.GetRelativePath(root, current) is var relative
-                && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                && !relative.StartsWith(".." + Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
-                && !Path.IsPathRooted(relative))
-            {
-                if (Directory.Exists(current) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
-                    throw new InvalidOperationException("Refusing to register an app-owned download through a symlink or junction.");
-                if (string.Equals(Path.GetFullPath(current).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), root, StringComparison.OrdinalIgnoreCase))
-                    return;
-                current = Path.GetDirectoryName(current);
-            }
+            PathContainmentGuard.RejectReparsePointAncestors(
+                contained,
+                includeExistingTarget: true,
+                "Refusing to register an app-owned download through a symlink or junction.");
         }
         catch (InvalidOperationException)
         {

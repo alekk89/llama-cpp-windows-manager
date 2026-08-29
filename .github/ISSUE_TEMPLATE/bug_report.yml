@@ -10,7 +10,7 @@ body:
     id: version
     attributes:
       label: Application version
-      placeholder: v2.2.0
+      placeholder: v2.5.0
     validations:
       required: true
   - type: dropdown
@@ -59,6 +59,17 @@ body:
       label: Sanitized logs
       description: Paste only the relevant redacted excerpt or attach a sanitized file.
       render: text
+  - type: input
+    id: error-code
+    attributes:
+      label: Stable error code
+      description: Include the LLWM-* code shown by the app or recorded in the reviewed diagnostics bundle, if available.
+      placeholder: LLWM-SESSION-UNEXPECTED-EXIT
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Reviewed diagnostics bundle
+      description: Create the bounded bundle from Logs, inspect every file, then drag the ZIP here. Do not attach it before reviewing it.
   - type: dropdown
     id: restart
     attributes:

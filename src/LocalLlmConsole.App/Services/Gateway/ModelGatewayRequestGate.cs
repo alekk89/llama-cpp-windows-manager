@@ -6,14 +6,53 @@ public sealed class ModelGatewayRequestGate
 {
     private readonly ConcurrentDictionary<string, ModelGateState> _gates = new(StringComparer.OrdinalIgnoreCase);
 
-    public Task<IDisposable> EnterAsync(
+    internal int TrackedModelCount => _gates.Count;
+
+    public async Task<IDisposable> EnterAsync(
         string modelId,
         string profileId,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelId);
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        return _gates.GetOrAdd(modelId, _ => new ModelGateState()).EnterAsync(profileId, cancellationToken);
+        while (true)
+        {
+            var state = _gates.GetOrAdd(modelId, _ => new ModelGateState());
+            if (!state.TryRetain())
+            {
+                _gates.TryRemove(new KeyValuePair<string, ModelGateState>(modelId, state));
+                continue;
+            }
+
+            try
+            {
+                var lease = await state.EnterAsync(profileId, cancellationToken);
+                return new TrackedLease(lease, () => Release(modelId, state));
+            }
+            catch
+            {
+                Release(modelId, state);
+                throw;
+            }
+        }
+    }
+
+    private void Release(string modelId, ModelGateState state)
+    {
+        if (state.ReleaseReference())
+            _gates.TryRemove(new KeyValuePair<string, ModelGateState>(modelId, state));
+    }
+
+    private sealed class TrackedLease(IDisposable inner, Action release) : IDisposable
+    {
+        private IDisposable? _inner = inner;
+        private Action? _release = release;
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref _inner, null)?.Dispose();
+            Interlocked.Exchange(ref _release, null)?.Invoke();
+        }
     }
 
     private sealed class ModelGateState
@@ -21,7 +60,29 @@ public sealed class ModelGatewayRequestGate
         private readonly object _sync = new();
         private string _activeProfileId = "";
         private int _activeRequests;
+        private int _references;
+        private bool _retired;
         private readonly LinkedList<Waiter> _waiters = [];
+
+        public bool TryRetain()
+        {
+            lock (_sync)
+            {
+                if (_retired) return false;
+                _references++;
+                return true;
+            }
+        }
+
+        public bool ReleaseReference()
+        {
+            lock (_sync)
+            {
+                if (--_references != 0) return false;
+                _retired = true;
+                return true;
+            }
+        }
 
         public async Task<IDisposable> EnterAsync(string profileId, CancellationToken cancellationToken)
         {

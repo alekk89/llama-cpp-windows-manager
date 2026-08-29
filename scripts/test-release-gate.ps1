@@ -9,12 +9,33 @@ param(
   [string] $InnoSetupPath = "",
   [string] $CertificateThumbprint = "",
   [string] $TimestampServer = "https://timestamp.digicert.com",
+  [string] $ExpectedPublisher = "",
+  [string] $ReleaseManifestKeyId = "",
+  [string] $ReleaseManifestPublicKeySpki = "",
+  [string] $ReleaseManifestNextKeyId = "",
+  [string] $ReleaseManifestNextPublicKeySpki = "",
+  [string] $RepositoryCommit = "",
+  [ValidateSet("development", "stable", "preview", "nightly")]
+  [string] $ReleaseChannel = "development",
   [switch] $RequireSigned
 )
 
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+
+function Test-CertificatePublisher {
+  param(
+    [Parameter(Mandatory = $true)] $Certificate,
+    [Parameter(Mandatory = $true)][string] $Publisher
+  )
+
+  $simpleName = $Certificate.GetNameInfo(
+    [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
+    $false)
+  return [string]::Equals($simpleName, $Publisher, [System.StringComparison]::OrdinalIgnoreCase) -or
+    [string]::Equals($Certificate.Subject, $Publisher, [System.StringComparison]::OrdinalIgnoreCase)
+}
 
 function Resolve-Dotnet {
   $bundledDotnet = Join-Path (Split-Path -Parent $RepoRoot) ".dotnet-sdk-10\dotnet.exe"
@@ -114,6 +135,21 @@ function Assert-HashCompanion {
   }
 }
 
+function Assert-TrustedSignature {
+  param(
+    [Parameter(Mandatory = $true)][string] $Path,
+    [Parameter(Mandatory = $true)][string] $Label
+  )
+  if (-not $RequireSigned) { return }
+  $signature = Get-AuthenticodeSignature -FilePath $Path
+  if ($signature.Status -ne "Valid") { throw "$Label is not Authenticode-valid: $Path" }
+  if (-not [string]::IsNullOrWhiteSpace($ExpectedPublisher) -and
+      ($null -eq $signature.SignerCertificate -or
+       -not (Test-CertificatePublisher -Certificate $signature.SignerCertificate -Publisher $ExpectedPublisher))) {
+    throw "$Label is not signed by expected publisher '$ExpectedPublisher': $Path"
+  }
+}
+
 function Assert-ZipContainsEntry {
   param(
     [Parameter(Mandatory = $true)]
@@ -154,6 +190,8 @@ function Assert-PublishArtifacts {
 
   Assert-HashCompanion -Path $appExe
   Assert-HashCompanion -Path $controlCli
+  Assert-TrustedSignature -Path $appExe -Label "Published application"
+  Assert-TrustedSignature -Path $controlCli -Label "Published control CLI"
   Assert-FileExists -Path $agentsGuide -Label "Agent instruction sidecar"
   Assert-FileExists -Path $quickGuide -Label "Quick agent instruction sidecar"
   Assert-FileExists -Path $controlApiGuide -Label "Control API reference sidecar"
@@ -215,6 +253,7 @@ function Assert-InstallerArtifacts {
   $appVersion = Read-ProjectVersion
   $installerPath = Join-Path $RepoRoot "dist\installer\LlamaCppWindowsManager-Setup-$appVersion-$Runtime.exe"
   Assert-HashCompanion -Path $installerPath
+  Assert-TrustedSignature -Path $installerPath -Label "Installer"
 }
 
 $dotnet = Resolve-Dotnet
@@ -229,6 +268,10 @@ if ($RequireCleanTree) {
   Invoke-GateStep "Verify clean Git worktree" {
     Assert-CleanGitTree -Path $RepoRoot
   }
+}
+
+Invoke-GateStep "Check code shape" {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check-code-shape.ps1")
 }
 
 $buildArgs = @(
@@ -262,6 +305,10 @@ Invoke-GateStep "Check diff whitespace" {
   & git -C $RepoRoot diff --check
 }
 
+Invoke-GateStep "Validate documentation links and commands" {
+  & (Join-Path $RepoRoot "scripts\test-docs.ps1")
+}
+
 Invoke-GateStep "Audit package vulnerabilities" {
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "test-vulnerabilities.ps1") -Configuration $Configuration
 }
@@ -278,8 +325,27 @@ if ($IncludePublish) {
     "-Configuration",
     $Configuration
   )
+  if ($RepositoryCommit) {
+    $publishArgs += @("-RepositoryCommit", $RepositoryCommit)
+  }
+  $publishArgs += @("-ReleaseChannel", $ReleaseChannel)
   if ($CertificateThumbprint) {
     $publishArgs += @("-CertificateThumbprint", $CertificateThumbprint, "-TimestampServer", $TimestampServer)
+  }
+  if ($ExpectedPublisher) {
+    $publishArgs += @("-ExpectedPublisher", $ExpectedPublisher)
+  }
+  if ($ReleaseManifestKeyId) {
+    $publishArgs += @("-ReleaseManifestKeyId", $ReleaseManifestKeyId)
+  }
+  if ($ReleaseManifestPublicKeySpki) {
+    $publishArgs += @("-ReleaseManifestPublicKeySpki", $ReleaseManifestPublicKeySpki)
+  }
+  if ($ReleaseManifestNextKeyId) {
+    $publishArgs += @("-ReleaseManifestNextKeyId", $ReleaseManifestNextKeyId)
+  }
+  if ($ReleaseManifestNextPublicKeySpki) {
+    $publishArgs += @("-ReleaseManifestNextPublicKeySpki", $ReleaseManifestNextPublicKeySpki)
   }
   if ($RequireSigned) {
     $publishArgs += "-RequireSigned"
@@ -315,6 +381,21 @@ if ($IncludeInstaller) {
   if ($CertificateThumbprint) {
     $installerArgs += @("-CertificateThumbprint", $CertificateThumbprint, "-TimestampServer", $TimestampServer)
   }
+  if ($ExpectedPublisher) {
+    $installerArgs += @("-ExpectedPublisher", $ExpectedPublisher)
+  }
+  if ($ReleaseManifestKeyId) {
+    $installerArgs += @("-ReleaseManifestKeyId", $ReleaseManifestKeyId)
+  }
+  if ($ReleaseManifestPublicKeySpki) {
+    $installerArgs += @("-ReleaseManifestPublicKeySpki", $ReleaseManifestPublicKeySpki)
+  }
+  if ($ReleaseManifestNextKeyId) {
+    $installerArgs += @("-ReleaseManifestNextKeyId", $ReleaseManifestNextKeyId)
+  }
+  if ($ReleaseManifestNextPublicKeySpki) {
+    $installerArgs += @("-ReleaseManifestNextPublicKeySpki", $ReleaseManifestNextPublicKeySpki)
+  }
   if ($RequireSigned) {
     $installerArgs += "-RequireSigned"
   }
@@ -337,6 +418,15 @@ if ($IncludeInstaller) {
 
   Invoke-GateStep "Verify installer artifacts" {
     Assert-InstallerArtifacts -Runtime $Runtime
+  }
+
+  Invoke-GateStep "Test installer install, repair, and uninstall" {
+    $appVersion = Read-ProjectVersion
+    $installerPath = Join-Path $RepoRoot "dist\installer\LlamaCppWindowsManager-Setup-$appVersion-$Runtime.exe"
+    $smokeArgs = @("-InstallerPath", $installerPath)
+    if ($RequireSigned) { $smokeArgs += "-RequireSigned" }
+    if ($ExpectedPublisher) { $smokeArgs += @("-ExpectedPublisher", $ExpectedPublisher) }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "test-installer-smoke.ps1") @smokeArgs
   }
 }
 

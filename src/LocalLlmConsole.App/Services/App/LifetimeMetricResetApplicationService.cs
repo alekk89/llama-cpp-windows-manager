@@ -26,31 +26,31 @@ public sealed record LifetimeMetricResetApplicationActions(
 public sealed class LifetimeMetricResetApplicationService
 {
     public async Task<LifetimeMetricResetApplicationOutcome> ResetAsync(
-        UiRow? row,
+        LifetimeMetricRow? row,
         LifetimeMetricResetApplicationActions actions)
     {
         Validate(actions);
         if (row is null)
             return LifetimeMetricResetApplicationOutcome.Ignored;
 
-        if (string.Equals(row.Data["Kind"]?.ToString(), "total", StringComparison.OrdinalIgnoreCase))
+        if (row.Kind == LifetimeMetricRowKind.Total)
             return await ResetAllAsync(actions);
 
         return await ResetModelAsync(row, actions);
     }
 
     private static async Task<LifetimeMetricResetApplicationOutcome> ResetModelAsync(
-        UiRow row,
+        LifetimeMetricRow row,
         LifetimeMetricResetApplicationActions actions)
     {
-        if (!row.B1)
+        if (!row.CanReset)
         {
             actions.SetStatus("Only model rows can be reset individually.");
             return LifetimeMetricResetApplicationOutcome.Blocked;
         }
 
-        var modelId = row.Data["ModelId"]?.ToString();
-        var modelName = row.Data["ModelName"]?.ToString() ?? row.C1;
+        var modelId = row.ModelId;
+        var modelName = row.ModelName;
         if (string.IsNullOrWhiteSpace(modelId))
         {
             actions.SetStatus("Only model rows can be reset individually.");

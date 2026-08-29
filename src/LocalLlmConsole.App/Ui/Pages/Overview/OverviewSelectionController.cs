@@ -138,23 +138,23 @@ public sealed class OverviewSelectionController
         => IsProfileLoaded(model);
 
     public static string SessionIdFromRowButton(object sender)
-        => (sender as FrameworkElement)?.Tag is UiRow row
-            ? row.Data["SessionId"]?.ToString() ?? ""
+        => (sender as FrameworkElement)?.Tag is OverviewSessionRow row
+            ? row.SessionId
             : "";
 
-    public static UiRow? EndpointRowFromLink(object sender)
-        => sender is System.Windows.Documents.Hyperlink { Tag: UiRow row } ? row : null;
+    public static OverviewSessionRow? EndpointRowFromLink(object sender)
+        => sender is System.Windows.Documents.Hyperlink { Tag: OverviewSessionRow row } ? row : null;
 
     public Task InspectSelectedEndpointAsync()
         => _page.SelectedLoadedSessionRow is { } row ? InspectEndpointRowAsync(row) : Task.CompletedTask;
 
-    public async Task InspectEndpointRowAsync(UiRow row)
+    public async Task InspectEndpointRowAsync(OverviewSessionRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
         EndpointInspectionReport report;
         string apiKey;
         var settings = _actions.Settings();
-        if (string.Equals(row.Data["Kind"]?.ToString(), "Gateway", StringComparison.OrdinalIgnoreCase))
+        if (row.Kind == OverviewEndpointKind.Gateway)
         {
             apiKey = settings.ModelApiKey;
             report = await _runtime.EndpointInspection.InspectGatewayAsync(
@@ -164,14 +164,14 @@ public sealed class OverviewSelectionController
         }
         else
         {
-            var sessionId = row.Data["SessionId"]?.ToString() ?? "";
+            var sessionId = row.SessionId;
             var session = _sessions.OverviewSnapshots().FirstOrDefault(item => string.Equals(
                 item.SessionId,
                 sessionId,
                 StringComparison.OrdinalIgnoreCase));
             if (session is null)
             {
-                _actions.SetStatus("The selected endpoint session is no longer available.");
+                _actions.SetStatus(Loc.T("Overview.EndpointSessionUnavailable"));
                 return;
             }
             apiKey = session.LaunchSettings.ModelApiKey;
@@ -192,7 +192,7 @@ public sealed class OverviewSelectionController
         var model = await _actions.AppServices().ModelLookupApplication.FindByIdAsync(session.ModelId);
         if (model is null)
         {
-            _actions.SetStatus("The selected loaded model is no longer present in the catalog.");
+            _actions.SetStatus(Loc.T("Overview.LoadedModelMissing"));
             return;
         }
 
@@ -226,7 +226,7 @@ public sealed class OverviewSelectionController
     public async Task SelectLoadedSessionRowAsync(CancellationToken cancellationToken)
     {
         if (_selection.IsLoadedSessionSelectionChanging || _page.SelectedLoadedSessionRow is not { } row) return;
-        var modelId = row.Data["ModelId"]?.ToString() ?? "";
+        var modelId = row.ModelId;
         if (string.IsNullOrWhiteSpace(modelId)) return;
 
         await _runtime.OverviewLoadedSessionSelectionApplication.SelectAsync(

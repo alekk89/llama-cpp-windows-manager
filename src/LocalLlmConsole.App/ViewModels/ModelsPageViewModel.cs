@@ -14,7 +14,8 @@ public sealed class ModelsPageViewModel
         Func<ModelRecord, bool> isModelActive,
         IEnumerable<NamedModelLaunchProfile>? namedProfiles = null,
         IReadOnlyDictionary<string, string>? modelSizeLabels = null,
-        IReadOnlyDictionary<string, ModelGroupRecord>? launchProfileGroups = null)
+        IReadOnlyDictionary<string, ModelGroupRecord>? launchProfileGroups = null,
+        IReadOnlySet<string>? favoriteProfileIds = null)
     {
         var allModels = models.ToArray();
         Rows.Clear();
@@ -67,6 +68,7 @@ public sealed class ModelsPageViewModel
                     ? "Add this launch profile to a model group."
                     : $"Click {groupName} to change or remove this group assignment.",
                 CanAssignGroup = string.IsNullOrWhiteSpace(groupName),
+                IsTrayFavorite = favoriteProfileIds?.Contains(profile.Id) == true,
                 CanLoad = !isMissing,
                 IsMissing = isMissing,
                 DeleteAction = hasAlternative ? "Remove" : "",

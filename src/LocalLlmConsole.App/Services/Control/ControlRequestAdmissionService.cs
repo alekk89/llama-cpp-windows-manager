@@ -13,20 +13,6 @@ public sealed record ControlAdmissionIdentity(
 {
     public static ControlAdmissionIdentity Unknown { get; } = new(false);
 
-    public static ControlAdmissionIdentity FromSession(
-        LoadedModelSessionSnapshot session,
-        string confidence = "explicit",
-        string matchedBy = "session")
-        => new(
-            true,
-            session.SessionId,
-            session.ModelId,
-            session.ModelName,
-            session.RuntimeId,
-            session.RuntimeName,
-            session.Mode,
-            confidence,
-            matchedBy);
 }
 
 public sealed record ControlAdmissionContext(

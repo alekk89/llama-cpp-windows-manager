@@ -46,11 +46,19 @@ public sealed class TrayWindowStateController
 
     public TrayMinimizeAction WindowStateChangedAction(WindowState windowState, string minimizeBehavior)
     {
+        var behavior = AppPreferenceService.MinimizeBehavior(minimizeBehavior);
+        if (behavior == "trayAndTaskbar")
+            return TrayMinimizeAction.TrayAndTaskbar;
         if (windowState != WindowState.Minimized)
             return TrayMinimizeAction.TaskbarOnly;
 
-        return BuildMinimizePlan(minimizeBehavior).Action;
+        return behavior == "trayOnly"
+            ? TrayMinimizeAction.TrayOnly
+            : TrayMinimizeAction.TaskbarOnly;
     }
+
+    public static bool KeepsTrayIconVisible(string minimizeBehavior)
+        => AppPreferenceService.MinimizeBehavior(minimizeBehavior) == "trayAndTaskbar";
 
     public TrayHidePlan BeginHideToTray(WindowState currentWindowState)
     {

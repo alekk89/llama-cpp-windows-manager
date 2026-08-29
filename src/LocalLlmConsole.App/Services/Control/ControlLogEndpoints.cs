@@ -23,11 +23,11 @@ internal sealed class ControlLogEndpoints : ControlEndpointHandler
                 logs = data.Files.Select(file => new
                 {
                     file = file.Name,
-                    path = file.FullName,
+                    path = file.FullPath,
                     sizeBytes = file.Length,
                     updatedAt = file.LastWriteTimeUtc,
                     active = _deps.Sessions.Snapshots().Any(session => session.IsRunning &&
-                        LogFileService.NormalizePath(session.LogPath).Equals(LogFileService.NormalizePath(file.FullName), StringComparison.OrdinalIgnoreCase))
+                        LogFileService.NormalizePath(session.LogPath).Equals(LogFileService.NormalizePath(file.FullPath), StringComparison.OrdinalIgnoreCase))
                 }).OrderByDescending(file => file.updatedAt).ToArray()
             });
         }

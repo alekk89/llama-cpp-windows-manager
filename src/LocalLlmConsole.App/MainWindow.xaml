@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LocalLlmConsole"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="llama.cpp Windows Manager v2.4.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
+        Title="llama.cpp Windows Manager v2.5.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" ResizeMode="CanResize"
         Background="{DynamicResource AppBack}"
@@ -58,7 +58,7 @@
                   CornerRadius="4"
                   VerticalAlignment="Center">
             <TextBlock x:Name="AppVersionText"
-                       Text="v2.4.0"
+                       Text="v2.5.0"
                        Foreground="{DynamicResource TextMuted}"
                        FontSize="10.5"
                        FontWeight="SemiBold"/>
@@ -128,6 +128,7 @@
             <Button x:Name="OverviewNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE80F;" Click="ShowOverview_Click"/>
             <Button x:Name="ModelsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE8B7;" Click="ShowModels_Click"/>
             <Button x:Name="RuntimesNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE943;" Click="ShowRuntimes_Click"/>
+            <Button x:Name="BenchmarksNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE9D2;" Click="ShowBenchmarks_Click"/>
             <Button x:Name="SettingsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE713;" Click="ShowSettings_Click"/>
             <Button x:Name="LifetimeNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE823;" Click="ShowLifetime_Click"/>
             <Button x:Name="LogsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE8A5;" Click="ShowLogs_Click"/>

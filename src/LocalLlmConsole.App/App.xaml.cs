@@ -13,8 +13,8 @@ public partial class App : System.Windows.Application
     {
         if (e.Args.Contains("--bootstrap-agent-sidecars-only", StringComparer.OrdinalIgnoreCase))
         {
-            var sidecars = new AgentSidecarBootstrapService().InstallEmbedded(
-                typeof(App).Assembly,
+            var sidecars = new AgentSidecarBootstrapService().InstallPackaged(
+                Environment.ProcessPath ?? "",
                 AppContext.BaseDirectory,
                 verifyBundleContents: true);
             if (sidecars.Status == AgentSidecarBootstrapStatus.Failed)
@@ -30,13 +30,27 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var startupSidecars = new AgentSidecarBootstrapService().InstallEmbedded(typeof(App).Assembly, AppContext.BaseDirectory);
-        if (startupSidecars.Status == AgentSidecarBootstrapStatus.Failed)
-            Trace.TraceWarning($"Agent control sidecar bootstrap failed: {startupSidecars.Error}");
-
         base.OnStartup(e);
         var window = new MainWindow();
         window.Show();
+        _ = BootstrapPackagedSidecarsAsync();
+    }
+
+    private static async Task BootstrapPackagedSidecarsAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            var result = await Task.Run(() => new AgentSidecarBootstrapService().InstallPackaged(
+                Environment.ProcessPath ?? "",
+                AppContext.BaseDirectory));
+            if (result.Status == AgentSidecarBootstrapStatus.Failed)
+                Trace.TraceWarning($"Agent control sidecar bootstrap failed: {result.Error}");
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Agent control sidecar bootstrap failed: {ex.Message}");
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

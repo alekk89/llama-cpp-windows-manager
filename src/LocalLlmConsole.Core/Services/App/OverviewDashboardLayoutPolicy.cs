@@ -243,20 +243,6 @@ public static partial class OverviewDashboardLayoutPolicy
             Cards = layout.Cards.Where(card => !string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase)).ToArray()
         });
 
-    public static OverviewDashboardLayout MoveCard(OverviewDashboardLayout layout, string cardId, string beforeCardId)
-    {
-        var normalized = Normalize(layout);
-        var cards = normalized.Cards.ToList();
-        var source = cards.FindIndex(card => string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase));
-        var target = cards.FindIndex(card => string.Equals(card.Id, beforeCardId, StringComparison.OrdinalIgnoreCase));
-        if (source < 0 || target < 0 || source == target) return normalized;
-        var card = cards[source];
-        cards.RemoveAt(source);
-        target = cards.FindIndex(item => string.Equals(item.Id, beforeCardId, StringComparison.OrdinalIgnoreCase));
-        cards.Insert(target, card);
-        return normalized with { Cards = cards };
-    }
-
     public static OverviewDashboardLayout MoveCardToIndex(OverviewDashboardLayout layout, string cardId, int targetIndex)
     {
         var normalized = Normalize(layout);

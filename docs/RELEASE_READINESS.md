@@ -34,17 +34,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installe
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller -CertificateThumbprint "<cert-thumbprint>" -RequireSigned
 ```
 
-Trusted signed GitHub release builds may run `.github/workflows/release.yml`
-manually with the protected `release` environment and its
-`WINDOWS_SIGNING_PFX_BASE64` and `WINDOWS_SIGNING_PFX_PASSWORD` secrets
-configured. Version tags do not trigger that optional signing workflow.
-Unsigned releases must pass the normal release gate, include matching SHA-256
-companions, and be described as unsigned.
+Trusted signed GitHub releases run `.github/workflows/release.yml` from a signed
+annotated `v*` tag, or by manual dispatch selecting an existing signed tag. The
+protected `release` environment must provide the Windows, tag-verification, and
+manifest-signing credentials and configured publisher identity. The workflow
+fails closed when any required identity is missing; it does not fall back to an
+unsigned release. Local and pull-request artifacts remain unsigned development
+builds and must be described that way.
 
 ## Release Gate
 
 - Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.5.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
@@ -69,18 +70,37 @@ companions, and be described as unsigned.
 - Confirm Runtime Downloads can check the upstream official llama.cpp release feed and list the official prebuilt packages for CUDA Windows, CUDA WSL, Vulkan Windows, Vulkan WSL, Intel Arc SYCL Windows, Intel Arc SYCL WSL, CPU Windows, and CPU WSL.
 - Confirm Runtimes has no advanced-view toggle or Runtime Jobs section, and each Runtime Downloads row places a compact **Build from source** action—sized consistently with the other row actions—immediately left of **Install**. Confirm job supervision and control remain available through Logs and `llwmctl`.
 - Confirm **Saved Launch Profiles** has no redundant **Open Folder** column; **Model Files** retains the folder action for the actual GGUF.
+- Right-click a saved launch profile and add it to tray favourites. Minimize the
+  Manager to the tray, right-click its icon, and confirm favourites appear first,
+  followed by an alphabetical Models submenu whose profile controls are created
+  only when that model is opened. Confirm light, dark, system, high-contrast, and
+  RTL presentation use the application menu theme.
+- From the tray, start a stopped profile, stop its exact running profile, and
+  switch to another profile for the same model. Confirm loading/stopping actions
+  are disabled, repeated clicks do not queue duplicate lifecycle operations,
+  normal results use tray notifications, and a required VRAM confirmation
+  restores the Manager before displaying the themed prompt.
+- Restart the Manager and confirm favourites persist. Remove a favourited saved
+  profile and confirm its tray preference is removed without affecting other
+  profiles. Leave the tray menu closed and confirm it adds no idle polling or CPU
+  activity.
 - Confirm a source row progresses **Check** -> **Download** -> **Build**, direct download is blocked before a successful source check, and a successful table build deletes its downloaded source and resets the action to **Check**.
 - Confirm **Installed Local Builds** and **Runtime Downloads** each share one header row with their right-aligned Type and Platform filters, with no redundant descriptive sentence below either title. Confirm Type filters select AMD/Vulkan, Intel/SYCL, or NVIDIA/CUDA and Platform filters select Windows or Linux/WSL on both inventories. Confirm CPU rows remain under All and filtering never hides Add custom source repository.
 - Confirm Runtime Downloads can check the Atomic TurboQuant binary feed, install the Windows CUDA package when published, and show the WSL CUDA row as not published until a matching Linux/WSL asset exists.
+- Confirm Runtime Downloads can check the TheTom TurboQuant release feed and select only the published CUDA Windows, Vulkan WSL, and CPU WSL assets. Confirm every selected asset carries a GitHub release SHA-256 digest before installation.
+- Confirm Runtime Repositories lists `ik_llama.cpp` CPU/CUDA choices for both Windows and WSL, plus TheTom TurboQuant CUDA Windows/WSL, Vulkan WSL, and CPU WSL choices. Confirm built runtimes are attributed to the matching provider/backend row rather than upstream llama.cpp.
 - Confirm runtime package downloads fail closed when the downloaded byte count
-  does not match release metadata or when no SHA-256 metadata/companion checksum
+  exceeds or does not match release metadata, including when the response omits
+  or misreports `Content-Length`, or when no SHA-256 metadata/companion checksum
   is available for a required package asset.
 - Confirm installing a prebuilt runtime does not require Git, CMake, Visual Studio Build Tools, WSL build tools, or source checkout.
 - Confirm installed prebuilt runtimes are registered, can be selected per model, and show update/delete state on the Runtime Downloads page.
 - Select a newly installed managed runtime and confirm its details show provider,
   repository, release, assets, checksum/signature status, installed time,
-  backend, version, and **Hash verified**. Run **Verify**, modify a copied test
-  runtime file, verify again, and confirm the runtime reports modified files.
+  backend, version, and **Local integrity checked**. Confirm the details explain
+  that this is local change detection rather than publisher authentication. Run
+  **Verify**, modify a copied test runtime file, add an unexpected file, verify
+  again, and confirm the runtime reports both problems.
   Confirm manual runtimes are labelled **Unverified custom runtime** and legacy
   managed installs without a manifest explain that reinstall is required.
 - Confirm changing the runtime on the Models launch form immediately clears the previous runtime's discovered controls, names the runtime being scanned, and renders only the newly selected executable's safe options in grouped two-column sections without dropping unmatched custom parameters. Confirm discovered editors match the curated 28px control sizing and compact field proportions, readable labels replace raw flags, exact `--flag-name` searches still work, and unknown text/choice defaults remain visually blank. Confirm advertised positive/negative switch pairs cycle Default/Enabled/Disabled and emit the matching alias, unpaired switches expose only their advertised direction, and search-filtered runtime options reflow without blank half-rows.
@@ -138,7 +158,7 @@ companions, and be described as unsigned.
 - At the default window size, confirm Overview uses two metric-card columns with
   no clipped card content and the loaded-session Runtime column remains readable;
   maximize the window and confirm the cards reflow to three columns. Enter
-  drag cards directly and resize the visible outer card from the top, bottom,
+  Drag cards directly and resize the visible outer card from the top, bottom,
   left, right, and all four corners without entering an edit mode. Confirm each
   edge and corner shows the corresponding Windows resize cursor, no overlay
   handles exist, and only the visible card border highlights on hover.
@@ -181,6 +201,10 @@ companions, and be described as unsigned.
   in the same card independently. Right-click open dashboard space to add a card.
   Open Add metrics and confirm Cancel and Add selected have identical rendered
   width and height in every supported language.
+  Focus a card and confirm Shift+F10/Menu opens its actions, Ctrl+Arrow moves it,
+  Ctrl+Shift+Arrow resizes it while unlocked, and Alt+Up/Down reorders a focused
+  metric. Confirm focus returns to the changed card or row and every card/metric
+  exposes a useful automation name and help text.
   Confirm token, speculative, and KV-cache labels remain on one line whenever
   the combined label, measured value, and unit fit, with values still aligned to
   the card's right edge and no reserved half-row gap.
@@ -258,17 +282,22 @@ companions, and be described as unsigned.
   right-aligned dropdowns, no Save Settings button, and a visible automatic-apply
   hint. Confirm Network has no blanket Action column and API-key Show, Copy, and
   Generate controls appear only inside the API-key value row.
-- Confirm Settings includes a **UI** category with compatibility switches for
-  independent switches for Model status, Hardware, Slots, Tokens, Speculative
-  tokens, KV cache, Live Runtime Log, All llama.cpp Metrics, and the Models
-  Hugging Face section. Confirm these choices read **Show/Hide**, each switch applies automatically, hidden rows
-  leave no blank splitter/space, card layout reflows, and choices persist after
-  restart. Confirm a switch adds or removes that metric from the customizable
-  dashboard without discarding unrelated cards, grouping, sizes, or charts.
-- Confirm a workspace without stored UI visibility keys defaults the six status
-  cards and live log to `Show`, and raw metrics and Hugging Face to `Hide`. Use
+- Confirm Settings includes a **UI** category with **Show/Hide** choices for
+  Model Status, Live Runtime Log, and the Models Hugging Face section.
+  Confirm each choice applies automatically, hidden rows leave no blank
+  splitter/space, and choices persist after restart. Confirm hiding Model Status
+  collapses the complete dashboard section without changing its saved cards and
+  leaves the model/profile controls and loaded-session table visible. Confirm Hardware, Slots, Tokens, Speculative tokens, and
+  KV cache are customized from the Overview dashboard rather than duplicated as
+  Settings rows. Confirm the raw-metrics and compatibility API fields remain
+  available; the latter still add or remove their metric group from the dashboard
+  without discarding unrelated cards, grouping, sizes, or charts.
+- Confirm a workspace without stored UI visibility keys defaults Hardware,
+  Tokens, Speculative tokens, KV cache, Model Status section, and Live Runtime
+  Log to `Show`; the Model status metric, Slots, raw metrics, and Hugging Face
+  default to `Hide`. Use
   `llwmctl settings set` followed by `llwmctl settings get` to verify the same
-  nine fields can be changed and read back through the live Manager without
+  ten fields can be changed and read back through the live Manager without
   restarting it.
 - Confirm the Overview live runtime log remains a compact 24-line viewport and
   scrolls to older captured lines. Change **Runtime log order** between **Latest
@@ -351,6 +380,8 @@ companions, and be described as unsigned.
 - At 100%, 125%, 150%, and 200% display scale, confirm the initial window fits
   the monitor work area and the Overview model/profile/load bar reflows without
   clipping at narrow widths.
+- At the minimum supported width, confirm Models keeps the launch form and
+  tables usable through horizontal scrolling instead of clipping actions.
 - Confirm Arabic and Persian switch the shell and owned dialogs to right-to-left
   flow. Confirm Arabic and Hindi are visibly labeled as partial previews, while
   production language packs pass the localization coverage floor.
@@ -362,6 +393,10 @@ companions, and be described as unsigned.
   buttons and the language selector have accessible names, changing status is
   announced politely, section titles are headings, and row-action buttons expose
   both names and help text.
+- Enable Windows high contrast while the app is running and confirm palette
+  resources update without restart, text and controls retain system contrast,
+  and keyboard focus remains visibly outlined across inputs, tables, links,
+  menu items, and dashboard cards.
 - Confirm a LAN client can reach the selected OpenAI-compatible `/v1` serving
   surface only after Windows Firewall and WSL networking allow the configured
   gateway or direct model port.
@@ -374,6 +409,9 @@ companions, and be described as unsigned.
 - Confirm interrupted jobs are marked `Interrupted` on restart and can be resumed or removed.
 - Confirm oversized auto-load gateway request bodies are rejected with `413`
   before proxying to a model runtime.
+- Confirm a gateway request times out if upstream response headers never arrive,
+  but a long streaming completion continues after headers until completion or
+  client/app cancellation.
 - Confirm Hugging Face downloads cannot write outside the configured models folder.
 - Confirm completed downloads are not registered when the final byte count mismatches the expected size or no expected size/SHA-256 metadata exists.
 - Confirm imported external model deletion removes only app registration files.
@@ -443,35 +481,82 @@ companions, and be described as unsigned.
   must prevent staging.
 - Confirm a signed installed app refuses an unsigned or differently signed staged update.
 - Confirm a completed staged update restarts `LlamaCppWindowsManager.exe` and shows the GitHub release notes.
+- Confirm a non-critical staging-cleanup failure after successful replacement is
+  reported but does not prevent the replacement executable from restarting.
 - Confirm an older renamed portable install migrates to `LlamaCppWindowsManager.exe` and removes the obsolete executable after shutdown.
+- Confirm shutdown continues remaining cleanup after a non-critical cleanup
+  failure, bounds background-task drain to 15 seconds, stops runtime sessions
+  before tearing down local hosts/state, and records cleanup warnings.
 
 ## Latest Local Verification
 
-Current local check on 2026-08-25:
+The repository gate was rerun for the themed tray-profile module on 2026-08-26:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1
+```
+
+Result: Release app and CLI builds succeeded with zero warnings; service/unit
+tests passed (`699/699`) and eleven WPF tests passed with no skips. Service
+coverage was 83.0% and model/view-model coverage was 97.4%. Formatting,
+documentation, whitespace, and package vulnerability/deprecation/currency checks
+passed. Publish and installer checks were not part of this feature-only rerun.
+
+Current repository-only release candidate audit on 2026-08-25:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1 -SkipPublish
 ```
 
 Result: the platform-neutral .NET 10 Core library, Windows Release app, and CLI
-builds succeeded with zero warnings; service/unit tests passed (`701/701`) and
-the WPF smoke tests passed (`2/2`) with no skips; service coverage was 83.0% and
-model/view-model coverage was 97.2%. Formatting, diff whitespace, and the
-vulnerability, deprecation, and direct-package currency audit passed. The
-portable publish and Inno Setup 6.7.2 installer build both passed artifact
-verification, including embedded operator/control sidecars, SHA-256 companions,
-sidecar bootstrap, ZIP content checks, and the SPDX 2.3 SBOM. The pinned Windows
-CI job remains responsible for clean-machine silent install, repair, and
-uninstall checks. The current local portable and installer artifacts are
-unsigned test builds.
-The v2.4.0 GitHub release must describe the artifacts as unsigned unless the
-protected signed-release workflow is used. Keep the release notes in GitHub
-rather than adding copy/paste working notes here.
+builds succeeded with zero warnings; service/unit tests passed (`695/695`) and
+nine independently diagnosable WPF tests passed with no skips. Service coverage
+was 83.0% and model/view-model coverage was 97.0%. Formatting, documentation
+format/link/version checks, whitespace, vulnerability, deprecation, and
+package-currency checks passed. Sanitized upstream fixtures cover valid,
+partial, unknown-field, malformed, and rate-limited release-feed responses, plus
+valid and malformed WSL and GPU probe output.
+
+The WPF harness uses a resource-only test application and a unique temporary
+workspace; it cannot invoke the production startup lifecycle. Five consecutive
+stress passes covering process supervision, gateway transport, shutdown, update,
+and diagnostics behavior passed 40 tests each and left no fake runtime process
+behind.
+
+The packaging audit passed portable publish, development-manifest signing and
+verification, a real v2.4.0-to-candidate portable helper update, and the Inno
+Setup 6.7.2 candidate build. The portable and installer artifacts have matching
+SHA-256 companions, and the portable package contains the SBOM, licenses, CLI,
+and automation sidecars without PDBs or the removed legacy executable alias.
+
+The exact-installer clean install, repair, uninstall, and pinned previous-version
+upgrade were intentionally not rerun in this Windows user session. The production
+installer identity and Start Menu shortcut are present and Windows Sandbox is not
+available. Both hardened scripts refused before creating a test install. Those
+checks remain mandatory on a clean disposable Windows runner; the protected
+release workflow runs the signed installer gate and pinned upgrade before publishing.
+
+Real llama.cpp model serving, Windows/WSL hardware lanes, LAN reachability,
+interactive DPI checks, Narrator or Accessibility Insights, and live high contrast
+remain clean-machine or hardware validation items. Exercising them in this user
+session would require stopping or sharing state with the production Manager and
+was outside this isolated audit.
+
+Local artifacts are unsigned development builds. A v2.5.0 stable release must be
+published only by the protected workflow with configured tag, manifest, and
+Authenticode keys; it must never silently fall back to those local artifacts.
 
 ## Manual Clean-Machine Test
 
+Use a disposable Windows user environment for this section. The production
+installer has a fixed per-user Inno Setup identity and Start Menu shortcut.
+Automated installer and previous-version upgrade scripts now refuse to run when
+either marker already exists, which prevents a temporary test from replacing a
+real installation's uninstall registration or shortcut.
+
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.4.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.5.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.

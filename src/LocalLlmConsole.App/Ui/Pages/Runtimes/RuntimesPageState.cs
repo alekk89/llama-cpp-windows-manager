@@ -27,6 +27,14 @@ public sealed class RuntimesPageState
         RuntimeCudaPreferenceCombo = controls.RuntimeCudaPreferenceCombo;
     }
 
+    public void ReleaseView()
+    {
+        RuntimesFolderText = null;
+        RuntimeGrid = null;
+        RuntimePackageGrid = null;
+        RuntimeCudaPreferenceCombo = null;
+    }
+
     public void RefreshRuntimePackageGrid()
         => RuntimePackageGrid?.Items.Refresh();
 

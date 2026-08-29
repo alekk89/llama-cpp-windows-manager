@@ -52,7 +52,7 @@ public sealed class OverviewPageViewModel
 
     public ObservableCollection<OverviewModelChoice> ModelChoices { get; } = new();
     public ObservableCollection<OverviewLaunchProfileChoice> LaunchProfileChoices { get; } = new();
-    public ObservableCollection<UiRow> SessionRows { get; } = new();
+    public ObservableCollection<OverviewSessionRow> SessionRows { get; } = new();
 
     public void ReplaceModels(IEnumerable<ModelRecord> models)
         => ReplaceModels(models, [], new Dictionary<string, ModelGroupAssignment>(), []);
@@ -152,47 +152,46 @@ public sealed class OverviewPageViewModel
         return true;
     }
 
-    private static IEnumerable<UiRow> BuildSessionRows(IReadOnlyList<LoadedModelSessionSnapshot> sessions, GatewayRoutingOverviewStatus gateway)
+    private static IEnumerable<OverviewSessionRow> BuildSessionRows(
+        IReadOnlyList<LoadedModelSessionSnapshot> sessions,
+        GatewayRoutingOverviewStatus gateway)
     {
         if (gateway.Visible)
             yield return GatewayRow(gateway);
 
         foreach (var session in sessions.OrderByDescending(session => session.IsSelected).ThenBy(session => session.ModelName, StringComparer.OrdinalIgnoreCase))
         {
-            yield return new UiRow
+            yield return new OverviewSessionRow
             {
-                C1 = session.IsSelected ? $"{session.ModelName} (selected)" : session.ModelName,
-                C2 = string.IsNullOrWhiteSpace(session.LaunchProfileName) ? "Unknown" : session.LaunchProfileName,
-                C3 = session.ModelSize,
-                C4 = SessionStatusLabel(session),
-                C5 = session.Endpoint,
-                T1 = session.Endpoint,
-                T2 = "",
-                C6 = session.RuntimeName,
-                C7 = $"{session.Backend} {session.Mode}",
-                C8 = session.IsRunning && session.Status != LoadedModelSessionStatus.Stopping ? "Unload" : "",
-                B1 = session.IsRunning && session.Status != LoadedModelSessionStatus.Stopping,
-                B2 = session.IsRunning && session.Status is LoadedModelSessionStatus.Running or LoadedModelSessionStatus.Warm or LoadedModelSessionStatus.Unreachable,
-                Data = JsonSerializer.SerializeToNode(new { Kind = "Session", session.SessionId, session.ModelId }) as JsonObject ?? new JsonObject()
+                Kind = OverviewEndpointKind.Session,
+                ModelName = session.IsSelected ? $"{session.ModelName} (selected)" : session.ModelName,
+                ProfileName = string.IsNullOrWhiteSpace(session.LaunchProfileName) ? "Unknown" : session.LaunchProfileName,
+                Size = session.ModelSize,
+                State = SessionStatusLabel(session),
+                Endpoint = session.Endpoint,
+                Runtime = session.RuntimeName,
+                Backend = $"{session.Backend} {session.Mode}",
+                ActionLabel = session.IsRunning && session.Status != LoadedModelSessionStatus.Stopping ? "Unload" : "",
+                CanUnload = session.IsRunning && session.Status != LoadedModelSessionStatus.Stopping,
+                CanInspect = session.IsRunning && session.Status is LoadedModelSessionStatus.Running or LoadedModelSessionStatus.Warm or LoadedModelSessionStatus.Unreachable,
+                SessionId = session.SessionId,
+                ModelId = session.ModelId
             };
         }
     }
 
-    private static UiRow GatewayRow(GatewayRoutingOverviewStatus gateway)
+    private static OverviewSessionRow GatewayRow(GatewayRoutingOverviewStatus gateway)
         => new()
         {
-            C1 = gateway.Enabled ? "Gateway (shared endpoint)" : "Gateway (off)",
-            C2 = "—",
-            C3 = "Shared router",
-            C4 = string.IsNullOrWhiteSpace(gateway.State) ? (gateway.Enabled ? "Enabled" : "Off") : gateway.State,
-            C5 = gateway.Enabled ? gateway.Endpoint : "Gateway disabled",
-            T1 = gateway.Enabled ? gateway.Endpoint : "Gateway disabled",
-            T2 = "",
-            C6 = string.IsNullOrWhiteSpace(gateway.Policy) ? "" : gateway.Policy,
-            C7 = string.IsNullOrWhiteSpace(gateway.Exposure) ? "" : gateway.Exposure,
-            B1 = false,
-            B2 = gateway.Enabled,
-            Data = JsonSerializer.SerializeToNode(new { Kind = "Gateway" }) as JsonObject ?? new JsonObject()
+            Kind = OverviewEndpointKind.Gateway,
+            ModelName = gateway.Enabled ? "Gateway (shared endpoint)" : "Gateway (off)",
+            ProfileName = "—",
+            Size = "Shared router",
+            State = string.IsNullOrWhiteSpace(gateway.State) ? (gateway.Enabled ? "Enabled" : "Off") : gateway.State,
+            Endpoint = gateway.Enabled ? gateway.Endpoint : "Gateway disabled",
+            Runtime = string.IsNullOrWhiteSpace(gateway.Policy) ? "" : gateway.Policy,
+            Backend = string.IsNullOrWhiteSpace(gateway.Exposure) ? "" : gateway.Exposure,
+            CanInspect = gateway.Enabled
         };
 
     private sealed record SessionRowSource(

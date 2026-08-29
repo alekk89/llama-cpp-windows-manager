@@ -66,7 +66,8 @@ public sealed record LocalControlDependencies(
     ControlApiAuditLogService? AuditLog = null,
     ModelGroupService? ModelGroups = null,
     EndpointInspectionService? EndpointInspection = null,
-    LifetimeMetricsApplicationService? LifetimeMetrics = null);
+    LifetimeMetricsApplicationService? LifetimeMetrics = null,
+    Func<BenchmarkApplicationService>? Benchmarks = null);
 
 public sealed record LocalControlDiscoveryDocument(
     int Version,

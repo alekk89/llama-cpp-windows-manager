@@ -2,7 +2,7 @@ namespace LocalLlmConsole.Services;
 
 public sealed record RuntimeMetricRowsRenderPlan(
     IReadOnlyList<PrometheusSample> Samples,
-    UiRow? LeadingRow);
+    RuntimeMetricRow? LeadingRow);
 
 public sealed class RuntimeMetricRowsRenderService
 {
@@ -30,13 +30,13 @@ public sealed class RuntimeMetricRowsRenderService
             null);
     }
 
-    private static UiRow LastKnownStatusRow(string error)
+    private static RuntimeMetricRow LastKnownStatusRow(string error)
         => new()
         {
-            C1 = "metrics_status",
-            C2 = "",
-            C3 = $"Last known values; refresh paused ({error})",
-            C4 = "status",
-            C5 = "The runtime did not return fresh metrics on the last poll."
+            Name = "metrics_status",
+            Labels = "",
+            Value = $"Last known values; refresh paused ({error})",
+            Type = "status",
+            Help = "The runtime did not return fresh metrics on the last poll."
         };
 }

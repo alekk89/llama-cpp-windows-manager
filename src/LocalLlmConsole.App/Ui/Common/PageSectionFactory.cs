@@ -68,27 +68,6 @@ public static class PageSectionFactory
         return section;
     }
 
-    public static Grid ContentSection(string title, UIElement content, string description = "")
-    {
-        var section = new Grid { Margin = new Thickness(0, 0, 0, 6) };
-        section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        section.RowDefinitions.Add(new RowDefinition());
-        section.Children.Add(SectionHeader(title, description));
-        var frame = new Border
-        {
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(7),
-            Margin = new Thickness(0, 7, 0, 8),
-            Padding = new Thickness(6, 5, 6, 6),
-            Child = content
-        };
-        frame.SetResourceReference(Border.BackgroundProperty, "SurfaceRaised");
-        frame.SetResourceReference(Border.BorderBrushProperty, "PanelBorder");
-        Grid.SetRow(frame, 1);
-        section.Children.Add(frame);
-        return section;
-    }
-
     private static Grid SectionHeader(string title, string description = "")
     {
         var header = new Grid { Margin = new Thickness(1, 2, 0, 4) };

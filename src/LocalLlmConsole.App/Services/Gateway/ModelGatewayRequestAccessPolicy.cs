@@ -29,6 +29,9 @@ public sealed class ModelGatewayRequestAccessPolicy
         return _options.AllowLanAccess || ApiSecurity.IsLoopbackHost(uri.Host);
     }
 
+    public bool IsRemoteEndpointAllowed(IPAddress? remoteAddress)
+        => _options.AllowLanAccess || remoteAddress is not null && IPAddress.IsLoopback(remoteAddress);
+
     public bool IsAuthorized(HttpListenerRequest request)
     {
         if (!_options.RequireApiKeyAuth) return true;

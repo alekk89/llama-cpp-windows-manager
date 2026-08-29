@@ -106,6 +106,8 @@ internal static class OverviewDashboardCardTitleDialog
             VerticalAlignment = VerticalAlignment.Center
         });
         var close = new WpfButton { Content = "×", MinWidth = 28, MinHeight = 26, Padding = new Thickness(2, 0, 2, 1) };
+        System.Windows.Automation.AutomationProperties.SetName(close, Loc.T("Accessibility.CloseDialog"));
+        close.ToolTip = Loc.T("Accessibility.CloseDialog");
         VisualRole.SetButtonRole(close, VisualRole.Quiet);
         close.Click += (_, _) => window.DialogResult = false;
         Grid.SetColumn(close, 1);

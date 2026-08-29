@@ -146,7 +146,7 @@ public sealed class WindowsEnvironmentService
         if (!string.IsNullOrWhiteSpace(syclLs))
         {
             var probe = RunTool(syclLs, [], TimeSpan.FromSeconds(4));
-            deviceLine = FirstSyclGpuLine(probe.Output);
+            deviceLine = GpuStatusService.FirstSyclGpuLine(probe.Output);
             if (!string.IsNullOrWhiteSpace(probe.Error))
                 details.Add($"sycl-ls error: {FirstLine(probe.Error)}");
         }
@@ -289,13 +289,6 @@ public sealed class WindowsEnvironmentService
 
         return "";
     }
-
-    private static string FirstSyclGpuLine(string output)
-        => (output ?? "")
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Trim())
-            .FirstOrDefault(line => line.Contains("level_zero", StringComparison.OrdinalIgnoreCase)
-                && line.Contains("gpu", StringComparison.OrdinalIgnoreCase)) ?? "";
 
     private static bool IsIntelGpuLine(string line)
         => line.Contains("intel", StringComparison.OrdinalIgnoreCase)

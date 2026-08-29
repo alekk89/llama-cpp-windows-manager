@@ -1,10 +1,17 @@
 namespace LocalLlmConsole.Services;
 
 public sealed record LogPageRefreshData(
-    IReadOnlyList<FileInfo> Files,
+    IReadOnlyList<LogPageFile> Files,
     IReadOnlyDictionary<string, JobRecord> JobsByLogPath,
     string ActiveLogPath,
     string ActiveModel);
+
+public sealed record LogPageFile(
+    string FullPath,
+    string Name,
+    DateTime LastWriteTime,
+    DateTime LastWriteTimeUtc,
+    long Length);
 
 public sealed record LogPreviewRequest(
     string Path,
@@ -68,6 +75,7 @@ public sealed class LogPageWorkflowService
         var files = await Task.Run(
             () => Directory.EnumerateFiles(LogRoot, "*.log", SearchOption.TopDirectoryOnly)
                 .Select(path => new FileInfo(path))
+                .Select(file => new LogPageFile(file.FullName, file.Name, file.LastWriteTime, file.LastWriteTimeUtc, file.Length))
                 .ToArray(),
             cancellationToken);
         var activeModel = selectedSession is { IsRunning: true } ? selectedSession.ModelName : "";

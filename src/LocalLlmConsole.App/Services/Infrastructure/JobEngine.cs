@@ -23,12 +23,6 @@ public sealed class JobEngine
         return job;
     }
 
-    public async Task UpdateStatusAsync(JobRecord job, JobStatus status, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        await UpsertValidatedAsync(job, status, job.PayloadJson);
-    }
-
     public async Task UpdateAsync(JobRecord job, JobStatus status, string payloadJson, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

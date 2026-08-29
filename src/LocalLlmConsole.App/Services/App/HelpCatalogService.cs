@@ -157,13 +157,13 @@ public sealed partial class HelpCatalogService
             "Use profiles and groups",
             "Profiles save launch variants; groups apply retention policy to selected profiles.",
             [
-                "Keep separate profiles for low memory, long context, vision, or different runtimes; right-click model or profile rows for their available actions.",
+                "Keep separate profiles for low memory, long context, vision, or different runtimes; right-click profile rows to add tray favourites, then right-click the tray icon to start, stop, or switch them.",
                 "A group can pin sessions, inherit the global idle timeout, or use its own idle timeout.",
                 "Group priority controls automatic idle-eviction order, not inference scheduling.",
                 "A group load validates runtimes, ports, duplicate models, and aggregate VRAM before starting anything."
             ],
             [Action("Open Models", "launch-settings")],
-            ["launch variant", "retention", "pinned", "idle timeout", "eviction", "multi model"]),
+            ["launch variant", "tray", "favourite", "quick start", "retention", "pinned", "idle timeout", "eviction", "multi model"]),
 
         Article(
             "vision-and-draft",

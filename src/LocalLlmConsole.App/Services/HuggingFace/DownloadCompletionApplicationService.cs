@@ -5,7 +5,6 @@ public sealed record DownloadCompletionApplicationActions(
     Func<Func<Task>, Task> RunOnUiThreadAsync,
     Func<Task> ScanModelsAsync,
     Func<Task> RefreshModelsAsync,
-    Func<Task> RefreshJobsAsync,
     Func<Task> RefreshOverviewAsync,
     Func<Task> RefreshDownloadHistoryAsync,
     Func<Task> RefreshHuggingFaceInstallStateAsync);
@@ -25,7 +24,6 @@ public sealed class DownloadCompletionApplicationService
         {
             await actions.ScanModelsAsync();
             await actions.RefreshModelsAsync();
-            await actions.RefreshJobsAsync();
             await actions.RefreshOverviewAsync();
             await actions.RefreshDownloadHistoryAsync();
             await actions.RefreshHuggingFaceInstallStateAsync();
@@ -39,7 +37,6 @@ public sealed class DownloadCompletionApplicationService
         ArgumentNullException.ThrowIfNull(actions.RunOnUiThreadAsync);
         ArgumentNullException.ThrowIfNull(actions.ScanModelsAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshModelsAsync);
-        ArgumentNullException.ThrowIfNull(actions.RefreshJobsAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshOverviewAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshDownloadHistoryAsync);
         ArgumentNullException.ThrowIfNull(actions.RefreshHuggingFaceInstallStateAsync);

@@ -47,7 +47,7 @@ The Runtime Command panel remains visible in Basic and Advanced modes. Its gener
 
 ## Launch parity
 
-`RuntimeLaunchRequestFactory` is shared by real launches and previews. `RuntimeAdapter.BuildArgs` remains the single token-emission implementation. The preview substitutes placeholders for the model and secret validation only; it does not display the API key, which continues to be passed through `LLAMA_API_KEY`.
+`RuntimeLaunchRequestFactory` is shared by real launches and previews. `LlamaCppLaunchValidator` owns launch-request policy and `LlamaCppArgumentBuilder.Build` remains the single token-emission implementation. The preview substitutes placeholders for the model and secret validation only; it does not display the API key, which continues to be passed through `LLAMA_API_KEY`.
 
 Custom arguments are validated before application-owned arguments such as metrics are appended. Model, host, port, credentials, curated performance fields, and other managed flags cannot be overridden through raw parameters.
 
@@ -56,7 +56,7 @@ Custom arguments are validated before application-owned arguments such as metric
 1. Add the persistent value to `AppSettings` and, when model-specific, `ModelLaunchSettings`.
 2. Add a `LaunchSettingUiDefinition` to `LaunchSettingUiSchema` with the appropriate section and editor metadata.
 3. Add binder parsing, application, and cross-field validation when the value is not a plain string.
-4. Add the command projection to `RuntimeAdapter` and mark every owned alias in `RuntimeLaunchOptionPolicy`.
+4. Add validation to `LlamaCppLaunchValidator`, command projection to `LlamaCppArgumentBuilder`, and mark every owned alias in `RuntimeLaunchOptionPolicy`.
 5. Add round-trip, validation, and argument-emission tests.
 
 Settings discovered at runtime require none of these steps unless they need richer validation or composite behavior than help metadata can express.

@@ -9,7 +9,10 @@ internal static class ControlCliOutput
         try
         {
             using var json = JsonDocument.Parse(text);
-            Console.WriteLine(JsonSerializer.Serialize(json.RootElement, new JsonSerializerOptions { WriteIndented = !compact }));
+            var typeInfo = compact
+                ? ControlCliJsonContext.Default.JsonElement
+                : ControlCliJsonContext.Indented.JsonElement;
+            Console.WriteLine(JsonSerializer.Serialize(json.RootElement, typeInfo));
         }
         catch
         {

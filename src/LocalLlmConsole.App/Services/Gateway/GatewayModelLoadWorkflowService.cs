@@ -80,9 +80,16 @@ public sealed class GatewayModelLoadWorkflowService
         }
     }
 
-    public async Task<GatewayModelLoadWorkflowResult> EnsureLoadedAsync(
+    public Task<GatewayModelLoadWorkflowResult> EnsureLoadedAsync(
         GatewayModelLoadWorkflowRequest request,
         CancellationToken cancellationToken = default)
+        => _runtimeSessions.Sessions.ExecuteLifecycleAsync(
+            () => EnsureLoadedCoreAsync(request, cancellationToken),
+            cancellationToken);
+
+    private async Task<GatewayModelLoadWorkflowResult> EnsureLoadedCoreAsync(
+        GatewayModelLoadWorkflowRequest request,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.StopModelAsync);

@@ -32,6 +32,11 @@ are separate actions that require the user's authorization. Public trusted
 releases must use the protected signed-release workflow; never label an
 unsigned local artifact as signed or trusted.
 
+`main` requires a pull request, an up-to-date branch, resolved conversations,
+and the Build/test/publish, CodeQL, and dependency-review checks. Force pushes,
+deletion, and administrator bypass are disabled. Recovery procedure and release
+authority are documented in [REPOSITORY_GOVERNANCE.md](REPOSITORY_GOVERNANCE.md).
+
 Before committing, inspect `git status --short` and make sure every intended
 source, test, manifest, license, and documentation file is tracked. Local builds
 compile SDK-globbed untracked `.cs` files, but CI and reviewers cannot see them;
@@ -50,6 +55,12 @@ back to the English pack, and the localization contract tests verify placeholder
 compatibility for every translated value. Do not copy English text into another
 pack merely to satisfy key parity; leave the key absent until it is translated.
 
+Keep localization at the App presentation boundary. Core emits domain values
+and stable identifiers and must not reference `Loc`; App view models, catalog
+presenters, dialogs, tray notifications, and page factories resolve user-facing
+text with `Loc.T`. Add new English keys first and let incomplete language packs
+use the deliberate English fallback until a real translation is available.
+
 ## Local Gate
 
 Run these before opening a release PR or after any architecture-level change:
@@ -62,9 +73,11 @@ That wrapper runs the same gate as the individual commands below:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-code-shape.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-coverage.ps1
 dotnet format LocalLlmConsole.sln --verify-no-changes --no-restore --verbosity minimal
 git diff --check
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-docs.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-vulnerabilities.ps1
 ```
 
@@ -85,6 +98,16 @@ To include packaging on a machine with publish/installer prerequisites, run:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
+```
+
+Run the installer portion only in a clean disposable Windows user environment,
+such as a fresh CI runner or VM. Inno Setup owns a fixed per-user uninstall
+identity and Start Menu shortcut, so the installer and previous-version upgrade
+smoke scripts refuse to run when either production marker already exists. The
+publish-only gate is safe beside an installed Manager:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish
 ```
 
 Use `-RequireCleanTree` on `scripts/test-release-gate.ps1`,
@@ -132,12 +155,13 @@ services remain under `src/LocalLlmConsole.App` feature modules:
 | Folder | Ownership |
 | --- | --- |
 | `Services/App` | App settings, startup/shutdown, updates, logs, help, cache, and shared app workflows. |
+| `Services/Control` | Authenticated loopback API admission, routing, capability schemas, operation dispatch, and audit logging. |
 | `Services/Environment` | Windows and WSL detection, setup command planning, and visible tool setup launchers. |
 | `Services/Gateway` | Local model gateway host/runtime contracts and gateway activity state. |
 | `Services/HuggingFace` | Hugging Face search, metadata, download safety, and download history. |
 | `Services/Infrastructure` | State store, local app service, process runner, filesystem/config safety, dialogs, jobs, and shell helpers. |
 | `Services/Models` | Model catalog, model capabilities, aliases, model launch profiles, and model deletion/import behavior. |
-| `Services/Runtimes` | Runtime registry, source/build jobs, launch execution, sessions, metric polling, readiness, and process supervision. |
+| `Services/Runtimes/<Responsibility>` | Runtime registry, source/build jobs, launch execution, sessions, metric polling, readiness, and process supervision, grouped under `Build`, `Catalog`, `Deletion`, `Launch`, `Packages`, `Readiness`, `Sessions`, and `Telemetry`. |
 
 Runtime readiness is also the authentication-policy boundary. Once an endpoint
 responds, a non-inference probe must prove the configured policy before the
@@ -158,6 +182,7 @@ UI factories and page state live under:
 
 - `Ui/Common`
 - `Ui/Pages/<Feature>`
+- `Ui/Shell/MainWindow/<Feature>` for thin shell partials only
 
 The current code keeps file-scoped namespaces stable. Namespace tightening can
 happen module-by-module after behavior is settled.
@@ -182,6 +207,10 @@ boundary.
 broker. Keep feature behavior in services, workflow/application services, page
 state, view models, or page controllers.
 
+Keep `MainWindow.xaml` and its primary code-behind at the app root. Thin shell
+partials belong under `Ui/Shell/MainWindow/<Feature>` so the project root stays
+small and each adapter remains discoverable by responsibility.
+
 Use these rules when touching `MainWindow`:
 
 - Persistent fields should be shell state, service bundles, loaded-service
@@ -197,19 +226,44 @@ Use these rules when touching `MainWindow`:
 - Page-specific row/event routing belongs in page controllers. Models, launch
   settings, Hugging Face download history, Runtimes, Windows, WSL, Overview,
   Logs, Lifetime, and Settings pages already follow this pattern.
+- Overview deliberately retains its composed dashboard across navigation. Other
+  page state objects must release control references and event subscriptions on
+  navigation because their factories rebuild the view on the next entry.
 - Runtime control-API dispatch and workflow composition belong in
-  `ControlRuntimeOperationApplicationService`; theme resource mutation belongs
-  in `ApplicationThemeService`; shared visual-tree and accessibility helpers
-  belong under `Ui/Common`.
+  `ControlRuntimeOperationApplicationService`; cache, logs, lifetime, download,
+  Windows/WSL, and update operation dispatch belongs in
+  `ControlNonRuntimeOperationApplicationService`. Build/signature reporting for
+  diagnostics belongs in `BuildAndUpdateDiagnosticsService`. Theme resource
+  mutation belongs in `ApplicationThemeService`; shared visual-tree and
+  accessibility helpers belong under `Ui/Common`.
+- Model lifecycle operations must pass through
+  `LoadedModelSessionManager.ExecuteLifecycleAsync`; publish immutable snapshots
+  under its state lock rather than exposing mutable session collections.
+- Shutdown cleanup is best effort but ordered: stop supervised runtime sessions
+  before service teardown, bound background-task draining, record cleanup
+  failures, and continue remaining cleanup stages.
 - Keep each `MainWindow*.cs` shell adapter at or below 300 nonblank lines. The
   architecture test enforces this limit and rejects reintroduced UI factories,
-  theme policy, or runtime control workflows in the window.
+  theme policy, or control operation workflows in the window.
 - Keep `ModelGroupDialogFactory` split by dialog responsibility; each partial is
   limited to 300 nonblank lines by the architecture test.
 - Empty placeholder partials should be deleted.
-- Production C# files must stay at or below 425 lines and test C# files at or
-  below 675 lines. The architecture test enforces both limits. Split by stable
-  responsibility before reaching the limit; do not create numbered part files.
+- Production C# files trigger review above 400 nonblank lines and fail above
+  500; test C# files trigger review above 650 nonblank lines and fail above 800.
+  `scripts/check-code-shape.ps1` owns these warnings and failures, excludes
+  generated sources, and reports the 15 largest production and test files.
+  MainWindow adapters retain their separate 300-nonblank-line hard limit plus
+  aggregate file-count and line budgets. Split by stable responsibility before
+  reaching a limit; do not create numbered part files. A cohesive declarative
+  exception must be path-specific and record its classification, behavioural
+  status, reason, separate limits, and future split condition in the script.
+- Treat the review threshold as one signal, not an automatic split. Refactor
+  when it is accompanied by another design signal: multiple stable reasons to
+  change, an 80–100-line method, unrelated state machines or fixtures, a large
+  direct dependency set, repeated cross-feature edits, spreading engine-specific
+  branches, or a generic type name that no longer describes its ownership. A
+  smaller file that mixes UI, HTTP, storage, and process execution still needs
+  attention even when it remains below the warning threshold.
 
 ## Test Guidance
 
@@ -222,21 +276,31 @@ must remain behavior-tested even though it is consumed through the WPF app.
 
 Useful test groups:
 
-- `ReleaseHardening.Architecture.Tests.cs`: module layout guardrails.
-- `ReleaseHardening.RuntimeProcessLifecycle.Tests.cs` and
-  `ReleaseHardening.RuntimeAdapter.Tests.cs`: process and launch behavior.
-- `ReleaseHardening.RuntimeMetricParsing.Tests.cs` and
-  `ReleaseHardening.RuntimeTelemetry.Tests.cs`: metric parsing, state, and UI
+- `Architecture/Architecture.Tests.cs`: module layout guardrails.
+- `Runtime/RuntimeProcessLifecycle.Tests.cs` and
+  `Runtime/LlamaCppLaunch.Tests.cs`: process and launch behavior.
+- `Runtime/RuntimeMetricParsing.Tests.cs` and
+  `Runtime/RuntimeTelemetry.Tests.cs`: metric parsing, state, and UI
   application behavior.
-- `ReleaseHardening.ModelCompanions.Tests.cs`,
-  `ReleaseHardening.DownloadSafety.Tests.cs`, and
-  `ReleaseHardening.ModelCatalogIntegrity.Tests.cs`: model and download safety.
-- `ReleaseHardening.UiShell.Tests.cs`,
-  `ReleaseHardening.UiThemesAndLayout.Tests.cs`, and
-  `ReleaseHardening.UiApplicationBoundaries.Tests.cs`: shell, theme, layout,
-  view-model, and application-boundary invariants.
+- `Models/ModelCompanions.Tests.cs`, `Models/DownloadSafety.Tests.cs`, and
+  `Models/ModelCatalogIntegrity.Tests.cs`: model and download safety.
+- `UI/UiShell.Tests.cs` and `Architecture/SemanticArchitecture.Tests.cs`:
+  shell policy and compiled
+  application-boundary invariants.
+- `tests/LocalLlmConsole.UiTests`: composed WPF shell, theme, layout, settings,
+  models, runtime, and dashboard behavior.
+- WPF facts live in behavior-named test classes so each surface can run and fail
+  independently. Shared dispatcher and visual-tree helpers may live in the
+  abstract `WpfUiTestBase`, but test facts must not be accumulated in one partial
+  smoke-test class. Keep one broad shell composition/navigation/close test and
+  express the remaining behavior in focused classes.
 - `FakeRuntimeIntegration.Tests.cs`: real process supervision against the
   deterministic test runtime under `tests/LocalLlmConsole.FakeRuntime`.
+
+Do not add source-string inventories for UI wiring or visual styling. Exercise
+the compiled service/controller contract or the composed WPF surface instead.
+Reserve repository-source inspection for durable layout, packaging, security,
+and lifecycle rules that cannot be expressed against compiled behavior.
 
 ### Adding an app-level UI preference
 

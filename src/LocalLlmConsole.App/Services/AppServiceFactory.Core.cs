@@ -91,17 +91,12 @@ public sealed partial class AppServiceFactory
         var runtimeReadinessMonitorWorkflow = CreateRuntimeReadinessMonitorWorkflowService(
             runtimeReadinessWorkflow,
             runtimeReadinessCompletion);
-        var runtimeReadinessCompletionApplication = CreateRuntimeReadinessCompletionApplicationService();
         var runtimeReadinessMonitorApplication = CreateRuntimeReadinessMonitorApplicationService(
-            runtimeReadinessMonitorWorkflow,
-            runtimeReadinessCompletionApplication);
+            runtimeReadinessMonitorWorkflow);
         var runtimeSessionActions = CreateRuntimeSessionActionDecisionService();
         var runtimeSessionCommands = CreateRuntimeSessionCommandService(runtimeSessions, runtimeSessionActions);
-        var runtimeSessionFollowupApplication = CreateRuntimeSessionFollowupApplicationService();
         var runtimeSessionApplication = CreateRuntimeSessionApplicationService(
-            runtimeSessionCommands,
-            runtimeSessionFollowupApplication);
-        var jobRows = CreateJobRowProjectionService();
+            runtimeSessionCommands);
         var modelRuntimeStartFollowup = CreateModelRuntimeStartFollowupService();
         var modelRuntimeStartFollowupApplication = CreateModelRuntimeStartFollowupApplicationService();
         var runtimeEndpointProbe = CreateRuntimeEndpointProbeService(request.RuntimeProbeClient);
@@ -235,10 +230,8 @@ public sealed partial class AppServiceFactory
                 runtimeReadinessWorkflow,
                 runtimeReadinessCompletion,
                 runtimeReadinessMonitorWorkflow,
-                runtimeReadinessCompletionApplication,
                 runtimeReadinessMonitorApplication,
                 runtimeSessionApplication,
-                jobRows,
                 runtimeEndpointProbe,
                 endpointInspection,
                 runtimeTelemetryApplication,

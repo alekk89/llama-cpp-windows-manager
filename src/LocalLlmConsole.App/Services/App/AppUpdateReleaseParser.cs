@@ -10,7 +10,7 @@ public static class AppUpdateReleaseParser
             release["tag_name"]?.ToString(),
             release["name"]?.ToString());
         if (string.IsNullOrWhiteSpace(latestVersion))
-            throw new InvalidOperationException("The GitHub release has no tag name.");
+            throw AppUpdateVerificationException.Trust("The GitHub release has no tag name.");
 
         var assets = release["assets"]?.AsArray();
         var asset = SelectPortableAsset(assets);
@@ -29,6 +29,43 @@ public static class AppUpdateReleaseParser
             asset.Size,
             checksum.Name,
             checksum.Url);
+    }
+
+    public static AppUpdateInfo ParseVerifiedLatestRelease(
+        JsonObject release,
+        string currentVersion,
+        VerifiedReleaseManifest verifiedManifest)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+        ArgumentNullException.ThrowIfNull(verifiedManifest);
+        var manifest = verifiedManifest.Document;
+        var latestVersion = FirstNonBlank(release["tag_name"]?.ToString(), release["name"]?.ToString());
+        if (string.IsNullOrWhiteSpace(latestVersion))
+            throw AppUpdateVerificationException.Manifest("The GitHub release has no tag name.");
+        if (!string.Equals(VersionLabel(latestVersion), VersionLabel(manifest.Tag), StringComparison.Ordinal) ||
+            !string.Equals(VersionLabel(latestVersion), VersionLabel(manifest.ApplicationVersion), StringComparison.Ordinal))
+        {
+            throw AppUpdateVerificationException.Manifest("Verified release-manifest version does not match the GitHub release.");
+        }
+
+        var selected = SelectVerifiedPortableAsset(release["assets"]?.AsArray(), manifest.Artifacts ?? []);
+        return new AppUpdateInfo(
+            IsVersionNewer(NormalizeVersion(latestVersion), NormalizeVersion(currentVersion)),
+            VersionLabel(currentVersion),
+            VersionLabel(latestVersion),
+            FirstNonBlank(release["name"]?.ToString(), VersionLabel(latestVersion)),
+            release["body"]?.ToString() ?? "",
+            release["html_url"]?.ToString() ?? AppUpdateService.RepositoryUrl,
+            selected.Asset.Name,
+            selected.Url,
+            selected.Asset.Size,
+            ExpectedSha256: selected.Asset.Sha256,
+            AuthenticityVerified: true,
+            ReleaseChannel: manifest.ReleaseChannel,
+            ManifestKeyId: manifest.SigningKeyId,
+            ManifestCommit: manifest.Commit,
+            ManifestExpiresAtUtc: manifest.ExpiresAtUtc,
+            ExpectedWindowsPublisher: manifest.ExpectedWindowsPublisher);
     }
 
     public static AppUpdateInfo NoUpdateAvailable(string currentVersion, string message = "No updates are available.")
@@ -56,6 +93,40 @@ public static class AppUpdateReleaseParser
             : candidates.FirstOrDefault(asset => asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && asset.Name.Contains("win-x64", StringComparison.OrdinalIgnoreCase))
                 is var zip && !string.IsNullOrWhiteSpace(zip.Name) ? zip
             : candidates.FirstOrDefault(asset => asset.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static (ReleaseManifestArtifact Asset, string Url) SelectVerifiedPortableAsset(
+        JsonArray? releaseAssets,
+        IReadOnlyList<ReleaseManifestArtifact> manifestArtifacts)
+    {
+        if (releaseAssets is null)
+            throw AppUpdateVerificationException.Asset("The GitHub release contains no assets.");
+        var published = releaseAssets
+            .OfType<JsonObject>()
+            .Select(asset => (
+                Name: asset["name"]?.ToString() ?? "",
+                Url: FirstNonBlank(asset["browser_download_url"]?.ToString(), asset["url"]?.ToString()),
+                Size: JsonLong(asset["size"])))
+            .Where(asset => !string.IsNullOrWhiteSpace(asset.Name) && IsHttps(asset.Url))
+            .ToDictionary(asset => asset.Name, StringComparer.OrdinalIgnoreCase);
+        var allowed = manifestArtifacts
+            .Where(artifact =>
+                string.Equals(artifact.Role, "application", StringComparison.Ordinal) ||
+                string.Equals(artifact.Role, "portable-archive", StringComparison.Ordinal))
+            .ToDictionary(artifact => artifact.Name, StringComparer.OrdinalIgnoreCase);
+
+        var orderedNames = allowed.Keys
+            .Where(name => name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && name.Contains("win-x64", StringComparison.OrdinalIgnoreCase))
+            .Concat([AppUpdateService.PortableExeName])
+            .Concat(allowed.Keys.Order(StringComparer.OrdinalIgnoreCase));
+        foreach (var name in orderedNames.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!allowed.TryGetValue(name, out var artifact) || !published.TryGetValue(name, out var releaseAsset)) continue;
+            if (releaseAsset.Size != artifact.Size)
+                throw AppUpdateVerificationException.Asset($"GitHub asset size for '{name}' does not match the signed release manifest.");
+            return (artifact, releaseAsset.Url);
+        }
+        throw AppUpdateVerificationException.Asset("The GitHub release has no portable Windows asset listed by the signed release manifest.");
     }
 
     private static (string Name, string Url) SelectChecksumAsset(JsonArray? assets, string assetName)
@@ -100,4 +171,7 @@ public static class AppUpdateReleaseParser
 
     private static long JsonLong(JsonNode? node)
         => node is JsonValue value && value.TryGetValue<long>(out var number) ? number : 0;
+
+    private static bool IsHttps(string value)
+        => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 }

@@ -19,6 +19,11 @@ public sealed partial class AppServiceFactory
     public ModelLaunchProfileService CreateModelLaunchProfileService(StateStore stateStore, LoadedModelSessionManager sessions)
         => new(stateStore, sessions);
 
+    public TrayProfileMenuApplicationService CreateTrayProfileMenuApplicationService(
+        StateStore stateStore,
+        LoadedModelSessionManager sessions)
+        => new(stateStore, sessions);
+
     public ModelLaunchVariantWorkflowService CreateModelLaunchVariantWorkflowService(
         ModelLaunchProfileService launchProfiles)
         => new(launchProfiles);

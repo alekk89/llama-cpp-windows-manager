@@ -10,7 +10,7 @@ public static class AppUpdateAssetVerifier
     {
         var expected = NormalizeSha256(update.ExpectedSha256);
         if (!string.IsNullOrWhiteSpace(update.ExpectedSha256) && string.IsNullOrWhiteSpace(expected))
-            throw new InvalidOperationException("The latest GitHub release includes an invalid SHA-256 checksum. Refusing to install without verification.");
+            throw AppUpdateVerificationException.Asset("The latest GitHub release includes an invalid SHA-256 checksum. Refusing to install without verification.");
         if (string.IsNullOrWhiteSpace(expected) && !string.IsNullOrWhiteSpace(update.ChecksumAssetUrl))
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, update.ChecksumAssetUrl);
@@ -18,15 +18,15 @@ public static class AppUpdateAssetVerifier
             response.EnsureSuccessStatusCode();
             expected = ExtractSha256(await response.Content.ReadAsStringAsync(cancellationToken), update.AssetName);
             if (string.IsNullOrWhiteSpace(expected))
-                throw new InvalidOperationException($"The SHA-256 companion file does not contain a checksum for {update.AssetName}. Refusing to install without verification.");
+                throw AppUpdateVerificationException.Asset($"The SHA-256 companion file does not contain a checksum for {update.AssetName}. Refusing to install without verification.");
         }
 
         if (string.IsNullOrWhiteSpace(expected))
-            throw new InvalidOperationException("The latest GitHub release asset could not be verified.");
+            throw AppUpdateVerificationException.Asset("The latest GitHub release asset could not be verified.");
 
         var actual = await ComputeSha256Async(assetPath, cancellationToken);
         if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expected), Convert.FromHexString(actual)))
-            throw new InvalidOperationException($"Update checksum mismatch. Expected SHA-256 {expected}, found {actual}.");
+            throw AppUpdateVerificationException.Asset($"Update checksum mismatch. Expected SHA-256 {expected}, found {actual}.");
     }
 
     public static string ExtractSha256(string checksumText, string assetName = "")
@@ -43,10 +43,7 @@ public static class AppUpdateAssetVerifier
     }
 
     public static string NormalizeSha256(string value)
-    {
-        var normalized = new string((value ?? "").Trim().Where(Uri.IsHexDigit).ToArray()).ToLowerInvariant();
-        return normalized.Length == 64 ? normalized : "";
-    }
+        => Sha256Digest.NormalizeLooseHex(value);
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
         => await FileSystemSafetyService.Sha256Async(path, cancellationToken);

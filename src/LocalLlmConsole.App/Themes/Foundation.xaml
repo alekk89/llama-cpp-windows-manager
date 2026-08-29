@@ -48,6 +48,21 @@
                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
                  VerticalAlignment="Center"/>
     </DataTemplate>
+    <Style x:Key="KeyboardFocusVisual">
+      <Setter Property="Control.Template">
+        <Setter.Value>
+          <ControlTemplate>
+            <Border BorderBrush="{DynamicResource FocusRing}"
+                    BorderThickness="2"
+                    CornerRadius="7"
+                    Margin="-3"
+                    SnapsToDevicePixels="True">
+              <AdornedElementPlaceholder/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="Button">
       <Setter Property="MinHeight" Value="34"/>
       <Setter Property="Padding" Value="14,6"/>
@@ -61,7 +76,7 @@
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="ContentTemplate" Value="{StaticResource ButtonTextTemplate}"/>
-      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">

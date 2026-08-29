@@ -1,44 +1,60 @@
-
 namespace LocalLlmConsole.Services;
+
+public sealed record GgufMetadataInspectionResult(
+    bool Success,
+    IReadOnlyDictionary<string, object?> Values,
+    string Error)
+{
+    public static GgufMetadataInspectionResult Failed(string error)
+        => new(false, new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase), error);
+}
 
 public static class GgufMetadataReader
 {
     private const uint MinSupportedVersion = 1;
     private const uint MaxSupportedVersion = 3;
-    private const ulong MaxMetadataBytes = 64UL * 1024UL * 1024UL;
-    private const ulong MaxArrayElements = 100_000UL;
-    private const ulong MaxSummaryMetadataBytes = 1024UL * 1024UL * 1024UL;
-    private const ulong MaxSummaryArrayElements = 10_000_000UL;
+    private const ulong MaxMetadataEntries = 100_000UL;
+    private const ulong MaxMetadataBytes = 1024UL * 1024UL * 1024UL;
+    private const ulong MaxArrayElements = 10_000_000UL;
+    private const ulong MaxStringBytes = 1024UL * 1024UL;
+    private const int MaxArrayNesting = 8;
 
-    public static IReadOnlyDictionary<string, object?> TryRead(string path, int maxKeys = 512)
+    public static GgufMetadataInspectionResult Inspect(string path)
     {
         var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         try
         {
             using var stream = File.OpenRead(path);
             using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: false);
-            if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "GGUF") return values;
-
-            var version = reader.ReadUInt32();
-            if (version is < MinSupportedVersion or > MaxSupportedVersion) return values;
+            EnsureHeader(reader);
             _ = reader.ReadUInt64();
             var metadataCount = reader.ReadUInt64();
+            if (metadataCount > MaxMetadataEntries)
+                throw new InvalidDataException("GGUF metadata contains too many entries.");
+
             var metadataStart = stream.Position;
-            var count = (int)Math.Min(metadataCount, (ulong)Math.Max(0, maxKeys));
-            for (var i = 0; i < count; i++)
+            for (ulong index = 0; index < metadataCount; index++)
             {
-                if ((ulong)(stream.Position - metadataStart) > MaxMetadataBytes) break;
+                EnsureMetadataBudget(stream, metadataStart);
                 var key = ReadString(reader);
-                var type = (GgufValueType)reader.ReadUInt32();
+                var type = ReadType(reader);
                 values[key] = ReadValue(reader, type);
             }
+            EnsureMetadataBudget(stream, metadataStart);
+            return new GgufMetadataInspectionResult(true, values, "");
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OverflowException)
         {
-            return values;
+            return GgufMetadataInspectionResult.Failed(ex.Message);
         }
+    }
 
-        return values;
+    public static IReadOnlyDictionary<string, object?> TryRead(string path)
+    {
+        var inspection = Inspect(path);
+        return inspection.Success
+            ? inspection.Values
+            : new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
     }
 
     public static long? TryReadParameterCount(string path)
@@ -47,26 +63,24 @@ public static class GgufMetadataReader
         {
             using var stream = File.OpenRead(path);
             using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: false);
-            if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "GGUF") return null;
-
-            var version = reader.ReadUInt32();
-            if (version is < MinSupportedVersion or > MaxSupportedVersion) return null;
+            EnsureHeader(reader);
             var tensorCount = reader.ReadUInt64();
             var metadataCount = reader.ReadUInt64();
-            if (tensorCount is 0 or > 1_000_000 || metadataCount > 100_000) return null;
+            if (tensorCount is 0 or > 1_000_000 || metadataCount > MaxMetadataEntries) return null;
 
             var metadataStart = stream.Position;
             for (ulong index = 0; index < metadataCount; index++)
             {
-                if ((ulong)(stream.Position - metadataStart) > MaxSummaryMetadataBytes) return null;
-                _ = ReadString(reader);
-                if (!SkipValue(reader, (GgufValueType)reader.ReadUInt32())) return null;
+                EnsureMetadataBudget(stream, metadataStart);
+                SkipString(reader);
+                SkipValue(reader, ReadType(reader), 0);
             }
+            EnsureMetadataBudget(stream, metadataStart);
 
             ulong total = 0;
             for (ulong index = 0; index < tensorCount; index++)
             {
-                _ = ReadString(reader);
+                SkipString(reader);
                 var dimensions = reader.ReadUInt32();
                 if (dimensions is 0 or > 8) return null;
                 ulong elements = 1;
@@ -79,49 +93,34 @@ public static class GgufMetadataReader
 
             return total is > 0 and <= long.MaxValue ? (long)total : null;
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OverflowException)
         {
             return null;
         }
     }
 
-    private static bool SkipValue(BinaryReader reader, GgufValueType type)
+    private static void EnsureHeader(BinaryReader reader)
     {
-        if (type != GgufValueType.Array)
-        {
-            _ = ReadValue(reader, type);
-            return true;
-        }
-
-        var elementType = (GgufValueType)reader.ReadUInt32();
-        var length = reader.ReadUInt64();
-        if (length > MaxSummaryArrayElements) return false;
-        var fixedSize = FixedSize(elementType);
-        if (fixedSize > 0)
-        {
-            var bytes = checked(length * (ulong)fixedSize);
-            return SkipBytes(reader, bytes);
-        }
-        if (elementType != GgufValueType.String) return false;
-
-        ulong totalBytes = 0;
-        for (ulong index = 0; index < length; index++)
-        {
-            var stringLength = reader.ReadUInt64();
-            if (stringLength > 1024 * 1024) return false;
-            totalBytes = checked(totalBytes + stringLength);
-            if (totalBytes > MaxSummaryMetadataBytes || !SkipBytes(reader, stringLength)) return false;
-        }
-        return true;
+        if (Encoding.ASCII.GetString(reader.ReadBytes(4)) != "GGUF")
+            throw new InvalidDataException("The file does not have a GGUF header.");
+        var version = reader.ReadUInt32();
+        if (version is < MinSupportedVersion or > MaxSupportedVersion)
+            throw new InvalidDataException($"GGUF version {version} is not supported.");
     }
 
-    private static bool SkipBytes(BinaryReader reader, ulong bytes)
+    private static void EnsureMetadataBudget(Stream stream, long metadataStart)
     {
-        if (bytes > MaxSummaryMetadataBytes
-            || bytes > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
-            return false;
-        reader.BaseStream.Seek(checked((long)bytes), SeekOrigin.Current);
-        return true;
+        var consumed = stream.Position - metadataStart;
+        if (consumed < 0 || (ulong)consumed > MaxMetadataBytes)
+            throw new InvalidDataException("GGUF metadata exceeds the supported inspection limit.");
+    }
+
+    private static GgufValueType ReadType(BinaryReader reader)
+    {
+        var type = (GgufValueType)reader.ReadUInt32();
+        if (type is < GgufValueType.UInt8 or > GgufValueType.Float64)
+            throw new InvalidDataException($"Unsupported GGUF metadata value type: {(uint)type}.");
+        return type;
     }
 
     private static object? ReadValue(BinaryReader reader, GgufValueType type) => type switch
@@ -135,53 +134,101 @@ public static class GgufMetadataReader
         GgufValueType.Float32 => reader.ReadSingle(),
         GgufValueType.Bool => reader.ReadByte() != 0,
         GgufValueType.String => ReadString(reader),
-        GgufValueType.Array => ReadArraySummary(reader),
+        GgufValueType.Array => ReadArraySummary(reader, 0),
         GgufValueType.UInt64 => reader.ReadUInt64(),
         GgufValueType.Int64 => reader.ReadInt64(),
         GgufValueType.Float64 => reader.ReadDouble(),
-        _ => null
+        _ => throw new InvalidDataException($"Unsupported GGUF metadata value type: {(uint)type}.")
     };
 
-    private static string ReadString(BinaryReader reader)
+    private static string ReadArraySummary(BinaryReader reader, int depth)
     {
+        var elementType = ReadType(reader);
         var length = reader.ReadUInt64();
-        if (length > 1024 * 1024) throw new InvalidDataException("GGUF string is too large.");
-        if (length > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
-            throw new EndOfStreamException("GGUF string extends past the end of the file.");
-        return Encoding.UTF8.GetString(reader.ReadBytes((int)length));
+        SkipArrayElements(reader, elementType, length, depth);
+        return FormattableString.Invariant($"{length:N0} {elementType} values");
     }
 
-    private static string ReadArraySummary(BinaryReader reader)
+    private static void SkipValue(BinaryReader reader, GgufValueType type, int depth)
     {
-        var elementType = (GgufValueType)reader.ReadUInt32();
-        var length = reader.ReadUInt64();
-        if (length > MaxArrayElements) throw new InvalidDataException("GGUF metadata array is too large.");
+        if (type == GgufValueType.Array)
+        {
+            var elementType = ReadType(reader);
+            var length = reader.ReadUInt64();
+            SkipArrayElements(reader, elementType, length, depth);
+            return;
+        }
+        if (type == GgufValueType.String)
+        {
+            SkipString(reader);
+            return;
+        }
+
+        var bytes = FixedSize(type);
+        if (bytes == 0)
+            throw new InvalidDataException($"Unsupported GGUF metadata value type: {(uint)type}.");
+        SkipBytes(reader, (ulong)bytes);
+    }
+
+    private static void SkipArrayElements(BinaryReader reader, GgufValueType elementType, ulong length, int depth)
+    {
+        if (depth >= MaxArrayNesting)
+            throw new InvalidDataException("GGUF metadata arrays are nested too deeply.");
+        if (length > MaxArrayElements)
+            throw new InvalidDataException("GGUF metadata array contains too many elements.");
+
         var fixedSize = FixedSize(elementType);
         if (fixedSize > 0)
         {
-            var bytes = checked(length * (ulong)fixedSize);
-            if (bytes > MaxMetadataBytes) throw new InvalidDataException("GGUF metadata array is too large.");
-            if (bytes > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
-                throw new EndOfStreamException("GGUF array extends past the end of the file.");
-            reader.BaseStream.Seek(checked((long)bytes), SeekOrigin.Current);
+            SkipBytes(reader, checked(length * (ulong)fixedSize));
+            return;
         }
-        else if (elementType == GgufValueType.String)
+        if (elementType == GgufValueType.String)
         {
-            for (ulong i = 0; i < length; i++)
+            for (ulong index = 0; index < length; index++)
+                SkipString(reader);
+            return;
+        }
+        if (elementType == GgufValueType.Array)
+        {
+            for (ulong index = 0; index < length; index++)
             {
-                var stringLength = reader.ReadUInt64();
-                if (stringLength > 1024 * 1024) throw new InvalidDataException("GGUF array string is too large.");
-                if (stringLength > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
-                    throw new EndOfStreamException("GGUF array string extends past the end of the file.");
-                reader.BaseStream.Seek(checked((long)stringLength), SeekOrigin.Current);
+                var nestedElementType = ReadType(reader);
+                var nestedLength = reader.ReadUInt64();
+                SkipArrayElements(reader, nestedElementType, nestedLength, depth + 1);
             }
+            return;
         }
-        else
-        {
-            for (ulong i = 0; i < length; i++)
-                _ = ReadValue(reader, elementType);
-        }
-        return $"{length:N0} {elementType} values";
+
+        throw new InvalidDataException($"Unsupported GGUF metadata array element type: {(uint)elementType}.");
+    }
+
+    private static string ReadString(BinaryReader reader)
+    {
+        var length = ReadStringLength(reader);
+        return Encoding.UTF8.GetString(reader.ReadBytes(checked((int)length)));
+    }
+
+    private static void SkipString(BinaryReader reader)
+        => SkipBytes(reader, ReadStringLength(reader));
+
+    private static ulong ReadStringLength(BinaryReader reader)
+    {
+        var length = reader.ReadUInt64();
+        if (length > MaxStringBytes)
+            throw new InvalidDataException("GGUF string is too large.");
+        if (length > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
+            throw new EndOfStreamException("GGUF string extends past the end of the file.");
+        return length;
+    }
+
+    private static void SkipBytes(BinaryReader reader, ulong bytes)
+    {
+        if (bytes > MaxMetadataBytes)
+            throw new InvalidDataException("GGUF metadata value is too large.");
+        if (bytes > (ulong)Math.Max(0, reader.BaseStream.Length - reader.BaseStream.Position))
+            throw new EndOfStreamException("GGUF metadata value extends past the end of the file.");
+        reader.BaseStream.Seek(checked((long)bytes), SeekOrigin.Current);
     }
 
     private static int FixedSize(GgufValueType type) => type switch

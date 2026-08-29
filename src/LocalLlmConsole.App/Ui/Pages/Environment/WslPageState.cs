@@ -16,7 +16,7 @@ public sealed class WslPageState
 
     public DataGrid? DistroGrid { get; private set; }
 
-    public UiRow? SelectedDistroRow => DistroGrid?.SelectedItem as UiRow;
+    public WslDistroRow? SelectedDistroRow => DistroGrid?.SelectedItem as WslDistroRow;
 
     public IEnumerable<WpfButton?> HelpButtons =>
     [
@@ -88,6 +88,31 @@ public sealed class WslPageState
         DeleteSyclRuntimeButton = controls.DeleteSyclRuntimeButton;
         InstallSyclOneApiButton = controls.InstallSyclOneApiButton;
         DeleteSyclOneApiButton = controls.DeleteSyclOneApiButton;
+    }
+
+    public void ReleaseView()
+    {
+        StatusMetric = null;
+        SelectedMetric = null;
+        InfoMetric = null;
+        ToolsMetric = null;
+        DistroGrid = null;
+        InstallButton = null;
+        CheckUpdatesButton = null;
+        DeleteButton = null;
+        InstallUbuntuButton = null;
+        CheckUbuntuUpdatesButton = null;
+        DeleteUbuntuButton = null;
+        InstallBuildToolsButton = null;
+        DeleteBuildToolsButton = null;
+        InstallCudaToolkitButton = null;
+        DeleteCudaToolkitButton = null;
+        InstallVulkanToolsButton = null;
+        DeleteVulkanToolsButton = null;
+        InstallSyclRuntimeButton = null;
+        DeleteSyclRuntimeButton = null;
+        InstallSyclOneApiButton = null;
+        DeleteSyclOneApiButton = null;
     }
 
     public void ApplyActionState(WslEnvironmentReport report, bool hasUbuntu, WslToolSnapshot tools)

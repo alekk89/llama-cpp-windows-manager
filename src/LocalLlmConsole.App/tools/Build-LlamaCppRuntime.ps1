@@ -418,6 +418,8 @@ sycl_cmake_args=()
   $Defs = @(
     "-DCMAKE_BUILD_TYPE=Release",
     "-DLLAMA_BUILD_SERVER=ON",
+    "-DLLAMA_BUILD_TOOLS=ON",
+    "-DLLAMA_TOOLS_INSTALL=ON",
     "-DLLAMA_BUILD_TESTS=OFF",
     "-DLLAMA_TESTS_INSTALL=OFF",
     "-DLLAMA_BUILD_EXAMPLES=OFF",
@@ -465,15 +467,26 @@ cmake -S $SourceQ -B $BuildQ "`${generator_args[@]}" $DefArgs "`${cuda_cmake_arg
 build_status=0
 cmake --build $BuildQ --config Release --target install --parallel `$(nproc) || build_status=`$?
 server_path=$InstallQ/bin/llama-server
+bench_path=$InstallQ/bin/llama-bench
 server_lib=$InstallQ/lib
 if [ ! -f "`$server_path" ]; then
   echo "Build finished but llama-server was not installed at `$server_path." >&2
   if [ "`$build_status" -eq 0 ]; then build_status=1; fi
   exit `$build_status
 fi
+if [ ! -f "`$bench_path" ]; then
+  echo "Build finished but llama-bench was not installed at `$bench_path." >&2
+  if [ "`$build_status" -eq 0 ]; then build_status=1; fi
+  exit `$build_status
+fi
 probe_ld_path="`$server_lib:`${LD_LIBRARY_PATH:-}"
 if ! LD_LIBRARY_PATH="`$probe_ld_path" "`$server_path" --version >/dev/null 2>&1; then
   echo "Build finished but installed llama-server failed a startup smoke test." >&2
+  if [ "`$build_status" -eq 0 ]; then build_status=1; fi
+  exit `$build_status
+fi
+if ! LD_LIBRARY_PATH="`$probe_ld_path" "`$bench_path" --help >/dev/null 2>&1; then
+  echo "Build finished but installed llama-bench failed a startup smoke test." >&2
   if [ "`$build_status" -eq 0 ]; then build_status=1; fi
   exit `$build_status
 fi
@@ -521,6 +534,8 @@ fi
   $Defs = @(
     "-DCMAKE_BUILD_TYPE=Release",
     "-DLLAMA_BUILD_SERVER=ON",
+    "-DLLAMA_BUILD_TOOLS=ON",
+    "-DLLAMA_TOOLS_INSTALL=ON",
     "-DLLAMA_BUILD_TESTS=OFF",
     "-DLLAMA_TESTS_INSTALL=OFF",
     "-DLLAMA_BUILD_EXAMPLES=OFF",
@@ -542,7 +557,10 @@ fi
   Invoke-Logged $CMakeExe @("--build", $BuildDir, "--config", "Release", "--target", "install", "--parallel", [string][Environment]::ProcessorCount)
   $ServerExe = Join-Path $InstallDir "bin\llama-server.exe"
   if (-not (Test-Path -LiteralPath $ServerExe)) { throw "Build finished but llama-server.exe was not found at $ServerExe" }
+  $BenchmarkExe = Join-Path $InstallDir "bin\llama-bench.exe"
+  if (-not (Test-Path -LiteralPath $BenchmarkExe)) { throw "Build finished but llama-bench.exe was not found at $BenchmarkExe" }
   Invoke-Logged $ServerExe @("--version")
+  Invoke-Logged $BenchmarkExe @("--help")
   try {
     $Commit = (& $GitExe -c core.longpaths=true -C $SourceDir rev-parse --short=12 HEAD 2>$null).Trim()
   } catch {
