@@ -14,7 +14,7 @@ public sealed class GpuEnergyTests : ManagerRegressionTestBase
         var snapshot = HostHardwareSnapshotParser.Parse(
             "CPU: AMD Ryzen\nTelemetry: 12% load | 5100 MHz core | 16 cores | 32 threads\n"
             + "RAM: 50% load | 16.0/32.0 GiB | 6000 MHz\n"
-            + "GPU 0: NVIDIA RTX | 75% load | 20.0/24.0 GiB VRAM | 225 W | 1800 MHz core | 70 °C | 82 °C memory\n"
+            + "GPU 0: NVIDIA RTX | 75% load | 20.0/24.0 GiB VRAM | 225 W | 300 W limit | 1800 MHz core | 70 °C | 82 °C memory\n"
             + "Process: 4.5% CPU | 3.25 GiB private RAM",
             capturedAt);
 
@@ -22,12 +22,35 @@ public sealed class GpuEnergyTests : ManagerRegressionTestBase
         Assert.Equal(16, snapshot.Cpu?.PhysicalCores);
         Assert.Equal(16, snapshot.Memory?.UsedGibibytes);
         Assert.Equal(225, snapshot.Gpus.Single().PowerWatts);
+        Assert.Equal(300, snapshot.Gpus.Single().PowerLimitWatts);
         Assert.Equal(82, snapshot.Gpus.Single().MemoryTemperatureCelsius);
         Assert.Equal(3.25, snapshot.Process?.PrivateMemoryGibibytes);
 
         var power = GpuPowerObservationParser.Parse(snapshot, capturedAt);
         Assert.Equal(225, power.TotalWatts);
         Assert.Equal(1, power.DetectedGpuCount);
+    }
+
+    [Theory]
+    [InlineData("NVIDIA RTX 3090", 250)]
+    [InlineData("AMD Radeon RX 7900 XTX", 550)]
+    [InlineData("Intel Arc B580", 190)]
+    public void PowerLimitWithoutDrawIsNotRecordedAsGpuPower(string gpuName, double powerLimit)
+    {
+        var capturedAt = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
+        var snapshot = HostHardwareSnapshotParser.Parse(
+            $"GPU 0: {gpuName} | 50% load | {powerLimit:0.#} W limit",
+            capturedAt);
+
+        var gpu = Assert.Single(snapshot.Gpus);
+        Assert.Null(gpu.PowerWatts);
+        Assert.Equal(powerLimit, gpu.PowerLimitWatts);
+
+        var observation = GpuPowerObservationParser.Parse(snapshot, capturedAt);
+        Assert.Empty(observation.Sensors);
+        Assert.Equal(0, observation.TotalWatts);
+        Assert.Equal(0, observation.ObservedGpuCount);
+        Assert.Equal(1, observation.DetectedGpuCount);
     }
 
     [Fact]

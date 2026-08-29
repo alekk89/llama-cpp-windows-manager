@@ -44,6 +44,7 @@ public sealed class LiveMetricRecommendationsTests : ManagerRegressionTestBase
         Assert.Contains(readings, reading => reading.MetricId == OverviewDashboardMetricIds.GpuMemoryActivity(0) && reading.Primary == 33);
         Assert.Contains(readings, reading => reading.MetricId == OverviewDashboardMetricIds.GpuFanSpeed(0) && reading.Primary == 40);
         Assert.Contains(readings, reading => reading.MetricId == OverviewDashboardMetricIds.GpuPowerLimit(0) && reading.Primary == 300);
+        Assert.DoesNotContain(readings, reading => reading.MetricId == OverviewDashboardMetricIds.GpuPower(0));
         Assert.Contains(readings, reading => reading.MetricId == OverviewDashboardMetricIds.GpuThrottling(0) && reading.Primary == 0);
     }
 

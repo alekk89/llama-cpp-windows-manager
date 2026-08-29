@@ -84,7 +84,7 @@ public static class HostHardwareSnapshotParser
             Percentage(raw),
             capacity?.Used,
             capacity?.Total,
-            Number(raw, @"(\d+(?:\.\d+)?)\s*W(?:\s|$)"),
+            Number(raw, @"(\d+(?:\.\d+)?)\s*W(?=\s*(?:/|\||$))"),
             Number(raw, @"(\d+(?:\.\d+)?)\s*MHz(?:\s+core)?"),
             Number(raw, @"(\d+(?:\.\d+)?)\s*°\s*C"),
             Number(raw, @"(\d+(?:\.\d+)?)\s*°\s*C\s+(?:memory|VRAM)"),
