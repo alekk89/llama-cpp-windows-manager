@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $violations = [Collections.Generic.List[string]]::new()
 $markdownFiles = Get-ChildItem -LiteralPath $RepoRoot -Recurse -Filter *.md -File |
-  Where-Object { $_.FullName -notmatch '[\\/](bin|obj|dist|TestResults|workspace)[\\/]' }
+  Where-Object { $_.FullName -notmatch '[\\/](bin|data|obj|dist|TestResults|workspace)[\\/]' }
 
 [xml] $appProject = Get-Content -LiteralPath (Join-Path $RepoRoot "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj")
 $currentVersion = @($appProject.Project.PropertyGroup.Version | Where-Object { $_ })[0].Trim()
