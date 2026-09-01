@@ -17,10 +17,10 @@ public partial class MainWindow
     private void ShowLifetime()
     {
         SetPage("Metrics", Loc.T("Lifetime.PageDescription"));
-        var page = LifetimePageFactory.Create(new LifetimePageRequest(
+        var page = SelectorFavoriteBinding.ConfigureLifetime(LifetimePageFactory.Create(new LifetimePageRequest(
             _viewModel.LifetimeMetrics.Rows,
             _viewModel.LifetimeMetrics.Selection,
-            _pageControllers.Lifetime.Build()));
+            _pageControllers.Lifetime.Build())), () => _stateStore, SetStatus);
         _lifetimePage.Apply(page.Controls);
         PageHost.Content = page.Content;
         RunBackground(RefreshLifetimeMetricsAsync, "Metrics refresh failed");
@@ -38,7 +38,7 @@ public partial class MainWindow
                 group.Id.Equals(assignment.GroupId, StringComparison.OrdinalIgnoreCase))))
             .Where(pair => pair.Group is not null)
             .ToDictionary(pair => pair.LaunchProfileId, pair => pair.Group!, StringComparer.OrdinalIgnoreCase);
-        var favoriteProfileIds = await ModelServices.TrayProfiles.FavoriteProfileIdsAsync();
+        var favoriteFlags = await Task.WhenAll(ModelServices.TrayProfiles.FavoriteProfileIdsAsync(), AppServices.StartupLaunchProfiles.ConfiguredProfileIdsAsync(), AppServices.StateStore.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Model));
 
         _viewModel.Models.ReplaceModels(
             result.Models,
@@ -46,7 +46,7 @@ public partial class MainWindow
             result.NamedLaunchProfiles,
             result.ModelSizeLabels,
             groupsByProfile,
-            favoriteProfileIds);
+            favoriteFlags[0], favoriteFlags[1], favoriteFlags[2]);
         var profileModelId = _viewModel.Models.ModelIdForLaunchProfile(selectedProfileId);
         _viewModel.Models.ShowLaunchProfilesForModel(
             profileModelId ?? selectedId ?? _viewModel.Models.Rows.FirstOrDefault()?.Model.Id);
@@ -76,7 +76,8 @@ public partial class MainWindow
             _sessions.Snapshots(),
             _runtimeCatalogState.RuntimeUpdateStates,
             _runtimeCatalogState.RuntimePackageUpdateStates));
-        _viewModel.Runtimes.ReplaceRows(result.Rows.Runtimes);
+        var favoriteRuntimeIds = await AppServices.StateStore.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Runtime);
+        _viewModel.Runtimes.ReplaceRows(result.Rows.Runtimes, favoriteRuntimeIds);
         _viewModel.RuntimePackages.ReplaceRows(result.Rows.PackagePresets);
         _viewModel.RuntimeBuilds.ReplaceRows(result.Rows.BuildPresets);
         _runtimesPage.RestoreRuntimeSelection(selectedId, _viewModel.Runtimes.Rows);

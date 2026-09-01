@@ -54,7 +54,7 @@ public sealed class GatewayRuntimeApplicationService
                 actions.StopModelAsync,
                 (runtime, model, profile, launchSettings, token) => StartModelWithStatusAsync(runtime, model, profile, launchSettings, token, actions),
                 actions.EndpointAliveAsync,
-                (model, launchSettings, token) => MarkReadyWithStatusAsync(model, launchSettings, token, actions),
+                (model, profile, launchSettings, token) => MarkReadyWithStatusAsync(model, profile, launchSettings, token, actions),
                 actions.SetActivityPhase),
                 cancellationToken);
 
@@ -91,11 +91,12 @@ public sealed class GatewayRuntimeApplicationService
 
     private static async Task<LoadedModelSessionSnapshot?> MarkReadyWithStatusAsync(
         ModelRecord model,
+        NamedModelLaunchProfile profile,
         AppSettings launchSettings,
         CancellationToken cancellationToken,
         GatewayRuntimeLoadApplicationActions actions)
     {
-        var session = await actions.MarkReadyAsync(model, launchSettings, cancellationToken);
+        var session = await actions.MarkReadyAsync(model, profile, launchSettings, cancellationToken);
         actions.SetStatus($"Gateway loaded {model.Name} at {RuntimeEndpointService.EndpointDisplay(launchSettings)}.");
         return session;
     }

@@ -143,6 +143,8 @@ public sealed partial class AppServiceFactory
             request.ProcessRunner);
         var runtimeBuildPrerequisites = CreateRuntimeBuildPrerequisiteService(runtimeToolPrerequisites);
         var runtimeLaunchPrerequisites = CreateRuntimeLaunchPrerequisiteService(runtimeToolPrerequisites);
+        var profileFitCapabilities = CreateProfileFitCapabilityService(request.ProcessRunner);
+        var profileFit = CreateProfileFitService(request.ProcessRunner, profileFitCapabilities);
         var visibleCommandLauncher = CreateVisibleCommandLaunchService();
         var windowsToolSetupWorkflow = CreateWindowsToolSetupWorkflowService(visibleCommandLauncher, request.WindowsEnvironment);
         var windowsToolSetupApplication = CreateWindowsToolSetupApplicationService(windowsToolSetupWorkflow);
@@ -245,7 +247,9 @@ public sealed partial class AppServiceFactory
                 runtimeLaunchAdmission,
                 runtimeToolPrerequisites,
                 runtimeBuildPrerequisites,
-                runtimeLaunchPrerequisites),
+                runtimeLaunchPrerequisites,
+                profileFitCapabilities,
+                profileFit),
             new MainWindowCoreModelServices(
                 modelCapabilities,
                 modelRuntimeStatus,

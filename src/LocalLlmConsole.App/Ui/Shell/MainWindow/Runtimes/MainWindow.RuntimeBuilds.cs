@@ -45,14 +45,4 @@ public partial class MainWindow
         await RefreshRuntimeMetricsAsync();
     }
 
-    private void RuntimeGrid_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        if (VisualTreeTraversal.FindAncestor<WpfButton>(e.OriginalSource as DependencyObject) is not null) return;
-        var row = VisualTreeTraversal.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
-        if (_runtimesPage.ClearSelectedRuntimeIfRowAlreadySelected(row))
-        {
-            e.Handled = true;
-        }
-    }
-
 }

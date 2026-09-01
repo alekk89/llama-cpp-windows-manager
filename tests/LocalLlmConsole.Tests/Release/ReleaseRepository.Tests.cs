@@ -35,10 +35,10 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
     {
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
 
-        Assert.Contains("<Version>2.5.0</Version>", project, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>2.5.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>2.5.0.0</FileVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>v2.5.0</InformationalVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<Version>2.6.0</Version>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>2.6.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>2.6.0.0</FileVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>v2.6.0</InformationalVersion>", project, StringComparison.Ordinal);
     }
 
     [Fact]

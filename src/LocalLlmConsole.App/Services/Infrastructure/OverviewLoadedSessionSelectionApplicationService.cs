@@ -22,12 +22,13 @@ public sealed class OverviewLoadedSessionSelectionApplicationService
 {
     public async Task<OverviewLoadedSessionSelectionOutcome> SelectAsync(
         string? modelId,
+        string? sessionId,
         OverviewLoadedSessionSelectionApplicationActions actions,
         CancellationToken cancellationToken = default)
     {
         Validate(actions);
 
-        if (string.IsNullOrWhiteSpace(modelId))
+        if (string.IsNullOrWhiteSpace(modelId) || string.IsNullOrWhiteSpace(sessionId))
             return OverviewLoadedSessionSelectionOutcome.Ignored;
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -42,7 +43,7 @@ public sealed class OverviewLoadedSessionSelectionApplicationService
         cancellationToken.ThrowIfCancellationRequested();
         actions.SelectModelId(modelId);
 
-        var selection = actions.SelectRuntimeModel(modelId);
+        var selection = actions.SelectRuntimeModel(sessionId);
         if (!selection.Selected)
         {
             actions.SetStatus("Selected session is no longer loaded.");

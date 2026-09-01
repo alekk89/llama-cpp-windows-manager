@@ -20,7 +20,7 @@ public sealed partial class LoadedModelSessionManager
         string launchProfileId = "",
         string launchProfileName = "")
     {
-        var sessionId = SessionIdFor(model.Id);
+        var sessionId = SessionIdFor(model.Id, launchProfileId);
         await StopCoreAsync(sessionId, "Replaced by a new launch", CancellationToken.None);
         var supervisor = CreateSupervisor();
         try

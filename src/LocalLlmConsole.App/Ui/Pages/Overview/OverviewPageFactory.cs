@@ -171,17 +171,20 @@ public static class OverviewPageFactory
             Margin = new Thickness(0, 0, 8, 0)
         };
         modelBar.Children.Add(modelLabel);
-        modelCombo = new WpfComboBox
+        modelCombo = new SearchableComboBox
         {
             ItemsSource = request.ViewModel.Overview.ModelChoices,
             ItemTemplate = ModelNameTemplate(),
             SelectedValuePath = nameof(OverviewModelChoice.Id),
+            SearchTextSelector = item => (item as OverviewModelChoice)?.DisplayName ?? "",
+            FavoriteKeySelector = item => item is OverviewModelChoice { Kind: OverviewModelChoiceKind.Model } choice ? choice.Id : "",
             Width = 240,
             MinHeight = 30,
             Margin = new Thickness(0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
             ToolTip = Loc.T("Tooltip.OverviewModelCombo")
         };
+        TextSearch.SetTextPath(modelCombo, nameof(OverviewModelChoice.DisplayName));
         modelCombo.SelectionChanged += async (_, _) => await request.Actions.SelectModelSessionAsync();
         Grid.SetColumn(modelCombo, 1);
         modelBar.Children.Add(modelCombo);
@@ -197,17 +200,20 @@ public static class OverviewPageFactory
         Grid.SetColumn(profileLabel, 3);
         modelBar.Children.Add(profileLabel);
 
-        launchProfileCombo = new WpfComboBox
+        launchProfileCombo = new SearchableComboBox
         {
             ItemsSource = request.ViewModel.Overview.LaunchProfileChoices,
             ItemTemplate = LaunchProfileNameTemplate(),
             SelectedValuePath = nameof(OverviewLaunchProfileChoice.Id),
+            SearchTextSelector = item => (item as OverviewLaunchProfileChoice)?.Name ?? "",
+            FavoriteKeySelector = item => (item as OverviewLaunchProfileChoice)?.Id ?? "",
             Width = 220,
             MinHeight = 30,
             Margin = new Thickness(0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
             ToolTip = Loc.T("Overview.LaunchProfileTooltip")
         };
+        TextSearch.SetTextPath(launchProfileCombo, nameof(OverviewLaunchProfileChoice.Name));
         launchProfileCombo.SelectionChanged += async (_, _) => await request.Actions.SelectLaunchProfileAsync();
         Grid.SetColumn(launchProfileCombo, 4);
         modelBar.Children.Add(launchProfileCombo);

@@ -19,7 +19,7 @@ public sealed record ModelRuntimeLaunchApplicationActions(
     Action StopLoadingStatus,
     Action<AppSettings> SetActiveRuntimeSettings,
     Func<Task> SaveActiveRuntimeSessionsAsync,
-    Action<ModelRecord, AppSettings> StartReadinessMonitor,
+    Action<LoadedModelSessionSnapshot> StartReadinessMonitor,
     Action StartRuntimeDashboardRefresh,
     Action UpdateLoadingStatus,
     Func<Task> RefreshOverviewAsync,
@@ -76,7 +76,8 @@ public sealed class ModelRuntimeLaunchApplicationService
                 actions.EnsureApiKeyAsync,
                 actions.EndpointRespondingAsync,
                 actions.ConfirmAdmissionAsync,
-                actions.ReadMemoryAsync), cancellationToken);
+                actions.ReadMemoryAsync,
+                request.LaunchProfileId), cancellationToken);
             if (!preparation.CanLaunch)
                 return new ModelRuntimeLaunchApplicationResult(false, null, preparation.LaunchSettings);
 
@@ -97,7 +98,7 @@ public sealed class ModelRuntimeLaunchApplicationService
                 _followup.AfterSessionStarted(),
                 new ModelRuntimeStartSessionActions(
                     actions.SaveActiveRuntimeSessionsAsync,
-                    () => actions.StartReadinessMonitor(request.Model, launchSettings),
+                    () => actions.StartReadinessMonitor(snapshot),
                     actions.StartRuntimeDashboardRefresh,
                     actions.UpdateLoadingStatus,
                     actions.RefreshOverviewAsync,

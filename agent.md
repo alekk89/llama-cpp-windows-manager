@@ -39,7 +39,23 @@ llwmctl gateway inspect
 llwmctl sessions metrics <session>
 llwmctl metrics usage --range 30d
 llwmctl sessions logs <session>
+llwmctl settings set --set uiScalePercent=125 --set fontScalePercent=110
+llwmctl benchmarks schema
+llwmctl benchmarks list
 ```
+
+The UI calls `fontScalePercent` **Text scale**. Favorite selectors,
+startup-profile selections, and remembered visual layouts are currently
+UI-managed preferences; do not edit SQLite or automate WPF controls to change
+them.
+
+Before running a benchmark, inspect `benchmarks schema`, validate the plan, run
+`self` and `sessions list`, and use a dry run. A real benchmark requires explicit
+confirmation and may stop loaded sessions only when the validated plan and app
+setting allow it. The CLI's self-stop protection still applies.
+
+Saved profiles may set `host`, but non-loopback binding remains gated by the
+application's direct-model LAN access policy.
 
 Run `self` before any action that can stop or replace a loaded model. Never use
 `--allow-self-stop` or `--confirm` without explicit authorization for the stated

@@ -9,16 +9,21 @@ public sealed class BenchmarkServingRunner : IDisposable
 {
     private readonly HttpClient _http;
     private readonly bool _ownsHttpClient;
+    private readonly Func<CancellationToken, Task<VramMemorySnapshot?>>? _readGpuMemoryAsync;
 
     public BenchmarkServingRunner()
-        : this(new HttpClient { Timeout = Timeout.InfiniteTimeSpan }, ownsHttpClient: true)
+        : this(new HttpClient { Timeout = Timeout.InfiniteTimeSpan }, ownsHttpClient: true, null)
     {
     }
 
-    internal BenchmarkServingRunner(HttpClient httpClient, bool ownsHttpClient = false)
+    internal BenchmarkServingRunner(
+        HttpClient httpClient,
+        bool ownsHttpClient = false,
+        Func<CancellationToken, Task<VramMemorySnapshot?>>? readGpuMemoryAsync = null)
     {
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _ownsHttpClient = ownsHttpClient;
+        _readGpuMemoryAsync = readGpuMemoryAsync;
     }
 
     public async Task<IReadOnlyList<BenchmarkParsedResult>> RunAsync(
@@ -56,7 +61,11 @@ public sealed class BenchmarkServingRunner : IDisposable
                         await Task.Delay(TimeSpan.FromSeconds(plan.DelaySeconds), cancellationToken);
                 }
 
-                var parsed = BuildResult(plan, item, runtime, model, workload, concurrency, samples);
+                var memory = _readGpuMemoryAsync is null ? null : await _readGpuMemoryAsync(cancellationToken);
+                var observedGpuMemoryMiB = memory is null
+                    ? 0
+                    : (long)Math.Round(Math.Max(0, memory.TotalGiB - memory.FreeGiB) * 1024);
+                var parsed = BuildResult(plan, item, runtime, model, workload, concurrency, samples, observedGpuMemoryMiB);
                 var speculativeType = SpeculativeTypePolicy.Normalize(parsed.SpeculativeType);
                 if (plan.Serving.RequireSpeculativeMetrics
                     && speculativeType is not ("" or "none")
@@ -187,7 +196,8 @@ public sealed class BenchmarkServingRunner : IDisposable
         ModelRecord model,
         BenchmarkPromptGenerationPair workload,
         int concurrency,
-        IReadOnlyList<ServingBatchSample> batches)
+        IReadOnlyList<ServingBatchSample> batches,
+        long observedGpuMemoryMiB)
     {
         var responses = batches.SelectMany(batch => batch.Responses).ToArray();
         var throughput = batches.Select(batch => batch.GenerationThroughput).ToArray();
@@ -222,6 +232,8 @@ public sealed class BenchmarkServingRunner : IDisposable
             flash_attn = item.LaunchSettings?.FlashAttention ?? "",
             devices = item.LaunchSettings?.GpuDevices ?? "",
             tensor_split = item.LaunchSettings?.GpuSplit ?? "",
+            tensor_buffer_overrides = item.LaunchSettings?.TensorBufferOverrides ?? "",
+            tensor_buft_overrides = item.LaunchSettings?.TensorBufferOverrides ?? "",
             avg_ns = (long)Math.Round(avgLatency * 1_000_000),
             stddev_ns = (long)Math.Round(StandardDeviation(latencies) * 1_000_000),
             avg_ts = avgThroughput,
@@ -242,7 +254,8 @@ public sealed class BenchmarkServingRunner : IDisposable
             draft_acceptance_percent = draft > 0 ? accepted * 100d / draft : 0,
             speculative_metrics_observed = draft > 0,
             target_prompt_tokens = workload.PromptTokens,
-            target_generation_tokens = workload.GenerationTokens
+            target_generation_tokens = workload.GenerationTokens,
+            gpu_memory_used_mib = observedGpuMemoryMiB
         });
         if (!BenchmarkResultService.TryParse(
                 raw, item.ModelFingerprint, item.EffectiveCommandSignature + $"|c={concurrency}|p={workload.PromptTokens}|g={workload.GenerationTokens}",
@@ -265,7 +278,8 @@ public sealed class BenchmarkServingRunner : IDisposable
             AcceptedDraftTokens = accepted,
             DraftAcceptancePercent = draft > 0 ? accepted * 100d / draft : 0,
             SpeculativeMetricsObserved = draft > 0,
-            ContextSize = item.LaunchSettings?.ContextSize ?? 0
+            ContextSize = item.LaunchSettings?.ContextSize ?? 0,
+            ObservedGpuMemoryUsedMiB = observedGpuMemoryMiB
         };
     }
 

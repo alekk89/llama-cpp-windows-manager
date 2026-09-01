@@ -34,7 +34,8 @@ public sealed class LaunchSettingsControlStateService
         var gpuRuntime = request.RuntimeBackend is RuntimeBackend.Cuda
             or RuntimeBackend.Vulkan
             or RuntimeBackend.Metal
-            or RuntimeBackend.Sycl;
+            or RuntimeBackend.Sycl
+            or RuntimeBackend.Rocm;
         var visionAvailable = true;
         var speculativeType = LaunchSettingMetadataService.NormalizeSpeculativeType(request.SpeculativeType);
         var draftAvailable = speculativeType.StartsWith("draft-", StringComparison.OrdinalIgnoreCase);

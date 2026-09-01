@@ -135,8 +135,9 @@ public sealed class OverviewPageViewModel
     {
         var sessionRows = sessions.ToArray();
         var sources = sessionRows
-            .OrderByDescending(session => session.IsSelected)
-            .ThenBy(session => session.ModelName, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(session => session.ModelName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(session => session.LaunchProfileName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(session => session.SessionId, StringComparer.OrdinalIgnoreCase)
             .Select(SessionRowSource.FromSnapshot)
             .ToArray();
         if (gateway == _lastSessionGateway
@@ -159,7 +160,10 @@ public sealed class OverviewPageViewModel
         if (gateway.Visible)
             yield return GatewayRow(gateway);
 
-        foreach (var session in sessions.OrderByDescending(session => session.IsSelected).ThenBy(session => session.ModelName, StringComparer.OrdinalIgnoreCase))
+        foreach (var session in sessions
+                     .OrderBy(session => session.ModelName, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(session => session.LaunchProfileName, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(session => session.SessionId, StringComparer.OrdinalIgnoreCase))
         {
             yield return new OverviewSessionRow
             {

@@ -60,8 +60,8 @@ and follow [release verification](UPDATES_AND_RELEASE_VERIFICATION.md).
 5. Wait for **Loaded** and copy the displayed `/v1` endpoint into an
    OpenAI-compatible client.
 
-CUDA targets NVIDIA GPUs, Vulkan commonly serves AMD and other Vulkan-capable
-devices, and SYCL targets Intel Arc. A CPU runtime is useful as a compatibility
+CUDA targets NVIDIA GPUs, Vulkan serves Vulkan-capable devices, ROCm targets
+supported AMD GPUs, and SYCL targets Intel Arc. A CPU runtime is useful as a compatibility
 fallback. WSL runtimes also require a working Ubuntu distribution and the tools
 or drivers required by the selected backend.
 
@@ -72,16 +72,21 @@ or drivers required by the selected backend.
 Overview is the operational dashboard. Use it to:
 
 - select a model, model group, and saved profile;
-- load or replace a profile;
+- load or restart a profile;
 - inspect or unload running sessions;
 - open direct endpoint and gateway reports;
 - watch model state, hardware, tokens, slots, cache, energy, and runtime logs;
 - customize the metric-card layout.
 
-Only one profile for the same physical model can run at a time. Other models can
-run concurrently when they use distinct ports and the host has enough capacity.
-Selecting a different profile for an already-loaded model replaces that model's
-session with the selected profile.
+Multiple profiles for the same physical model can run concurrently when they use
+distinct ports and the host has enough capacity. Selecting another profile starts
+an independent session; stopping or restarting one profile does not affect the
+other running profiles for that model.
+
+The model and launch-profile selectors are searchable. Opening either dropdown
+shows a search field; type any part of a visible name to filter its choices
+immediately. Use the star beside a model or profile to add or remove it from
+favorites. Favorites remain at the top of equivalent selector lists.
 
 Double-click a loaded-session or gateway row, or select its endpoint link, to
 open a read-only endpoint report. **Copy report** excludes the model API key;
@@ -116,6 +121,17 @@ Models owns GGUF inventory and launch profiles. Use it to:
 - create groups and assign profiles;
 - unregister or delete models according to ownership.
 
+The runtime selector above the model launch settings is searchable by runtime
+name. Its opened list shows what you type, and its star action keeps favorite
+runtimes at the top throughout the app.
+
+The **Model Files** and **Saved Launch Profiles** tables also have compact search
+fields that filter without adding a permanent full-width form row. Use the star
+at the start of either row, or **Add to favorites** from its context menu, to
+share that favorite state with Overview, Metrics, Benchmarks, and the tray.
+Saved profile context menus additionally expose **Load on startup** or **Do not
+load on startup**. Favorite-first sorting never selects or expands a row.
+
 Scanning reads GGUF role metadata before using narrow filename fallbacks.
 Main-model files are registered automatically. Projectors and speculative
 assistants are classified as companions. An ambiguous or companion-like file
@@ -133,6 +149,11 @@ Advanced mode for runtime-specific controls. See
 [Launch settings schema](LAUNCH_SETTINGS_SCHEMA.md) for the rendering,
 persistence, and safety rules.
 
+Advanced **Server** settings include a profile-specific **Host IP**. It is
+emitted as `--host` and saved with the launch profile. A non-loopback address is
+accepted only when Settings allows direct-model LAN access; local-only policy
+continues to bind the model to loopback.
+
 ### Runtimes
 
 Runtimes owns installed `llama-server` builds and available packages. Use it to:
@@ -144,9 +165,16 @@ Runtimes owns installed `llama-server` builds and available packages. Use it to:
 - check, download, and build supported source presets;
 - add a custom HTTPS source repository.
 
+Search filters the installed runtime inventory as you type. Use the compact star
+at the start of a runtime row to keep it above non-favorites everywhere runtime
+choices are shown. Use the adjacent vertical-ellipsis action to expand or
+collapse details; selecting or right-clicking the row does not change expansion.
+
 The normal path is a managed prebuilt package. Source builds are available when
 you need a custom branch or configuration. A source row follows **Check →
 Download → Build** so a moving branch is resolved before compilation.
+Official Windows and WSL ROCm packages use the same managed install, update,
+verification, and deletion workflow as the CUDA and Vulkan packages.
 
 The curated list distinguishes providers in every row. Alongside upstream
 `llama.cpp`, it includes compatible Atomic TurboQuant, `ik_llama.cpp`, and
@@ -183,6 +211,9 @@ same profile can be added again with a different runtime without creating an
 unintended cross-product. Remove individual rows with the purple × action or use
 **Clear**. The numbered workflow then starts with **1. Launch settings to test**
 followed by **2. Choose the request workload**.
+The model, profile, and runtime dropdowns show an in-list search field and
+filter in real time as you type. Their stars use the same persistent favorites
+as Overview, Metrics, and the launch-settings runtime selector.
 
 For the recommended saved-profile server benchmark, the complete saved launch
 configuration is inherited. Only comparison rows enabled on this page—and the
@@ -261,17 +292,28 @@ categories cover:
 
 - storage and cache;
 - window and startup behavior;
+- loading any number of saved model profiles when the Manager starts;
 - model idle unloading;
 - runtime source cleanup;
 - network exposure, gateway policy, and API-key authentication;
 - Overview and Models visibility choices;
 - electricity rates and idle GPU-energy tracking;
 - log size and Overview runtime-log order;
-- theme selection.
+- theme selection and additional UI scaling.
 
 Settings save automatically. Choices apply quickly. Ordinary text fields wait
 until typing pauses before entering the shared save debounce. Invalid input stays
 visible for correction and does not replace the last valid persisted value.
+
+**Load profiles on startup** lists saved model/profile pairs. Search or choose a
+pair from the dropdown and select **Add**; repeat for every profile that should
+start with the Manager. The same choice is available from the Saved Launch
+Profiles context menu. Remove a row to stop loading that profile automatically. Startup
+recovers still-running managed sessions first, leaves matching profiles alone,
+and then starts the remaining selections independently. One failure does not
+prevent later selections from being attempted. Every selected profile still
+needs a valid runtime and a unique direct API port, and normal memory admission
+rules still apply.
 
 Model-serving API-key authentication is enabled by default and is separate from
 the Manager's control credential. Authentication may be disabled only with
@@ -298,6 +340,9 @@ Metrics presents persisted usage and GPU-energy history. It includes:
 
 Use the model, profile, and runtime filters to narrow token usage. Select **1D**,
 **7D**, **30D**, or **All**, or choose exact dates in the calendar.
+Open any of the three dropdowns to see and edit its live filter text. Starred
+models, profiles, and runtimes appear first and share their favorite state with
+the other selectors.
 **Ctrl+click** toggles dates, **Shift+click** selects a continuous range, and
 **Ctrl+Shift+click** adds a range. The control API additionally supports current
 calendar-month and 90-day ranges.
@@ -381,9 +426,11 @@ One-shot `llwmctl` overrides do not change a saved profile unless explicitly
 saved.
 
 Groups contain launch profiles, not model records. A group load validates the
-complete set before starting anything: duplicate physical models, missing
-runtimes, port conflicts, and aggregate GPU memory can block the operation.
-Failure during startup rolls back members already started by that group action.
+complete set before starting anything: missing runtimes, port conflicts, and
+aggregate GPU memory can block the operation. Multiple profiles may reference
+the same physical GGUF; each starts as an independent session and counts toward
+the memory preflight. Failure during startup rolls back members already started
+by that group action.
 
 Retention controls automatic idle unloading:
 
@@ -409,10 +456,11 @@ to saved profiles. Each route reports its configured `context_length`; `0` means
 the profile uses automatic context sizing.
 
 The gateway can prefer keeping loaded models or enforce a Single active model.
-Concurrent requests for one active profile remain concurrent. A request for a
-different profile of the same GGUF waits for active responses before switching.
-Long streamed response bodies are not cut off by the bounded upstream-header
-wait.
+With **Prefer keeping loaded models**, routes for different profiles of the same
+GGUF can remain loaded together on their saved ports. With **Single active
+model**, a request waits for active responses before the gateway stops other
+sessions and starts the requested profile. Long streamed response bodies are not
+cut off by the bounded upstream-header wait.
 
 Model-serving exposure can remain local or allow the gateway, direct endpoints,
 or both on the LAN. LAN access also depends on Windows Firewall and, for WSL,
@@ -427,9 +475,33 @@ and Persian, and live Windows high-contrast palette changes. At narrow supported
 window widths, the Models page uses horizontal scrolling rather than clipping
 its launch form or actions.
 
-If a control is difficult to reach, collapse the navigation sidebar to give the
-current page more space. Use Windows display scaling normally; the initial window
-is constrained to the available monitor work area.
+If text or controls are too small after using Windows display scaling, choose
+**Settings → UI → UI scale**. The 75% to 175% slider moves in 1% steps, shows
+the current percentage, and adds an application-only multiplier on top of
+Windows per-monitor DPI scaling. The selected value applies to the main window
+and owned dialogs immediately as the slider moves, with no debounce or pause
+required, and persists once when the pointer or adjustment key is released.
+Use **Settings → UI → Text scale** for the same 75% to 175% live adjustment when
+only text should change size; controls, spacing, and window chrome retain their
+normal dimensions. At
+narrower window widths, Settings collapses its sections into one
+ordered column and returns to two columns when widened. Collapse the navigation
+sidebar when a larger scale needs more room. The initial window remains
+constrained to the available monitor work area.
+
+The Manager automatically remembers the main-window size, position, and
+maximized state. It also remembers table column widths and order plus the
+splitter positions that control page sections, such as the height assigned to
+Saved Launch Profiles. Layouts are stored separately for each page in the
+current workspace and restored when that page is opened again. If the saved
+monitor arrangement is no longer available, the window is moved back into the
+visible desktop area.
+
+Shared Models and Runtimes table columns can be narrowed to a compact 48-pixel
+minimum from either side of a header boundary. Text is allowed to clip at that
+point so the chosen proportions remain under user control. Delete and Remove columns
+retain their smaller **×** fallback; the Models Folder action uses a folder glyph
+when **Open** no longer fits. Widening either action restores its full label.
 
 ## Automation
 
@@ -446,7 +518,18 @@ llwmctl runtimes list
 llwmctl load <model> --profile <profile> --wait
 llwmctl sessions inspect <session>
 llwmctl metrics usage --range month
+llwmctl benchmarks schema
+llwmctl benchmarks validate --plan benchmark-plan.json
 ```
+
+Benchmark automation can validate, run, wait for, inspect, compare, export, and
+delete persisted runs. Starting a benchmark requires confirmation because it
+applies sustained load and may stop sessions when that setting is enabled. Run
+`llwmctl self` first and follow the self-stop protections in the operator guide.
+
+Favorite selectors, startup-profile selections, and remembered visual layouts
+are currently UI-managed preferences rather than control-API settings. Automation
+must not edit their SQLite tables or manipulate WPF controls.
 
 Automation must use `llwmctl`; do not edit SQLite state, launch `llama-server`
 directly, expose the control API, or automate WPF controls. Read

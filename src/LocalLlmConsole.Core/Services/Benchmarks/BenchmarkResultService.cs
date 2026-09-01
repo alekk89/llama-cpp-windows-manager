@@ -80,7 +80,7 @@ public static class BenchmarkResultService
                 String(root, "flash_attn"),
                 String(root, "devices"),
                 String(root, "tensor_split"),
-                String(root, "tensor_buft_overrides"),
+                StringAny(root, "tensor_buft_overrides", "tensor_buffer_overrides"),
                 String(root, "load_mode"),
                 Bool(root, "embeddings"),
                 Bool(root, "no_op_offload"),
@@ -108,7 +108,8 @@ public static class BenchmarkResultService
                 Long(root, "accepted_draft_tokens"),
                 Double(root, "draft_acceptance_percent"),
                 Bool(root, "speculative_metrics_observed"),
-                Int(root, "n_ctx"));
+                Int(root, "n_ctx"),
+                Long(root, "gpu_memory_used_mib"));
             return true;
         }
         catch (JsonException ex)
@@ -129,6 +130,8 @@ public static class BenchmarkResultService
 
     private static string String(JsonElement root, string name)
         => root.TryGetProperty(name, out var value) ? value.ToString() : "";
+    private static string StringAny(JsonElement root, params string[] names)
+        => names.Select(name => String(root, name)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "";
     private static int Int(JsonElement root, string name)
         => root.TryGetProperty(name, out var value) && value.TryGetInt32(out var parsed) ? parsed : 0;
     private static bool TryInt(JsonElement root, string name, out int parsed)

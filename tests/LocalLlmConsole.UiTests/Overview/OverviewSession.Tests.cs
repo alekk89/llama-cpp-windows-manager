@@ -16,12 +16,28 @@ public sealed class WpfOverviewSessionTests : WpfUiTestBase
             var (_, overview) = CreateOverviewSurface();
             Assert.Equal(0, Grid.GetRow(overview.LoadButton));
             Assert.Equal(1, Grid.GetRowSpan(overview.LoadButton));
-            Assert.Equal(240, overview.ModelCombo.Width);
-            Assert.Equal(220, overview.LaunchProfileCombo.Width);
+            Assert.True(double.IsNaN(overview.ModelCombo.Width));
+            Assert.True(double.IsNaN(overview.LaunchProfileCombo.Width));
+            Assert.IsType<LocalLlmConsole.SearchableComboBox>(overview.ModelCombo);
+            Assert.IsType<LocalLlmConsole.SearchableComboBox>(overview.LaunchProfileCombo);
+            Assert.False(overview.ModelCombo.IsEditable);
+            Assert.False(overview.LaunchProfileCombo.IsEditable);
             Assert.Equal(Grid.GetRow(overview.ModelCombo), Grid.GetRow(overview.LaunchProfileCombo));
             Assert.Equal(Grid.GetRow(overview.ModelCombo), Grid.GetRow(overview.LoadButton));
             Assert.True(Grid.GetColumn(overview.LoadButton) > Grid.GetColumn(overview.LaunchProfileCombo));
             Assert.InRange(overview.LoadButton.ActualHeight, 28, 36);
+            var modelWidth = overview.ModelCombo.ActualWidth;
+            var profileWidth = overview.LaunchProfileCombo.ActualWidth;
+            overview.Root.Measure(new Size(1180, 680));
+            overview.Root.Arrange(new Rect(0, 0, 1180, 680));
+            overview.Root.UpdateLayout();
+            Assert.True(overview.ModelCombo.ActualWidth > modelWidth);
+            Assert.True(overview.LaunchProfileCombo.ActualWidth > profileWidth);
+            overview.Root.Measure(new Size(900, 680));
+            overview.Root.Arrange(new Rect(0, 0, 900, 680));
+            overview.Root.UpdateLayout();
+            Assert.Equal(modelWidth, overview.ModelCombo.ActualWidth, precision: 1);
+            Assert.Equal(profileWidth, overview.LaunchProfileCombo.ActualWidth, precision: 1);
 
             var overviewState = new LocalLlmConsole.OverviewPageState();
             overviewState.Apply(overview);
@@ -37,11 +53,8 @@ public sealed class WpfOverviewSessionTests : WpfUiTestBase
             Assert.Equal("The model file is missing. Restore it or remove the catalog entry before loading.", overview.LoadButton.ToolTip);
             Assert.True(ToolTipService.GetShowOnDisabled(overview.LoadButton));
 
-            var launchProfileText = VisualDescendants<TextBlock>(overview.LaunchProfileCombo)
-                .Select(text => text.Text)
-                .ToArray();
-            Assert.Contains("Default", launchProfileText);
-            Assert.DoesNotContain(launchProfileText, text => text.Contains(nameof(OverviewLaunchProfileChoice), StringComparison.Ordinal));
+            Assert.Equal("Default", overview.LaunchProfileCombo.Text);
+            Assert.DoesNotContain(nameof(OverviewLaunchProfileChoice), overview.LaunchProfileCombo.Text, StringComparison.Ordinal);
             Assert.Equal(8, overview.LoadedSessionsGrid.Columns.Count);
             var sessionRow = Assert.Single(overview.LoadedSessionsGrid.Items.Cast<object>());
             Assert.NotNull(sessionRow);

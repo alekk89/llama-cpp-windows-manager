@@ -27,12 +27,16 @@ endpoints on native Windows or Ubuntu/WSL.
 * Installs or registers Windows and WSL `llama.cpp` runtimes.
 * Downloads, imports, scans, and organizes GGUF models.
 * Saves multiple launch profiles for each model.
-* Starts, stops, and switches favourite saved profiles from a themed tray menu.
+* Searches and favourites models, saved profiles, and runtimes consistently,
+  including quick profile control from the themed tray menu.
 * Runs and supervises several model servers on separate ports.
 * Provides direct endpoints and an optional shared gateway.
 * Tracks runtime health, logs, token usage, hardware metrics, and GPU energy.
+* Adds independent live UI and Text scaling on top of Windows per-monitor DPI
+  scaling, remembers resized tables and page sections, and keeps Settings
+  responsive between one and two columns.
 * Plans and runs unattended saved-profile serving benchmarks—including draft/MTP acceptance, concurrency, latency, and throughput—or explicit low-level `llama-bench` suites, with persisted CSV/JSON export.
-* Supports CPU, CUDA, Vulkan, and Intel Arc SYCL backends.
+* Supports CPU, NVIDIA CUDA, Vulkan, AMD ROCm, and Intel Arc SYCL backends.
 * Provides authenticated local automation through `llwmctl`.
 
 ## Why use it?
@@ -68,6 +72,9 @@ Verify the matching `.sha256` file before running a download. See
 3. Choose a runtime and save a launch profile.
 4. Select the model and profile in **Overview**, then choose **Load**.
 5. Connect an OpenAI compatible client to the displayed `/v1` endpoint.
+
+To keep saved profiles ready after a restart, add one or more model/profile pairs
+under **Settings → Load profiles on startup**.
 
 The [User guide](docs/USER_GUIDE.md) explains how the app fits together and how
 to use every page. It also covers profiles, groups, networking, metrics,

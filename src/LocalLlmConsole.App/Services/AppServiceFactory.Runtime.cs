@@ -165,6 +165,14 @@ public sealed partial class AppServiceFactory
         RuntimeToolPrerequisiteService runtimeTools)
         => new(runtimeTools);
 
+    public ProfileFitCapabilityService CreateProfileFitCapabilityService(IProcessRunner processRunner)
+        => new(processRunner);
+
+    public ProfileFitService CreateProfileFitService(
+        IProcessRunner processRunner,
+        ProfileFitCapabilityService capabilities)
+        => new(processRunner, capabilities);
+
     public RuntimeDeletionPlanner CreateRuntimeDeletionPlanner(
         StateStore stateStore,
         ModelLaunchProfileService launchProfiles,

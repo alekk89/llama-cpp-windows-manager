@@ -1,11 +1,15 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Globalization;
+using System.Windows.Input;
 using System.Windows.Media;
 using WpfApplication = System.Windows.Application;
 using WpfBinding = System.Windows.Data.Binding;
 using WpfButton = System.Windows.Controls.Button;
 using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfSlider = System.Windows.Controls.Slider;
 using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace LocalLlmConsole;
@@ -17,8 +21,10 @@ public static class SettingsGridColumnFactory
     public static DataGridTemplateColumn ValueColumn(
         RoutedEventHandler revealClick,
         RoutedEventHandler copyClick,
-        RoutedEventHandler primaryClick)
+        RoutedEventHandler primaryClick,
+        Action sliderCommitted)
     {
+        ArgumentNullException.ThrowIfNull(sliderCommitted);
         var root = new FrameworkElementFactory(typeof(DockPanel));
         root.SetBinding(FrameworkElement.ToolTipProperty, new WpfBinding(nameof(EditableSettingRow.ToolTip)));
 
@@ -85,7 +91,7 @@ public static class SettingsGridColumnFactory
         textBox.SetValue(FrameworkElement.HeightProperty, 28.0);
         textBox.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0));
         var textBoxStyle = new Style(typeof(WpfTextBox), (Style)WpfApplication.Current.Resources[typeof(WpfTextBox)]);
-        foreach (var hiddenType in new[] { "choice", "readonly", "secret" })
+        foreach (var hiddenType in new[] { "choice", "readonly", "secret", "slider" })
         {
             var trigger = new DataTrigger { Binding = new WpfBinding(nameof(EditableSettingRow.Type)), Value = hiddenType };
             trigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
@@ -113,6 +119,60 @@ public static class SettingsGridColumnFactory
         comboStyle.Triggers.Add(showComboForChoice);
         combo.SetValue(FrameworkElement.StyleProperty, comboStyle);
         editor.AppendChild(combo);
+
+        var sliderPanel = new FrameworkElementFactory(typeof(DockPanel));
+        sliderPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        sliderPanel.SetValue(FrameworkElement.HeightProperty, 28.0);
+        sliderPanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0));
+        var sliderPanelStyle = new Style(typeof(DockPanel));
+        sliderPanelStyle.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+        var showSlider = new DataTrigger { Binding = new WpfBinding(nameof(EditableSettingRow.Type)), Value = "slider" };
+        showSlider.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible));
+        sliderPanelStyle.Triggers.Add(showSlider);
+        sliderPanel.SetValue(FrameworkElement.StyleProperty, sliderPanelStyle);
+
+        var sliderValue = new FrameworkElementFactory(typeof(TextBlock));
+        sliderValue.SetValue(DockPanel.DockProperty, Dock.Right);
+        sliderValue.SetValue(FrameworkElement.WidthProperty, 50.0);
+        sliderValue.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right);
+        sliderValue.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        sliderValue.SetValue(TextBlock.ForegroundProperty, WpfApplication.Current.Resources["TextSoft"]);
+        sliderValue.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(EditableSettingRow.Value))
+        {
+            StringFormat = "{0}%"
+        });
+        sliderPanel.AppendChild(sliderValue);
+
+        var slider = new FrameworkElementFactory(typeof(WpfSlider));
+        slider.SetBinding(AutomationProperties.NameProperty, new WpfBinding(nameof(EditableSettingRow.Label)));
+        slider.SetBinding(WpfSlider.ValueProperty, new WpfBinding(nameof(EditableSettingRow.Value))
+        {
+            Mode = BindingMode.TwoWay,
+            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            Converter = new ScaleSliderValueConverter()
+        });
+        slider.SetValue(WpfSlider.MinimumProperty, (double)AppPreferenceService.ScaleMinimumPercent);
+        slider.SetValue(WpfSlider.MaximumProperty, (double)AppPreferenceService.ScaleMaximumPercent);
+        slider.SetValue(WpfSlider.TickFrequencyProperty, (double)AppPreferenceService.ScaleStepPercent);
+        slider.SetValue(WpfSlider.SmallChangeProperty, (double)AppPreferenceService.ScaleStepPercent);
+        slider.SetValue(WpfSlider.LargeChangeProperty, 25.0);
+        slider.SetValue(WpfSlider.IsSnapToTickEnabledProperty, true);
+        slider.SetValue(
+            WpfSlider.AutoToolTipPlacementProperty,
+            System.Windows.Controls.Primitives.AutoToolTipPlacement.TopLeft);
+        slider.SetValue(WpfSlider.AutoToolTipPrecisionProperty, 0);
+        slider.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
+        slider.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        slider.SetValue(FrameworkElement.MinWidthProperty, 120.0);
+        slider.SetValue(FrameworkElement.HeightProperty, 28.0);
+        slider.AddHandler(
+            UIElement.PreviewMouseLeftButtonUpEvent,
+            new MouseButtonEventHandler((_, _) => sliderCommitted()));
+        slider.AddHandler(
+            UIElement.PreviewKeyUpEvent,
+            new System.Windows.Input.KeyEventHandler((_, _) => sliderCommitted()));
+        sliderPanel.AppendChild(slider);
+        editor.AppendChild(sliderPanel);
 
         var textBlock = new FrameworkElementFactory(typeof(TextBlock));
         textBlock.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(EditableSettingRow.DisplayValue)));
@@ -184,4 +244,16 @@ public static class SettingsGridColumnFactory
         button.SetValue(FrameworkElement.StyleProperty, style);
         return button;
     }
+
+    private sealed class ScaleSliderValueConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => (double)AppPreferenceService.ParseUiScalePercent(value?.ToString(), AppSettings.DefaultUiScalePercent);
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => value is double percent
+                ? ((int)Math.Round(percent)).ToString(CultureInfo.InvariantCulture)
+                : WpfBinding.DoNothing;
+    }
+
 }

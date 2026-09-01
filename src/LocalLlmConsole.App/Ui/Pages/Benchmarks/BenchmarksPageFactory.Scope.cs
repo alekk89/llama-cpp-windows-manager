@@ -50,7 +50,7 @@ public static partial class BenchmarksPageFactory
             ("Runtime", nameof(BenchmarkScopeRow.Runtime), 1.25),
             ("Environment", nameof(BenchmarkScopeRow.Environment), .75));
         PageSectionFactory.AddButtonColumn(scopeProfiles, "", nameof(BenchmarkScopeRow.RemoveAction), nameof(BenchmarkScopeRow.CanRemove),
-            controller.RemoveProfile, .65, tooltipBinding: nameof(BenchmarkScopeRow.RemoveToolTip), visualRole: VisualRole.Danger);
+            controller.RemoveProfile, .65, tooltipBinding: nameof(BenchmarkScopeRow.RemoveToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         scopeProfiles.MinHeight = 118;
         scopeProfiles.MaxHeight = 220;
         scopeProfiles.SelectionMode = DataGridSelectionMode.Extended;
@@ -124,9 +124,9 @@ public static partial class BenchmarksPageFactory
             layout = nextLayout;
             if (layout == 2)
             {
-                SetBenchmarkColumns(bar, GridLength.Auto, new GridLength(240), new GridLength(16), GridLength.Auto,
-                    new GridLength(220), new GridLength(16), GridLength.Auto, new GridLength(220),
-                    new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto);
+                SetBenchmarkColumns(bar, GridLength.Auto, new GridLength(1.1, GridUnitType.Star), new GridLength(16), GridLength.Auto,
+                    new GridLength(1, GridUnitType.Star), new GridLength(16), GridLength.Auto, new GridLength(220),
+                    new GridLength(16), GridLength.Auto, GridLength.Auto);
                 PlaceBenchmarkControl(modelLabel, 0, 0);
                 PlaceBenchmarkControl(model, 0, 1);
                 PlaceBenchmarkControl(profileLabel, 0, 3);
@@ -138,8 +138,8 @@ public static partial class BenchmarksPageFactory
                 Grid.SetColumnSpan(model, 1);
                 Grid.SetColumnSpan(profile, 1);
                 Grid.SetColumnSpan(runtime, 1);
-                model.Width = 240;
-                profile.Width = runtime.Width = 220;
+                model.Width = profile.Width = double.NaN;
+                runtime.Width = 220;
                 profileLabel.Margin = runtimeLabel.Margin = new Thickness(0, 0, 8, 0);
                 profile.Margin = runtime.Margin = new Thickness(0);
                 add.MinWidth = clear.MinWidth = 94;
@@ -225,7 +225,11 @@ public static partial class BenchmarksPageFactory
 
     private static ComboBox OverviewSizedCombo(string name, double width)
     {
-        var combo = Combo(name);
+        var combo = new SearchableComboBox
+        {
+            FavoriteKeySelector = item => (item as BenchmarkSelectionItem)?.Id ?? ""
+        };
+        AutomationProperties.SetName(combo, name);
         combo.Width = width;
         combo.MinHeight = 30;
         combo.Height = double.NaN;

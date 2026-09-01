@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -12,7 +13,7 @@ namespace LocalLlmConsole;
 public sealed record RuntimesPageActions(
     Func<Task> ChooseRuntimeFolderAsync,
     Func<Task> ChangeCudaPackagePreferenceAsync,
-    MouseButtonEventHandler RuntimeGridPreviewMouseLeftButtonDown,
+    Func<RuntimeRecord, Task> ToggleRuntimeFavoriteAsync,
     RoutedEventHandler VerifyRuntimeRowClick,
     RoutedEventHandler DeleteRuntimeRowClick,
     RoutedEventHandler RuntimeSourceRowClick,
@@ -32,6 +33,7 @@ public sealed record RuntimesPageControls(
     Grid Root,
     TextBlock RuntimesFolderText,
     DataGrid RuntimeGrid,
+    DataGridSearchControls RuntimeSearch,
     DataGrid RuntimePackageGrid,
     WpfComboBox RuntimeCudaPreferenceCombo);
 
@@ -45,6 +47,9 @@ public static class RuntimesPageFactory
         root.Children.Add(header);
 
         var runtimeGrid = InstalledRuntimesGrid(request);
+        var runtimeSearch = DataGridSearch.Create(runtimeGrid,
+            item => item is RuntimeCatalogRow row ? $"{row.Name} {row.Backend} {row.State} {row.Location} {row.Details}" : "",
+            Loc.T("Runtimes.SearchInstalled"));
         var runtimeSection = FilteredSection(
             Loc.T("Runtimes.InstalledLocalBuildsTitle"),
             request.ViewModel.Runtimes.VendorFilters,
@@ -53,7 +58,8 @@ public static class RuntimesPageFactory
             request.ViewModel.Runtimes.SelectedPlatformFilter,
             (vendor, platform) => request.ViewModel.Runtimes.ApplyFilters(vendor, platform),
             runtimeGrid,
-            "InstalledRuntime");
+            "InstalledRuntime",
+            runtimeSearch.Root);
         Grid.SetRow(runtimeSection, 1);
         root.Children.Add(runtimeSection);
         root.Children.Add(PageSectionFactory.HorizontalGridSplitter(2));
@@ -75,6 +81,7 @@ public static class RuntimesPageFactory
             root,
             runtimesFolderText,
             runtimeGrid,
+            runtimeSearch,
             runtimePackageGrid,
             runtimeCudaPreferenceCombo);
     }
@@ -134,16 +141,25 @@ public static class RuntimesPageFactory
             (Loc.T("Runtimes.Col.Backend"), nameof(RuntimeCatalogRow.Backend), .55),
             (Loc.T("Runtimes.Col.State"), nameof(RuntimeCatalogRow.State), .55),
             (Loc.T("Runtimes.Col.Location"), nameof(RuntimeCatalogRow.Location), 3));
-        grid.RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.VisibleWhenSelected;
+        grid.RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.Collapsed;
         grid.RowDetailsTemplate = PageSectionFactory.RowDetailsTemplate(nameof(RuntimeCatalogRow.Details));
-        grid.PreviewMouseLeftButtonDown += request.Actions.RuntimeGridPreviewMouseLeftButtonDown;
+        grid.Columns.Insert(0, RuntimeDetailsColumn());
+        grid.Columns.Insert(1, SelectorFavoriteGridColumn.Create<RuntimeCatalogRow>(row =>
+            request.Actions.ToggleRuntimeFavoriteAsync(row.Runtime!), nameof(RuntimeCatalogRow.Runtime)));
+        grid.LoadingRow += (_, args) => args.Row.DetailsVisibility = args.Row.Item is RuntimeCatalogRow { IsDetailsExpanded: true }
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.Col.Trust"), nameof(RuntimeCatalogRow.VerifyAction), nameof(RuntimeCatalogRow.CanVerify), request.Actions.VerifyRuntimeRowClick, .62, tooltipBinding: nameof(RuntimeCatalogRow.VerifyToolTip));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.ActionButton"), nameof(RuntimeCatalogRow.DeleteAction), nameof(RuntimeCatalogRow.CanDelete), request.Actions.DeleteRuntimeRowClick, .65, tooltipBinding: nameof(RuntimeCatalogRow.DeleteToolTip), visualRole: VisualRole.Danger);
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.ActionButton"), nameof(RuntimeCatalogRow.DeleteAction), nameof(RuntimeCatalogRow.CanDelete), request.Actions.DeleteRuntimeRowClick, .65, tooltipBinding: nameof(RuntimeCatalogRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         PageSectionFactory.ApplyGridTextMargin(grid, new Thickness(6, 0, 6, 0));
         request.Actions.ConfigureRuntimeGridColumnSizing(grid);
         grid.ItemsSource = request.ViewModel.Runtimes.Rows;
         DataGridRowContextMenu.Attach(
             grid,
+            SelectorFavoriteContextAction.Create<RuntimeCatalogRow>(
+                row => row.IsFavorite,
+                row => row.Runtime is not null,
+                row => request.Actions.ToggleRuntimeFavoriteAsync(row.Runtime!)),
             new(row => ((RuntimeCatalogRow)row).VerifyAction,
                 row => row is RuntimeCatalogRow { CanVerify: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.VerifyRuntimeRowClick, row),
@@ -154,6 +170,41 @@ public static class RuntimesPageFactory
                 SeparatorBefore: true,
                 ToolTip: row => ((RuntimeCatalogRow)row).DeleteToolTip));
         return grid;
+    }
+
+    private static DataGridTemplateColumn RuntimeDetailsColumn()
+    {
+        var button = new FrameworkElementFactory(typeof(WpfButton));
+        button.SetBinding(ContentControl.ContentProperty, new System.Windows.Data.Binding(nameof(RuntimeCatalogRow.DetailsAction)));
+        button.SetBinding(UIElement.IsEnabledProperty, new System.Windows.Data.Binding(nameof(RuntimeCatalogRow.CanExpandDetails)));
+        button.SetBinding(FrameworkElement.TagProperty, new System.Windows.Data.Binding("."));
+        button.SetValue(FrameworkElement.ToolTipProperty, Loc.T("Runtimes.ExpandDetails"));
+        button.SetValue(AutomationProperties.NameProperty, Loc.T("Runtimes.ExpandDetails"));
+        InlineGlyphButtonVisual.ConfigureForDataGrid(button, 15);
+        button.AddHandler(WpfButton.ClickEvent, new RoutedEventHandler(ToggleRuntimeDetails));
+        return new DataGridTemplateColumn
+        {
+            Header = "",
+            CellTemplate = new DataTemplate(typeof(RuntimeCatalogRow)) { VisualTree = button },
+            CellStyle = InlineGlyphButtonVisual.CenteredDataGridCellStyle(),
+            Width = new DataGridLength(28),
+            MinWidth = 28,
+            MaxWidth = 28
+        };
+    }
+
+    private static void ToggleRuntimeDetails(object sender, RoutedEventArgs args)
+    {
+        if (sender is not WpfButton { Tag: RuntimeCatalogRow row } button
+            || VisualTreeTraversal.FindAncestor<DataGridRow>(button) is not { } container)
+            return;
+        row.IsDetailsExpanded = !row.IsDetailsExpanded;
+        container.DetailsVisibility = row.IsDetailsExpanded ? Visibility.Visible : Visibility.Collapsed;
+        button.Content = row.DetailsAction;
+        var label = Loc.T(row.IsDetailsExpanded ? "Runtimes.CollapseDetails" : "Runtimes.ExpandDetails");
+        button.ToolTip = label;
+        AutomationProperties.SetName(button, label);
+        args.Handled = true;
     }
 
     private static DataGrid RuntimePackageGrid(RuntimesPageRequest request)
@@ -167,7 +218,7 @@ public static class RuntimesPageFactory
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.BuildFromSourceTitle"), nameof(RuntimePackagePresetRow.BuildSourceAction), nameof(RuntimePackagePresetRow.CanBuildSource), request.Actions.RuntimeSourceRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.BuildSourceToolTip));
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.ActionBtn.Install"), nameof(RuntimePackagePresetRow.InstallAction), nameof(RuntimePackagePresetRow.CanInstall), request.Actions.InstallRuntimePackageRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.InstallToolTip));
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.ActionBtn.Update"), nameof(RuntimePackagePresetRow.CheckAction), nameof(RuntimePackagePresetRow.CanCheck), request.Actions.CheckRuntimePackageUpdateRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.CheckToolTip));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.DeleteButton"), nameof(RuntimePackagePresetRow.DeleteAction), nameof(RuntimePackagePresetRow.CanDelete), request.Actions.DeleteRuntimePackageRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.DeleteToolTip), visualRole: VisualRole.Danger);
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.DeleteButton"), nameof(RuntimePackagePresetRow.DeleteAction), nameof(RuntimePackagePresetRow.CanDelete), request.Actions.DeleteRuntimePackageRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         PageSectionFactory.ApplyGridTextMargin(grid, new Thickness(6, 0, 6, 0));
         request.Actions.ConfigureRuntimeBuildGridColumnSizing(grid);
         grid.ItemsSource = request.ViewModel.RuntimePackages.Rows;
@@ -201,7 +252,8 @@ public static class RuntimesPageFactory
         string selectedPlatform,
         Action<string, string> applyFilters,
         DataGrid dataGrid,
-        string namePrefix)
+        string namePrefix,
+        FrameworkElement? headerAction = null)
     {
         var section = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -225,6 +277,8 @@ public static class RuntimesPageFactory
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center
         };
+        if (headerAction is not null)
+            bar.Children.Add(headerAction);
         bar.Children.Add(FilterLabel("Type"));
         var vendor = FilterCombo(vendorOptions, selectedVendor, $"{namePrefix}TypeFilter");
         bar.Children.Add(vendor);

@@ -122,7 +122,9 @@ public sealed record MainWindowCoreRuntimeServices(
     RuntimeLaunchAdmissionService RuntimeLaunchAdmission,
     RuntimeToolPrerequisiteService RuntimeToolPrerequisites,
     RuntimeBuildPrerequisiteService RuntimeBuildPrerequisites,
-    RuntimeLaunchPrerequisiteService RuntimeLaunchPrerequisites);
+    RuntimeLaunchPrerequisiteService RuntimeLaunchPrerequisites,
+    ProfileFitCapabilityService ProfileFitCapabilities,
+    ProfileFitService ProfileFit);
 
 public sealed record MainWindowCoreModelServices(
     ModelCapabilityCacheService ModelCapabilities,
@@ -173,6 +175,8 @@ public sealed record MainWindowLoadedAppServices(
     StateStore StateStore,
     AppSettingsWorkflowService SettingsWorkflow,
     AppSettingsApplicationService SettingsApplication,
+    StartupLaunchProfileApplicationService StartupLaunchProfiles,
+    UiLayoutPersistenceService UiLayouts,
     CacheClearWorkflowService CacheClearWorkflow,
     LogPageWorkflowService LogPageWorkflow,
     LogPageApplicationService LogPageApplication,

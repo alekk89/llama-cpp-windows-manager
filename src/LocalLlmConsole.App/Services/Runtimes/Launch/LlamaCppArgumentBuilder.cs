@@ -21,7 +21,7 @@ public static class LlamaCppArgumentBuilder
         };
         // API key is passed via LLAMA_API_KEY environment variable (not CLI arg)
         // to avoid exposure in process command lines visible to Task Manager / WMI.
-        if (request.Backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Metal or RuntimeBackend.Sycl)
+        if (request.Backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Metal or RuntimeBackend.Sycl or RuntimeBackend.Rocm)
         {
             args.AddRange(["--n-gpu-layers", request.GpuLayers.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
             var gpuMode = LaunchSettingMetadataService.NormalizeGpuMode(request.GpuMode);
@@ -33,6 +33,8 @@ public static class LlamaCppArgumentBuilder
                 args.AddRange(["--device", gpuDevices]);
             if (gpuSplit.Length > 0)
                 args.AddRange(["--tensor-split", gpuSplit]);
+            if (!string.IsNullOrWhiteSpace(request.TensorBufferOverrides))
+                args.AddRange(["--override-tensor", request.TensorBufferOverrides.Trim()]);
         }
         args.AddRange([
             "--parallel", request.ParallelSlots.ToString(System.Globalization.CultureInfo.InvariantCulture),

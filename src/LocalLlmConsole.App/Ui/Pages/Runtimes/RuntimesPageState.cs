@@ -41,15 +41,6 @@ public sealed class RuntimesPageState
     public void RefreshRuntimeDownloadsGrid()
         => RuntimePackageGrid?.Items.Refresh();
 
-    public bool ClearSelectedRuntimeIfRowAlreadySelected(DataGridRow? row)
-    {
-        if (row?.IsSelected != true || RuntimeGrid is null)
-            return false;
-
-        RuntimeGrid.SelectedItem = null;
-        return true;
-    }
-
     public void RestoreRuntimeSelection(string? selectedId, IReadOnlyList<RuntimeCatalogRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);

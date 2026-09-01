@@ -47,11 +47,13 @@ public static partial class LaunchSettingsPanelFactory
 
     private static WpfComboBox RuntimeCombo(LaunchSettingsPanelRequest request)
     {
-        var combo = CrispCompactControl(new WpfComboBox
+        var combo = CrispCompactControl(new SearchableComboBox
         {
             ItemsSource = request.RuntimeChoices,
             ItemTemplate = RuntimeNameTemplate(),
             SelectedValuePath = nameof(RuntimeChoice.Id),
+            SearchTextSelector = item => (item as RuntimeChoice)?.DisplayName ?? "",
+            FavoriteKeySelector = item => (item as RuntimeChoice)?.Id ?? "",
             Height = 28,
             MinHeight = 28,
             Margin = new Thickness(0, 0, 4, 1),
@@ -59,23 +61,29 @@ public static partial class LaunchSettingsPanelFactory
             HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
             ToolTip = Loc.T("Tooltip.RuntimeCombo")
         });
+        TextSearch.SetTextPath(combo, nameof(RuntimeChoice.DisplayName));
         combo.SelectionChanged += (_, _) => request.RuntimeSelectionChanged();
         return combo;
     }
-
     private static Grid LaunchSettingsToolbar(
         LaunchSettingsPanelRequest request,
         out WpfTextBox searchBox,
+        out WpfButton fitButton,
         out WpfButton advancedButton)
     {
         const double toolbarControlHeight = 28;
         var grid = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var searchHost = LaunchSettingsSearchHost(request.LaunchSettingsSearchChanged, out searchBox);
         Grid.SetColumn(searchHost, 0);
         grid.Children.Add(searchHost);
+
+        fitButton = ToolbarFitButton(request, toolbarControlHeight);
+        Grid.SetColumn(fitButton, 1);
+        grid.Children.Add(fitButton);
 
         var showAdvanced = request.ShowAdvancedLaunchSettings;
         var toggleButton = new WpfButton
@@ -95,7 +103,7 @@ public static partial class LaunchSettingsPanelFactory
             request.AdvancedSettingsChanged(showAdvanced);
         };
         advancedButton = toggleButton;
-        Grid.SetColumn(advancedButton, 1);
+        Grid.SetColumn(advancedButton, 2);
         grid.Children.Add(advancedButton);
 
         return grid;
@@ -104,7 +112,9 @@ public static partial class LaunchSettingsPanelFactory
     private static string AdvancedButtonText(bool showAdvanced)
         => showAdvanced ? Loc.T("Launch.HideAdvanced") : Loc.T("Launch.ShowAdvanced");
 
-    private static WrapPanel ActionButtons(LaunchSettingsPanelRequest request, out WpfButton saveForModelButton)
+    private static WrapPanel ActionButtons(
+        LaunchSettingsPanelRequest request,
+        out WpfButton saveForModelButton)
     {
         var actions = Bar();
         saveForModelButton = Button(Loc.T("Launch.SaveForModelButton"), request.SaveForModelAsync);

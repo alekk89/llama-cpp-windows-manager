@@ -337,6 +337,8 @@ public sealed class RuntimeLaunchOptionsTests
         {
             ContextSize = 8192,
             Temperature = 0.4,
+            ModelAccessMode = "models",
+            Host = "10.10.10.21",
             CustomParameters = "--slot-save-path \"C:\\slot cache\""
         };
         var runtime = new RuntimeChoice("runtime", "Runtime", RuntimeBackend.Cpu, RuntimeMode.Native, "llama-server.exe");
@@ -346,6 +348,7 @@ public sealed class RuntimeLaunchOptionsTests
         Assert.Contains("--model <model.gguf>", preview, StringComparison.Ordinal);
         Assert.Contains("--ctx-size 8192", preview, StringComparison.Ordinal);
         Assert.Contains("--temp 0.4", preview, StringComparison.Ordinal);
+        Assert.Contains("--host 10.10.10.21", preview, StringComparison.Ordinal);
         Assert.Contains("--slot-save-path \"C:\\\\slot cache\"", preview, StringComparison.Ordinal);
     }
 

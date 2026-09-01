@@ -60,5 +60,5 @@ public sealed class RuntimeLaunchAdmissionService
     }
 
     private static bool RequiresAdmissionCheck(bool hasRunningGpuSessions, RuntimeRecord runtime)
-        => hasRunningGpuSessions && runtime.Backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl;
+        => hasRunningGpuSessions && runtime.Backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl or RuntimeBackend.Rocm;
 }

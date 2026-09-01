@@ -23,11 +23,11 @@ public partial class MainWindow
         SetPage("Overview", Loc.T("PageSubtitle.Overview"));
         if (rebuild || !_overviewPage.IsAvailable)
         {
-            var overview = OverviewPageFactory.Create(new OverviewPageRequest(
+            var overview = SelectorFavoriteBinding.ConfigureOverview(OverviewPageFactory.Create(new OverviewPageRequest(
                 _viewModel,
                 _pageControllers.Overview.Build(),
                 SetRuntimeMetricsGridColumnSizing,
-                _settings.OverviewDashboardLayout));
+                _settings.OverviewDashboardLayout)), () => _stateStore, SetStatus);
             _overviewPage.Apply(overview);
             _overviewPage.ApplyUiPreferences(_settings);
             _runtimeDashboardPage.Apply(overview);

@@ -7,7 +7,7 @@ public sealed record RuntimeSessionRecoveryApplicationActions(
     RuntimeEndpointStatusProbe IsEndpointAliveAsync,
     RuntimeEndpointStatusProbe IsEndpointRespondingAsync,
     Action<ModelRecord, AppSettings> StartLoadingStatus,
-    Action<ModelRecord, AppSettings> StartReadinessMonitor,
+    Action<LoadedModelSessionSnapshot> StartReadinessMonitor,
     Action<AppSettings?> ApplyActiveSettings,
     Action<string> SetStatus,
     Action StartRuntimeDashboardRefreshTimer,
@@ -80,7 +80,7 @@ public sealed class RuntimeSessionRecoveryApplicationService
             {
                 if (attachment.WasSelected)
                     actions.StartLoadingStatus(attachment.Model, attachment.Snapshot.LaunchSettings);
-                actions.StartReadinessMonitor(attachment.Model, attachment.Snapshot.LaunchSettings);
+                actions.StartReadinessMonitor(attachment.Snapshot);
             }
 
             actions.ApplyActiveSettings(_sessions.ActiveSettings);

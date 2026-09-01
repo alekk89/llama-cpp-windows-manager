@@ -294,7 +294,7 @@ public sealed class RuntimeSessionPresentationTests : ManagerRegressionTestBase
                 () => calls.Add("stop-loading"),
                 _ => calls.Add("active"),
                 () => { calls.Add("save"); return Task.CompletedTask; },
-                (_, _) => calls.Add("readiness"),
+                _ => calls.Add("readiness"),
                 () => calls.Add("dashboard"),
                 () => calls.Add("loading"),
                 () => { calls.Add("overview"); return Task.CompletedTask; },

@@ -270,4 +270,5 @@ public sealed record BenchmarkParsedResult(
     long AcceptedDraftTokens = 0,
     double DraftAcceptancePercent = 0,
     bool SpeculativeMetricsObserved = false,
-    int ContextSize = 0);
+    int ContextSize = 0,
+    long ObservedGpuMemoryUsedMiB = 0);

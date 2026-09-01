@@ -17,6 +17,8 @@ public sealed partial class AppServiceFactory
         var settingsApplication = CreateAppSettingsApplicationService(
             settingsWorkflow,
             CreateWindowsStartupRegistrationService());
+        var startupLaunchProfiles = CreateStartupLaunchProfileApplicationService(stateStore);
+        var uiLayouts = CreateUiLayoutPersistenceService(stateStore);
         var cacheClearWorkflow = CreateCacheClearWorkflowService(stateStore);
         var logPageWorkflow = CreateLogPageWorkflowService(stateStore);
         var logPageApplication = CreateLogPageApplicationService(logPageWorkflow);
@@ -93,6 +95,8 @@ public sealed partial class AppServiceFactory
                 stateStore,
                 settingsWorkflow,
                 settingsApplication,
+                startupLaunchProfiles,
+                uiLayouts,
                 cacheClearWorkflow,
                 logPageWorkflow,
                 logPageApplication,

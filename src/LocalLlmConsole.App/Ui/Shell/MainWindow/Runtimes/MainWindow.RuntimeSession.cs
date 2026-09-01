@@ -1,15 +1,3 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-using Forms = System.Windows.Forms;
-using WpfApplication = System.Windows.Application;
-using WpfBinding = System.Windows.Data.Binding;
-using WpfButton = System.Windows.Controls.Button;
-using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
-using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public partial class MainWindow
@@ -27,7 +15,7 @@ public partial class MainWindow
                 async (settings, token) => await _coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync(settings, token),
                 async (settings, token) => await _coreServices.Runtime.RuntimeEndpointProbe.IsRespondingAsync(settings, token),
                 (model, settings) => StartModelLoadingTimer(model.Id, model.Name, settings),
-                (model, settings) => StartRuntimeReadinessMonitor(model, settings),
+                session => StartRuntimeReadinessMonitor(session),
                 settings => _activeRuntimeSettings = settings,
                 SetStatus,
                 StartRuntimeDashboardRefreshTimer,
@@ -51,12 +39,16 @@ public partial class MainWindow
                 RefreshOverviewSessionRows,
                 UpdateOverviewModelActions));
         foreach (var session in result.RemovedSessions ?? [])
+        {
             await RecordRuntimeLifecycleAsync(
                 session.Status == LoadedModelSessionStatus.Failed ? "failed" : "unloaded",
                 session.SessionId,
                 session.ModelId,
                 session.ModelName,
                 new { status = session.Status.ToString(), session.StatusReason, session.ProcessId });
+            if (session.Status == LoadedModelSessionStatus.Failed)
+                await _launchSettingsController.OfferOutOfMemoryRecoveryAsync(session);
+        }
         if ((result.RemovedSessions?.Count ?? 0) > 0)
             ApplyGpuEnergyTrackingBoundary();
     }
@@ -65,9 +57,8 @@ public partial class MainWindow
     {
         var metricsSessionId = _sessions.SelectedSnapshot()?.SessionId ?? "";
         var sessions = _sessions.OverviewSnapshots();
-        _viewModel.Overview.ReplaceSessionsIfChanged(sessions, OverviewGatewayRoutingStatus(sessions));
-
         using var selectionScope = _coreServices.Ui.SelectionReentrancy.SuppressLoadedSessionSelection();
+        _viewModel.Overview.ReplaceSessionsIfChanged(sessions, OverviewGatewayRoutingStatus(sessions));
         _overviewPage.RestoreLoadedSessionSelection(metricsSessionId, _viewModel.Overview.SessionRows);
     }
 

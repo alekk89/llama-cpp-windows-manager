@@ -86,6 +86,17 @@ public static partial class LaunchSettingsPanelFactory
         return button;
     }
 
+    private static WpfButton ToolbarFitButton(LaunchSettingsPanelRequest request, double height)
+    {
+        var button = Button(Loc.T("Launch.FitVramButton"), request.FitToAvailableVramAsync);
+        button.Height = height;
+        button.MinHeight = height;
+        button.Margin = new Thickness(0, 0, 6, 0);
+        button.ToolTip = Loc.T("Tooltip.FitVramButton");
+        ToolTipService.SetShowOnDisabled(button, true);
+        return button;
+    }
+
     private static string ButtonToolTip(string text)
     {
         var t = (text ?? "").Trim();

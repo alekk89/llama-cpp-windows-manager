@@ -48,7 +48,7 @@ public partial class MainWindow
                 StopLoadingStatus: () => StopModelLoadingTimer(),
                 SetActiveRuntimeSettings: settings => _activeRuntimeSettings = settings,
                 SaveActiveRuntimeSessionsAsync: SaveActiveRuntimeSessionsAsync,
-                StartReadinessMonitor: (loadingModel, settings) => StartRuntimeReadinessMonitor(loadingModel, settings, selectLoadedOverviewModel),
+                StartReadinessMonitor: session => StartRuntimeReadinessMonitor(session, selectLoadedOverviewModel),
                 StartRuntimeDashboardRefresh: StartRuntimeDashboardRefreshTimer,
                 UpdateLoadingStatus: UpdateModelLoadingStatus,
                 RefreshOverviewAsync: RefreshOverviewAsync,
@@ -131,19 +131,19 @@ public partial class MainWindow
             SetStatus(plan.StatusText);
     }
 
-    private void StartRuntimeReadinessMonitor(ModelRecord model, AppSettings launchSettings, bool selectLoadedOverviewModel = true)
+    private void StartRuntimeReadinessMonitor(LoadedModelSessionSnapshot session, bool selectLoadedOverviewModel = true)
     {
-        var cts = _coreServices.Ui.RuntimeReadinessMonitors.Start(model.Id);
+        var cts = _coreServices.Ui.RuntimeReadinessMonitors.Start(session.SessionId);
         RunBackground(
             () => _coreServices.Runtime.RuntimeReadinessMonitorApplication.RunAsync(
                 new RuntimeReadinessMonitorApplicationRequest(
-                    model.Id,
-                    model.Name,
-                    launchSettings,
-                    _coreServices.Models.ModelRuntimeStatus.IsLoadingModel(model.Id),
+                    session.SessionId,
+                    session.ModelName,
+                    session.LaunchSettings,
+                    _coreServices.Models.ModelRuntimeStatus.IsLoadingModel(session.ModelId),
                     _viewModel.CurrentPage == "Overview",
                     cts),
-                RuntimeReadinessMonitorActions(model.Id, model.Name, selectLoadedOverviewModel)),
+                RuntimeReadinessMonitorActions(session, selectLoadedOverviewModel)),
             "Runtime readiness monitor failed");
     }
 
@@ -154,36 +154,24 @@ public partial class MainWindow
 
     private void StopRuntimeReadinessMonitor(string modelId)
     {
-        _coreServices.Ui.RuntimeReadinessMonitors.Stop(modelId);
+        _coreServices.Ui.RuntimeReadinessMonitors.StopSessionOrModel(modelId, _sessions.Snapshots());
     }
 
     private RuntimeReadinessMonitorApplicationActions RuntimeReadinessMonitorActions(
-        string modelId,
-        string modelName,
+        LoadedModelSessionSnapshot loadingSession,
         bool selectLoadedOverviewModel = true)
-        => new(
-            id => _sessions.SessionForModel(id),
+        => RuntimeReadinessMonitorActionFactory.Create(
+            _sessions,
+            _coreServices.Ui.RuntimeReadinessMonitors,
+            loadingSession,
             (settings, token) => _coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync(settings, token),
             (settings, token) => _coreServices.Runtime.RuntimeEndpointProbe.VerifyAuthenticationAsync(settings, token),
-            id => _sessions.MarkModelLoadedIfRunning(id),
-            new RuntimeReadinessCompletionActions(
-                showLoadedDuration => StopModelLoadingTimer(showLoadedDuration, modelName),
-                () => selectLoadedOverviewModel ? SelectOverviewLoadedModelAsync(modelId) : Task.CompletedTask,
-                SaveActiveRuntimeSessionsAsync,
-                SetStatus,
-                () =>
-                {
-                    UpdateOverviewModelActions();
-                    QueueOpenTrayProfileMenuRefresh();
-                },
-                RefreshRuntimeMetricsAsync,
-                async () =>
-                {
-                    var session = _sessions.SessionForModel(modelId);
-                    if (session is not null)
-                        await _sessions.StopAsync(session.SessionId, "Runtime authentication enforcement failed.");
-                }),
-            (modelId, source) => _coreServices.Ui.RuntimeReadinessMonitors.Complete(modelId, source));
+            showLoadedDuration => StopModelLoadingTimer(showLoadedDuration, loadingSession.ModelName),
+            selectLoadedOverviewModel ? _overviewSelection.SelectLoadedSessionAsync : (_, _) => Task.CompletedTask,
+            SaveActiveRuntimeSessionsAsync,
+            SetStatus,
+            () => { UpdateOverviewModelActions(); QueueOpenTrayProfileMenuRefresh(); },
+            RefreshRuntimeMetricsAsync);
 
     private async Task StopLoadedRuntimeAsync()
     {
@@ -213,11 +201,9 @@ public partial class MainWindow
             await RecordRuntimeLifecycleAsync("unloaded", stoppedSession.SessionId, stoppedSession.ModelId, stoppedSession.ModelName);
     }
 
-    private async Task SwitchToLoadedModelAsync(ModelRecord model)
+    private async Task SwitchToLoadedModelAsync(ModelRecord model, string launchProfileId = "")
     {
-        await _coreServices.Runtime.RuntimeSessionApplication.SwitchToModelAsync(
-            model,
-            new RuntimeSwitchApplicationActions(
+        var actions = new RuntimeSwitchApplicationActions(
                 settings => _activeRuntimeSettings = settings,
                 ResetMetricCounters,
                 SaveActiveRuntimeSessionsAsync,
@@ -225,7 +211,11 @@ public partial class MainWindow
                 RefreshOverviewModelSelectorAsync,
                 RefreshRuntimeMetricsAsync,
                 UpdateOverviewModelActions,
-                SetStatus));
+                SetStatus);
+        if (string.IsNullOrWhiteSpace(launchProfileId))
+            await _coreServices.Runtime.RuntimeSessionApplication.SwitchToModelAsync(model, actions);
+        else
+            await _coreServices.Runtime.RuntimeSessionApplication.SwitchToProfileAsync(model, launchProfileId, actions);
     }
 
     private RuntimeStopApplicationActions RuntimeStopActions()

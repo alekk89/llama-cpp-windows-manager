@@ -55,8 +55,14 @@ public sealed partial class LoadedModelSessionManager
         }
     }
 
-    public static string SessionIdFor(string modelId)
-        => ModelCatalogService.SafeId($"session-{modelId}");
+    public static string SessionIdFor(string modelId, string launchProfileId = "")
+        => string.IsNullOrWhiteSpace(launchProfileId)
+            ? ModelCatalogService.SafeId($"session-{modelId}")
+            : ModelCatalogService.SafeId($"session-{ProfileHash(launchProfileId)}-{modelId}-{launchProfileId}");
+
+    private static string ProfileHash(string launchProfileId)
+        => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(launchProfileId.ToLowerInvariant())))[..8].ToLowerInvariant();
 
     private LlamaProcessSupervisor CreateSupervisor()
         => _createSupervisor() ?? throw new InvalidOperationException("Supervisor factory returned no supervisor.");

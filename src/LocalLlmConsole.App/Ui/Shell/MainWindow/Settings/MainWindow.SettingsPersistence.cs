@@ -1,15 +1,3 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-using Forms = System.Windows.Forms;
-using WpfApplication = System.Windows.Application;
-using WpfBinding = System.Windows.Data.Binding;
-using WpfButton = System.Windows.Controls.Button;
-using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
-using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public partial class MainWindow
@@ -24,6 +12,12 @@ public partial class MainWindow
         _coreServices.Ui.SettingsAutoApply.Schedule(
             cancellationToken => SaveSettingsAsync(themeMode, values, cancellationToken),
             action => RunBackground(action, "Automatic settings apply failed"));
+    }
+
+    private void ApplyLiveUiScale(int percent)
+    {
+        _coreServices.Ui.SettingsAutoApply.Cancel();
+        ApplicationUiScaleService.Apply(percent);
     }
 
     private async Task SaveSettingsAsync(
@@ -51,6 +45,7 @@ public partial class MainWindow
                     settings.RuntimeLogOrder,
                     StringComparison.OrdinalIgnoreCase);
                 _settings = settings;
+                ApplicationUiScaleService.Apply(settings.UiScalePercent); ApplicationFontScaleService.Apply(settings.FontScalePercent);
                 ApplyTrayIconVisibilityPreference();
                 if (_viewModel.CurrentPage == "Settings")
                     _settingsPage.Synchronize(() => _viewModel.Settings.ApplyPersistedSettings(settings));

@@ -27,9 +27,10 @@ public sealed class RuntimeSessionCoordinator
         string modelId,
         AppSettings launchSettings,
         bool autoLoadGatewayEnabled,
-        int autoLoadGatewayPort)
+        int autoLoadGatewayPort,
+        string launchProfileId = "")
     {
-        var sessionId = LoadedModelSessionManager.SessionIdFor(modelId);
+        var sessionId = LoadedModelSessionManager.SessionIdFor(modelId, launchProfileId);
         if (_sessions.ReservedPorts(sessionId).Contains(launchSettings.Port))
             throw new InvalidOperationException($"Port {launchSettings.Port} is already assigned to another loaded model. Set a unique model port next to the runtime before launching.");
         if (autoLoadGatewayEnabled && launchSettings.Port == autoLoadGatewayPort)
@@ -67,6 +68,12 @@ public sealed class RuntimeSessionCoordinator
     public RuntimeSessionSelectResult SelectSession(string sessionId)
     {
         var selected = _sessions.SelectSession(sessionId);
+        return new RuntimeSessionSelectResult(selected, _sessions.ActiveSettings);
+    }
+
+    public RuntimeSessionSelectResult SelectProfile(string modelId, string launchProfileId)
+    {
+        var selected = _sessions.SelectProfile(modelId, launchProfileId);
         return new RuntimeSessionSelectResult(selected, _sessions.ActiveSettings);
     }
 

@@ -265,7 +265,7 @@ public static partial class BenchmarksPageFactory
         history.SelectionMode = DataGridSelectionMode.Extended;
         PageSectionFactory.AddButtonColumn(
             history, "", nameof(BenchmarkRunRow.RemoveAction), nameof(BenchmarkRunRow.CanRemove),
-            controller.RemoveRun, .65, tooltipBinding: nameof(BenchmarkRunRow.RemoveToolTip), visualRole: VisualRole.Danger);
+            controller.RemoveRun, .65, tooltipBinding: nameof(BenchmarkRunRow.RemoveToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         content.Children.Add(PageSectionFactory.GridSection("Recent runs", history, "Double-click one run to view its report, or select exactly two and double-click to compare. Right-click for more actions."));
         var historyPage = Muted("Page 1");
         var historyPrevious = Button("Previous", controller.PreviousHistoryPage);

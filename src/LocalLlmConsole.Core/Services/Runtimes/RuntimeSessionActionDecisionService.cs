@@ -16,7 +16,7 @@ public sealed class RuntimeSessionActionDecisionService
 {
     public RuntimeStopDecision StopSelected(LoadedModelSessionSnapshot? selectedSession, bool selectedModelIsLoading)
     {
-        var selectedModelId = selectedSession?.ModelId ?? "";
+        var selectedModelId = selectedSession?.SessionId ?? "";
         return new RuntimeStopDecision(
             selectedModelId,
             string.IsNullOrWhiteSpace(selectedModelId) || selectedModelIsLoading,

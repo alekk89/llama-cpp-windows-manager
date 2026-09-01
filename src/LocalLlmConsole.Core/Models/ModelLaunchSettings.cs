@@ -67,9 +67,11 @@ public sealed record ModelLaunchSettings(
     string GpuMode = AppSettings.DefaultGpuMode,
     string GpuDevices = "",
     string GpuSplit = "",
+    string TensorBufferOverrides = "",
     string ReasoningEffort = "default",
     string ReasoningBudgetMessage = "",
-    string ReasoningPreserve = "auto")
+    string ReasoningPreserve = "auto",
+    string Host = "127.0.0.1")
 {
     public static ModelLaunchSettings FromAppSettings(AppSettings settings, string runtimeId = "") => new(
         settings.ContextSize,
@@ -130,9 +132,11 @@ public sealed record ModelLaunchSettings(
         settings.GpuMode,
         settings.GpuDevices,
         settings.GpuSplit,
+        settings.TensorBufferOverrides,
         settings.ReasoningEffort,
         settings.ReasoningBudgetMessage,
-        settings.ReasoningPreserve);
+        settings.ReasoningPreserve,
+        settings.Host);
 
     public AppSettings ApplyTo(AppSettings settings) => settings with
     {
@@ -195,6 +199,8 @@ public sealed record ModelLaunchSettings(
         CustomParameters = CustomParameters ?? "",
         GpuMode = GpuMode ?? AppSettings.DefaultGpuMode,
         GpuDevices = GpuDevices ?? "",
-        GpuSplit = GpuSplit ?? ""
+        GpuSplit = GpuSplit ?? "",
+        TensorBufferOverrides = TensorBufferOverrides ?? "",
+        Host = string.IsNullOrWhiteSpace(Host) ? settings.Host : Host.Trim()
     };
 }

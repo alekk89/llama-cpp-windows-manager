@@ -1,15 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-using Forms = System.Windows.Forms;
-using WpfApplication = System.Windows.Application;
-using WpfBinding = System.Windows.Data.Binding;
-using WpfButton = System.Windows.Controls.Button;
-using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
-using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public partial class MainWindow : Window
@@ -50,12 +39,13 @@ public partial class MainWindow : Window
             _launchSettingsPanel,
             _coreServices.Ui,
             _coreServices.Models,
+            _coreServices.Runtime,
             new LaunchSettingsPageControllerActions(
                 Settings: () => _settings,
                 SetSettings: settings => _settings = settings,
                 SelectedModel: SelectedModel,
                 SelectedProfileId: SelectedModelLaunchProfileId,
-                SelectedRuntimeId: SelectedLaunchRuntimeId,
+                SelectedRuntimeId: SelectedLaunchRuntimeId, SelectedRuntime: () => _launchSettingsPanel.RuntimeCombo?.SelectedItem as RuntimeChoice,
                 ModelServices: () => ModelServices,
                 RunBusyAsync: RunAsync,
                 RunBackground: RunBackground,
@@ -63,6 +53,7 @@ public partial class MainWindow : Window
                 ApplyModelCapabilitiesAsync: ApplyModelCapabilitiesAsync,
                 RefreshModelsAsync: RefreshModelsAsync,
                 SelectProfileAfterRefresh: SelectLaunchProfileAfterRefresh,
+                SelectModelAfterRefresh: SelectModelAfterRefresh,
                 RefreshOverviewModelsAsync: RefreshOverviewModelSelectorAsync,
                 PersistSettingsAsync: PersistSettingsAsync,
                 UpdateControlVisibility: UpdateLaunchControlVisibility,
@@ -71,6 +62,9 @@ public partial class MainWindow : Window
                 NormalizeContextSize: NormalizeContextSizeBox,
                 CancelRuntimeOptionDiscovery: CancelRuntimeLaunchOptionDiscovery,
                 PickOpenFile: request => _coreServices.App.FileSystemDialogs.PickOpenFile(request, this),
+                OpenBenchmarkPlan: OpenBenchmarkPlan,
+                ShowModels: ShowModels,
+                OpenLog: OpenLogPath,
                 SetStatus: SetStatus));
         _overviewSelection = new OverviewSelectionController(
             _viewModel,
@@ -111,6 +105,7 @@ public partial class MainWindow : Window
                         {
                             _settings = settings;
                             ApplicationThemeService.Apply(settings.ThemeMode);
+                            ApplicationUiScaleService.Apply(settings.UiScalePercent); ApplicationFontScaleService.Apply(settings.FontScalePercent);
                             Loc.LoadLanguage(settings.UiCulture);
                             ApplyLocalizedXamlStrings();
                             PopulateLanguageSelector();
@@ -119,10 +114,14 @@ public partial class MainWindow : Window
                     ApplyLoadedServices,
                     service => _service = service,
                     SetStatus));
+            await AppServices.UiLayouts.AttachShellAsync(this, PageHost, () => _viewModel.CurrentPage);
             RunBackground(SeedSuggestedLaunchProfilesInBackgroundAsync, "Launch profile seeding follow-up failed");
             ShowOverview(refresh: false);
             await RefreshAllAsync();
             await RecoverActiveRuntimeSessionAsync();
+            await AppServices.StartupLaunchProfiles.LoadConfiguredAsync(new(
+                (model, profile, token) => EnsureGatewayModelLoadedAsync(new(model, profile), ModelGatewaySwapPolicy.KeepLoaded, token),
+                (model, profile) => _sessions.SessionForProfile(model.Id, profile.Id) is { IsRunning: true }, SetStatus));
             await StartModelGatewaySafelyAsync();
             StartGpuEnergyTrackingTimer();
             RunBackground(AutoSelectDetectedWslDistroAsync, "WSL distro auto-select failed");
@@ -177,9 +176,7 @@ public partial class MainWindow : Window
     private async void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         var controlShutdownConfirmed = Interlocked.Exchange(ref _controlShutdownConfirmed, 0) == 1;
-        // Cancel synchronously before the first await. Otherwise WPF can continue
-        // closing the window while cleanup is still running, and the follow-up
-        // Close() below then throws because the window is already closing.
+        // Cancel before awaiting so WPF does not continue closing during cleanup.
         e.Cancel = true;
         try
         {
@@ -212,6 +209,7 @@ public partial class MainWindow : Window
 
     private async Task ShutdownAsync()
     {
+        if (_appServices is not null) await _appServices.UiLayouts.SaveShellAsync();
         var cleanup = await _coreServices.App.ShutdownCleanupApplication.CleanupAsync(new AppShutdownCleanupActions(
             StopDownloadHistoryRefreshTimer: _coreServices.Ui.DownloadHistoryRefreshTimer.Stop,
             StopRuntimeDashboardRefreshTimer: _coreServices.Ui.RuntimeDashboardRefreshTimer.Stop,

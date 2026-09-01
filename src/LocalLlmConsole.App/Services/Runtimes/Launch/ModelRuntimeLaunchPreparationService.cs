@@ -16,7 +16,8 @@ public sealed record ModelRuntimeLaunchPreparationRequest(
     ModelRuntimeApiKeyEnsurer EnsureApiKeyAsync,
     RuntimeEndpointRespondingProbe EndpointRespondingAsync,
     RuntimeLaunchAdmissionConfirmation? ConfirmAdmissionAsync = null,
-    RuntimeLaunchMemoryReader? ReadMemoryAsync = null);
+    RuntimeLaunchMemoryReader? ReadMemoryAsync = null,
+    string LaunchProfileId = "");
 
 public sealed record ModelRuntimeLaunchPreparationResult(
     bool CanLaunch,
@@ -57,7 +58,8 @@ public sealed class ModelRuntimeLaunchPreparationService
             request.Model.Id,
             launchSettings,
             request.AutoLoadGatewayEnabled,
-            request.AutoLoadGatewayPort);
+            request.AutoLoadGatewayPort,
+            request.LaunchProfileId);
         await _runtimeLaunchPrerequisites.EnsureReadyAsync(new RuntimeLaunchPrerequisiteRequest(
             request.Runtime,
             launchSettings,

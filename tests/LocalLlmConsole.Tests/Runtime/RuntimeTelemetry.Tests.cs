@@ -124,7 +124,7 @@ public sealed class RuntimeTelemetryTests : ManagerRegressionTestBase
             id => Task.FromResult<ModelRecord?>(id == model.Id ? model : null),
             unloaded =>
             {
-                stopped.Add(unloaded.Id);
+                stopped.Add(unloaded.ModelId);
                 return Task.CompletedTask;
             },
             statuses.Add);

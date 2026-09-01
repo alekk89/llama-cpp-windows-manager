@@ -4,6 +4,7 @@ namespace LocalLlmConsole;
 
 public sealed record SettingsPageActionControllerActions(
     Action PreviewTheme,
+    Action CommitSlider,
     Func<object, EditableSettingRow?> RowFromSender,
     Func<EditableSettingRow?, Task> RunRowActionAsync,
     Action<EditableSettingRow?> ToggleSecret,
@@ -24,7 +25,8 @@ public sealed class SettingsPageActionController
             (_, _) => _actions.PreviewTheme(),
             RevealSecretRow_Click,
             CopySecretRow_Click,
-            RowAction_Click);
+            RowAction_Click,
+            _actions.CommitSlider);
 
     private async void RowAction_Click(object sender, RoutedEventArgs e)
     {

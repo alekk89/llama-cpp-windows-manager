@@ -134,11 +134,11 @@ public sealed class OverviewTelemetryTests : ManagerRegressionTestBase
             () => calls.Add("actions"),
             status => calls.Add($"status:{status}"));
 
-        var ignored = await service.SelectAsync("", actions, TestContext.Current.CancellationToken);
-        var selectedAfterRefresh = await service.SelectAsync(model.Id, actions, TestContext.Current.CancellationToken);
+        var ignored = await service.SelectAsync("", "", actions, TestContext.Current.CancellationToken);
+        var selectedAfterRefresh = await service.SelectAsync(model.Id, "session-1", actions, TestContext.Current.CancellationToken);
         knownModels.Clear();
         selectSucceeds = false;
-        var stale = await service.SelectAsync(model.Id, actions, TestContext.Current.CancellationToken);
+        var stale = await service.SelectAsync(model.Id, "session-1", actions, TestContext.Current.CancellationToken);
 
         Assert.Equal(OverviewLoadedSessionSelectionOutcome.Ignored, ignored);
         Assert.Equal(OverviewLoadedSessionSelectionOutcome.Selected, selectedAfterRefresh);
@@ -148,7 +148,7 @@ public sealed class OverviewTelemetryTests : ManagerRegressionTestBase
             "refresh-selector",
             $"find:{model.Id}",
             $"select-ui:{model.Id}",
-            $"select-runtime:{model.Id}",
+            "select-runtime:session-1",
             "active:8085",
             "save",
             "metrics",
@@ -158,7 +158,7 @@ public sealed class OverviewTelemetryTests : ManagerRegressionTestBase
             "refresh-selector",
             $"find:{model.Id}",
             $"select-ui:{model.Id}",
-            $"select-runtime:{model.Id}",
+            "select-runtime:session-1",
             "status:Selected session is no longer loaded."
         ], calls);
     }

@@ -90,7 +90,7 @@ public partial class MainWindow
                 models,
                 runtimes,
                 new OverviewModelGroupLoadApplicationActions(
-                    async (model, _) => await StopModelRuntimeAsync(model),
+                    async (sessionId, _) => await _overviewSelection.UnloadSessionAsync(sessionId),
                     async (runtime, model, settings, profileId, profileName, _) => await StartModelRuntimeAsync(
                         runtime,
                         model,
@@ -126,16 +126,14 @@ public partial class MainWindow
 
     private async Task LoadLaunchProfileAsync(ModelRecord model, NamedModelLaunchProfile profile)
     {
-        var loadedProfileId = _sessions.SessionForModel(model.Id) is { IsRunning: true } session
-            ? session.LaunchProfileId
-            : "";
+        var selectedProfileLoaded = _sessions.SessionForProfile(model.Id, profile.Id) is { IsRunning: true };
         await _coreServices.Models.ModelRuntimeLoadApplication.LoadOverviewAsync(
             new OverviewModelRuntimeLoadApplicationRequest(
                 model,
                 IsModelLoaded(model),
                 IsModelActive(model),
                 AppReady: true,
-                SelectedProfileLoaded: string.Equals(loadedProfileId, profile.Id, StringComparison.OrdinalIgnoreCase)),
+                SelectedProfileLoaded: selectedProfileLoaded),
             ModelRuntimeLoadActions(() => _settings, profile.Id, profile.Name));
     }
 
@@ -154,12 +152,12 @@ public partial class MainWindow
         bool restoreForInteractivePrompts = false)
         => new(
             runBusyAsync ?? RunResponsiveAsync,
-            SwitchToLoadedModelAsync,
+            model => SwitchToLoadedModelAsync(model, launchProfileId),
             () => RenderSelectedModelLaunchSettingsAsync(),
             readLaunchSettings,
             ListRuntimesAsync,
             model => DraftModelLaunchProfileAsync(model, launchProfileId),
-            StopModelRuntimeAsync,
+            model => _overviewSelection.UnloadSessionAsync(LoadedModelSessionManager.SessionIdFor(model.Id, launchProfileId)),
             (runtime, model, launchSettings) => StartModelRuntimeAsync(
                 runtime,
                 model,

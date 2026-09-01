@@ -6,13 +6,14 @@ public partial class MainWindow
 {
     private UIElement CreateLaunchSettingsPanel()
     {
-        var panel = LaunchSettingsPanelFactory.Create(new LaunchSettingsPanelRequest(
+        var panel = SelectorFavoriteBinding.ConfigureLaunchSettings(LaunchSettingsPanelFactory.Create(new LaunchSettingsPanelRequest(
             _settings,
             _viewModel.LaunchSettings.RuntimeChoices,
             _coreServices.Ui.AdvancedSections.ShowLaunchSettings,
             () =>
             {
                 UpdateLaunchControlVisibility();
+                _launchSettingsController.ScheduleProfileFitCapabilityProbe();
                 ScheduleRuntimeLaunchOptionDiscovery();
                 UpdateLaunchSaveButtonState();
             },
@@ -23,6 +24,7 @@ public partial class MainWindow
             },
             ScheduleLaunchSettingsInputRefresh,
             SaveLaunchSettingsForSelectedModelAsync,
+            _launchSettingsController.FitSelectedProfileToAvailableVramAsync,
             SaveLaunchDefaultsFromControlsAsync,
             ResetLaunchSettingsToDefaults,
             SaveLaunchSettingsAsNewModelAsync,
@@ -38,9 +40,9 @@ public partial class MainWindow
                 DefaultExt: "",
                 FileName: File.Exists(initialPath) ? Path.GetFileName(initialPath) : "",
                 InitialDirectory: File.Exists(initialPath) ? Path.GetDirectoryName(initialPath) ?? "" : ""), this),
-            initialPath => _coreServices.App.FileSystemDialogs.PickFolder(initialPath)));
-
+            initialPath => _coreServices.App.FileSystemDialogs.PickFolder(initialPath))), () => _stateStore, SetStatus);
         ApplyLaunchSettingsPanelControls(panel);
+        _launchSettingsController.ScheduleProfileFitCapabilityProbe();
         AttachLaunchSettingsChangeHandlers();
         ApplyLaunchSettingsToControls();
         RunBackground(() => RenderSelectedModelLaunchSettingsAsync(), "Launch settings refresh failed");

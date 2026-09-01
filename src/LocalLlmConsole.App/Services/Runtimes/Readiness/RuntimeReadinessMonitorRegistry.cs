@@ -23,6 +23,14 @@ public sealed class RuntimeReadinessMonitorRegistry : IDisposable
         CancelAndDispose(cancellation);
     }
 
+    public void StopSessionOrModel(string identifier, IEnumerable<LoadedModelSessionSnapshot> sessions)
+    {
+        Stop(identifier);
+        foreach (var session in sessions.Where(session =>
+                     session.ModelId.Equals(identifier, StringComparison.OrdinalIgnoreCase)))
+            Stop(session.SessionId);
+    }
+
     public void StopAll()
     {
         foreach (var modelId in _monitors.Keys.ToArray())

@@ -68,7 +68,7 @@ public partial class MainWindow
     private RuntimeIdleUnloadApplicationActions RuntimeIdleUnloadActions(ModelGroupSnapshot? groupSnapshot = null)
         => new(
             FindModelByIdAsync,
-            StopModelRuntimeAsync,
+            session => _overviewSelection.UnloadSessionAsync(session.SessionId),
             SetStatus,
             groupSnapshot is null
                 ? null

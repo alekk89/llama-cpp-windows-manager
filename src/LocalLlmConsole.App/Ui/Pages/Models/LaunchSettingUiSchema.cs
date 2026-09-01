@@ -28,12 +28,12 @@ public static class LaunchSettingUiSchema
         Choice(nameof(AppSettings.GpuMode), "Basic", "GpuMode", LaunchSettingMetadataService.GpuModeOptions),
         Text(nameof(AppSettings.GpuDevices), "Basic", "GpuDevices", advanced: true),
         Text(nameof(AppSettings.GpuSplit), "Basic", "GpuSplit", advanced: true),
-
         Text(nameof(AppSettings.BatchSize), "PerformanceMemory", "BatchSize"),
         Text(nameof(AppSettings.MicroBatchSize), "PerformanceMemory", "MicroBatch"),
         Choice(nameof(AppSettings.FlashAttention), "PerformanceMemory", "FlashAttention", LaunchSettingMetadataService.AutoOnOffOptions),
         Choice(nameof(AppSettings.CacheTypeK), "PerformanceMemory", "KCache", LaunchSettingMetadataService.CacheTypeOptions),
         Choice(nameof(AppSettings.CacheTypeV), "PerformanceMemory", "VCache", LaunchSettingMetadataService.CacheTypeOptions),
+        Text(nameof(AppSettings.TensorBufferOverrides), "PerformanceMemory", "TensorBufferOverrides", advanced: true),
         Choice(nameof(AppSettings.KvOffload), "PerformanceMemory", "KvOffload", LaunchSettingMetadataService.AutoOnOffOptions, true),
         Choice(nameof(AppSettings.KvUnified), "PerformanceMemory", "UnifiedKv", LaunchSettingMetadataService.AutoOnOffOptions, true),
         Choice(nameof(AppSettings.PromptCacheMode), "PerformanceMemory", "PromptCache", LaunchSettingMetadataService.AutoOnOffOptions, true),
@@ -84,6 +84,7 @@ public static class LaunchSettingUiSchema
         Text(nameof(AppSettings.RopeFreqScale), "ContextExtension", "RopeFreq", advancedSection: true),
 
         Text(nameof(AppSettings.ParallelSlots), "Server", "ParallelSlots", advancedSection: true),
+        Text(nameof(AppSettings.Host), "Server", "Host", advancedSection: true),
         Choice(nameof(AppSettings.ContinuousBatching), "Server", "ContinuousBatch", LaunchSettingMetadataService.OnOffOptions, advancedSection: true),
         Choice(nameof(AppSettings.EnableMetrics), "Server", "Metrics", LaunchSettingMetadataService.OnOffOptions, advancedSection: true),
         Text(nameof(AppSettings.CustomParameters), "Server", "CustomParams", advanced: true, advancedSection: true)

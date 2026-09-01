@@ -108,6 +108,12 @@ public abstract partial class WpfUiTestBase
         Assert.Equal(190, page.Controls.ModelFilter.ActualWidth, precision: 1);
         Assert.Equal(170, page.Controls.ProfileFilter.ActualWidth, precision: 1);
         Assert.Equal(170, page.Controls.RuntimeFilter.ActualWidth, precision: 1);
+        Assert.All(new[] { page.Controls.ModelFilter, page.Controls.ProfileFilter, page.Controls.RuntimeFilter }, combo =>
+        {
+            Assert.IsType<LocalLlmConsole.SearchableComboBox>(combo);
+            Assert.False(combo.IsEditable);
+            Assert.True(combo.StaysOpenOnEdit);
+        });
 
         page.Content.Measure(new Size(624, 504));
         page.Content.Arrange(new Rect(0, 0, 624, 504));

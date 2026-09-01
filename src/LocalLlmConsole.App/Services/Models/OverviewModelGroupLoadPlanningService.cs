@@ -51,12 +51,6 @@ public sealed class OverviewModelGroupLoadPlanningService
         if (selectedProfiles.Length == 0)
             errors.Add($"Group '{group.Name}' has no launch profiles. Add profiles to the group before loading it.");
 
-        foreach (var duplicate in selectedProfiles.GroupBy(profile => profile.ModelId, StringComparer.OrdinalIgnoreCase).Where(items => items.Count() > 1))
-        {
-            var modelName = models.FirstOrDefault(model => model.Id.Equals(duplicate.Key, StringComparison.OrdinalIgnoreCase))?.Name ?? duplicate.Key;
-            errors.Add($"Group '{group.Name}' contains more than one launch profile for {modelName}. Keep one profile per model in a loadable group.");
-        }
-
         var targets = new List<OverviewModelGroupLoadTarget>();
         foreach (var profile in selectedProfiles)
         {
@@ -77,7 +71,10 @@ public sealed class OverviewModelGroupLoadPlanningService
             }
 
             var launchSettings = profile.Settings.ApplyTo(defaults);
-            var existing = sessions.FirstOrDefault(session => session.IsRunning && session.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase));
+            var existing = sessions.FirstOrDefault(session =>
+                session.IsRunning
+                && session.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase)
+                && session.LaunchProfileId.Equals(profile.Id, StringComparison.OrdinalIgnoreCase));
             targets.Add(new OverviewModelGroupLoadTarget(
                 model,
                 profile,
@@ -90,15 +87,7 @@ public sealed class OverviewModelGroupLoadPlanningService
 
         var pendingGpuTargets = targets.Where(target => !target.AlreadyLoaded && IsGpuLaunch(target.Runtime, target.LaunchSettings)).ToArray();
         var estimatedRequired = pendingGpuTargets.Sum(target => VramAdmissionService.EstimateRequiredGiB(target.Model, target.LaunchSettings));
-        var replacedModelIds = pendingGpuTargets.Select(target => target.Model.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var reclaimable = sessions
-            .Where(session => session.IsRunning && replacedModelIds.Contains(session.ModelId) && IsGpuLaunch(session.Backend, session.LaunchSettings))
-            .Sum(session =>
-            {
-                var model = models.FirstOrDefault(candidate => candidate.Id.Equals(session.ModelId, StringComparison.OrdinalIgnoreCase));
-                return model is null ? 0 : VramAdmissionService.EstimateRequiredGiB(model, session.LaunchSettings);
-            });
-        var available = memory is null ? 0 : Math.Max(0, memory.FreeGiB + reclaimable - SafetyReserveGiB);
+        var available = memory is null ? 0 : Math.Max(0, memory.FreeGiB - SafetyReserveGiB);
 
         if (pendingGpuTargets.Length > 0 && memory is null)
             errors.Add($"Available VRAM could not be measured, so group '{group.Name}' was not started. Load the profiles individually or restore GPU telemetry.");
@@ -125,13 +114,9 @@ public sealed class OverviewModelGroupLoadPlanningService
         foreach (var duplicate in targets.GroupBy(target => target.LaunchSettings.Port).Where(items => items.Count() > 1))
             errors.Add($"Group '{group.Name}' assigns port {duplicate.Key} to more than one launch profile.");
 
-        // Ports owned by models being replaced are reclaimable because the group
-        // execution service stops every replacement session before the first start.
-        var targetModelIds = targets.Select(target => target.Model.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var target in targets.Where(target => !target.AlreadyLoaded))
         {
             var conflict = sessions.FirstOrDefault(session => session.IsRunning
-                && !targetModelIds.Contains(session.ModelId)
                 && session.LaunchSettings.Port == target.LaunchSettings.Port);
             if (conflict is not null)
                 errors.Add($"Port {target.LaunchSettings.Port} for '{target.Profile.Name}' is already used by {conflict.ModelName}.");
@@ -142,6 +127,6 @@ public sealed class OverviewModelGroupLoadPlanningService
         => IsGpuLaunch(runtime.Backend, settings);
 
     private static bool IsGpuLaunch(RuntimeBackend backend, AppSettings settings)
-        => backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl
+        => backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl or RuntimeBackend.Rocm
            && settings.GpuLayers != 0;
 }

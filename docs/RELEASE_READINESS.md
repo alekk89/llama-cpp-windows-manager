@@ -45,7 +45,7 @@ builds and must be described that way.
 ## Release Gate
 
 - Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.5.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.6.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
@@ -67,16 +67,18 @@ builds and must be described that way.
 - Confirm uninstall keeps `data` by default and only deletes it when the user explicitly chooses to delete app data.
 - Launch the published app on a clean Windows user profile with no repository checkout.
 - Confirm only one app instance can run in the same user session.
-- Confirm Runtime Downloads can check the upstream official llama.cpp release feed and list the official prebuilt packages for CUDA Windows, CUDA WSL, Vulkan Windows, Vulkan WSL, Intel Arc SYCL Windows, Intel Arc SYCL WSL, CPU Windows, and CPU WSL.
+- Confirm Runtime Downloads can check the upstream official llama.cpp release feed and list the official prebuilt packages for CUDA, Vulkan, ROCm, Intel Arc SYCL, and CPU on every Windows/WSL platform published upstream.
 - Confirm Runtimes has no advanced-view toggle or Runtime Jobs section, and each Runtime Downloads row places a compact **Build from source** action—sized consistently with the other row actions—immediately left of **Install**. Confirm job supervision and control remain available through Logs and `llwmctl`.
 - Confirm **Saved Launch Profiles** has no redundant **Open Folder** column; **Model Files** retains the folder action for the actual GGUF.
-- Right-click a saved launch profile and add it to tray favourites. Minimize the
-  Manager to the tray, right-click its icon, and confirm favourites appear first,
+- Right-click a saved launch profile and choose **Add to favorites**. Confirm the
+  same star state appears in Saved Launch Profiles, Overview, Benchmarks,
+  Metrics, and the tray. Minimize the Manager to the tray, right-click its icon,
+  and confirm favourites appear first,
   followed by an alphabetical Models submenu whose profile controls are created
   only when that model is opened. Confirm light, dark, system, high-contrast, and
   RTL presentation use the application menu theme.
 - From the tray, start a stopped profile, stop its exact running profile, and
-  switch to another profile for the same model. Confirm loading/stopping actions
+  start another profile for the same model without stopping the first. Confirm loading/stopping actions
   are disabled, repeated clicks do not queue duplicate lifecycle operations,
   normal results use tray notifications, and a required VRAM confirmation
   restores the Manager before displaying the themed prompt.
@@ -85,7 +87,7 @@ builds and must be described that way.
   profiles. Leave the tray menu closed and confirm it adds no idle polling or CPU
   activity.
 - Confirm a source row progresses **Check** -> **Download** -> **Build**, direct download is blocked before a successful source check, and a successful table build deletes its downloaded source and resets the action to **Check**.
-- Confirm **Installed Local Builds** and **Runtime Downloads** each share one header row with their right-aligned Type and Platform filters, with no redundant descriptive sentence below either title. Confirm Type filters select AMD/Vulkan, Intel/SYCL, or NVIDIA/CUDA and Platform filters select Windows or Linux/WSL on both inventories. Confirm CPU rows remain under All and filtering never hides Add custom source repository.
+- Confirm **Installed Local Builds** and **Runtime Downloads** each share one header row with their right-aligned Type and Platform filters, with no redundant descriptive sentence below either title. Confirm Type filters select AMD/Vulkan/ROCm, Intel/SYCL, or NVIDIA/CUDA and Platform filters select Windows or Linux/WSL on both inventories. Confirm CPU rows remain under All and filtering never hides Add custom source repository.
 - Confirm Runtime Downloads can check the Atomic TurboQuant binary feed, install the Windows CUDA package when published, and show the WSL CUDA row as not published until a matching Linux/WSL asset exists.
 - Confirm Runtime Downloads can check the TheTom TurboQuant release feed and select only the published CUDA Windows, Vulkan WSL, and CPU WSL assets. Confirm every selected asset carries a GitHub release SHA-256 digest before installation.
 - Confirm Runtime Repositories lists `ik_llama.cpp` CPU/CUDA choices for both Windows and WSL, plus TheTom TurboQuant CUDA Windows/WSL, Vulkan WSL, and CPU WSL choices. Confirm built runtimes are attributed to the matching provider/backend row rather than upstream llama.cpp.
@@ -144,14 +146,21 @@ builds and must be described that way.
   Confirm the gateway's dedicated API-key action copies the current model API
   key from Settings.
 - Confirm Overview places Model, Launch profile, and Load on one row; Model and
-  Launch profile retain fixed practical widths at non-maximized window sizes.
+  Launch profile grow and shrink with the available window width while keeping
+  their left-side stars visible.
+  Open both dropdowns, type a partial name, and confirm the typed query remains
+  visible in the popup while choices filter immediately. Star and unstar a model
+  and profile, confirm favorites move to the top without selecting them, and
+  confirm the same favorite order appears in Benchmarks and Metrics. Confirm
+  closing without choosing preserves the prior selection.
   Confirm each available model is labelled `Name · size` in the Model dropdown,
   while group choices keep their `Group · name (count)` label. Remove a registered
   GGUF, rescan, and confirm the Models Size column shows `Missing`, Overview shows
   `Name · Missing`, and the model's launch profiles remain registered.
   When a model is running, selecting its active profile hides Load, while
-  selecting a different profile shows Load and replaces the model session with
-  that exact saved profile.
+  selecting a different profile shows Load and starts that exact saved profile
+  as a second session. Confirm both profiles remain listed and can be stopped or
+  restarted independently.
 - Confirm the Overview Model Status card shows Loading Model / Loaded Model and
   Loading Time as separate rows, and that Loading Time remains at the completed
   duration after the model becomes ready.
@@ -225,12 +234,15 @@ builds and must be described that way.
   responsive activity calendar and breakdown without restarting the app.
   Confirm fixed-size day boxes reveal more history as the window grows, up to
   the 24-month calendar data window, while dates before tracking and future
-  dates are unavailable rather than false zero
-  usage. Click a day twice to select and clear it; use Ctrl+click for disjoint
+  dates are unavailable rather than false zero usage. Click a day twice to
+  select and clear it; use Ctrl+click for disjoint
   dates, Shift+click for a continuous week/range, and Ctrl+Shift+click to add a
   range. Confirm selected dates drive every summary card and model row. Confirm the compact
   7D/Month/90D/All selector updates the calendar in one click, and Month includes
   every calendar day through the end of the current month.
+- Confirm the model/profile/runtime dropdowns on Benchmarks and Metrics, plus
+  the runtime dropdown above Model launch settings, filter by partial text as it
+  is typed and commit a filtered choice only once.
 - On a host with a supported GPU power sensor, leave the Manager running through
   at least two 10-second samples. Confirm the Metrics page displays combined
   historical energy in its summary and calendar without per-GPU cards. Before
@@ -273,7 +285,8 @@ builds and must be described that way.
 - Confirm the gateway `/v1/models` response lists every saved launch profile,
   reports each profile's configured `context_length`, exposes accurate GGUF
   training context, parameter count, and file size in `meta`, and requesting
-  another profile for a running model restarts it with that profile.
+  another profile for a running model keeps both profile routes loaded under
+  **Prefer keeping loaded models** while **Single active model** stops the others.
 - Confirm Settings is separated into named category sections arranged in two
   equal-width columns rather than one large full-width settings grid. Confirm
   Network and UI remain in opposite columns and narrow values/actions do not
@@ -333,8 +346,9 @@ builds and must be described that way.
   membership, **Profiles…** supports multi-select launch-profile assignment and removal, and
   right-click **Assign to group…** can assign a profile or return it to global policy.
 - Confirm Overview lists `Group · name (count)` choices after physical models.
-  A valid group starts all assigned profiles; duplicate-model, unavailable-runtime,
-  port-conflict, missing-GPU-telemetry, and aggregate-VRAM failures display an error
+  A valid group starts all assigned profiles, including multiple profiles backed
+  by the same GGUF; unavailable-runtime, duplicate-port, missing-GPU-telemetry,
+  and aggregate-VRAM failures display an error
   before any member starts. Confirm CPU-only groups work without VRAM telemetry.
 - Switch between Dark and Light without restarting on Models while the launch
   settings form is visible. Confirm every panel changes theme, then inspect Overview,
@@ -380,6 +394,46 @@ builds and must be described that way.
 - At 100%, 125%, 150%, and 200% display scale, confirm the initial window fits
   the monitor work area and the Overview model/profile/load bar reflows without
   clipping at narrow widths.
+- With Windows scaling unchanged, move the **UI scale** slider through its 75%
+  to 175% range. Confirm it snaps in 1% steps, displays the current percentage,
+  resizes synchronously while moving in either direction without pausing,
+  persists once on pointer/key release, survives restart, and does not compound
+  transforms when returned to 100%.
+- Move the **Text scale** slider through the same range. Confirm text changes
+  synchronously and survives restart, while control sizes, spacing, window
+  chrome, and layout transforms remain unchanged and repeated changes do not
+  compound.
+- In **Settings → Load profiles on startup**, type into the dropdown search,
+  add at least two saved model/profile pairs, and confirm the dropdown and Add
+  button match the compact height of the surrounding settings controls. Remove
+  one row, then toggle another with **Load on startup** from Saved Launch
+  Profiles. Restart and confirm only the remaining selections load, a failed
+  selection does not prevent later selections, and deleting a saved profile
+  removes its startup reference.
+- Resize and reorder representative table columns on Overview, Models, Runtimes,
+  Benchmarks, Metrics, and Logs. Resize the splitters that control page-section
+  proportions, close and reopen each page, then restart the Manager and confirm
+  every page restores its own layout. Move the window between monitor layouts
+  and confirm stale bounds are clamped back to the visible desktop.
+- Narrow every resizable Delete/Remove action column below its full label width
+  and confirm the action changes to **×** without clipping; widen it and confirm
+  the localized full label returns. Repeat on Models, Saved Launch Profiles,
+  startup profiles, Runtimes, runtime packages, Logs, Hugging Face history, and
+  Benchmarks.
+- On Models and Runtimes, shrink ordinary text and non-destructive action
+  columns to 48 px using both the left and right sides of shared header
+  boundaries. Confirm text may clip without the old wide minimum snapping back.
+  Narrow Models Folder until **Open** becomes the folder glyph, then widen it
+  and confirm the full localized label returns while its tooltip and automation
+  name remain unchanged.
+- Confirm Model Files, Saved Launch Profiles, and Runtimes provide compact search
+  controls and visible star actions. Favorite rows must sort first without a
+  selection highlight or automatic detail expansion. Confirm only the star
+  changes color, stars align vertically across every row and selector, and the
+  Runtimes vertical-ellipsis detail action remains square and aligned.
+- Narrow Settings below its responsive breakpoint and confirm every section
+  appears in its original order in one column. Widen it and confirm sections
+  return to the balanced two-column layout without losing edited values.
 - At the minimum supported width, confirm Models keeps the launch form and
   tables usable through horizontal scrolling instead of clipping actions.
 - Confirm Arabic and Persian switch the shell and owned dialogs to right-to-left
@@ -543,7 +597,7 @@ remain clean-machine or hardware validation items. Exercising them in this user
 session would require stopping or sharing state with the production Manager and
 was outside this isolated audit.
 
-Local artifacts are unsigned development builds. A v2.5.0 stable release must be
+Local artifacts are unsigned development builds. A v2.6.0 stable release must be
 published only by the protected workflow with configured tag, manifest, and
 Authenticode keys; it must never silently fall back to those local artifacts.
 
@@ -556,7 +610,7 @@ either marker already exists, which prevents a temporary test from replacing a
 real installation's uninstall registration or shortcut.
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.5.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.6.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.

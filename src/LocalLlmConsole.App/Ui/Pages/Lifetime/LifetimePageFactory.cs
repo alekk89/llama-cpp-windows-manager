@@ -215,11 +215,12 @@ public static partial class LifetimePageFactory
     {
         var stack = new StackPanel { Margin = new Thickness(column == 0 ? 0 : 6, 0, column == 3 ? 0 : 6, 0) };
         var text = FilterLabel(label);
-        var combo = new WpfComboBox
+        var combo = new SearchableComboBox
         {
             Width = width,
             MinWidth = 110,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Left
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            FavoriteKeySelector = item => (item as LifetimeMetricFilterOption)?.Id ?? ""
         };
         AutomationProperties.SetName(combo, label);
         stack.Children.Add(text);

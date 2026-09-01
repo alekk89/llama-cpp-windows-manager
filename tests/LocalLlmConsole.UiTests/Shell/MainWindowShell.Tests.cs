@@ -63,7 +63,7 @@ public sealed class WpfMainWindowShellTests : WpfUiTestBase
                 var statusY = statusCard.TranslatePoint(new Point(0, 0), windowContent).Y;
                 Assert.True(statusY > helpY + helpButton.ActualHeight, $"Help bottom {helpY + helpButton.ActualHeight}, status top {statusY}.");
                 Assert.True(statusY + statusCard.ActualHeight <= 680, $"Status bottom {statusY + statusCard.ActualHeight}.");
-                Assert.Equal("v2.5.0", appVersionText.Text);
+                Assert.Equal("v2.6.0", appVersionText.Text);
                 Assert.Equal(28, navigationToggle.Width);
                 var navigationToggleGlyph = Assert.IsType<TextBlock>(navigationToggle.Content);
                 Assert.Equal("\uE700", navigationToggleGlyph.Text);

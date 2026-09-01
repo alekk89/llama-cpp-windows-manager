@@ -16,10 +16,14 @@ public sealed class RuntimesPageViewModel
 
     public string SelectedPlatformFilter { get; private set; } = RuntimeInventoryFilterService.All;
 
-    public void ReplaceRows(IEnumerable<RuntimeCatalogRow> rows)
+    public void ReplaceRows(IEnumerable<RuntimeCatalogRow> rows, IReadOnlySet<string>? favoriteRuntimeIds = null)
     {
         _allRows.Clear();
-        _allRows.AddRange(rows);
+        foreach (var row in rows)
+        {
+            row.IsFavorite = row.Runtime is not null && favoriteRuntimeIds?.Contains(row.Runtime.Id) == true;
+            _allRows.Add(row);
+        }
         ApplyFilters(SelectedVendorFilter, SelectedPlatformFilter);
     }
 
@@ -28,11 +32,13 @@ public sealed class RuntimesPageViewModel
         SelectedVendorFilter = Normalize(vendor, VendorFilters);
         SelectedPlatformFilter = Normalize(platform, PlatformFilters);
         Rows.Clear();
-        foreach (var row in _allRows.Where(row => RuntimeInventoryFilterService.Matches(
-                     row.Vendor,
-                     row.Platform,
-                     SelectedVendorFilter,
-                     SelectedPlatformFilter)))
+        foreach (var row in _allRows
+                     .Where(row => RuntimeInventoryFilterService.Matches(
+                         row.Vendor,
+                         row.Platform,
+                         SelectedVendorFilter,
+                         SelectedPlatformFilter))
+                     .OrderByDescending(row => row.IsFavorite))
             Rows.Add(row);
     }
 

@@ -142,8 +142,6 @@ public sealed class ModelRuntimeLoadApplicationService
             return ModelRuntimeLoadApplicationOutcome.MissingRuntime;
         }
 
-        if (request.ModelLoaded)
-            await actions.StopModelRuntimeAsync(model);
         await actions.StartModelRuntimeAsync(runtime, model, profile.ApplyTo(actions.ReadLaunchSettings()));
         return ModelRuntimeLoadApplicationOutcome.Started;
     }

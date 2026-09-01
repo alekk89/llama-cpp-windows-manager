@@ -125,7 +125,8 @@ public static class BenchmarkSpeedReportService
         if (result.ExecutionMode == BenchmarkExecutionMode.ProfileServing)
         {
             var profile = string.IsNullOrWhiteSpace(result.ProfileName) ? "Saved profile" : result.ProfileName;
-            return $"{profile} · {result.PromptTokens}/{result.GenerationTokens} tokens · ctx {result.ContextSize} · batch {result.BatchSize} · concurrency {result.Concurrency}";
+            var memory = result.ObservedGpuMemoryUsedMiB > 0 ? $" · VRAM {result.ObservedGpuMemoryUsedMiB:N0} MiB" : "";
+            return $"{profile} · {result.PromptTokens}/{result.GenerationTokens} tokens · ctx {result.ContextSize} · batch {result.BatchSize} · concurrency {result.Concurrency}{memory}";
         }
 
         var parts = new List<string>

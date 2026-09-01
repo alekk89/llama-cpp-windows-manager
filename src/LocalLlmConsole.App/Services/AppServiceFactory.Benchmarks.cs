@@ -14,6 +14,7 @@ public sealed partial class AppServiceFactory
                 sessions,
                 new BenchmarkCapabilityService(processRunner),
                 new BenchmarkProcessRunner(CreateWslRuntimeStopService(processRunner)),
-                _workspaceRoot),
+                _workspaceRoot,
+                gpuStatus: CreateGpuStatusProbeService(processRunner)),
             LazyThreadSafetyMode.ExecutionAndPublication);
 }

@@ -17,6 +17,7 @@ public sealed record LaunchSettingsPanelRequest(
     Action<bool> AdvancedSettingsChanged,
     Action LaunchSettingsSearchChanged,
     Func<Task> SaveForModelAsync,
+    Func<Task> FitToAvailableVramAsync,
     Func<Task> SaveDefaultsAsync,
     Action ResetDefaults,
     Func<Task> SaveAsNewAsync,
@@ -35,6 +36,7 @@ public sealed class LaunchSettingsPanelControls
     public required WpfTextBox LaunchSettingsSearchBox { get; init; }
     public required WpfButton AdvancedLaunchSettingsButton { get; init; }
     public required WpfButton SaveModelLaunchSettingsButton { get; init; }
+    public required WpfButton FitToAvailableVramButton { get; init; }
     public required WpfTextBox SaveAsNewModelNameBox { get; init; }
     public required WpfButton SaveAsNewModelButton { get; init; }
     public required LaunchSettingsFormControls FormControls { get; init; }
@@ -75,6 +77,7 @@ public static partial class LaunchSettingsPanelFactory
         panel.Children.Add(LaunchSettingsToolbar(
             request,
             out var launchSettingsSearchBox,
+            out var fitButton,
             out var advancedLaunchSettingsButton));
 
         var builder = new LaunchSettingsPanelBuilder(
@@ -106,6 +109,7 @@ public static partial class LaunchSettingsPanelFactory
             LaunchSettingsSearchBox = launchSettingsSearchBox,
             AdvancedLaunchSettingsButton = advancedLaunchSettingsButton,
             SaveModelLaunchSettingsButton = saveForModelButton,
+            FitToAvailableVramButton = fitButton,
             SaveAsNewModelNameBox = saveAsNewModelNameBox,
             SaveAsNewModelButton = saveAsNewModelButton,
             FormControls = formControls,

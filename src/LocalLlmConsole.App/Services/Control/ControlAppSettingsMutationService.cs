@@ -84,6 +84,8 @@ public sealed class ControlAppSettingsMutationService
             AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(updated.AutoLoadGatewayPolicy),
             CudaPackagePreference = AppPreferenceService.CudaPackagePreference(updated.CudaPackagePreference),
             RuntimeLogOrder = AppPreferenceService.RuntimeLogOrder(updated.RuntimeLogOrder),
+            UiScalePercent = AppPreferenceService.NormalizeUiScalePercent(updated.UiScalePercent),
+            FontScalePercent = AppPreferenceService.NormalizeFontScalePercent(updated.FontScalePercent),
             UiCulture = string.IsNullOrWhiteSpace(updated.UiCulture) ? current.UiCulture : updated.UiCulture.Trim()
         };
         var apiKey = ApiSecurity.StrongBearerSecretOrNew(

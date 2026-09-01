@@ -276,6 +276,8 @@ public sealed class ReleaseGateIntegrationTests : ManagerRegressionTestBase
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["modelAccessMode"] = "Gateway + direct LAN",
+            ["uiScalePercent"] = "150%",
+            ["fontScalePercent"] = "125%",
             ["requireApiKeyAuth"] = "Enable",
             ["modelApiKey"] = "",
             ["autoLoadGatewayEnabled"] = "Yes",
@@ -304,6 +306,8 @@ public sealed class ReleaseGateIntegrationTests : ManagerRegressionTestBase
         var updated = service.Build(new AppSettingsUpdateRequest(current, root, "dark", values, new HashSet<int>()));
         Assert.True(updated.Success);
         Assert.Equal("both", updated.Settings.ModelAccessMode);
+        Assert.Equal(150, updated.Settings.UiScalePercent);
+        Assert.Equal(125, updated.Settings.FontScalePercent);
         Assert.Equal(10080, updated.Settings.AutoUnloadIdleMinutes);
         Assert.Equal(4096, updated.Settings.MaxLogFileSizeMb);
         Assert.False(updated.Settings.ShowOverviewModelStatus);
@@ -323,6 +327,16 @@ public sealed class ReleaseGateIntegrationTests : ManagerRegressionTestBase
         var idleEnergyTracking = new SettingsPageDefinitionService().BuildRows(updated.Settings)
             .Single(row => row.Key == "trackGpuEnergyWhileIdle");
         Assert.Equal("choice", idleEnergyTracking.Type);
+        var uiScale = new SettingsPageDefinitionService().BuildRows(updated.Settings)
+            .Single(row => row.Key == "uiScalePercent");
+        Assert.Equal("slider", uiScale.Type);
+        Assert.Equal("150", uiScale.Value);
+        Assert.Null(uiScale.Options);
+        var fontScale = new SettingsPageDefinitionService().BuildRows(updated.Settings)
+            .Single(row => row.Key == "fontScalePercent");
+        Assert.Equal("slider", fontScale.Type);
+        Assert.Equal("125", fontScale.Value);
+        Assert.Null(fontScale.Options);
         var runtimeLogOrder = new SettingsPageDefinitionService().BuildRows(updated.Settings)
             .Single(row => row.Key == "runtimeLogOrder");
         Assert.Equal("choice", runtimeLogOrder.Type);
@@ -373,6 +387,8 @@ public sealed class ReleaseGateIntegrationTests : ManagerRegressionTestBase
         Assert.True(Directory.Exists(saved.Settings.ModelsRoot));
         var reloaded = await store.GetAppSettingsAsync(root);
         Assert.False(reloaded.ShowOverviewModelStatus);
+        Assert.Equal(150, reloaded.UiScalePercent);
+        Assert.Equal(125, reloaded.FontScalePercent);
         Assert.False(reloaded.BenchmarkPreventSystemSleep);
         Assert.True(reloaded.BenchmarkStopActiveSessions);
         Assert.False(reloaded.ShowOverviewHardware);

@@ -85,7 +85,8 @@ public sealed class RuntimeGpuSummaryApplicationService
         var usesAccelerator = activeSession.Backend is RuntimeBackend.Cuda
             or RuntimeBackend.Vulkan
             or RuntimeBackend.Metal
-            or RuntimeBackend.Sycl;
+            or RuntimeBackend.Sycl
+            or RuntimeBackend.Rocm;
         var acceleratorProbe = !usesAccelerator || activeSession.LaunchSettings.GpuLayers == 0
             ? HostAcceleratorSummaryAsync(cancellationToken)
             : AcceleratorSummaryAsync(activeSession, cancellationToken);

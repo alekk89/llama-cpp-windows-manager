@@ -25,6 +25,7 @@ public abstract partial class WpfUiTestBase
             AdvancedSettingsChanged: _ => { },
             LaunchSettingsSearchChanged: () => panelState.ApplyControlState(controlPlan),
             SaveForModelAsync: () => Task.CompletedTask,
+            FitToAvailableVramAsync: () => Task.CompletedTask,
             SaveDefaultsAsync: () => Task.CompletedTask,
             ResetDefaults: () => { },
             SaveAsNewAsync: () => Task.CompletedTask,
@@ -44,7 +45,22 @@ public abstract partial class WpfUiTestBase
         panelState.ApplyControlState(controlPlan);
 
         Assert.Equal(28, panel.LaunchSettingsSearchBox.Height);
+        var launchSettingsToolbar = Assert.IsType<Grid>(panel.FitToAvailableVramButton.Parent);
+        var launchSettingsSearchHost = Assert.IsType<Grid>(panel.LaunchSettingsSearchBox.Parent);
+        Assert.Same(launchSettingsToolbar, panel.AdvancedLaunchSettingsButton.Parent);
+        Assert.Same(launchSettingsToolbar, launchSettingsSearchHost.Parent);
+        Assert.Equal(0, Grid.GetColumn(launchSettingsSearchHost));
+        Assert.Equal(1, Grid.GetColumn(panel.FitToAvailableVramButton));
+        Assert.Equal(2, Grid.GetColumn(panel.AdvancedLaunchSettingsButton));
+        Assert.Equal(28, panel.FitToAvailableVramButton.Height);
         Assert.True(panel.RuntimeCombo.MinHeight >= 28);
+        Assert.IsType<LocalLlmConsole.SearchableComboBox>(panel.RuntimeCombo);
+        Assert.False(panel.RuntimeCombo.IsEditable);
+        Assert.True(panel.RuntimeCombo.StaysOpenOnEdit);
+        Assert.NotNull(panel.FormControls.HostBox);
+        Assert.Equal("127.0.0.1", panel.FormControls.HostBox.Text);
+        panel.FormControls.HostBox.Text = "10.10.10.21";
+        Assert.Equal("10.10.10.21", LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls).Host);
         Assert.All(
             panelState.LaunchSettingElements.SelectMany(pair => pair.Value),
             element =>
@@ -113,6 +129,9 @@ public abstract partial class WpfUiTestBase
             VisionLaunchSettingsAvailable: true,
             SpeculativeType: "none"));
         panelState.ApplyControlState(basicPlan);
+        Assert.Equal(Grid.GetRow(panel.FormControls.BatchSizeBox!), Grid.GetRow(panel.FormControls.MicroBatchSizeBox!));
+        Assert.Equal(1, Grid.GetColumn(panel.FormControls.BatchSizeBox!));
+        Assert.Equal(4, Grid.GetColumn(panel.FormControls.MicroBatchSizeBox!));
         Assert.Equal(Visibility.Collapsed, panel.FormControls.RuntimeOptions.AdditionalSettingsRoot.Visibility);
         Assert.Equal(Visibility.Visible, panel.FormControls.RuntimeOptions.CommandRoot.Visibility);
         panel.FormControls.RuntimeOptions.UpdatePreview("llama-server --model model.gguf");

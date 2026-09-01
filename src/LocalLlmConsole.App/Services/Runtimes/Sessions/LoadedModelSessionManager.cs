@@ -93,7 +93,7 @@ public sealed partial class LoadedModelSessionManager : IDisposable
             lock (_stateLock)
                 return _sessions.Values.Any(session =>
                     session.Supervisor.IsRunning
-                    && session.Runtime.Backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl);
+                    && session.Runtime.Backend is RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl or RuntimeBackend.Rocm);
         }
     }
 
@@ -121,8 +121,26 @@ public sealed partial class LoadedModelSessionManager : IDisposable
         => Snapshots().FirstOrDefault(snapshot => snapshot.IsSelected)
             ?? Snapshots().FirstOrDefault();
 
+    public LoadedModelSessionSnapshot? SessionById(string sessionId)
+        => Snapshots().FirstOrDefault(snapshot =>
+            string.Equals(snapshot.SessionId, sessionId, StringComparison.OrdinalIgnoreCase));
+
     public LoadedModelSessionSnapshot? SessionForModel(string modelId)
-        => Snapshots().FirstOrDefault(snapshot => string.Equals(snapshot.ModelId, modelId, StringComparison.OrdinalIgnoreCase));
+    {
+        var sessions = SessionsForModel(modelId);
+        return sessions.FirstOrDefault(snapshot => snapshot.IsSelected)
+            ?? sessions.FirstOrDefault();
+    }
+
+    public IReadOnlyList<LoadedModelSessionSnapshot> SessionsForModel(string modelId)
+        => Snapshots()
+            .Where(snapshot => string.Equals(snapshot.ModelId, modelId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+    public LoadedModelSessionSnapshot? SessionForProfile(string modelId, string launchProfileId)
+        => Snapshots().FirstOrDefault(snapshot =>
+            string.Equals(snapshot.ModelId, modelId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(snapshot.LaunchProfileId, launchProfileId ?? "", StringComparison.OrdinalIgnoreCase));
 
     public bool IsModelLoaded(string modelId)
         => SessionForModel(modelId) is { IsRunning: true };
@@ -193,13 +211,29 @@ public sealed partial class LoadedModelSessionManager : IDisposable
         }
     }
 
+    public bool SelectProfile(string modelId, string launchProfileId)
+    {
+        lock (_stateLock)
+        {
+            var session = _sessions.Values.FirstOrDefault(item =>
+                string.Equals(item.Model.Id, modelId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.LaunchProfileId, launchProfileId ?? "", StringComparison.OrdinalIgnoreCase));
+            if (session is null) return false;
+            _selectedSessionId = session.SessionId;
+            return true;
+        }
+    }
+
     public async Task StopModelAsync(string modelId)
         => await ExecuteLifecycleAsync(async () =>
         {
-            string? sessionId;
+            string[] sessionIds;
             lock (_stateLock)
-                sessionId = _sessions.Values.FirstOrDefault(item => string.Equals(item.Model.Id, modelId, StringComparison.OrdinalIgnoreCase))?.SessionId;
-            if (sessionId is not null)
+                sessionIds = _sessions.Values
+                    .Where(item => string.Equals(item.Model.Id, modelId, StringComparison.OrdinalIgnoreCase))
+                    .Select(item => item.SessionId)
+                    .ToArray();
+            foreach (var sessionId in sessionIds)
                 await StopCoreAsync(sessionId, "Unloaded by user", CancellationToken.None);
         });
 

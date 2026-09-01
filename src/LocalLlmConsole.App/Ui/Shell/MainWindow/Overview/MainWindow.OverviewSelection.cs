@@ -43,9 +43,6 @@ public partial class MainWindow
     private Task InspectOverviewEndpointRowAsync(OverviewSessionRow row)
         => _overviewSelection.InspectEndpointRowAsync(row);
 
-    private Task UnloadLoadedSessionAsync(string sessionId)
-        => _overviewSelection.UnloadSessionAsync(sessionId);
-
     private Task SelectOverviewModelSessionAsync(CancellationToken cancellationToken)
         => _overviewSelection.SelectModelSessionAsync(cancellationToken);
 

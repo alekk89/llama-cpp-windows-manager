@@ -100,6 +100,19 @@ public sealed class RuntimeSessionApplicationService
             actions);
     }
 
+    public Task SwitchToProfileAsync(
+        ModelRecord model,
+        string launchProfileId,
+        RuntimeSwitchApplicationActions actions)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actions);
+
+        return ApplySwitchAsync(
+            _commands.SwitchToProfile(model, launchProfileId),
+            actions);
+    }
+
     internal static async Task ApplyStopAsync(
         RuntimeStopApplicationRequest request,
         RuntimeStopApplicationActions actions)

@@ -54,12 +54,12 @@ public static class PageSectionFactory
         return frame;
     }
 
-    public static Grid GridSection(string title, DataGrid grid, string description = "")
+    public static Grid GridSection(string title, DataGrid grid, string description = "", FrameworkElement? headerAction = null)
     {
         var section = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         section.RowDefinitions.Add(new RowDefinition());
-        var header = SectionHeader(title, description);
+        var header = SectionHeader(title, description, headerAction);
 
         section.Children.Add(header);
         var frame = GridFrame(grid);
@@ -68,9 +68,11 @@ public static class PageSectionFactory
         return section;
     }
 
-    private static Grid SectionHeader(string title, string description = "")
+    private static Grid SectionHeader(string title, string description = "", FrameworkElement? action = null)
     {
         var header = new Grid { Margin = new Thickness(1, 2, 0, 4) };
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var copy = new StackPanel();
         var titleBlock = new TextBlock
         {
@@ -94,6 +96,11 @@ public static class PageSectionFactory
             copy.Children.Add(descriptionBlock);
         }
         header.Children.Add(copy);
+        if (action is not null)
+        {
+            Grid.SetColumn(action, 1);
+            header.Children.Add(action);
+        }
         return header;
     }
 
@@ -157,12 +164,12 @@ public static class PageSectionFactory
         grid.Columns.Clear();
         var textStyle = (Style)WpfApplication.Current.Resources["GridCellText"];
         foreach (var col in columns)
-            grid.Columns.Add(new DataGridTextColumn
+            grid.Columns.Add(new FlexibleTextDataGridColumn
             {
                 Header = col.Header,
                 Binding = new WpfBinding(col.Binding),
                 Width = new DataGridLength(col.Weight, DataGridLengthUnitType.Star),
-                MinWidth = 56,
+                MinWidth = FlexibleTextDataGridColumn.CompactMinWidth,
                 CanUserResize = true,
                 ElementStyle = textStyle
             });
@@ -185,10 +192,21 @@ public static class PageSectionFactory
         double weight,
         string tooltipBinding = "",
         Func<string, string>? tooltipProvider = null,
-        string visualRole = "")
+        string visualRole = "",
+        string compactContent = "",
+        string compactFontFamily = "")
     {
-        var factory = new FrameworkElementFactory(typeof(WpfButton));
-        factory.SetBinding(ContentControl.ContentProperty, new WpfBinding(contentBinding));
+        var responsive = !string.IsNullOrWhiteSpace(compactContent);
+        var factory = new FrameworkElementFactory(responsive ? typeof(ResponsiveActionButton) : typeof(WpfButton));
+        if (responsive)
+        {
+            factory.SetBinding(ResponsiveActionButton.FullLabelProperty, new WpfBinding(contentBinding));
+            factory.SetValue(ResponsiveActionButton.CompactLabelProperty, compactContent);
+        }
+        else
+        {
+            factory.SetBinding(ContentControl.ContentProperty, new WpfBinding(contentBinding));
+        }
         factory.SetBinding(AutomationProperties.NameProperty, new WpfBinding(contentBinding));
         factory.SetBinding(UIElement.IsEnabledProperty, new WpfBinding(enabledBinding));
         factory.SetBinding(FrameworkElement.TagProperty, new WpfBinding("."));
@@ -215,6 +233,14 @@ public static class PageSectionFactory
         {
             RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(WpfButton), 1)
         });
+        if (!string.IsNullOrWhiteSpace(compactFontFamily))
+        {
+            var labelStyle = new Style(typeof(TextBlock));
+            var compactTrigger = new DataTrigger { Binding = new WpfBinding("."), Value = compactContent };
+            compactTrigger.Setters.Add(new Setter(TextBlock.FontFamilyProperty, new System.Windows.Media.FontFamily(compactFontFamily)));
+            labelStyle.Triggers.Add(compactTrigger);
+            labelFactory.SetValue(FrameworkElement.StyleProperty, labelStyle);
+        }
         factory.SetValue(ContentControl.ContentTemplateProperty, new DataTemplate { VisualTree = labelFactory });
         var style = new Style(typeof(WpfButton), (Style)WpfApplication.Current.Resources[typeof(WpfButton)]);
         var emptyTrigger = new Trigger { Property = ContentControl.ContentProperty, Value = "" };
@@ -223,14 +249,14 @@ public static class PageSectionFactory
         factory.SetValue(FrameworkElement.StyleProperty, style);
         factory.AddHandler(WpfButton.ClickEvent, click);
 
-        grid.Columns.Add(new DataGridTemplateColumn
-        {
-            Header = header,
-            Width = new DataGridLength(weight, DataGridLengthUnitType.Star),
-            MinWidth = 72,
-            CanUserResize = true,
-            CellTemplate = new DataTemplate { VisualTree = factory }
-        });
+        DataGridTemplateColumn column = responsive && string.Equals(compactContent, "×", StringComparison.Ordinal)
+            ? new ResponsiveActionDataGridColumn { MinWidth = ResponsiveActionDataGridColumn.CompactMinWidth }
+            : new FlexibleActionDataGridColumn { MinWidth = FlexibleActionDataGridColumn.CompactMinWidth };
+        column.Header = header;
+        column.Width = new DataGridLength(weight, DataGridLengthUnitType.Star);
+        column.CanUserResize = true;
+        column.CellTemplate = new DataTemplate { VisualTree = factory };
+        grid.Columns.Add(column);
     }
 
     public static void ConfigureGridActionButton(FrameworkElementFactory factory)

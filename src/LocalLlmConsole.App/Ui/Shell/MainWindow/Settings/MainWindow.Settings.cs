@@ -28,18 +28,24 @@ public partial class MainWindow
         var page = SettingsPageFactory.Create(new SettingsPageRequest(
             _viewModel.Settings.Rows,
             _settings.ThemeMode,
-            _pageControllers.Settings.Build()));
+            _pageControllers.Settings.Build(),
+            StartupLaunchProfileSettingsSnapshot.Empty,
+            new(profileId => AppServices.StartupLaunchProfiles.SetLoadOnStartupAsync(profileId, loadOnStartup: true), profileId => AppServices.StartupLaunchProfiles.SetLoadOnStartupAsync(profileId, loadOnStartup: false),
+                AppServices.StartupLaunchProfiles.GetSettingsSnapshotAsync, RunEventAsync)));
         _settingsPage.Apply(
             page,
             _viewModel.Settings.Rows,
             ScheduleSettingsApply,
-            NotifyApiKeyAuthenticationDisabled);
+            NotifyApiKeyAuthenticationDisabled,
+            ApplyLiveUiScale,
+            percent => { _coreServices.Ui.SettingsAutoApply.Cancel(); ApplicationFontScaleService.Apply(percent); });
         PageHost.Content = page.Root;
 
         if (_viewModel.Settings.CacheRow is { } cacheRow)
             RunBackground(
                 () => RefreshSettingsCacheSizeAsync(cacheRoot, cacheRow, pageVersion),
                 "Cache size refresh failed");
+        RunBackground(async () => page.StartupProfiles.Apply(await AppServices.StartupLaunchProfiles.GetSettingsSnapshotAsync()), "Startup profile settings refresh failed");
     }
 
     private async Task RefreshSettingsCacheSizeAsync(

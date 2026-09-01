@@ -17,7 +17,7 @@ public sealed class VramAdmissionService
 
     public VramAdmissionResult Assess(ModelRecord model, RuntimeRecord runtime, AppSettings settings, VramMemorySnapshot? memory)
     {
-        if (runtime.Backend != RuntimeBackend.Cuda && runtime.Backend != RuntimeBackend.Vulkan && runtime.Backend != RuntimeBackend.Sycl)
+        if (runtime.Backend is not (RuntimeBackend.Cuda or RuntimeBackend.Vulkan or RuntimeBackend.Sycl or RuntimeBackend.Rocm))
             return new VramAdmissionResult(VramAdmissionDecision.Allow, "Runtime is not GPU-backed.", 0, memory?.FreeGiB ?? 0);
 
         if (settings.GpuLayers == 0)

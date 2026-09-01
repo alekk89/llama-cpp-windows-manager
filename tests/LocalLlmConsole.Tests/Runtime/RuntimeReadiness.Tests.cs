@@ -270,11 +270,13 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
             "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorWorkflowService.cs"));
         var monitorApplication = File.ReadAllText(FindRepositoryFile(
             "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorApplicationService.cs"));
+        var actionFactory = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorActionFactory.cs"));
 
         Assert.Contains("_coreServices.Runtime.RuntimeReadinessMonitorApplication.RunAsync(", source, StringComparison.Ordinal);
         Assert.Contains("new RuntimeReadinessMonitorApplicationRequest(", source, StringComparison.Ordinal);
-        Assert.Contains("RuntimeReadinessMonitorActions(model.Id, model.Name, selectLoadedOverviewModel)", source, StringComparison.Ordinal);
-        Assert.Contains("new RuntimeReadinessCompletionActions(", source, StringComparison.Ordinal);
+        Assert.Contains("RuntimeReadinessMonitorActions(session, selectLoadedOverviewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("new RuntimeReadinessCompletionActions(", actionFactory, StringComparison.Ordinal);
         Assert.Contains("_workflow.RunAsync(new RuntimeReadinessMonitorWorkflowRequest(", monitorApplication, StringComparison.Ordinal);
         Assert.Contains("ApplyCompletionAsync(result.CompletionPlan", monitorApplication, StringComparison.Ordinal);
         Assert.Contains("catch (OperationCanceledException)", monitorApplication, StringComparison.Ordinal);
@@ -413,6 +415,8 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         var source = ReadMainWindowSources();
         var application = File.ReadAllText(FindRepositoryFile(
             "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorApplicationService.cs"));
+        var actionFactory = File.ReadAllText(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorActionFactory.cs"));
         using var registry = new RuntimeReadinessMonitorRegistry();
 
         var first = registry.Start("model-1");
@@ -432,8 +436,8 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         registry.StopAll();
         Assert.True(thirdToken.IsCancellationRequested);
         Assert.Equal(0, registry.Count);
-        Assert.Contains("_coreServices.Ui.RuntimeReadinessMonitors.Start(model.Id)", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Ui.RuntimeReadinessMonitors.Complete", source, StringComparison.Ordinal);
+        Assert.Contains("_coreServices.Ui.RuntimeReadinessMonitors.Start(session.SessionId)", source, StringComparison.Ordinal);
+        Assert.Contains("monitors.Complete(sessionId, source)", actionFactory, StringComparison.Ordinal);
         Assert.Contains("actions.CompleteMonitor(request.ModelId, request.CancellationSource)", application, StringComparison.Ordinal);
         Assert.DoesNotContain("Dictionary<string, CancellationTokenSource> _coreServices.Ui.RuntimeReadinessMonitors", source, StringComparison.Ordinal);
     }
@@ -473,7 +477,7 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         var switchMissing = service.SwitchToModel(model, selected: false);
         var switchLoaded = service.SwitchToModel(model, selected: true);
 
-        Assert.Equal(model.Id, stopSelected.ReadinessMonitorModelId);
+        Assert.Equal(session.SessionId, stopSelected.ReadinessMonitorModelId);
         Assert.True(stopSelected.StopLoadingStatus);
         Assert.True(stopSelected.ResetMetricCounters);
         Assert.Equal("Runtime stopped.", stopSelected.StatusMessage);
@@ -549,7 +553,7 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         Assert.Equal(ModelRuntimeUnloadCommandKind.Stop, unloadLoaded.Kind);
         Assert.Contains("_coreServices.Models.ModelRuntimeLoadApplication.LoadSelectedAsync(", source, StringComparison.Ordinal);
         Assert.Contains("_coreServices.Models.ModelRuntimeLoadApplication.LoadOverviewAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("_models.ModelRuntimeUnloadApplication.UnloadOverviewAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("_overviewSelection.UnloadSessionAsync", source, StringComparison.Ordinal);
         Assert.Contains("ModelRuntimeLoadActions(", source, StringComparison.Ordinal);
         Assert.Contains("ModelRuntimeUnloadActions()", source, StringComparison.Ordinal);
         Assert.Contains("_commands.PlanSelectedLoad(", loadApplicationSource, StringComparison.Ordinal);

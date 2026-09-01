@@ -90,6 +90,26 @@ public sealed class RuntimeRegistryAndValidationTests : ManagerRegressionTestBas
         Assert.Equal(Path.Combine(binRoot, "llama-server"), runtime.ExecutablePath);
     }
 
+    [Fact]
+    public async Task RuntimeRegistryInfersRocmFromHipRuntimeFiles()
+    {
+        var root = CreateTempRoot();
+        var runtimeRoot = Path.Combine(root, "runtimes");
+        var buildRoot = Path.Combine(runtimeRoot, "imported-amd-build");
+        var binRoot = Path.Combine(buildRoot, "bin");
+        Directory.CreateDirectory(binRoot);
+        await File.WriteAllTextAsync(Path.Combine(binRoot, "llama-server.exe"), "fake native binary", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(binRoot, "ggml-hip.dll"), "fake ROCm library", TestContext.Current.CancellationToken);
+        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
+        await store.InitializeAsync();
+
+        await new RuntimeRegistryService(store).ScanAsync(runtimeRoot);
+        var runtime = Assert.Single(await store.ListRuntimesAsync());
+
+        Assert.Equal(RuntimeBackend.Rocm, runtime.Backend);
+        Assert.Equal(RuntimeInventoryFilterService.Amd, RuntimeInventoryFilterService.Vendor(runtime.Backend));
+    }
+
 
     [Fact]
     public async Task RuntimeRegistryDoesNotInferGpuBackendFromLooseFolderText()

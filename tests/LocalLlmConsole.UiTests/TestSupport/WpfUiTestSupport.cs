@@ -253,7 +253,11 @@ public abstract partial class WpfUiTestBase
     protected static void AssertGridActionButtonMatches(Button actual, DataGrid grid, string expectedPeerContent)
     {
         var expected = VisualDescendants<Button>(grid)
-            .Single(button => Equals(button.Content, expectedPeerContent)
+            .Single(button => Equals(
+                                  button is LocalLlmConsole.ResponsiveActionButton responsive
+                                      ? responsive.FullLabel
+                                      : button.Content,
+                                  expectedPeerContent)
                               && ReferenceEquals(button.DataContext, actual.DataContext));
         Assert.True(double.IsNaN(actual.Height));
         Assert.Equal(expected.ActualHeight, actual.ActualHeight, precision: 1);
@@ -460,17 +464,43 @@ public abstract partial class WpfUiTestBase
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _ = TestDispatcher.Value.BeginInvoke(new Action(() =>
         {
+            Exception? failure = null;
             try
             {
                 LocalLlmConsole.Localization.Loc.LoadLanguage("en");
                 action();
-                DeleteTestWorkspace();
-                completion.SetResult();
             }
             catch (Exception ex)
             {
-                completion.SetException(ex);
+                failure = ex;
             }
+            try { DeleteTestWorkspace(); }
+            catch (Exception ex) { failure ??= ex; }
+            if (failure is null) completion.SetResult();
+            else completion.SetException(failure);
+        }));
+        await completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    protected static async Task RunStaAsync(Func<Task> action)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = TestDispatcher.Value.BeginInvoke(new Action(async () =>
+        {
+            Exception? failure = null;
+            try
+            {
+                LocalLlmConsole.Localization.Loc.LoadLanguage("en");
+                await action();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+            try { DeleteTestWorkspace(); }
+            catch (Exception ex) { failure ??= ex; }
+            if (failure is null) completion.SetResult();
+            else completion.SetException(failure);
         }));
         await completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
@@ -525,8 +555,17 @@ public abstract partial class WpfUiTestBase
 
     private static void DeleteTestWorkspace()
     {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         if (Directory.Exists(TestWorkspace))
             Directory.Delete(TestWorkspace, recursive: true);
+    }
+
+    protected static void AssertVerticallyCentered(FrameworkElement element, FrameworkElement row)
+    {
+        row.UpdateLayout();
+        var top = element.TranslatePoint(new Point(0, 0), row).Y;
+        var centerDelta = Math.Abs((top + element.ActualHeight / 2) - row.ActualHeight / 2);
+        Assert.InRange(centerDelta, 0, .51);
     }
 
     protected static void DetachLoadedStartup(LocalLlmConsole.MainWindow window)
