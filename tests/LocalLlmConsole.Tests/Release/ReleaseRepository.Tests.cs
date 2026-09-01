@@ -191,6 +191,7 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         Assert.Contains("attest-build-provenance", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("gh release create", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("-RequireSigned", releaseWorkflow, StringComparison.Ordinal);
+        Assert.Contains("if: ${{ vars.TRUSTED_RELEASE_ENABLED == 'true' }}", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("workflow_dispatch:", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("tags:", releaseWorkflow, StringComparison.Ordinal);
         Assert.Matches(@"actions/checkout@[0-9a-f]{40}\s+# v7", releaseWorkflow);

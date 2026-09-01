@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   release:
+    if: ${{ vars.TRUSTED_RELEASE_ENABLED == 'true' }}
     name: Verify, sign, attest, and publish
     runs-on: windows-latest
     timeout-minutes: 45
