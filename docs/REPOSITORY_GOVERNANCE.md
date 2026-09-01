@@ -50,6 +50,7 @@ Configure these protected-environment secrets:
 
 Configure these repository or protected-environment variables:
 
+- `TRUSTED_RELEASE_ENABLED=true` after every required release credential is configured;
 - `RELEASE_TAG_SIGNING_FINGERPRINT`;
 - `RELEASE_MANIFEST_KEY_ID`;
 - `RELEASE_MANIFEST_PUBLIC_KEY_SPKI`;

@@ -27,6 +27,10 @@ embedded version.
 
 Trusted stable builds use `.github/workflows/release.yml`, triggered by a signed
 annotated `v*` tag (or a manual dispatch that selects an existing signed tag).
+The trusted job runs only when the repository variable
+`TRUSTED_RELEASE_ENABLED` is set to `true`. Leave it unset while publishing
+explicitly labelled unsigned community releases; their tags then skip the
+trusted job without creating a failed `release` environment deployment.
 The protected `release` environment holds the PFX, trusted tag public key, and
 release-manifest private key. The workflow verifies the tag and protected-main
 reachability, runs the complete signed gate, validates upgrade from the pinned
