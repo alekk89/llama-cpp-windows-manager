@@ -2,7 +2,9 @@ param(
   [Parameter(Mandatory = $true)]
   [string] $InstallerPath,
   [switch] $RequireSigned,
-  [string] $ExpectedPublisher = ""
+  [string] $ExpectedPublisher = "",
+  [ValidateRange(30, 900)]
+  [int] $ProcessTimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,10 +57,19 @@ function Invoke-CheckedProcess {
     [Parameter(Mandatory = $true)][string[]] $ArgumentList,
     [Parameter(Mandatory = $true)][string] $Label
   )
-  $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Wait -PassThru -WindowStyle Hidden
+  Write-Host "$Label..."
+  $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru -WindowStyle Hidden
+  if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) {
+    & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+    if (-not $process.HasExited) {
+      Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw "$Label exceeded the $ProcessTimeoutSeconds-second timeout."
+  }
   if ($process.ExitCode -ne 0) {
     throw "$Label failed with exit code $($process.ExitCode)."
   }
+  Write-Host "$Label completed."
 }
 
 function Assert-InstalledFiles {
