@@ -40,6 +40,9 @@ public sealed partial class StateStore
 INSERT INTO tray_favorite_launch_profiles (launch_profile_id, updated_at)
 VALUES ($profile_id, $updated_at)
 ON CONFLICT(launch_profile_id) DO UPDATE SET updated_at = excluded.updated_at;
+INSERT INTO favorite_models (model_id, updated_at)
+SELECT model_id, $updated_at FROM model_launch_profiles WHERE id = $profile_id
+ON CONFLICT(model_id) DO UPDATE SET updated_at = excluded.updated_at;
 """;
                 command.Parameters.AddWithValue("$updated_at", DateTimeOffset.UtcNow.ToString("O"));
             }

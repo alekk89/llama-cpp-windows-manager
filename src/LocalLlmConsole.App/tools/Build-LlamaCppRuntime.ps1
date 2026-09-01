@@ -468,6 +468,7 @@ build_status=0
 cmake --build $BuildQ --config Release --target install --parallel `$(nproc) || build_status=`$?
 server_path=$InstallQ/bin/llama-server
 bench_path=$InstallQ/bin/llama-bench
+fit_path=$InstallQ/bin/llama-fit-params
 server_lib=$InstallQ/lib
 if [ ! -f "`$server_path" ]; then
   echo "Build finished but llama-server was not installed at `$server_path." >&2
@@ -479,6 +480,11 @@ if [ ! -f "`$bench_path" ]; then
   if [ "`$build_status" -eq 0 ]; then build_status=1; fi
   exit `$build_status
 fi
+if [ ! -f "`$fit_path" ]; then
+  echo "Build finished but llama-fit-params was not installed at `$fit_path." >&2
+  if [ "`$build_status" -eq 0 ]; then build_status=1; fi
+  exit `$build_status
+fi
 probe_ld_path="`$server_lib:`${LD_LIBRARY_PATH:-}"
 if ! LD_LIBRARY_PATH="`$probe_ld_path" "`$server_path" --version >/dev/null 2>&1; then
   echo "Build finished but installed llama-server failed a startup smoke test." >&2
@@ -487,6 +493,11 @@ if ! LD_LIBRARY_PATH="`$probe_ld_path" "`$server_path" --version >/dev/null 2>&1
 fi
 if ! LD_LIBRARY_PATH="`$probe_ld_path" "`$bench_path" --help >/dev/null 2>&1; then
   echo "Build finished but installed llama-bench failed a startup smoke test." >&2
+  if [ "`$build_status" -eq 0 ]; then build_status=1; fi
+  exit `$build_status
+fi
+if ! LD_LIBRARY_PATH="`$probe_ld_path" "`$fit_path" --help >/dev/null 2>&1; then
+  echo "Build finished but installed llama-fit-params failed a startup smoke test." >&2
   if [ "`$build_status" -eq 0 ]; then build_status=1; fi
   exit `$build_status
 fi
@@ -559,8 +570,11 @@ fi
   if (-not (Test-Path -LiteralPath $ServerExe)) { throw "Build finished but llama-server.exe was not found at $ServerExe" }
   $BenchmarkExe = Join-Path $InstallDir "bin\llama-bench.exe"
   if (-not (Test-Path -LiteralPath $BenchmarkExe)) { throw "Build finished but llama-bench.exe was not found at $BenchmarkExe" }
+  $FitParamsExe = Join-Path $InstallDir "bin\llama-fit-params.exe"
+  if (-not (Test-Path -LiteralPath $FitParamsExe)) { throw "Build finished but llama-fit-params.exe was not found at $FitParamsExe" }
   Invoke-Logged $ServerExe @("--version")
   Invoke-Logged $BenchmarkExe @("--help")
+  Invoke-Logged $FitParamsExe @("--help")
   try {
     $Commit = (& $GitExe -c core.longpaths=true -C $SourceDir rev-parse --short=12 HEAD 2>$null).Trim()
   } catch {

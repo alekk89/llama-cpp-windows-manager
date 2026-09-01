@@ -57,7 +57,9 @@ public partial class MainWindow
                 ManageModelGroupsAsync,
                 AssignLaunchProfileGroupAsync,
                 RemoveLaunchProfileGroupAsync,
+                async model => { await AppServices.StateStore.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Model, model.Id); await RefreshModelsAsync(); },
                 ToggleTrayProfileFavoriteAsync,
+                async (_, profile) => { await AppServices.StartupLaunchProfiles.ToggleLoadOnStartupAsync(profile.Id); await RefreshModelsAsync(); },
                 LoadLaunchProfileAsync,
                 BeginNewLaunchProfile,
                 SelectModelGridRow,
@@ -97,6 +99,7 @@ public partial class MainWindow
         => new(
             new SettingsPageActionControllerActions(
                 PreviewSettingsTheme,
+                ScheduleSettingsApply,
                 SettingRowFromSender,
                 RunSettingsRowActionAsync,
                 ToggleSettingsSecret,
@@ -133,7 +136,7 @@ public partial class MainWindow
             new RuntimesPageActionControllerActions(
                 async () => await ChooseRuntimeFolderAsync(scanAfter: true),
                 async () => await RunEventAsync(ChangeRuntimeCudaPackagePreferenceAsync),
-                RuntimeGrid_PreviewMouseLeftButtonDown,
+                async runtime => { await AppServices.StateStore.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Runtime, runtime.Id); await RefreshRuntimesAsync(); },
                 runtimeRows,
                 SetRuntimeGridColumnSizing,
                 SetRuntimeBuildGridColumnSizing));
@@ -145,12 +148,13 @@ public partial class MainWindow
                 SelectOverviewLaunchProfileAsync,
                 UpdateOverviewModelActions,
                 LoadOverviewSelectedModelAsync,
+                () => _coreServices.Ui.SelectionReentrancy.IsLoadedSessionSelectionChanging,
                 SelectLoadedSessionRowAsync,
                 InspectSelectedOverviewEndpointAsync,
                 EndpointRowFromLink,
                 InspectOverviewEndpointRowAsync,
                 LoadedSessionIdFromRowButton,
-                UnloadLoadedSessionAsync,
+                _overviewSelection.UnloadSessionAsync,
                 PersistOverviewDashboardLayoutAsync,
                 RunEventAsync));
 

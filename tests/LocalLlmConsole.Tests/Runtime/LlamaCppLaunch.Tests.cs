@@ -163,7 +163,8 @@ public sealed class LlamaCppLaunchTests : ManagerRegressionTestBase
             ReasoningEffort = "xhigh",
             ReasoningBudget = 16_384,
             ReasoningBudgetMessage = "Finish reasoning now.",
-            ReasoningPreserve = "off"
+            ReasoningPreserve = "off",
+            Host = "10.10.10.21"
         };
 
         var profile = ModelLaunchSettings.FromAppSettings(edited, "runtime-current");
@@ -173,6 +174,7 @@ public sealed class LlamaCppLaunchTests : ManagerRegressionTestBase
         Assert.Equal(16_384, restored.ReasoningBudget);
         Assert.Equal("Finish reasoning now.", restored.ReasoningBudgetMessage);
         Assert.Equal("off", restored.ReasoningPreserve);
+        Assert.Equal("10.10.10.21", restored.Host);
     }
 
     [Fact]

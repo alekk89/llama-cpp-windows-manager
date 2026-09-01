@@ -32,7 +32,7 @@ public sealed class RuntimeSessionReconciler
         foreach (var session in sessions.Snapshots().Where(session => session is { IsRunning: true, Status: LoadedModelSessionStatus.Loading }))
         {
             if (!await loadingSessionReady(session)) continue;
-            if (!sessions.MarkModelLoadedIfRunning(session.ModelId)) continue;
+            if (!sessions.MarkLoadedIfRunning(session.SessionId)) continue;
 
             loadedTransitions.Add(new RuntimeSessionLoadedTransition(
                 session.ModelId,

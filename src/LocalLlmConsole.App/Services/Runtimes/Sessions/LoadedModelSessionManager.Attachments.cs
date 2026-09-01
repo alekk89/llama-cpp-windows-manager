@@ -15,7 +15,7 @@ public sealed partial class LoadedModelSessionManager
         string launchProfileId = "",
         string launchProfileName = "")
     {
-        var resolvedSessionId = string.IsNullOrWhiteSpace(sessionId) ? SessionIdFor(model.Id) : sessionId;
+        var resolvedSessionId = string.IsNullOrWhiteSpace(sessionId) ? SessionIdFor(model.Id, launchProfileId) : sessionId;
         var supervisor = CreateSupervisor();
         supervisor.AttachExisting(runtime, model.Id, settings, logPath, state, processMarker, processId);
         var session = new LoadedModelSession

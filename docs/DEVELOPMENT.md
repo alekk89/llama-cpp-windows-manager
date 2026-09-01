@@ -1,6 +1,6 @@
 # Development Guide
 
-Last reviewed: 2026-08-25
+Last reviewed: 2026-09-01
 
 This repo is a Windows-first .NET 10 WPF app. The app should stay easy to run
 from source, but end users should receive the published portable app or
@@ -136,6 +136,7 @@ Core feature folders currently contain:
 | --- | --- |
 | `Models` | Shared settings, model/runtime/session/job records, UI row contracts, runtime catalog/package contracts, and telemetry snapshots. |
 | `Services/App` | Portable preference and access policy normalization. |
+| `Services/Benchmarks` | Benchmark plans, matrix expansion, result normalization, comparison, and profile-fit plan policy. |
 | `Services/HuggingFace` | README/config/command launch-setting suggestion parsing. |
 | `Services/Infrastructure` | Platform-neutral display formatting only. |
 | `Services/Models` | Pure model allocation policy. |
@@ -155,13 +156,14 @@ services remain under `src/LocalLlmConsole.App` feature modules:
 | Folder | Ownership |
 | --- | --- |
 | `Services/App` | App settings, startup/shutdown, updates, logs, help, cache, and shared app workflows. |
+| `Services/Benchmarking` | Lazy benchmark orchestration, exact-profile serving, native/WSL runners, persistence, comparison, and export. |
 | `Services/Control` | Authenticated loopback API admission, routing, capability schemas, operation dispatch, and audit logging. |
 | `Services/Environment` | Windows and WSL detection, setup command planning, and visible tool setup launchers. |
 | `Services/Gateway` | Local model gateway host/runtime contracts and gateway activity state. |
 | `Services/HuggingFace` | Hugging Face search, metadata, download safety, and download history. |
-| `Services/Infrastructure` | State store, local app service, process runner, filesystem/config safety, dialogs, jobs, and shell helpers. |
+| `Services/Infrastructure` | State store, UI-layout and selector-preference persistence, local app service, process runner, filesystem/config safety, dialogs, jobs, and shell helpers. |
 | `Services/Models` | Model catalog, model capabilities, aliases, model launch profiles, and model deletion/import behavior. |
-| `Services/Runtimes/<Responsibility>` | Runtime registry, source/build jobs, launch execution, sessions, metric polling, readiness, and process supervision, grouped under `Build`, `Catalog`, `Deletion`, `Launch`, `Packages`, `Readiness`, `Sessions`, and `Telemetry`. |
+| `Services/Runtimes/<Responsibility>` | Runtime registry, source/build jobs, launch execution, profile fitting, sessions, metric polling, readiness, and process supervision, grouped under `Build`, `Catalog`, `Deletion`, `Launch`, `Packages`, `ProfileFit`, `Readiness`, `Sessions`, and `Telemetry`. |
 
 Runtime readiness is also the authentication-policy boundary. Once an endpoint
 responds, a non-inference probe must prove the configured policy before the

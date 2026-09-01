@@ -54,13 +54,17 @@ public sealed class TrayProfileMenuApplicationService
 
         foreach (var model in models.OrderBy(model => model.Name, StringComparer.OrdinalIgnoreCase))
         {
-            var session = sessions.FirstOrDefault(candidate =>
-                candidate.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase));
             var entries = profiles
                 .Where(profile => profile.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(profile => profile.IsDefault)
                 .ThenBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(profile => Entry(model, profile, favorites.Contains(profile.Id), session))
+                .Select(profile => Entry(
+                    model,
+                    profile,
+                    favorites.Contains(profile.Id),
+                    sessions.FirstOrDefault(candidate =>
+                        candidate.ModelId.Equals(model.Id, StringComparison.OrdinalIgnoreCase)
+                        && candidate.LaunchProfileId.Equals(profile.Id, StringComparison.OrdinalIgnoreCase))))
                 .ToArray();
             if (entries.Length > 0)
                 modelRows.Add(new TrayProfileMenuModel(model, entries));
@@ -95,21 +99,17 @@ public sealed class TrayProfileMenuApplicationService
         ArgumentNullException.ThrowIfNull(actions.LoadAsync);
         ArgumentNullException.ThrowIfNull(actions.StopAsync);
 
-        var running = _sessions.SessionForModel(entry.Model.Id);
-        if (running is { IsRunning: true }
-            && running.LaunchProfileId.Equals(entry.Profile.Id, StringComparison.OrdinalIgnoreCase))
+        var running = _sessions.SessionForProfile(entry.Model.Id, entry.Profile.Id);
+        if (running is { IsRunning: true })
         {
             await actions.StopAsync(entry.Model, entry.Profile);
             return new TrayProfileCommandResult(
                 TrayProfileActionKind.Stop,
-                StopCompleted: _sessions.SessionForModel(entry.Model.Id) is not { IsRunning: true });
+                StopCompleted: _sessions.SessionForProfile(entry.Model.Id, entry.Profile.Id) is not { IsRunning: true });
         }
 
-        var action = running is { IsRunning: true }
-            ? TrayProfileActionKind.Switch
-            : TrayProfileActionKind.Start;
         return new TrayProfileCommandResult(
-            action,
+            TrayProfileActionKind.Start,
             await actions.LoadAsync(entry.Model, entry.Profile));
     }
 
@@ -125,8 +125,6 @@ public sealed class TrayProfileMenuApplicationService
             return new TrayProfileMenuEntry(model, profile, favorite, TrayProfileActionKind.Loading, false);
         if (session is not { IsRunning: true })
             return new TrayProfileMenuEntry(model, profile, favorite, TrayProfileActionKind.Start, true);
-        return session.LaunchProfileId.Equals(profile.Id, StringComparison.OrdinalIgnoreCase)
-            ? new TrayProfileMenuEntry(model, profile, favorite, TrayProfileActionKind.Stop, true)
-            : new TrayProfileMenuEntry(model, profile, favorite, TrayProfileActionKind.Switch, true);
+        return new TrayProfileMenuEntry(model, profile, favorite, TrayProfileActionKind.Stop, true);
     }
 }

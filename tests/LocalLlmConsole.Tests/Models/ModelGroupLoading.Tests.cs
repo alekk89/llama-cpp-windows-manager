@@ -36,7 +36,7 @@ public sealed class ModelGroupLoadingTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public void OverviewGroupLoadAllowsCpuProfilesWithoutVramTelemetryAndRejectsAmbiguousModels()
+    public void OverviewGroupLoadAllowsMultipleCpuProfilesForTheSameModel()
     {
         var root = CreateTempRoot();
         var runtime = Runtime(root, "cpu", RuntimeBackend.Cpu);
@@ -53,8 +53,8 @@ public sealed class ModelGroupLoadingTests : ManagerRegressionTestBase
 
         var duplicateModel = new OverviewModelGroupLoadPlanningService().Plan(
             group, Snapshot(group, first, second), [first, second], [model], [runtime], [], defaults, null);
-        Assert.False(duplicateModel.CanLoad);
-        Assert.Contains(duplicateModel.Errors, error => error.Contains("more than one launch profile", StringComparison.Ordinal));
+        Assert.True(duplicateModel.CanLoad);
+        Assert.Equal(2, duplicateModel.Targets.Count);
     }
 
     [Fact]
@@ -85,21 +85,17 @@ public sealed class ModelGroupLoadingTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public async Task OverviewGroupLoadReleasesAllReplacementPortsAndRestoresOriginalProfilesOnFailure()
+    public async Task OverviewGroupLoadRollsBackOnlyProfilesStartedByTheFailedLoad()
     {
         var root = CreateTempRoot();
         var runtime = Runtime(root, "cpu", RuntimeBackend.Cpu);
         var defaults = AppSettings.CreateDefault(root) with { GpuLayers = 0 };
         var first = Model(root, "model-a", 1024);
         var second = Model(root, "model-b", 1024);
-        var firstProfile = Profile(first, runtime, 8092, defaults);
-        var secondProfile = Profile(second, runtime, 8091, defaults);
-        var group = Group("Port swap");
-        var sessions = new[]
-        {
-            Session(first, runtime, defaults with { Port = 8091 }, "old:model-a"),
-            Session(second, runtime, defaults with { Port = 8092 }, "old:model-b")
-        };
+        var firstProfile = Profile(first, runtime, 8091, defaults);
+        var secondProfile = Profile(second, runtime, 8092, defaults);
+        var group = Group("Rollback");
+        var sessions = Array.Empty<LoadedModelSessionSnapshot>();
         var plan = new OverviewModelGroupLoadPlanningService().Plan(
             group,
             Snapshot(group, firstProfile, secondProfile),
@@ -120,9 +116,9 @@ public sealed class ModelGroupLoadingTests : ManagerRegressionTestBase
                 [first, second],
                 [runtime],
                 new OverviewModelGroupLoadApplicationActions(
-                    (model, _) =>
+                    (sessionId, _) =>
                     {
-                        events.Add($"stop:{model.Id}");
+                        events.Add($"stop:{sessionId}");
                         return Task.CompletedTask;
                     },
                     (_, model, settings, profileId, _, _) =>
@@ -134,16 +130,12 @@ public sealed class ModelGroupLoadingTests : ManagerRegressionTestBase
                     }),
                 TestContext.Current.CancellationToken));
 
-        Assert.Contains("previous running profiles were restored", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("profiles started by this group load were stopped", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(
             [
-                "stop:model-a",
-                "stop:model-b",
-                $"start:model-a:8092:{firstProfile.Id}",
-                $"start:model-b:8091:{secondProfile.Id}",
-                "stop:model-a",
-                "start:model-a:8091:old:model-a",
-                "start:model-b:8092:old:model-b"
+                $"start:model-a:8091:{firstProfile.Id}",
+                $"start:model-b:8092:{secondProfile.Id}",
+                $"stop:{LoadedModelSessionManager.SessionIdFor(first.Id, firstProfile.Id)}"
             ],
             events);
     }

@@ -243,7 +243,7 @@ public sealed class ModelGridRow
     public string BaseModel { get; init; } = "";
     public string Port { get; init; } = "";
     public string Description { get; init; } = "";
-    public string OpenFolderAction { get; init; } = "Open Folder";
+    public string OpenFolderAction { get; init; } = "Open";
     public string DeleteAction { get; init; } = "Delete";
     public string OpenFolderToolTip { get; init; } = "Open the folder containing this model file.";
     public string DeleteToolTip { get; init; } = "Delete this model from disk and remove it from the catalog.";
@@ -252,7 +252,8 @@ public sealed class ModelGridRow
     public bool CanLoad { get; init; } = true;
     public bool IsMissing { get; init; }
     public bool CanAssignGroup { get; init; }
-    public bool IsTrayFavorite { get; init; }
+    public bool IsFavorite { get; init; }
+    public bool IsLoadOnStartup { get; init; }
     public required ModelRecord Model { get; init; }
     public NamedModelLaunchProfile? LaunchProfile { get; init; }
 }
@@ -282,6 +283,10 @@ public sealed class RuntimeCatalogRow
     public bool CanBuild { get; init; }
     public bool CanVerify { get; init; }
     public bool CanDelete { get; init; }
+    public bool IsFavorite { get; set; }
+    public bool IsDetailsExpanded { get; set; }
+    public bool CanExpandDetails => !string.IsNullOrWhiteSpace(Details);
+    public string DetailsAction => "⋮";
     public RuntimeRecord? Runtime { get; init; }
     public RuntimeSourceEntry? Source { get; init; }
 }

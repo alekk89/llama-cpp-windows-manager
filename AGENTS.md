@@ -83,6 +83,10 @@ Repeated `--set name=value` options are one-shot overrides. Persist them only
 when requested with `--save-profile=<name>` or the profile commands. Obtain the
 complete setting names and accepted values from `capabilities`.
 
+`host` is a saved per-profile launch field. A non-loopback value is effective
+only when the application `modelAccessMode` permits direct-model LAN access;
+do not weaken that application policy merely to make a profile load.
+
 Before any restart or unload, identify the current model with `self`. Never
 stop the session serving the current operation unless the user explicitly asks
 for that consequence and accepts that the response may terminate. Only then may
@@ -120,8 +124,10 @@ llwmctl groups unassign <model> <profile>
 ```
 
 Valid retention modes are `inherit`, `pinned`, and `idle-timeout`; priorities
-are `low`, `normal`, and `high`. A group load preflights duplicate model
-assignments, runtimes, ports, and aggregate VRAM before starting anything.
+are `low`, `normal`, and `high`. A group load preflights duplicate ports,
+runtimes, missing profiles, and aggregate VRAM before starting anything.
+Different profiles of the same model may run together when their ports and
+hardware allocations do not conflict.
 Retention affects automatic idle unload, not inference scheduling. Explicit
 lifecycle operations and the gateway's Single active policy still take
 precedence.
@@ -158,21 +164,68 @@ Runtime source work must follow the staged operation flow: run
 Use `operations run <name> --dry-run --set name=value` before consequential
 operations.
 
+Prebuilt package work starts with `runtime-package.check` so the Manager resolves
+the newest compatible published release and exact platform/backend asset. Inspect
+the returned catalog state before an explicitly authorized
+`runtime-package.install`; do not infer release ordering or substitute another
+backend.
+
+## Benchmark automation
+
+Discover the versioned plan contract and runtime capabilities before creating a
+plan:
+
+```powershell
+llwmctl benchmarks schema
+llwmctl benchmarks presets
+llwmctl benchmarks capabilities <runtime>
+llwmctl benchmarks validate --plan <plan.json>
+```
+
+Starting a benchmark applies sustained load and requires explicit confirmation.
+Run `llwmctl self` and `llwmctl sessions list` first. A plan may stop active
+sessions only when its validated plan and the `benchmarkStopActiveSessions`
+setting allow it; the CLI still refuses to stop the identified current session
+without the user's explicit self-stop authorization.
+
+```powershell
+llwmctl benchmarks run --plan <plan.json> --dry-run
+llwmctl benchmarks run --plan <plan.json> --confirm --wait
+llwmctl benchmarks inspect <run>
+llwmctl benchmarks results <run>
+llwmctl benchmarks export <run> --format csv
+```
+
+Use `pause`, `resume`, or `cancel` for an active benchmark and `compare` for two
+compatible persisted runs. Deleting a run also deletes its persisted results and
+requires explicit authorization plus `benchmarks delete <run> --confirm`.
+
 ## Application settings and UI visibility
 
 Patch settings through the running Manager, never its database:
 
 ```powershell
 llwmctl settings set --set showOverviewHardware=false --set showModelsHuggingFace=true
+llwmctl settings set --set uiScalePercent=125 --set fontScalePercent=110
 llwmctl settings get
 ```
 
-The presentation fields are `showOverviewModelStatus`,
+`uiScalePercent` adds a bounded application-only scale multiplier on top of
+Windows DPI scaling and applies to current and newly opened Manager windows.
+`fontScalePercent` uses the same bounded range and applies only to application
+text, leaving controls and spacing at their normal size. The UI labels this
+setting **Text scale**; the automation field retains its compatibility name.
+The visibility fields are `showOverviewModelStatus`,
 `showOverviewHardware`, `showOverviewSlots`, `showOverviewTokens`,
 `showOverviewMtpTokens`, `showOverviewKvCache`,
 `showOverviewLiveRuntimeLog`, `showOverviewAllMetrics`, and
 `showModelsHuggingFace`. They apply automatically and do not disable the
 underlying telemetry, logs, or downloads.
+
+Favorite models/profiles/runtimes, **Load profiles on startup** selections, and
+remembered window/table/splitter layouts are UI-owned preferences and are not
+part of the current settings-patch contract. Do not edit their SQLite tables or
+automate WPF controls to change them.
 
 ## Consequential operations
 

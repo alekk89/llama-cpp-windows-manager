@@ -133,6 +133,7 @@ public sealed class RuntimeRegistryService
     private static RuntimeBackend InferBackend(string folder, string executablePath, JsonObject? metadata)
     {
         if (TryParseBackend(metadata?["backend"]?.ToString(), out var explicitBackend)) return explicitBackend;
+        if (HasNearbyRocmMarker(folder)) return RuntimeBackend.Rocm;
         if (HasNearbySyclMarker(folder)) return RuntimeBackend.Sycl;
         if (HasNearbyCudaMarker(folder)) return RuntimeBackend.Cuda;
         if (HasNearbyVulkanMarker(folder)) return RuntimeBackend.Vulkan;
@@ -156,6 +157,7 @@ public sealed class RuntimeRegistryService
             values.AddRange(tags.Select(tag => tag?.ToString() ?? ""));
 
         var text = string.Join(" ", values);
+        if (ContainsBackendToken(text, "rocm") || ContainsBackendToken(text, "hip")) { backend = RuntimeBackend.Rocm; return true; }
         if (ContainsBackendToken(text, "sycl")) { backend = RuntimeBackend.Sycl; return true; }
         if (ContainsBackendToken(text, "cuda")) { backend = RuntimeBackend.Cuda; return true; }
         if (ContainsBackendToken(text, "vulkan")) { backend = RuntimeBackend.Vulkan; return true; }
@@ -225,6 +227,7 @@ public sealed class RuntimeRegistryService
 
         if (OfficialRuntimeMarkers.Any(marker => text.Contains(marker, StringComparison.OrdinalIgnoreCase)))
         {
+            if (backend == RuntimeBackend.Rocm) return isNative ? "official-windows-rocm" : "official-rocm";
             if (backend == RuntimeBackend.Sycl) return isNative ? "official-windows-sycl" : "official-sycl";
             if (backend == RuntimeBackend.Cuda) return isNative ? "official-windows-cuda" : "official-cuda";
             if (backend == RuntimeBackend.Vulkan) return isNative ? "official-windows-vulkan" : "official-vulkan";
@@ -292,6 +295,23 @@ public sealed class RuntimeRegistryService
     }
 
     private static bool HasNearbyCudaMarker(string folder) => HasNearbyMarker(folder, "cuda");
+
+    private static bool HasNearbyRocmMarker(string folder)
+    {
+        if (folder.Contains("rocm", StringComparison.OrdinalIgnoreCase)) return true;
+        foreach (var candidate in new[] { folder, Path.Combine(folder, "bin"), Path.Combine(folder, "lib") })
+        {
+            if (!Directory.Exists(candidate)) continue;
+            if (Directory.EnumerateFiles(candidate, "*", SearchOption.TopDirectoryOnly).Any(file =>
+                Path.GetFileName(file) is var name
+                && (name.StartsWith("ggml-hip", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith("amdhip", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith("hipblas", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith("rocblas", StringComparison.OrdinalIgnoreCase))))
+                return true;
+        }
+        return false;
+    }
 
     private static bool HasNearbySyclMarker(string folder) => HasNearbyMarker(folder, "sycl");
 

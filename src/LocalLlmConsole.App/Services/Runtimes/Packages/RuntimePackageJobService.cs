@@ -116,6 +116,7 @@ public sealed class RuntimePackageJobService
         {
             "cuda" => RuntimeBackend.Cuda,
             "vulkan" => RuntimeBackend.Vulkan,
+            "rocm" => RuntimeBackend.Rocm,
             "sycl" => RuntimeBackend.Sycl,
             _ => RuntimeBackend.Cpu
         };

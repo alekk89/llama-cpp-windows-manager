@@ -3,6 +3,7 @@ namespace LocalLlmConsole.Services;
 public static class RuntimePackageSourceCatalog
 {
     public const string LatestReleaseApiUrl = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
+    public const string RecentOfficialReleasesApiUrl = "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=20";
     public const string ReleasesUrl = "https://github.com/ggml-org/llama.cpp/releases";
     public const string OfficialRepositoryUrl = "https://github.com/ggml-org/llama.cpp";
     public const string AtomicTurboQuantRepositoryUrl = "https://github.com/AtomicBot-ai/atomic-llama-cpp-turboquant";
@@ -18,6 +19,8 @@ public static class RuntimePackageSourceCatalog
         new("official-prebuilt-cuda", "Official llama.cpp CUDA WSL", RuntimeBackend.Cuda, RuntimeMode.Wsl, "official-cuda"),
         new("official-prebuilt-windows-vulkan", "Official llama.cpp Vulkan Windows", RuntimeBackend.Vulkan, RuntimeMode.Native, "official-windows-vulkan"),
         new("official-prebuilt-vulkan", "Official llama.cpp Vulkan WSL", RuntimeBackend.Vulkan, RuntimeMode.Wsl, "official-vulkan"),
+        new("official-prebuilt-windows-rocm", "Official llama.cpp ROCm Windows", RuntimeBackend.Rocm, RuntimeMode.Native, ""),
+        new("official-prebuilt-rocm", "Official llama.cpp ROCm WSL", RuntimeBackend.Rocm, RuntimeMode.Wsl, ""),
         new("official-prebuilt-windows-sycl", "Official llama.cpp SYCL Windows (Intel Arc)", RuntimeBackend.Sycl, RuntimeMode.Native, "official-windows-sycl"),
         new("official-prebuilt-sycl", "Official llama.cpp SYCL WSL (Intel Arc)", RuntimeBackend.Sycl, RuntimeMode.Wsl, "official-sycl"),
         new("official-prebuilt-windows-cpu", "Official llama.cpp CPU Windows", RuntimeBackend.Cpu, RuntimeMode.Native, "official-windows-cpu"),
@@ -60,6 +63,7 @@ public static class RuntimePackageSourceCatalog
     {
         RuntimeBackend.Cuda => "CUDA",
         RuntimeBackend.Vulkan => "Vulkan",
+        RuntimeBackend.Rocm => "ROCm",
         RuntimeBackend.Sycl => "SYCL",
         _ => "CPU"
     };

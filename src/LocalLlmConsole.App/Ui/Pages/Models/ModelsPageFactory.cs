@@ -17,7 +17,9 @@ public sealed record ModelsPageActions(
     Func<Task> ManageModelGroupsAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> AssignLaunchProfileGroupAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> RemoveLaunchProfileGroupAsync,
+    Func<ModelRecord, Task> ToggleModelFavoriteAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> ToggleTrayProfileFavoriteAsync,
+    Func<ModelRecord, NamedModelLaunchProfile, Task> ToggleStartupLaunchProfileAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> LoadLaunchProfileAsync,
     Action BeginNewLaunchProfile,
     Action<DataGrid, DataGrid?> SelectModelGridRow,
@@ -38,6 +40,8 @@ public sealed record ModelsPageControls(
     TextBlock ModelsFolderText,
     DataGrid ModelsGrid,
     DataGrid ModelVariantsGrid,
+    DataGridSearchControls ModelsSearch,
+    DataGridSearchControls LaunchProfilesSearch,
     Grid HuggingFaceSection,
     GridSplitter HuggingFaceSplitter,
     WpfTextBox HuggingFaceQueryBox,
@@ -77,7 +81,7 @@ public static class ModelsPageFactory
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(.95, GridUnitType.Star), MinWidth = 380 });
 
-        var (modelLists, modelsGrid, modelVariantsGrid) = ModelLists(request);
+        var (modelLists, modelsGrid, modelVariantsGrid, modelsSearch, launchProfilesSearch) = ModelLists(request);
         body.Children.Add(modelLists);
         body.Children.Add(PageSectionFactory.VerticalGridSplitter(1));
         Grid.SetColumn(request.LaunchSettingsPanel, 2);
@@ -101,10 +105,10 @@ public static class ModelsPageFactory
         Grid.SetRow(huggingFaceSection, 3);
         root.Children.Add(huggingFaceSection);
 
-        return new ModelsPageControls(root, modelsFolderText, modelsGrid, modelVariantsGrid, huggingFaceSection, huggingFaceSplitter, huggingFaceQueryBox, huggingFaceGrid);
+        return new ModelsPageControls(root, modelsFolderText, modelsGrid, modelVariantsGrid, modelsSearch, launchProfilesSearch, huggingFaceSection, huggingFaceSplitter, huggingFaceQueryBox, huggingFaceGrid);
     }
 
-    private static (Grid Section, DataGrid ModelsGrid, DataGrid ModelVariantsGrid) ModelLists(ModelsPageRequest request)
+    private static (Grid Section, DataGrid ModelsGrid, DataGrid ModelVariantsGrid, DataGridSearchControls ModelsSearch, DataGridSearchControls LaunchProfilesSearch) ModelLists(ModelsPageRequest request)
     {
         var modelLists = new Grid();
         modelLists.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 130 });
@@ -115,8 +119,10 @@ public static class ModelsPageFactory
             (Loc.T("Models.Col.Name"), nameof(ModelGridRow.Name), 2.35),
             (Loc.T("Models.Col.Quant"), nameof(ModelGridRow.Quant), .6),
             (Loc.T("Models.Col.Size"), nameof(ModelGridRow.Size), .65));
-        PageSectionFactory.AddButtonColumn(modelsGrid, Loc.T("Models.ActionBtn.OpenFolder"), nameof(ModelGridRow.OpenFolderAction), nameof(ModelGridRow.CanOpenFolder), request.Actions.OpenModelFolderRowClick, .85, tooltipBinding: nameof(ModelGridRow.OpenFolderToolTip));
-        PageSectionFactory.AddButtonColumn(modelsGrid, Loc.T("Models.ActionBtn.Delete"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .65, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger);
+        modelsGrid.Columns.Insert(0, SelectorFavoriteGridColumn.Create<ModelGridRow>(row =>
+            request.Actions.ToggleModelFavoriteAsync(row.Model)));
+        PageSectionFactory.AddButtonColumn(modelsGrid, Loc.T("Models.Col.Folder"), nameof(ModelGridRow.OpenFolderAction), nameof(ModelGridRow.CanOpenFolder), request.Actions.OpenModelFolderRowClick, .85, tooltipBinding: nameof(ModelGridRow.OpenFolderToolTip), compactContent: "\uE8B7", compactFontFamily: "Segoe Fluent Icons, Segoe MDL2 Assets");
+        PageSectionFactory.AddButtonColumn(modelsGrid, Loc.T("Models.ActionBtn.Delete"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .65, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         request.Actions.ConfigureModelGridColumnSizing(modelsGrid);
         modelsGrid.ItemsSource = request.ViewModel.Models.Rows;
         AttachModelContextMenu(modelsGrid, request.Actions);
@@ -124,22 +130,30 @@ public static class ModelsPageFactory
             (Loc.T("Models.Col.Name"), nameof(ModelGridRow.Name), 1.35),
             (Loc.T("Models.Col.BaseModel"), nameof(ModelGridRow.BaseModel), 1.35),
             (Loc.T("Models.Col.Port"), nameof(ModelGridRow.Port), .45));
+        modelVariantsGrid.Columns.Insert(0, SelectorFavoriteGridColumn.Create<ModelGridRow>(row =>
+            ToggleTrayFavoriteAsync(request.Actions, row)));
         modelVariantsGrid.Columns.Add(LaunchProfileGroupColumn(
             request.Actions.AssignLaunchProfileGroupAsync,
             request.Actions.RemoveLaunchProfileGroupAsync));
-        PageSectionFactory.AddButtonColumn(modelVariantsGrid, Loc.T("Models.ActionBtn.Remove"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .68, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger);
+        PageSectionFactory.AddButtonColumn(modelVariantsGrid, Loc.T("Models.ActionBtn.Remove"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .68, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         modelVariantsGrid.ItemsSource = request.ViewModel.Models.VariantRows;
         AttachLaunchProfileContextMenu(modelVariantsGrid, request.Actions);
+        var modelsSearch = DataGridSearch.Create(modelsGrid,
+            item => item is ModelGridRow row ? $"{row.Name} {row.Quant} {row.Size}" : "",
+            Loc.T("Models.SearchModels"));
+        var launchProfilesSearch = DataGridSearch.Create(modelVariantsGrid,
+            item => item is ModelGridRow row ? $"{row.Name} {row.BaseModel} {row.Port} {row.Group}" : "",
+            Loc.T("Models.SearchLaunchProfiles"));
 
         modelsGrid.SelectionChanged += (_, _) => request.Actions.SelectModelGridRow(modelsGrid, modelVariantsGrid);
         modelVariantsGrid.SelectionChanged += (_, _) => request.Actions.SelectModelGridRow(modelVariantsGrid, modelsGrid);
 
-        modelLists.Children.Add(PageSectionFactory.GridSection(Loc.T("Models.ModelFilesTitle"), modelsGrid, Loc.T("Models.ModelFilesDescription")));
+        modelLists.Children.Add(PageSectionFactory.GridSection(Loc.T("Models.ModelFilesTitle"), modelsGrid, Loc.T("Models.ModelFilesDescription"), modelsSearch.Root));
         modelLists.Children.Add(PageSectionFactory.HorizontalGridSplitter(1));
-        var variantsSection = PageSectionFactory.GridSection(Loc.T("Models.SavedVariantsTitle"), modelVariantsGrid, Loc.T("Models.SavedVariantsDescription"));
+        var variantsSection = PageSectionFactory.GridSection(Loc.T("Models.SavedVariantsTitle"), modelVariantsGrid, Loc.T("Models.SavedVariantsDescription"), launchProfilesSearch.Root);
         Grid.SetRow(variantsSection, 2);
         modelLists.Children.Add(variantsSection);
-        return (modelLists, modelsGrid, modelVariantsGrid);
+        return (modelLists, modelsGrid, modelVariantsGrid, modelsSearch, launchProfilesSearch);
     }
 
     private static DataGridTemplateColumn LaunchProfileGroupColumn(
@@ -214,12 +228,12 @@ public static class ModelsPageFactory
         ungrouped.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "GroupNameButton"));
         template.Triggers.Add(ungrouped);
 
-        return new DataGridTemplateColumn
+        return new FlexibleActionDataGridColumn
         {
             Header = Loc.T("ModelGroups.Column.Group"),
             CellTemplate = template,
             Width = new DataGridLength(.75, DataGridLengthUnitType.Star),
-            MinWidth = 84
+            MinWidth = FlexibleActionDataGridColumn.CompactMinWidth
         };
     }
 
@@ -227,6 +241,10 @@ public static class ModelsPageFactory
     {
         DataGridRowContextMenu.Attach(
             grid,
+            SelectorFavoriteContextAction.Create<ModelGridRow>(
+                row => row.IsFavorite,
+                row => row.LaunchProfile is null,
+                row => actions.ToggleModelFavoriteAsync(row.Model)),
             new(_ => Loc.T("Models.ActionBtn.OpenFolder"),
                 row => row is ModelGridRow { CanOpenFolder: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(actions.OpenModelFolderRowClick, row)),
@@ -249,11 +267,15 @@ public static class ModelsPageFactory
                 ToolTip: row => ((ModelGridRow)row).IsMissing
                     ? Loc.T("Overview.MissingModelLoadTooltip")
                     : Loc.T("Tooltip.Load")),
-            new(row => ((ModelGridRow)row).IsTrayFavorite
-                    ? Loc.T("Tray.RemoveFavorite")
-                    : Loc.T("Tray.AddFavorite"),
+            SelectorFavoriteContextAction.Create<ModelGridRow>(
+                row => row.IsFavorite,
+                row => row.LaunchProfile is not null,
+                row => ToggleTrayFavoriteAsync(actions, row)),
+            new(row => Loc.T(((ModelGridRow)row).IsLoadOnStartup
+                    ? "Settings.StartupProfiles.RemoveAction"
+                    : "Settings.StartupProfiles.Action"),
                 row => row is ModelGridRow { LaunchProfile: not null },
-                row => ToggleTrayFavoriteAsync(actions, (ModelGridRow)row)),
+                row => ToggleStartupProfileAsync(actions, (ModelGridRow)row)),
             new(row => ((ModelGridRow)row).CanAssignGroup
                     ? Loc.T("ModelGroups.AssignAction")
                     : Loc.T("ModelGroups.ChangeGroup"),
@@ -283,6 +305,9 @@ public static class ModelsPageFactory
 
     private static Task ToggleTrayFavoriteAsync(ModelsPageActions actions, ModelGridRow row)
         => actions.ToggleTrayProfileFavoriteAsync(row.Model, row.LaunchProfile!);
+
+    private static Task ToggleStartupProfileAsync(ModelsPageActions actions, ModelGridRow row)
+        => actions.ToggleStartupLaunchProfileAsync(row.Model, row.LaunchProfile!);
 
     private static Task RemoveGroupAsync(ModelsPageActions actions, ModelGridRow row)
         => actions.RemoveLaunchProfileGroupAsync(row.Model, row.LaunchProfile!);

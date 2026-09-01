@@ -244,12 +244,12 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
             ?? throw new InvalidOperationException(string.IsNullOrWhiteSpace(profileSettings.RuntimeId)
                 ? "No registered llama.cpp runtime is available."
                 : $"Runtime '{profileSettings.RuntimeId}' is not registered or available.");
-        var current = _deps.Sessions.SessionForModel(model.Id);
+        var current = _deps.Sessions.SessionForProfile(model.Id, profile.Id);
         var restart = forceRestart || request.Restart;
         if (current is { IsRunning: true } && !restart)
             return Ok(new { ok = true, alreadyRunning = true, session = SessionView(current) });
         if (current is { IsRunning: true })
-            await _deps.Actions.StopModelAsync(model, cancellationToken);
+            await _deps.Sessions.StopAsync(current.SessionId, "Restarted through the control API", cancellationToken);
 
         var launchSettings = profileSettings.ApplyTo(_deps.Actions.GetSettings());
         var session = await _deps.Actions.StartModelAsync(
@@ -261,7 +261,7 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
             cancellationToken);
 
         if (request.WaitForReady)
-            session = await WaitForReadyAsync(model, launchSettings, request.TimeoutSeconds, cancellationToken);
+            session = await WaitForReadyAsync(model, profile, launchSettings, request.TimeoutSeconds, cancellationToken);
 
         return Ok(new
         {
@@ -275,6 +275,7 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
 
     private async Task<LoadedModelSessionSnapshot> WaitForReadyAsync(
         ModelRecord model,
+        NamedModelLaunchProfile profile,
         AppSettings settings,
         int timeoutSeconds,
         CancellationToken cancellationToken)
@@ -284,14 +285,14 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var session = _deps.Sessions.SessionForModel(model.Id)
+            var session = _deps.Sessions.SessionForProfile(model.Id, profile.Id)
                 ?? throw new InvalidOperationException($"{model.Name} stopped before its endpoint became ready.");
             if (!session.IsRunning)
                 throw new InvalidOperationException($"{model.Name} stopped before its endpoint became ready: {session.StatusReason}");
             if (await _deps.RuntimeEndpointProbe.IsAliveAsync(settings, cancellationToken))
             {
-                _deps.Sessions.MarkModelLoadedIfRunning(model.Id);
-                return _deps.Sessions.SessionForModel(model.Id) ?? session;
+                _deps.Sessions.MarkLoadedIfRunning(session.SessionId);
+                return _deps.Sessions.SessionForProfile(model.Id, profile.Id) ?? session;
             }
             await Task.Delay(500, cancellationToken);
         }

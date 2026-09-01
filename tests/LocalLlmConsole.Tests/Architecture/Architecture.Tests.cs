@@ -291,6 +291,7 @@ public sealed class ArchitectureTests : ManagerRegressionTestBase
             "Deletion",
             "Launch",
             "Packages",
+            "ProfileFit",
             "Readiness",
             "Sessions",
             "Telemetry"

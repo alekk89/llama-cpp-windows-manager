@@ -51,6 +51,11 @@ The Runtime Command panel remains visible in Basic and Advanced modes. Its gener
 
 Custom arguments are validated before application-owned arguments such as metrics are appended. Model, host, port, credentials, curated performance fields, and other managed flags cannot be overridden through raw parameters.
 
+Host is a curated per-profile Server setting. It defaults from the application
+settings, round-trips through `ModelLaunchSettings`, and is projected to
+`--host`. The direct-model LAN access policy remains authoritative: a profile
+cannot use a non-loopback host while direct LAN serving is disabled.
+
 ## Adding a polished setting
 
 1. Add the persistent value to `AppSettings` and, when model-specific, `ModelLaunchSettings`.

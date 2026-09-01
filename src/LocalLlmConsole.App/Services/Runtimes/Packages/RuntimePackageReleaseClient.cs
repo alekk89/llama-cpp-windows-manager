@@ -13,6 +13,13 @@ public static class RuntimePackageReleaseClient
 
     public static async Task<RuntimePackageRelease> FetchLatestReleaseAsync(HttpClient client, RuntimePackagePreset? preset, CancellationToken cancellationToken = default)
     {
+        if (preset is not null && RuntimePackageSourceCatalog.IsOfficialPackage(preset))
+        {
+            var recentRelease = await FetchRecentOfficialReleaseAsync(client, preset, cancellationToken);
+            if (recentRelease is not null)
+                return recentRelease;
+        }
+
         var apiUrl = RuntimePackageSourceCatalog.ReleaseApiUrlFor(preset);
         using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
         request.Headers.UserAgent.Add(new ProductInfoHeaderValue("LocalLlmConsole", "1.0"));
@@ -25,6 +32,58 @@ public static class RuntimePackageReleaseClient
 
         var release = ParseReleaseJson(json);
         return await ResolveOfficialNightlyReleaseAsync(client, preset, release, cancellationToken);
+    }
+
+    private static async Task<RuntimePackageRelease?> FetchRecentOfficialReleaseAsync(
+        HttpClient client,
+        RuntimePackagePreset preset,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var json = await DownloadJsonAsync(
+                client,
+                RuntimePackageSourceCatalog.RecentOfficialReleasesApiUrl,
+                cancellationToken);
+            var releases = JsonNode.Parse(json) as JsonArray;
+            if (releases is null)
+                return null;
+
+            foreach (var candidate in releases
+                         .OfType<JsonObject>()
+                         .Where(release => !BooleanValue(release["draft"]))
+                         .Select(release => new
+                         {
+                             Release = release,
+                             Build = OfficialBuildNumber(release["tag_name"]?.ToString())
+                         })
+                         .Where(candidate => candidate.Build >= 0)
+                         .OrderByDescending(candidate => candidate.Build))
+            {
+                RuntimePackageRelease release;
+                try
+                {
+                    release = ParseReleaseJson(candidate.Release.ToJsonString());
+                    _ = RuntimePackageAssetSelector.SelectAssets(preset, release);
+                }
+                catch (InvalidOperationException)
+                {
+                    continue;
+                }
+
+                return release;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // The stable release marker remains a bounded fallback when the recent-release feed is unavailable.
+        }
+        catch (JsonException)
+        {
+            // Fall back when GitHub returns an unexpected recent-release payload.
+        }
+
+        return null;
     }
 
     private static async Task<RuntimePackageRelease> ResolveOfficialNightlyReleaseAsync(
@@ -239,4 +298,15 @@ public static class RuntimePackageReleaseClient
         if (node is JsonValue value && value.TryGetValue<long>(out var result)) return result;
         return long.TryParse(node?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
     }
+
+    private static bool BooleanValue(JsonNode? node)
+        => node is JsonValue value && value.TryGetValue<bool>(out var result) && result;
+
+    private static long OfficialBuildNumber(string? tag)
+        => tag is not null
+            && tag.Length > 1
+            && tag[0] is 'b' or 'B'
+            && long.TryParse(tag.AsSpan(1), NumberStyles.None, CultureInfo.InvariantCulture, out var build)
+                ? build
+                : -1;
 }

@@ -51,4 +51,14 @@ public sealed class RuntimeSessionCommandService
             _decisions.SwitchToModel(model, selection.Selected),
             selection.ActiveSettings);
     }
+
+    public RuntimeSwitchCommandResult SwitchToProfile(ModelRecord model, string launchProfileId)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        var selection = _runtimeSessions.SelectProfile(model.Id, launchProfileId);
+        return new RuntimeSwitchCommandResult(
+            _decisions.SwitchToModel(model, selection.Selected),
+            selection.ActiveSettings);
+    }
 }

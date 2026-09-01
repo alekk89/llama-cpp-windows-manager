@@ -26,15 +26,16 @@ internal static class OverviewPageResponsiveCoordinator
             narrow = shouldUseNarrowLayout;
             if (!narrow)
             {
-                SetColumns(modelBar, GridLength.Auto, new GridLength(240), new GridLength(16), GridLength.Auto, new GridLength(220), new GridLength(1, GridUnitType.Star), GridLength.Auto);
+                SetColumns(modelBar, GridLength.Auto, new GridLength(1.1, GridUnitType.Star), new GridLength(16), GridLength.Auto,
+                    new GridLength(1, GridUnitType.Star), new GridLength(16), GridLength.Auto);
                 Place(modelLabel, 0, 0);
                 Place(modelCombo, 0, 1);
                 Place(profileLabel, 0, 3);
                 Place(launchProfileCombo, 0, 4);
                 Place(loadButton, 0, 6);
                 Grid.SetRowSpan(loadButton, 1);
-                modelCombo.Width = 240;
-                launchProfileCombo.Width = 220;
+                modelCombo.Width = double.NaN;
+                launchProfileCombo.Width = double.NaN;
                 profileLabel.Margin = new Thickness(0, 0, 8, 0);
                 launchProfileCombo.Margin = new Thickness(0);
                 return;

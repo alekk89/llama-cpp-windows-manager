@@ -36,6 +36,7 @@ public static class RuntimeLaunchRequestFactory
             GpuMode = settings.GpuMode,
             GpuDevices = settings.GpuDevices,
             GpuSplit = settings.GpuSplit,
+            TensorBufferOverrides = settings.TensorBufferOverrides,
             ParallelSlots = settings.ParallelSlots,
             BatchSize = settings.BatchSize,
             MicroBatchSize = settings.MicroBatchSize,
@@ -105,13 +106,17 @@ public static class RuntimeLaunchRequestFactory
         if (previewSettings.EnableMetrics) extra.Add("--metrics");
         extra.AddRange(custom);
         var speculativeType = LaunchSettingMetadataService.NormalizeSpeculativeType(previewSettings.SpeculativeType);
+        var allowNetworkAccess = AppPreferenceService.DirectModelsAllowLanAccess(previewSettings.ModelAccessMode);
+        var launchHost = allowNetworkAccess
+            ? string.IsNullOrWhiteSpace(previewSettings.Host) ? "0.0.0.0" : previewSettings.Host.Trim()
+            : "127.0.0.1";
         var request = Create(previewSettings, new RuntimeLaunchRequestContext(
             runtime?.Mode ?? RuntimeMode.Native,
             runtime?.Backend ?? RuntimeBackend.Cpu,
             runtime?.ExecutablePath ?? "llama-server",
             "<model.gguf>",
-            "127.0.0.1",
-            false,
+            launchHost,
+            allowNetworkAccess,
             previewSettings.VisionProjectorPath,
             VisionProjectorEmbedded: string.Equals(previewSettings.VisionMode, "on", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(previewSettings.VisionProjectorPath),
             DraftModelPath: previewSettings.SpecDraftModelPath,

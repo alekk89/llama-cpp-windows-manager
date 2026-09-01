@@ -168,6 +168,12 @@ public sealed partial class AppServiceFactory
         WindowsStartupRegistrationService startupRegistration)
         => new(settingsWorkflow, startupRegistration);
 
+    public StartupLaunchProfileApplicationService CreateStartupLaunchProfileApplicationService(StateStore stateStore)
+        => new(stateStore);
+
+    public UiLayoutPersistenceService CreateUiLayoutPersistenceService(StateStore stateStore)
+        => new(stateStore);
+
     public SettingsPageDefinitionService CreateSettingsPageDefinitionService()
         => new();
 

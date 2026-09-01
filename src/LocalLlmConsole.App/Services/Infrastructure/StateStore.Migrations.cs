@@ -227,6 +227,33 @@ CREATE INDEX IF NOT EXISTS ix_benchmark_results_workload
 ON benchmark_results(workload_signature);
 CREATE INDEX IF NOT EXISTS ix_benchmark_results_environment
 ON benchmark_results(environment_signature);
+"""),
+        new(12, "model-and-runtime-selector-favorites", """
+CREATE TABLE IF NOT EXISTS favorite_models (
+  model_id TEXT PRIMARY KEY,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(model_id) REFERENCES models(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS favorite_runtimes (
+  runtime_id TEXT PRIMARY KEY,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(runtime_id) REFERENCES runtimes(id) ON DELETE CASCADE
+);
+"""),
+        new(13, "startup-launch-profiles", """
+CREATE TABLE IF NOT EXISTS startup_launch_profiles (
+  launch_profile_id TEXT PRIMARY KEY,
+  position INTEGER NOT NULL CHECK (position >= 0),
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(launch_profile_id) REFERENCES model_launch_profiles(id) ON DELETE CASCADE
+);
+"""),
+        new(14, "persistent-ui-layouts", """
+CREATE TABLE IF NOT EXISTS ui_layout_state (
+  scope_key TEXT PRIMARY KEY,
+  layout_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 """)
     ];
 

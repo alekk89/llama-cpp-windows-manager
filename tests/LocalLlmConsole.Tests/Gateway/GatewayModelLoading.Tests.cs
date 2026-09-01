@@ -54,17 +54,19 @@ public sealed class GatewayModelLoadingTests : ManagerRegressionTestBase
                 stopped.Add(model.Id);
                 await runtimeSessions.StopModelAsync(model.Id);
             },
-            (startedRuntime, model, _, launchSettings, _) =>
+            (startedRuntime, model, profile, launchSettings, _) =>
             {
                 startedSettings = launchSettings;
-                sessions.AttachExisting(startedRuntime, model, launchSettings, Path.Combine(root, "target.log"), LlamaRuntimeState.Loading, "", "target-session", DateTimeOffset.UtcNow);
+                sessions.AttachExisting(startedRuntime, model, launchSettings, Path.Combine(root, "target.log"), LlamaRuntimeState.Loading, "", "target-session", DateTimeOffset.UtcNow,
+                    launchProfileId: profile.Id, launchProfileName: profile.Name);
                 return Task.CompletedTask;
             },
             (_, _) => Task.FromResult(true),
-            (model, _, _) =>
+            (model, profile, _, _) =>
             {
-                sessions.MarkModelLoadedIfRunning(model.Id);
-                return Task.FromResult(sessions.SessionForModel(model.Id));
+                var session = sessions.SessionForProfile(model.Id, profile.Id);
+                sessions.MarkLoadedIfRunning(session!.SessionId);
+                return Task.FromResult(sessions.SessionForProfile(model.Id, profile.Id));
             },
             phases.Add,
             ReadyTimeout: TimeSpan.FromSeconds(1),
@@ -84,7 +86,7 @@ public sealed class GatewayModelLoadingTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public async Task GatewayModelLoadWorkflowRestartsSameModelForRequestedProfile()
+    public async Task GatewayModelLoadWorkflowLoadsAnotherProfileOfSameModelConcurrently()
     {
         var root = CreateTempRoot();
         await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
@@ -136,21 +138,23 @@ public sealed class GatewayModelLoadingTests : ManagerRegressionTestBase
                 return Task.CompletedTask;
             },
             (_, _) => Task.FromResult(true),
-            (readyModel, _, _) =>
+            (readyModel, readyProfile, _, _) =>
             {
-                sessions.MarkModelLoadedIfRunning(readyModel.Id);
-                return Task.FromResult(sessions.SessionForModel(readyModel.Id));
+                var session = sessions.SessionForProfile(readyModel.Id, readyProfile.Id);
+                sessions.MarkLoadedIfRunning(session!.SessionId);
+                return Task.FromResult(sessions.SessionForProfile(readyModel.Id, readyProfile.Id));
             },
             phases.Add,
             ReadyTimeout: TimeSpan.FromSeconds(1),
             PollInterval: TimeSpan.FromMilliseconds(1)),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, stopped);
+        Assert.Equal(0, stopped);
         Assert.Equal(tunedProfile.Id, startedProfile?.Id);
         Assert.Equal(tunedProfile.Id, result.Session.LaunchProfileId);
         Assert.Equal(8085, result.LaunchSettings.Port);
-        Assert.Contains(phases, phase => phase.Contains("switching from Default to 128K", StringComparison.Ordinal));
+        Assert.Equal(2, sessions.SessionsForModel(model.Id).Count);
+        Assert.DoesNotContain(phases, phase => phase.Contains("switching from", StringComparison.Ordinal));
     }
 
 
@@ -189,18 +193,20 @@ public sealed class GatewayModelLoadingTests : ManagerRegressionTestBase
                 ExistingSession: null),
             new GatewayRuntimeLoadApplicationActions(
                 (_, _) => throw new InvalidOperationException("Keep-loaded policy should not stop models."),
-                (startedRuntime, runtimeModel, _, launchSettings, _) =>
+                (startedRuntime, runtimeModel, startedProfile, launchSettings, _) =>
                 {
                     calls.Add($"start:{runtimeModel.Id}:{launchSettings.Port}");
-                    sessions.AttachExisting(startedRuntime, runtimeModel, launchSettings, Path.Combine(root, "target.log"), LlamaRuntimeState.Loading, "", "target-session", DateTimeOffset.UtcNow);
+                    sessions.AttachExisting(startedRuntime, runtimeModel, launchSettings, Path.Combine(root, "target.log"), LlamaRuntimeState.Loading, "", "target-session", DateTimeOffset.UtcNow,
+                        launchProfileId: startedProfile.Id, launchProfileName: startedProfile.Name);
                     return Task.CompletedTask;
                 },
                 (_, _) => Task.FromResult(true),
-                (runtimeModel, _, _) =>
+                (runtimeModel, readyProfile, _, _) =>
                 {
                     calls.Add($"ready:{runtimeModel.Id}");
-                    sessions.MarkModelLoadedIfRunning(runtimeModel.Id);
-                    return Task.FromResult(sessions.SessionForModel(runtimeModel.Id));
+                    var session = sessions.SessionForProfile(runtimeModel.Id, readyProfile.Id);
+                    sessions.MarkLoadedIfRunning(session!.SessionId);
+                    return Task.FromResult(sessions.SessionForProfile(runtimeModel.Id, readyProfile.Id));
                 },
                 (runtimeModel, phase) => calls.Add($"activity:{phase}:{runtimeModel.Id}"),
                 phase => calls.Add($"phase:{phase}"),

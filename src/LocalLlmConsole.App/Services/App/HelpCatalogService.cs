@@ -157,10 +157,10 @@ public sealed partial class HelpCatalogService
             "Use profiles and groups",
             "Profiles save launch variants; groups apply retention policy to selected profiles.",
             [
-                "Keep separate profiles for low memory, long context, vision, or different runtimes; right-click profile rows to add tray favourites, then right-click the tray icon to start, stop, or switch them.",
+                "Keep separate profiles for low memory, long context, vision, or different runtimes; use the shared star or Add to favorites action to keep frequent models and profiles first throughout the app and tray, and toggle Load on startup from a saved profile row.",
                 "A group can pin sessions, inherit the global idle timeout, or use its own idle timeout.",
                 "Group priority controls automatic idle-eviction order, not inference scheduling.",
-                "A group load validates runtimes, ports, duplicate models, and aggregate VRAM before starting anything."
+                "A group load validates runtimes, unique ports, and aggregate VRAM before starting independent profile sessions."
             ],
             [Action("Open Models", "launch-settings")],
             ["launch variant", "tray", "favourite", "quick start", "retention", "pinned", "idle timeout", "eviction", "multi model"]),
@@ -199,12 +199,12 @@ public sealed partial class HelpCatalogService
             "Choose a backend",
             "Use CPU for compatibility or select the GPU backend supported by your hardware and drivers.",
             [
-                "CUDA targets NVIDIA GPUs, Vulkan commonly targets AMD or other Vulkan-capable GPUs, and SYCL targets Intel Arc.",
+                "CUDA targets NVIDIA GPUs, Vulkan targets Vulkan-capable GPUs, ROCm targets supported AMD GPUs, and SYCL targets Intel Arc.",
                 "Windows and WSL packages are separate and are not interchangeable.",
                 "If a GPU runtime cannot start, try the CPU package to separate model problems from driver/backend problems."
             ],
             [Action("Open Runtimes", "runtime-download")],
-            ["cuda", "nvidia", "vulkan", "amd", "sycl", "intel arc", "cpu"]),
+            ["cuda", "nvidia", "vulkan", "rocm", "amd", "hip", "sycl", "intel arc", "cpu"]),
 
         Article(
             "runtime-trust",
@@ -280,13 +280,12 @@ public sealed partial class HelpCatalogService
             "App behavior and data",
             "Settings apply automatically and the workspace remains fixed for the running process.",
             [
-                "The customizable Overview dashboard and UI switches change presentation without disabling telemetry, logs, metrics, or downloads.",
-                "Use a card's right-click menu for metrics, an optional title, charts, and removal; resize from any visible side or corner, or use the dashboard Lock button to preserve every card's current dimensions. Hardware rows include independent CPU, RAM, VRAM, power, clock, core-temperature, and VRAM-temperature sensors when Windows or the GPU driver exposes them.",
-                "Portable installs normally keep models, runtimes, state, cache, and logs under data beside the executable.",
-                "Start with Windows and minimize behavior apply to the current Windows user."
+                "The customizable Overview dashboard and UI switches change presentation without disabling telemetry, logs, metrics, or downloads. Use a card's right-click menu for metrics, titles, charts, removal, resizing, and layout locking.",
+                "UI scale enlarges text and controls on top of Windows display scaling; Text scale changes text only. Both apply immediately. The Manager also remembers window bounds, table column widths and order, and page splitter positions in the current workspace.",
+                "Start with Windows, Load profiles on startup, and minimize behavior apply to the current Windows user."
             ],
             [Action("Open Settings", "settings")],
-            ["workspace", "portable data", "hide metrics", "dashboard", "vram", "power", "temperature", "startup", "tray"]),
+            ["workspace", "portable data", "ui scale", "font size", "dpi", "resolution", "display", "hide metrics", "dashboard", "vram", "power", "temperature", "startup", "tray"]),
 
         Article(
             "model-will-not-load",

@@ -93,6 +93,17 @@ CREATE TABLE IF NOT EXISTS launch_profile_group_assignments (
 );
 CREATE INDEX IF NOT EXISTS ix_launch_profile_group_assignments_group_id
 ON launch_profile_group_assignments(group_id);
+CREATE TABLE IF NOT EXISTS startup_launch_profiles (
+  launch_profile_id TEXT PRIMARY KEY,
+  position INTEGER NOT NULL CHECK (position >= 0),
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(launch_profile_id) REFERENCES model_launch_profiles(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS ui_layout_state (
+  scope_key TEXT PRIMARY KEY,
+  layout_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS runtimes (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

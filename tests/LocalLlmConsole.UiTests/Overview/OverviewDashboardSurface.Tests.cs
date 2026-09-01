@@ -293,7 +293,7 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
                 new LocalLlmConsole.RuntimesPageActions(
                     ChooseRuntimeFolderAsync: () => Task.CompletedTask,
                     ChangeCudaPackagePreferenceAsync: () => Task.CompletedTask,
-                    RuntimeGridPreviewMouseLeftButtonDown: (_, _) => { },
+                    ToggleRuntimeFavoriteAsync: _ => Task.CompletedTask,
                     VerifyRuntimeRowClick: noOp,
                     DeleteRuntimeRowClick: noOp,
                     RuntimeSourceRowClick: noOp,

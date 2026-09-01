@@ -44,6 +44,7 @@ public static partial class RuntimeMetadataService
                 || text.Contains("ggerganov/llama.cpp", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("llama.cpp", StringComparison.OrdinalIgnoreCase))
             {
+                if (runtime.Backend == RuntimeBackend.Rocm || text.Contains("rocm", StringComparison.OrdinalIgnoreCase)) return isNative ? "official-windows-rocm" : "official-rocm";
                 if (runtime.Backend == RuntimeBackend.Sycl || text.Contains("sycl", StringComparison.OrdinalIgnoreCase)) return isNative ? "official-windows-sycl" : "official-sycl";
                 if (runtime.Backend == RuntimeBackend.Cuda || text.Contains("cuda", StringComparison.OrdinalIgnoreCase)) return isNative ? "official-windows-cuda" : "official-cuda";
                 if (runtime.Backend == RuntimeBackend.Vulkan || text.Contains("vulkan", StringComparison.OrdinalIgnoreCase)) return isNative ? "official-windows-vulkan" : "official-vulkan";

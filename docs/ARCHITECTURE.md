@@ -1,6 +1,6 @@
 # Target Architecture
 
-Last reviewed: 2026-08-25
+Last reviewed: 2026-09-01
 
 ## Boundary
 
@@ -26,6 +26,13 @@ The repo does not own large data by default:
 - downloaded/extracted llama.cpp builds
 
 The startup workspace is fixed for the process and defaults to `data` beside `LlamaCppWindowsManager.exe` when that location is writable. If not, it falls back to `%LocalAppData%\llama.cpp Windows Manager`, while reusing `%LocalAppData%\llama.cpp Console` or `%LocalAppData%\LocalLlmConsole` only when those legacy folders already exist. It can be overridden with `LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE` before launch; `LLAMA_CPP_CONSOLE_WORKSPACE` and `LOCAL_LLM_CONSOLE_WORKSPACE` remain accepted as legacy aliases. Models and runtimes are configured in App Settings and stored in SQLite. Cache data is kept inside the fixed workspace and is not exposed as a separate Settings folder. The source tree contains the platform-neutral Core library, the WPF app, the `llwmctl` control CLI, tests, docs, and the helper script used for llama.cpp builds. Release builds append a bounded ZIP containing the CLI and operator/control sidecars to the app executable and restore verified copies beside it at startup. Keeping that payload outside the managed WPF assembly avoids loading the self-contained CLI with the UI while retaining executable-only recovery. Normal startup compares installed sidecars with the packaged manifest before extracting anything; the explicit bootstrap-only verification mode additionally validates every packaged payload.
+
+Saved startup-profile selections are ordered foreign-key references to named
+launch profiles, so deleting a profile or model removes its selection. After
+active-session recovery, startup attempts each remaining selection through the
+normal keep-loaded gateway/runtime lifecycle before the gateway listener starts.
+This preserves readiness checks, port and admission rules, and same-model
+multi-profile session identity.
 
 ## Runtime Shape
 
@@ -75,10 +82,17 @@ Current:
 11. Confirmed shutdown stops supervised runtime sessions before local hosts and
     state teardown. Non-critical stage failures are recorded while remaining
     cleanup continues, and background-task draining is bounded to 15 seconds.
-12. Tray favourites are presentation preferences stored separately from launch
-    settings and cascade when a profile is removed. Right-click menu snapshots
-    join models, profiles, favourites, and immutable loaded-session state only
-    when opened; the tray adds no polling loop or background timer.
+12. Selector favourites are presentation preferences stored separately from
+    launch settings for models, profiles, and runtimes. They cascade when their
+    target is removed and drive one favorite-first order across page lists,
+    selectors, Benchmarks, Metrics, and the tray. Right-click tray snapshots are
+    built only when opened; the tray adds no polling loop or background timer.
+13. Startup-profile selections are ordered foreign-key references to saved
+    launch profiles. Removing a profile or model cascades its startup selection;
+    a failure to load one selection does not stop later selections.
+14. Main-window bounds plus page-scoped DataGrid column widths/order and
+    GridSplitter proportions are stored in `ui_layout_state`. Restoration is
+    versioned and monitor-safe, and obsolete control identities are ignored.
 
 ## Architecture Contract
 
@@ -214,7 +228,9 @@ under `Services/App`, `Services/Environment`, `Services/Gateway`,
 `Services/HuggingFace`, `Services/Infrastructure`, `Services/Models`,
 and `Services/Runtimes`. Runtime implementations are divided again by stable
 responsibility under `Build`, `Catalog`, `Deletion`, `Launch`, `Packages`,
-`Readiness`, `Sessions`, and `Telemetry`. UI factories and page state are
+`ProfileFit`, `Readiness`, `Sessions`, and `Telemetry`. `ProfileFit` owns exact-runtime
+`llama-fit-params` capability probing and deterministic fit process execution;
+portable parsing and OOM classification remain in Core. UI factories and page state are
 similarly grouped under `Ui/Common` and `Ui/Pages/*`, while thin window adapters
 live under `Ui/Shell/MainWindow/*`; larger UI factories such
 as `LaunchSettingsPanelFactory` are split into shell, section composition,
@@ -263,7 +279,7 @@ termination. The active queue alone may hold a Windows system-awake request.
 
 - `MainWindowViewModel` and page view models (`OverviewPageViewModel`, `ModelsPageViewModel`, `RuntimesPageViewModel`, `RuntimePackagesPageViewModel`, `RuntimeBuildsPageViewModel`, `RuntimeMetricsViewModel`, `WindowsPageViewModel`, `WslLinuxPageViewModel`, `HuggingFacePageViewModel`, `LogsViewModel`, `SettingsPageViewModel`, `LaunchSettingsViewModel`, `UpdatesPageViewModel`, and `LifetimeMetricsViewModel`) own row collections, selection lists, status/busy state, and deterministic row projection for migrated pages.
 - `LocalControlApi`, its explicit endpoint handlers, `LocalControlDiscoveryService`, and `llwmctl` own the versioned loopback automation surface, current-user endpoint/token discovery, safe model self-identification, full typed setting patches, endpoint inspection without secret disclosure, and structured command output. The CLI separates argument parsing, connection discovery/DPAPI handling, output, and help from request construction and self-stop admission. `ControlAppSettingsMutationService` owns control-surface settings normalization, protected-field enforcement, mandatory API-key validation, and live port-conflict checks. `ControlRuntimeOperationApplicationService` owns runtime package/source/build/job dispatch; `ControlNonRuntimeOperationApplicationService` owns cache, logs, lifetime, download, Windows/WSL, and update dispatch. Both compose existing application services without placing those workflows in `MainWindow`. `ControlRequestAdmissionService` applies self-preservation rules, while `ControlOperationCatalog` exposes machine and application operations. `ControlApiAuditLogService` writes a bounded request audit containing only method, path, result status, and duration; `LogFileService` exposes it in the Logs page as Type **Control API**. Control actions reuse the same model/runtime services and dispatch UI synchronization through the shell bridge.
-- `StateStore`, `ModelGroupService`, `OverviewModelGroupLoadPlanningService`, `OverviewModelGroupLoadApplicationService`, `JobEngine`, and `SecretProtector` own durable state, transactional launch-profile-group replacement, validated membership/retention policy, group-load planning and rollback, jobs, protected settings, and persisted job-transition validation. A supervised session resolves policy through its stored launch-profile ID, allowing profiles of one model to differ. Legacy model-level assignments migrate to the model's default profile. Group loading validates the complete runtime/port/aggregate-VRAM plan before starting its first member, stops all sessions that must be replaced before cross-port swaps, and restores the original sessions if any target fails to start. Group eviction priority ranks automatic idle-unload candidates only; it is not an inference scheduler.
+- `StateStore`, `ModelGroupService`, `OverviewModelGroupLoadPlanningService`, `OverviewModelGroupLoadApplicationService`, `JobEngine`, and `SecretProtector` own durable state, transactional launch-profile-group replacement, validated membership/retention policy, group-load planning and rollback, jobs, protected settings, and persisted job-transition validation. A supervised session resolves policy through its stored launch-profile ID, allowing profiles of one model to differ. Legacy model-level assignments migrate to the model's default profile. Group loading validates the complete runtime/port/aggregate-VRAM plan before starting its first member, keeps existing sessions intact, and rolls back only the sessions started by that group action if a target fails. Group eviction priority ranks automatic idle-unload candidates only; it is not an inference scheduler.
 - `ModelCatalogService`, `HuggingFaceService`, `HuggingFaceInstallStateService`, `HuggingFaceLaunchSettingsSuggester`, and `ModelCapabilityService` own model discovery, download lifecycle, exact-model-folder companion discovery, embedded NextN/MTP precedence, type-safe MTP/DFlash/DSpark/Eagle3/draft classification, matching mmproj/projector companion downloads, installed/download button state, README launch hints, and local model capability inference. Model and projector transfers run as background workers, and their potentially multi-gigabyte SHA-256 verification uses asynchronous sequential file reads. Hugging Face launch suggestion parsing is split across config JSON parsing, README command extraction, shell tokenization, and option mapping.
 - `RuntimeRegistryService`, `LlamaCppLaunchValidator`, `LlamaCppArgumentBuilder`, `RuntimeLaunchOptionSwitchService`, `RuntimeDeletionPlanner`, `RuntimeDeletionExecutorService`, `RuntimePackageSourceCatalog`, `RuntimePackageReleaseClient`, `RuntimePackageAssetSelector`, `RuntimePackageInstallFileService`, `RuntimePackageInventoryPresenter`, `RuntimeBuildCatalogService`, `RuntimeBuildJobService`, `RuntimeBuildToolService`, `RuntimeMetadataService`, `RuntimeEquivalenceService`, `RuntimeFileService`, `RuntimePortAllocator`, `ModelPortAllocator`, and `RuntimeEndpointService` own runtime discovery, launch validation, llama.cpp command projection, advertised positive/negative switch pairing, deletion planning, deletion execution, prebuilt package source/feed selection, release parsing, asset matching, extraction/metadata stamping, package inventory projection, source/build catalog metadata and remote-ref parsing, build job payload/log metadata, build-tool command construction, source/prebuilt equivalence, safe delete boundaries, model-server URLs, stable per-model ports, and served-model matching. The obsolete `RuntimeAdapter` remains only as a temporary source-compatibility facade while downstream callers migrate; production code uses the focused validator and builder directly. Package checksum/extraction, recursive safety inspection/deletion, runtime fingerprinting, and filesystem-backed catalog projection execute away from the WPF dispatcher.
 - `LlamaProcessSupervisor`, `NativeRuntimeStopService`, `LlamaRuntimeOutputObserver`, `TrackedProcessRunner`, `WindowsEnvironmentService`, `WindowsSetupCommands`, `WslEnvironmentService`, `WslSetupCommands`, and `CommandLineService` own process supervision, asynchronously awaited native/WSL stop verification, runtime stdout/stderr observation, tracked process execution, Windows and WSL detection/status/tool-probe parsing, setup/probe commands, and visible shell command quoting/launching. Normal unload and restart paths never synchronously wait on a process from the UI dispatcher; the synchronous supervisor fallback is reserved for final disposal after the awaited shutdown path.
@@ -303,6 +319,12 @@ termination. The active queue alone may hold a Windows system-awake request.
   `TrayIconHost` remains the narrow native notification-area adapter. Commands
   reuse the normal model lifecycle application services and do not launch or
   stop processes directly.
+- `StartupLaunchProfileApplicationService` projects ordered saved-profile
+  selections, persists add/remove actions through `StateStore`, and attempts
+  each configured profile through the normal loaded-session lifecycle after
+  recovery. `SelectorFavoriteBinding`, `SearchableComboBox`, and the shared
+  favorite column/context helpers apply the same persistent favorite state to
+  models, profiles, and runtimes without coupling page factories to SQLite.
 - `EndpointInspectionService` performs read-only, authenticated live inspection of direct model endpoints (`/health`, `/v1/models`, `/props`, and `/slots`) and the shared gateway (`/health`, `/v1/models`, and `/running`). It preserves partial results when a fork omits an optional endpoint. `EndpointInspectionDialogFactory` renders those normalized results without issuing inference requests and exposes selectable fields plus separate copy actions. `EndpointInspectionReportFormatter` has no API-key input, so the general copied report cannot include the model credential; only the dedicated key action receives it. The complete surface and the Model Groups dialogs use the same 21-pack localization contract as the shell.
 - `OverviewDashboardLayoutPolicy` owns the versioned, platform-neutral dashboard
   layout contract, normalization, legacy visibility projection, card ordering,
@@ -438,7 +460,12 @@ termination. The active queue alone may hold a Windows system-awake request.
   debounced `SettingsPageState` change notification persists valid edits and
   reapplies page state without rebuilding the focused editor. Missing keys use
   the documented per-surface defaults. The typed `AppSettings` control schema
-  exposes the same fields automatically.
+  exposes the same fields automatically. UI-scale and text-scale slider values
+  are the focused exception: `SettingsPageState` applies each movement
+  synchronously through `ApplicationUiScaleService` or
+  `ApplicationFontScaleService` and cancels any older pending settings write,
+  while the slider's pointer/key release schedules the single persistence commit
+  for the latest value.
 - `ModelGatewayService`, `ModelGatewayRequestAccessPolicy`, `ModelGatewayRequestResolver`, `ModelGatewayUpstreamProxy`, `ModelGatewayResponseWriter`, `GatewayModelLoadWorkflowService`, `GatewayRuntimeApplicationService`, `GatewayActivityStatusTracker`, `GatewayActivityStatusController`, and `GatewayPerformanceTracker` own the shared auto-load router, access/CORS checks, model-id resolution, upstream proxying, client-facing response payloads, policy-aware load workflow, client-facing load failures, Overview routing status, and bounded request latency/health observations.
 The largest service classes are also split by concern: `StateStore` separates catalog, model-group policy, settings, job persistence, and legacy launch-default migration; `HuggingFaceService` separates search, download lifecycle, safety verification, projector companion handling, and launch-profile suggestions; `LlamaProcessSupervisor` separates runtime lifecycle, launch helpers, and WSL cleanup helpers; `RuntimeBuildCatalogService` separates default presets, custom repository persistence, downloaded source metadata, preset row presentation, and backend/mode identity helpers; `RuntimeMetadataService` separates package metadata reads, preset inference, commit helpers, and runtime folder/package path helpers; `ModelGatewayService` delegates access policy, request/model resolution, upstream proxying, and response payloads to gateway helpers; `RuntimeDeletionPlanner` separates direct runtime, package, source-cache, and build-preset planning while `RuntimeDeletionExecutorService` performs state/filesystem mutation; `AppUpdateService` delegates release parsing and checksum verification to update helpers; and `ModelCatalogService` keeps legacy metadata parsing separate from normal scan/import/delete flows.
 
@@ -446,6 +473,25 @@ Domain models are grouped by use instead of living in one catch-all file: core r
 
 `ApplicationThemeService` owns dynamic application resource replacement,
 system-theme detection, and Windows high-contrast palette projection.
+`ApplicationUiScaleService` owns the persisted application-only scale multiplier,
+applies it to the content of every current or newly loaded Manager window, and
+preserves WPF's existing Per-Monitor-V2 DPI behavior rather than replacing it.
+`ApplicationFontScaleService` separately scales inherited and explicitly sized
+WPF text while preserving control dimensions, spacing, and existing layout
+transforms.
+`UiLayoutPersistenceService` observes the shell's current page and applies one
+generic persistence policy to every page `DataGrid` and `GridSplitter`. It
+debounces column-width, display-order, splitter, and main-window changes into
+the versioned `ui_layout_state` SQLite table, restores them as pages are
+composed, and clamps obsolete window bounds to the current virtual desktop.
+Shared flexible text/action column types coerce page-specific sizing hints to a
+compact 48-pixel user minimum while fixed glyph columns retain their explicit
+widths and destructive responsive columns retain the 36-pixel **×** minimum.
+WPF's paired header grippers keep the shared boundary resizable from either
+adjacent column. Responsive action labels preserve their full automation name
+and tooltip while displaying a compact glyph.
+`SettingsPageResponsiveCoordinator` preserves settings-section order while
+switching the page between one and two columns at its content-width breakpoint.
 `VisualTreeTraversal` and `UiAccessibility` provide shared WPF traversal,
 visible keyboard-focus, and automation helpers. `MainWindow` no longer contains
 duplicated page factories, metric factories, theme palettes, or control
@@ -480,7 +526,7 @@ Current:
 2. Classify readable GGUFs from role metadata first (`MainModel`, `VisionProjector`, `SpeculativeAssistant`, or `Ambiguous`), use narrow filename conventions only as a fallback or conflict signal, and return per-file scan diagnostics instead of silently relying on broad name exclusions.
 3. Auto-register main-model GGUFs in SQLite. An explicit file import rejects invalid GGUFs, asks for confirmation before treating a companion or ambiguous file as a main model, and persists that confirmation so later scans do not discard the registration.
 4. Pick a prebuilt or custom built llama.cpp runtime and launch settings.
-5. Load/restart/unload explicitly; more than one model can stay loaded at the same time when each model has a unique saved port and hardware capacity allows it.
+5. Load/restart/unload explicitly; more than one launch profile can stay loaded at the same time, including profiles backed by the same GGUF, when each profile has a unique saved port and hardware capacity allows it.
 6. Search Hugging Face from the Models page, paste a Hugging Face repo or GGUF file URL directly, review compatibility signals, open the selected repo's model card, and download/install the selected GGUF plus a discoverable verified mmproj/projector companion as a background job.
 7. Delete registration or app-owned model directory according to ownership flags.
 8. Generate compact model manifests from readable GGUF metadata while preserving imported/download metadata.
@@ -498,7 +544,7 @@ Gateway routing:
 
 - The auto-load gateway listens on one OpenAI-compatible `/v1` port and never serves a model process itself. Local-only mode rejects every non-loopback peer address before authentication or routing. On Windows, an existing wildcard URL reservation may be reused for the listener so switching from LAN mode does not strand the gateway behind an HTTP.sys 503; the peer-address check remains the serving security boundary in that case.
 - `GET /v1/models` exposes one route for every saved launch profile, including a `context_length` extension containing that profile's configured context size and llama.cpp-compatible `meta` values for the GGUF training context, parameter count, and current file size. Metadata inspection is cached by model-file fingerprint, never inferred from names, and reused across profiles for the same model. The default profile retains the registered model id and existing model aliases; non-default profiles receive deterministic route ids derived from the model and saved profile id. Normalization collisions receive a stable hash suffix so no profile disappears from discovery.
-- Each requested profile still launches on its saved direct runtime port. The gateway resolves the requested route to a model/profile pair, ensures that exact profile is loaded, then proxies the request to that direct port. Requesting another profile for an already-running model stops that session and restarts it with the requested profile. Concurrent requests for the active profile remain concurrent until another profile queues; queued profile groups then receive FIFO priority so continuous active-profile traffic cannot starve a switch. Requests for different models remain concurrent.
+- Each requested profile launches on its saved direct runtime port. The gateway resolves the requested route to a model/profile pair, ensures that exact profile session is loaded, then proxies the request to that direct port. Under **Prefer keeping loaded models**, another profile backed by the same GGUF starts as an independent session and both routes remain available. Under **Single active model**, all other direct sessions are stopped before the requested profile starts. Concurrent requests for the same profile share one serialized load, while different profile routes may remain loaded together.
 - Upstream response headers, including any load/swap delay, have a bounded wait.
   After headers arrive, the body stream has no fixed request-duration timeout;
   it ends when the upstream completes, the client disconnects, or app shutdown
@@ -516,14 +562,14 @@ Still needed:
 
 Current:
 
-1. Install prebuilt llama.cpp runtime packages from Runtime Downloads first. Current presets cover official CUDA Windows, CUDA WSL, Vulkan Windows, Vulkan WSL, Intel Arc SYCL Windows, Intel Arc SYCL WSL, CPU Windows, and CPU WSL. Curated third-party presets cover Atomic TurboQuant CUDA Windows/WSL and TheTom TurboQuant CUDA Windows, Vulkan WSL, and CPU WSL when those repositories publish matching checksum-verifiable assets.
+1. Install prebuilt llama.cpp runtime packages from Runtime Downloads first. Current presets cover official CUDA Windows/WSL, Vulkan Windows/WSL, ROCm Windows/WSL, Intel Arc SYCL Windows/WSL, and CPU Windows/WSL. Curated third-party presets cover Atomic TurboQuant CUDA Windows/WSL and TheTom TurboQuant CUDA Windows, Vulkan WSL, and CPU WSL when those repositories publish matching checksum-verifiable assets.
 2. Scan configured runtime roots and register folders containing `llama-server` or `llama-server.exe`.
-3. Select a runtime per model and save a stable per-model port next to that runtime in model launch settings.
+3. Select a runtime per model and save a stable per-model host and port next to that runtime in model launch settings; application LAN policy still constrains non-loopback binding.
 4. Unregister unused runtimes; runtime file deletion is disabled when a runtime is active or referenced by saved model launch settings.
 5. Reconcile source-built and prebuilt runtimes from the same curated provider by runtime fingerprint when their binaries match.
 6. Build CPU, CUDA, Vulkan, or SYCL llama.cpp for native Windows or Ubuntu/WSL through the Runtime Downloads row state machine: Check source, Download, then Build. Curated source repositories include upstream llama.cpp, Atomic TurboQuant, `ik_llama.cpp`, and TheTom TurboQuant for the platform/backend combinations their `llama-server` build supports. Source-only and custom repositories share the same table, while jobs remain visible for progress and recovery.
 7. Delete downloaded source/build folders only when bounded inside the configured runtimes folder. Builds started from the Runtime Downloads table force cleanup of the downloaded source after success so the row resets to Check; lower-level control operations retain the explicit cleanup setting.
-8. Filter downloadable and installed runtime inventories by vendor (AMD/Vulkan, Intel/SYCL, NVIDIA/CUDA) and platform (Windows or Linux/WSL), while CPU entries remain in the unfiltered inventory.
+8. Filter downloadable and installed runtime inventories by vendor (AMD/Vulkan/ROCm, Intel/SYCL, NVIDIA/CUDA) and platform (Windows or Linux/WSL), while CPU entries remain in the unfiltered inventory.
 9. Cancel active runtime build jobs, retry failed/cancelled/interrupted runtime build jobs, clear finished runtime build job records/logs, and show latest build-log progress in the job summary.
 10. Detect installed WSL distros from the WSL Linux page, ignoring Docker-managed WSL distros.
 11. Select the Ubuntu distro used for WSL launches/builds.
@@ -541,6 +587,10 @@ Current:
     detects changed, missing, and unexpected files without claiming publisher
     authentication. Existing installations remain pinned until the user
     explicitly updates them.
+20. Resolve the newest compatible release and asset deterministically from a
+    package feed. Do not depend on feed ordering, and never substitute a
+    different platform/backend when the newest release omits the requested
+    checksum-verifiable asset.
 
 Still needed:
 

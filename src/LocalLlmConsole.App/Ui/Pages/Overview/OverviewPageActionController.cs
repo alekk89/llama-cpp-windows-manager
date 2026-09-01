@@ -5,6 +5,7 @@ public sealed record OverviewPageActionControllerActions(
     Func<Task> SelectLaunchProfileAsync,
     Action UpdateModelActions,
     Func<Task> LoadSelectedModelAsync,
+    Func<bool> IsLoadedSessionSelectionChanging,
     Func<CancellationToken, Task> SelectLoadedSessionRowAsync,
     Func<Task> InspectSelectedEndpointAsync,
     Func<object, OverviewSessionRow?> EndpointRowFromLink,
@@ -66,6 +67,7 @@ public sealed class OverviewPageActionController
 
     private async Task SelectLoadedSessionRowAsync()
     {
+        if (_actions.IsLoadedSessionSelectionChanging()) return;
         var current = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _loadedSessionSelection, current);
         previous?.Cancel();

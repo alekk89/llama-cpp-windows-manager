@@ -72,7 +72,7 @@ public partial class MainWindow
     private async Task StopTrayProfileAsync(ModelRecord model, NamedModelLaunchProfile profile)
         => await RunTrayResponsiveAsync(
             Loc.T("Tray.StoppingProfile", model.Name, profile.Name),
-            () => StopModelRuntimeAsync(model));
+            () => _overviewSelection.UnloadSessionAsync(LoadedModelSessionManager.SessionIdFor(model.Id, profile.Id)));
 
     private async Task ReportTrayProfileErrorAsync(Exception exception)
     {

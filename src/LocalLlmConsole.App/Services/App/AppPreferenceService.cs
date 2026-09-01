@@ -2,12 +2,37 @@ namespace LocalLlmConsole.Services;
 
 public static class AppPreferenceService
 {
-
+    public const int ScaleMinimumPercent = 75;
+    public const int ScaleMaximumPercent = 175;
+    public const int ScaleStepPercent = 1;
 
     public static string ThemeMode(string text)
     {
         var value = (text ?? "").Trim().ToLowerInvariant();
         return value is "light" or "dark" or "system" ? value : "system";
+    }
+
+    public static int NormalizeUiScalePercent(int value)
+        => NormalizeScalePercent(value);
+
+    public static int ParseUiScalePercent(string? text, int fallback)
+        => ParseScalePercent(text, fallback);
+
+    public static int NormalizeFontScalePercent(int value)
+        => NormalizeScalePercent(value);
+
+    public static int ParseFontScalePercent(string? text, int fallback)
+        => ParseScalePercent(text, fallback);
+
+    private static int NormalizeScalePercent(int value)
+        => Math.Clamp(value, ScaleMinimumPercent, ScaleMaximumPercent);
+
+    private static int ParseScalePercent(string? text, int fallback)
+    {
+        var value = (text ?? "").Trim().TrimEnd('%').Trim();
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var percent)
+            ? NormalizeScalePercent(percent)
+            : NormalizeScalePercent(fallback);
     }
 
     public static string MinimizeBehavior(string text)

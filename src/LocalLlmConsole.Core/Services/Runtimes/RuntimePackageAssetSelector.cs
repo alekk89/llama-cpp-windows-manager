@@ -14,6 +14,8 @@ public static class RuntimePackageAssetSelector
             "thetom-prebuilt-cpu" => SelectSingleAsset(preset, release, @"^turboquant-plus-.+-linux-x64-cpu\.tar\.gz$"),
             "official-prebuilt-windows-vulkan" => SelectSingleAsset(preset, release, @"^llama-.+-bin-win-vulkan-x64\.zip$"),
             "official-prebuilt-vulkan" => SelectSingleAsset(preset, release, @"^llama-.+-bin-ubuntu-vulkan-x64\.tar\.gz$"),
+            "official-prebuilt-windows-rocm" => SelectSingleAsset(preset, release, @"^llama-.+-bin-win-rocm(?:-[0-9.]+)?-x64\.zip$"),
+            "official-prebuilt-rocm" => SelectSingleAsset(preset, release, @"^llama-.+-bin-(?:ubuntu|linux)-rocm(?:-[0-9.]+)?-x64\.tar\.gz$"),
             "official-prebuilt-windows-sycl" => SelectSingleAsset(preset, release, @"^llama-.+-bin-win-sycl-x64\.zip$"),
             "official-prebuilt-sycl" => SelectSingleAsset(preset, release, @"^llama-.+-bin-(?:ubuntu|linux)(?:-24)?-sycl(?:-(?:fp16|f16|fp32))?-x64\.(?:tar\.gz|zip)$"),
             "official-prebuilt-windows-cpu" => SelectSingleAsset(preset, release, @"^llama-.+-bin-win-cpu-x64\.zip$"),

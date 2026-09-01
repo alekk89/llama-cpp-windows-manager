@@ -31,7 +31,8 @@ public enum RuntimeBackend
     Cuda,
     Vulkan,
     Metal,
-    Sycl
+    Sycl,
+    Rocm
 }
 
 public enum LoadedModelSessionStatus

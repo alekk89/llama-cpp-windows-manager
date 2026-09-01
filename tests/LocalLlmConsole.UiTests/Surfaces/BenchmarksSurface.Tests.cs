@@ -56,6 +56,12 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.Equal(controls.Name.Height, controls.PromptSizes.Height);
             Assert.Equal(controls.Name.Height, controls.Preset.Height);
             Assert.False(string.IsNullOrWhiteSpace(controls.Model.ToolTip?.ToString()));
+            Assert.All(new[] { controls.Model, controls.Profile, controls.Runtime }, combo =>
+            {
+                Assert.IsType<LocalLlmConsole.SearchableComboBox>(combo);
+                Assert.False(combo.IsEditable);
+                Assert.True(combo.StaysOpenOnEdit);
+            });
             Assert.False(string.IsNullOrWhiteSpace(controls.PromptSizes.ToolTip?.ToString()));
             Assert.Contains("ignores both lists", controls.PromptSizes.ToolTip?.ToString(), StringComparison.OrdinalIgnoreCase);
             Assert.Contains("standalone token-generation", controls.GenerationSizes.ToolTip?.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -103,7 +109,7 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.Equal(addProfileButton.MinHeight, clearButton.MinHeight);
             Assert.Equal(controls.Runtime.MinHeight, addProfileButton.MinHeight);
             Assert.Equal(5, controls.ScopeProfiles.Columns.Count);
-            Assert.IsType<DataGridTemplateColumn>(controls.ScopeProfiles.Columns[4]);
+            Assert.Equal(36, Assert.IsType<LocalLlmConsole.ResponsiveActionDataGridColumn>(controls.ScopeProfiles.Columns[4]).MinWidth);
             Assert.DoesNotContain(VisualDescendants<TextBlock>(controls.Root), block => block.Text.StartsWith("Benchmarks\n", StringComparison.Ordinal));
             Assert.Contains(VisualDescendants<TextBlock>(controls.Root), block => block.Text == "1. Launch settings to test");
             Assert.Contains(VisualDescendants<TextBlock>(controls.Root), block => block.Text == "2. Choose the request workload");
@@ -187,6 +193,16 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             controls.Root.Measure(new Size(1180, 700));
             controls.Root.Arrange(new Rect(0, 0, 1180, 700));
             controls.Root.UpdateLayout();
+            var wideModelWidth = controls.Model.ActualWidth;
+            var wideProfileWidth = controls.Profile.ActualWidth;
+            Assert.True(double.IsNaN(controls.Model.Width));
+            Assert.True(double.IsNaN(controls.Profile.Width));
+            Assert.Equal(220, controls.Runtime.Width);
+            controls.Root.Measure(new Size(1480, 700));
+            controls.Root.Arrange(new Rect(0, 0, 1480, 700));
+            controls.Root.UpdateLayout();
+            Assert.True(controls.Model.ActualWidth > wideModelWidth);
+            Assert.True(controls.Profile.ActualWidth > wideProfileWidth);
             Assert.Equal(controls.GpuConfigurations.Mode.ActualWidth,
                 controls.GpuConfigurations.Distribution.ActualWidth, 3);
             Assert.Equal(controls.GpuConfigurations.Mode.ActualHeight,
@@ -197,8 +213,8 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
                 controls.SpeculativeConfigurations.Head.ActualWidth, 3);
             Assert.Equal(controls.SpeculativeConfigurations.Type.TranslatePoint(new Point(), controls.Root).Y,
                 controls.SpeculativeConfigurations.AddButton.TranslatePoint(new Point(), controls.Root).Y, 3);
-            Assert.Equal(240, controls.Model.Width);
-            Assert.Equal(220, controls.Profile.Width);
+            Assert.True(double.IsNaN(controls.Model.Width));
+            Assert.True(double.IsNaN(controls.Profile.Width));
             Assert.Equal(220, controls.Runtime.Width);
             Assert.Equal(0, Grid.GetRow(controls.Profile));
             Assert.Equal(0, Grid.GetRow(controls.Runtime));
@@ -336,7 +352,8 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             controls.ScopeProfiles.UpdateLayout();
             var removeButton = Assert.Single(
                 VisualDescendants<Button>(controls.ScopeProfiles),
-                button => Equals(button.Content, "Remove"));
+                button => button is LocalLlmConsole.ResponsiveActionButton { FullLabel: "Remove" });
+            Assert.Contains(removeButton.Content, new object[] { "Remove", "×" });
             Assert.Equal(LocalLlmConsole.VisualRole.Danger, LocalLlmConsole.VisualRole.GetButtonRole(removeButton));
             state.AddAllProfilesForSelectedModel();
             Assert.Equal(2, state.ScopeRows.Count);
@@ -446,7 +463,7 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.DoesNotContain(VisualDescendants<Button>(controls.Root), button =>
                 button.Content?.ToString() is "View report" or "Compare 2" or "More");
             Assert.Equal(6, controls.History.Columns.Count);
-            Assert.IsType<DataGridTemplateColumn>(controls.History.Columns[^1]);
+            Assert.Equal(36, Assert.IsType<LocalLlmConsole.ResponsiveActionDataGridColumn>(controls.History.Columns[^1]).MinWidth);
             Assert.Equal(
                 ["View report", "Compare selected", "Pause after current test", "Resume selected run", "Export results", "Clone selected plan", "Import plan", "Export current plan", "Open run log", "Refresh runs"],
                 controls.History.ContextMenu!.Items.OfType<MenuItem>().Select(item => item.Header?.ToString()).ToArray());

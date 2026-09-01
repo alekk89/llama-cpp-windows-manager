@@ -129,9 +129,8 @@ public sealed class OverviewSelectionController
 
     private bool IsProfileLoaded(ModelRecord? model)
     {
-        if (model is null || _sessions.SessionForModel(model.Id) is not { IsRunning: true } session)
-            return false;
-        return string.Equals(session.LaunchProfileId, SelectedLaunchProfileId, StringComparison.OrdinalIgnoreCase);
+        return model is not null
+            && _sessions.SessionForProfile(model.Id, SelectedLaunchProfileId) is { IsRunning: true };
     }
 
     public bool IsSelectedProfileLoaded(ModelRecord? model)
@@ -183,22 +182,14 @@ public sealed class OverviewSelectionController
 
     public async Task UnloadSessionAsync(string sessionId)
     {
-        var session = _sessions.Snapshots().FirstOrDefault(item => string.Equals(
-            item.SessionId,
-            sessionId,
-            StringComparison.OrdinalIgnoreCase));
+        var session = _sessions.SessionById(sessionId);
         if (session is null) return;
-
-        var model = await _actions.AppServices().ModelLookupApplication.FindByIdAsync(session.ModelId);
-        if (model is null)
-        {
-            _actions.SetStatus(Loc.T("Overview.LoadedModelMissing"));
-            return;
-        }
-
-        await _models.ModelRuntimeUnloadApplication.UnloadOverviewAsync(
-            new ModelRuntimeUnloadApplicationRequest(model, session.IsRunning),
-            _actions.ModelRuntimeUnloadActions());
+        await _sessions.StopAsync(session.SessionId);
+        _actions.SetActiveRuntimeSettings(_sessions.ActiveSettings);
+        await _actions.SaveActiveRuntimeSessionsAsync();
+        await _actions.RefreshRuntimeMetricsAsync();
+        UpdateActions();
+        _actions.SetStatus(Loc.T("Tray.StoppedProfile", session.ModelName, session.LaunchProfileName));
     }
 
     public async Task SelectModelSessionAsync(CancellationToken cancellationToken)
@@ -231,6 +222,7 @@ public sealed class OverviewSelectionController
 
         await _runtime.OverviewLoadedSessionSelectionApplication.SelectAsync(
             modelId,
+            row.SessionId,
             new OverviewLoadedSessionSelectionApplicationActions(
                 FindModelChoice,
                 RefreshModelsAsync,
@@ -239,7 +231,7 @@ public sealed class OverviewSelectionController
                     using var selectionScope = _selection.SuppressLoadedSessionSelection();
                     _page.SelectModelId(selectedModelId);
                 },
-                _runtime.RuntimeSessions.SelectModel,
+                _runtime.RuntimeSessions.SelectSession,
                 _actions.SetActiveRuntimeSettings,
                 _actions.SaveActiveRuntimeSessionsAsync,
                 _actions.RefreshRuntimeMetricsAsync,
@@ -262,6 +254,15 @@ public sealed class OverviewSelectionController
         _actions.SetActiveRuntimeSettings(selection.ActiveSettings);
         UpdateActions();
         return true;
+    }
+
+    public async Task SelectLoadedSessionAsync(string sessionId, string modelId)
+    {
+        if (!await SelectLoadedModelAsync(modelId)) return;
+        var selection = _runtime.RuntimeSessions.SelectSession(sessionId);
+        if (!selection.Selected) return;
+        _actions.SetActiveRuntimeSettings(selection.ActiveSettings);
+        UpdateActions();
     }
 
     public Task<(string Model, string Runtime)> ActiveRuntimeLabelsAsync()

@@ -49,6 +49,24 @@ public sealed class ControlSettingsTests : ManagerRegressionTestBase
         Assert.False(updated.ShowOverviewModelSection);
     }
 
+    [Fact]
+    public void ControlSettingsExposeAndNormalizeApplicationScales()
+    {
+        var current = AppSettings.CreateDefault(CreateTempRoot());
+        var schema = System.Text.Json.JsonSerializer.Serialize(ControlEndpointHandler.SettingsSchema<AppSettings>());
+
+        Assert.Contains("\"name\":\"uiScalePercent\"", schema, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"fontScalePercent\"", schema, StringComparison.Ordinal);
+
+        var updated = new ControlAppSettingsMutationService().Patch(
+            current,
+            JsonNode.Parse("""{"uiScalePercent":999,"fontScalePercent":1}""")!.AsObject(),
+            []);
+
+        Assert.Equal(175, updated.UiScalePercent);
+        Assert.Equal(75, updated.FontScalePercent);
+    }
+
     [Theory]
     [InlineData("{\"electricityCurrencyCode\":\"UK\"}")]
     [InlineData("{\"electricityDayRatePerKwh\":-1}")]

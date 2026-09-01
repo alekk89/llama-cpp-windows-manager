@@ -111,6 +111,7 @@ public sealed class RuntimePackageInstallationTests : ManagerRegressionTestBase
         Assert.Equal("cudart-llama-bin-win-cuda-13.3-x64.zip", Assert.Single(selection.AdditionalAssets).Name);
         Assert.Equal(
             [
+                RuntimePackageSourceCatalog.RecentOfficialReleasesApiUrl,
                 RuntimePackageSourceCatalog.LatestReleaseApiUrl,
                 "https://github.com/ggml-org/llama.cpp/releases/download/v0.3.0/nightly-tag.txt",
                 "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b10621"
@@ -132,11 +133,13 @@ public sealed class RuntimePackageInstallationTests : ManagerRegressionTestBase
             { "name": "llama-b9354-bin-win-cuda-12.4-x64.zip", "browser_download_url": "https://example.com/cuda12.zip", "size": 12 },
             { "name": "cudart-llama-bin-win-cuda-12.4-x64.zip", "browser_download_url": "https://example.com/cudart12.zip", "size": 2 },
             { "name": "llama-b9354-bin-win-vulkan-x64.zip", "browser_download_url": "https://example.com/win-vulkan.zip", "size": 4 },
+            { "name": "llama-b9354-bin-win-rocm-7.1-x64.zip", "browser_download_url": "https://example.com/win-rocm.zip", "size": 14 },
             { "name": "llama-b9354-bin-win-sycl-x64.zip", "browser_download_url": "https://example.com/win-sycl.zip", "size": 9 },
             { "name": "llama-b9354-bin-win-cpu-x64.zip", "browser_download_url": "https://example.com/win-cpu.zip", "size": 5 },
             { "name": "llama-b9354-bin-ubuntu-cuda-13.1-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu-cuda13.tar.gz", "size": 11 },
             { "name": "llama-b9354-bin-ubuntu-cuda-12.4-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu-cuda.tar.gz", "size": 8 },
             { "name": "llama-b9354-bin-ubuntu-vulkan-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu-vulkan.tar.gz", "size": 6 },
+            { "name": "llama-b9354-bin-ubuntu-rocm-7.1-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu-rocm.tar.gz", "size": 15 },
             { "name": "llama-b9354-bin-ubuntu-sycl-f16-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu-sycl.tar.gz", "size": 10 },
             { "name": "llama-b9354-bin-ubuntu-x64.tar.gz", "browser_download_url": "https://example.com/ubuntu-cpu.tar.gz", "size": 7 }
           ]
@@ -149,12 +152,14 @@ public sealed class RuntimePackageInstallationTests : ManagerRegressionTestBase
         var cudaWsl = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-cuda"), release);
         var cudaWslCompatibility = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-cuda"), release, "compatibility");
         var vulkanWsl = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-vulkan"), release);
+        var rocmWindows = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-windows-rocm"), release);
+        var rocmWsl = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-rocm"), release);
         var sycl = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-windows-sycl"), release);
         var syclWsl = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-sycl"), release);
         var atomicWindows = presets.Single(preset => preset.Id == "atomic-prebuilt-windows-cuda");
 
         Assert.Equal(
-            ["official-prebuilt-windows-cuda", "official-prebuilt-cuda", "official-prebuilt-windows-vulkan", "official-prebuilt-vulkan", "official-prebuilt-windows-sycl", "official-prebuilt-sycl", "official-prebuilt-windows-cpu", "official-prebuilt-cpu", "atomic-prebuilt-windows-cuda", "atomic-prebuilt-cuda", "thetom-prebuilt-windows-cuda", "thetom-prebuilt-vulkan", "thetom-prebuilt-cpu"],
+            ["official-prebuilt-windows-cuda", "official-prebuilt-cuda", "official-prebuilt-windows-vulkan", "official-prebuilt-vulkan", "official-prebuilt-windows-rocm", "official-prebuilt-rocm", "official-prebuilt-windows-sycl", "official-prebuilt-sycl", "official-prebuilt-windows-cpu", "official-prebuilt-cpu", "atomic-prebuilt-windows-cuda", "atomic-prebuilt-cuda", "thetom-prebuilt-windows-cuda", "thetom-prebuilt-vulkan", "thetom-prebuilt-cpu"],
             presets.Select(preset => preset.Id).ToArray());
         Assert.Equal("b9354", release.TagName);
         Assert.Equal("llama-b9354-bin-win-cuda-13.1-x64.zip", cuda.PrimaryAsset.Name);
@@ -168,6 +173,10 @@ public sealed class RuntimePackageInstallationTests : ManagerRegressionTestBase
         Assert.Equal("CUDA WSL", RuntimePackageSourceCatalog.BackendLabel(cudaWsl.Preset));
         Assert.Equal("llama-b9354-bin-ubuntu-vulkan-x64.tar.gz", vulkanWsl.PrimaryAsset.Name);
         Assert.Equal("Vulkan WSL", RuntimePackageSourceCatalog.BackendLabel(vulkanWsl.Preset));
+        Assert.Equal("llama-b9354-bin-win-rocm-7.1-x64.zip", rocmWindows.PrimaryAsset.Name);
+        Assert.Equal("ROCm Windows", RuntimePackageSourceCatalog.BackendLabel(rocmWindows.Preset));
+        Assert.Equal("llama-b9354-bin-ubuntu-rocm-7.1-x64.tar.gz", rocmWsl.PrimaryAsset.Name);
+        Assert.Equal("ROCm WSL", RuntimePackageSourceCatalog.BackendLabel(rocmWsl.Preset));
         Assert.Equal("llama-b9354-bin-win-sycl-x64.zip", sycl.PrimaryAsset.Name);
         Assert.Equal("SYCL Windows", RuntimePackageSourceCatalog.BackendLabel(sycl.Preset));
         Assert.Equal("llama-b9354-bin-ubuntu-sycl-f16-x64.tar.gz", syclWsl.PrimaryAsset.Name);

@@ -2,7 +2,7 @@ namespace LocalLlmConsole.Services;
 
 public sealed record RuntimeIdleUnloadApplicationActions(
     Func<string, Task<ModelRecord?>> FindModelByIdAsync,
-    Func<ModelRecord, Task> StopModelRuntimeAsync,
+    Func<LoadedModelSessionSnapshot, Task> StopSessionRuntimeAsync,
     Action<string> SetStatus,
     Func<string, int, EffectiveModelRetentionPolicy>? ResolveRetentionPolicy = null);
 
@@ -148,7 +148,7 @@ public sealed class RuntimeTelemetryApplicationService
 
                     var policy = policies[idle.RuntimeKey];
                     actions.SetStatus(AutoUnloadStatus(model, policy.IdleMinutes, policy.GroupName));
-                    await actions.StopModelRuntimeAsync(model);
+                    await actions.StopSessionRuntimeAsync(idle.Session);
                 },
                 maximumUnloads: 1,
                 cancellationToken);
@@ -164,7 +164,7 @@ public sealed class RuntimeTelemetryApplicationService
                 if (model is null) return;
 
                 actions.SetStatus(AutoUnloadStatus(model, idleMinutes));
-                await actions.StopModelRuntimeAsync(model);
+                await actions.StopSessionRuntimeAsync(idle.Session);
             },
             cancellationToken);
     }
@@ -193,7 +193,7 @@ public sealed class RuntimeTelemetryApplicationService
     {
         ArgumentNullException.ThrowIfNull(actions);
         ArgumentNullException.ThrowIfNull(actions.FindModelByIdAsync);
-        ArgumentNullException.ThrowIfNull(actions.StopModelRuntimeAsync);
+        ArgumentNullException.ThrowIfNull(actions.StopSessionRuntimeAsync);
         ArgumentNullException.ThrowIfNull(actions.SetStatus);
     }
 }

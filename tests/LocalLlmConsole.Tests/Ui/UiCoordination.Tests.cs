@@ -64,6 +64,8 @@ public sealed class UiCoordinationTests : ManagerRegressionTestBase
         var completed = new List<int>();
         var invocation = 0;
         var actionUpdates = 0;
+        var suppressLoadedSelection = true;
+        var loadedSelections = 0;
         var controller = new OverviewPageActionController(new OverviewPageActionControllerActions(
             async cancellationToken =>
             {
@@ -79,7 +81,8 @@ public sealed class UiCoordinationTests : ManagerRegressionTestBase
             () => Task.CompletedTask,
             () => actionUpdates++,
             () => Task.CompletedTask,
-            _ => Task.CompletedTask,
+            () => suppressLoadedSelection,
+            _ => { loadedSelections++; return Task.CompletedTask; },
             () => Task.CompletedTask,
             _ => null,
             _ => Task.CompletedTask,
@@ -100,6 +103,12 @@ public sealed class UiCoordinationTests : ManagerRegressionTestBase
 
         Assert.Equal([2], completed);
         Assert.Equal(1, actionUpdates);
+
+        await actions.SelectLoadedSessionRowAsync();
+        Assert.Equal(0, loadedSelections);
+        suppressLoadedSelection = false;
+        await actions.SelectLoadedSessionRowAsync();
+        Assert.Equal(1, loadedSelections);
     }
 
 

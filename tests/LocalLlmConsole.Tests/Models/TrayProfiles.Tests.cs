@@ -20,6 +20,7 @@ public sealed class TrayProfilesTests : ManagerRegressionTestBase
 
         Assert.True(await store.IsLaunchProfileFavoriteAsync(profile.Id));
         Assert.Contains(profile.Id, await store.ListFavoriteLaunchProfileIdsAsync());
+        Assert.Contains(model.Id, await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Model));
 
         await store.DeleteNamedModelLaunchProfileAsync(profile.Id);
 
@@ -28,7 +29,45 @@ public sealed class TrayProfilesTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public async Task SnapshotSortsFavoritesAndDescribesStartStopAndSwitchActions()
+    public async Task SelectorFavoritesPersistForModelsProfilesAndRuntimesAndCascadeOnDeletion()
+    {
+        var root = CreateTempRoot();
+        await using var store = new StateStore(Path.Combine(root, "state", "manager.db"));
+        await store.InitializeAsync();
+        var model = Model(root, "model-favorite", "Favorite model");
+        var profile = Profile(root, model, "profile-favorite", "Favorite profile", isDefault: true);
+        var runtime = new RuntimeRecord(
+            "runtime-favorite",
+            "Favorite runtime",
+            RuntimeMode.Native,
+            RuntimeBackend.Cpu,
+            Path.Combine(root, "llama-server.exe"),
+            "{}",
+            DateTimeOffset.UtcNow);
+        await store.UpsertModelAsync(model);
+        await store.SaveNamedModelLaunchProfileAsync(profile);
+        await store.UpsertRuntimeAsync(runtime);
+
+        Assert.True(await store.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Model, model.Id));
+        Assert.True(await store.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.LaunchProfile, profile.Id));
+        Assert.True(await store.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Runtime, runtime.Id));
+        Assert.Contains(model.Id, await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Model));
+        Assert.Contains(profile.Id, await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.LaunchProfile));
+        Assert.Contains(runtime.Id, await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Runtime));
+
+        Assert.False(await store.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Model, model.Id));
+        Assert.Empty(await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Model));
+        Assert.True(await store.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Model, model.Id));
+        await store.DeleteModelAsync(model.Id);
+        await store.DeleteRuntimeAsync(runtime.Id);
+
+        Assert.Empty(await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Model));
+        Assert.Empty(await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.LaunchProfile));
+        Assert.Empty(await store.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Runtime));
+    }
+
+    [Fact]
+    public async Task SnapshotSortsFavoritesAndDescribesConcurrentStartAndStopActions()
     {
         var root = CreateTempRoot();
         await using var store = new StateStore(Path.Combine(root, "state", "manager.db"));
@@ -75,7 +114,7 @@ public sealed class TrayProfilesTests : ManagerRegressionTestBase
         var alphaProfiles = snapshot.Models[0].Profiles;
         Assert.Equal(["Default", "Long context"], alphaProfiles.Select(profile => profile.Profile.Name));
         Assert.Equal(TrayProfileActionKind.Stop, alphaProfiles[0].Action);
-        Assert.Equal(TrayProfileActionKind.Switch, alphaProfiles[1].Action);
+        Assert.Equal(TrayProfileActionKind.Start, alphaProfiles[1].Action);
         Assert.Equal(TrayProfileActionKind.Start, snapshot.Models[1].Profiles[0].Action);
         Assert.All(snapshot.Models.SelectMany(model => model.Profiles), profile => Assert.True(profile.CanExecute));
 
@@ -95,7 +134,7 @@ public sealed class TrayProfilesTests : ManagerRegressionTestBase
         var switchResult = await application.ExecuteAsync(alphaProfiles[1], actions);
         var stopResult = await application.ExecuteAsync(alphaProfiles[0], actions);
 
-        Assert.Equal(TrayProfileActionKind.Switch, switchResult.Action);
+        Assert.Equal(TrayProfileActionKind.Start, switchResult.Action);
         Assert.Equal(ModelRuntimeLoadApplicationOutcome.Started, switchResult.LoadOutcome);
         Assert.Equal(alphaLong.Id, loadedProfileId);
         Assert.Equal(TrayProfileActionKind.Stop, stopResult.Action);

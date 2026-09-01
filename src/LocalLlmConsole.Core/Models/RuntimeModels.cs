@@ -66,6 +66,7 @@ public sealed record RuntimeLaunchRequest
     public string GpuMode { get; init; } = AppSettings.DefaultGpuMode;
     public string GpuDevices { get; init; } = "";
     public string GpuSplit { get; init; } = "";
+    public string TensorBufferOverrides { get; init; } = "";
     public int ParallelSlots { get; init; } = 1;
     public int BatchSize { get; init; } = AppSettings.DefaultBatchSize;
     public int MicroBatchSize { get; init; } = 512;

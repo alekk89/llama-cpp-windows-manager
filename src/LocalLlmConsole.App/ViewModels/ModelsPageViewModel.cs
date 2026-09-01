@@ -15,13 +15,17 @@ public sealed class ModelsPageViewModel
         IEnumerable<NamedModelLaunchProfile>? namedProfiles = null,
         IReadOnlyDictionary<string, string>? modelSizeLabels = null,
         IReadOnlyDictionary<string, ModelGroupRecord>? launchProfileGroups = null,
-        IReadOnlySet<string>? favoriteProfileIds = null)
+        IReadOnlySet<string>? favoriteProfileIds = null,
+        IReadOnlySet<string>? startupProfileIds = null,
+        IReadOnlySet<string>? favoriteModelIds = null)
     {
         var allModels = models.ToArray();
         Rows.Clear();
         VariantRows.Clear();
         _allVariantRows.Clear();
-        foreach (var model in allModels.Where(model => !ModelAliasService.IsLaunchAlias(model)))
+        foreach (var model in allModels
+                     .Where(model => !ModelAliasService.IsLaunchAlias(model))
+                     .OrderByDescending(model => favoriteModelIds?.Contains(model.Id) == true))
         {
             var sizeLabel = modelSizeLabels?.GetValueOrDefault(model.Id) ?? "";
             var isMissing = string.Equals(sizeLabel, "Missing", StringComparison.OrdinalIgnoreCase);
@@ -32,7 +36,9 @@ public sealed class ModelsPageViewModel
                 Size = sizeLabel,
                 CanLoad = !isMissing,
                 IsMissing = isMissing,
+                OpenFolderAction = Loc.T("Common.OpenButton"),
                 CanDelete = !isModelActive(model),
+                IsFavorite = favoriteModelIds?.Contains(model.Id) == true,
                 DeleteToolTip = isModelActive(model)
                     ? "Unload this model before deleting it from disk."
                     : "Delete this model file and remove it from the catalog.",
@@ -45,7 +51,8 @@ public sealed class ModelsPageViewModel
         var profileCounts = profiles
             .GroupBy(profile => profile.ModelId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-        foreach (var profile in profiles)
+        foreach (var profile in profiles
+                     .OrderByDescending(profile => favoriteProfileIds?.Contains(profile.Id) == true))
         {
             var model = physicalModels.FirstOrDefault(candidate =>
                 string.Equals(candidate.Id, profile.ModelId, StringComparison.OrdinalIgnoreCase));
@@ -68,7 +75,8 @@ public sealed class ModelsPageViewModel
                     ? "Add this launch profile to a model group."
                     : $"Click {groupName} to change or remove this group assignment.",
                 CanAssignGroup = string.IsNullOrWhiteSpace(groupName),
-                IsTrayFavorite = favoriteProfileIds?.Contains(profile.Id) == true,
+                IsFavorite = favoriteProfileIds?.Contains(profile.Id) == true,
+                IsLoadOnStartup = startupProfileIds?.Contains(profile.Id) == true,
                 CanLoad = !isMissing,
                 IsMissing = isMissing,
                 DeleteAction = hasAlternative ? "Remove" : "",

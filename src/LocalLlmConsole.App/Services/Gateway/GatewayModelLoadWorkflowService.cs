@@ -13,6 +13,7 @@ public delegate Task<bool> GatewayEndpointProbe(AppSettings launchSettings, Canc
 
 public delegate Task<LoadedModelSessionSnapshot?> GatewayReadyMarker(
     ModelRecord model,
+    NamedModelLaunchProfile profile,
     AppSettings launchSettings,
     CancellationToken cancellationToken);
 
@@ -52,7 +53,7 @@ public sealed class GatewayModelLoadWorkflowService
     private readonly ModelLaunchProfileService _launchProfiles;
     private readonly RuntimeSessionCoordinator _runtimeSessions;
 
-    // Per-model serialization gates prevent concurrent requests for the same model from
+    // Per-profile serialization gates prevent concurrent requests for the same route from
     // spawning duplicate llama-server processes while the first one is still loading.
     private readonly Dictionary<string, SemaphoreSlim> _modelLoadGates = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _gateLock = new();
@@ -67,14 +68,14 @@ public sealed class GatewayModelLoadWorkflowService
         _runtimeSessions = runtimeSessions ?? throw new ArgumentNullException(nameof(runtimeSessions));
     }
 
-    private SemaphoreSlim GetModelLoadGate(string modelId)
+    private SemaphoreSlim GetModelLoadGate(string sessionId)
     {
         lock (_gateLock)
         {
-            if (!_modelLoadGates.TryGetValue(modelId, out var gate))
+            if (!_modelLoadGates.TryGetValue(sessionId, out var gate))
             {
                 gate = new SemaphoreSlim(1, 1);
-                _modelLoadGates[modelId] = gate;
+                _modelLoadGates[sessionId] = gate;
             }
             return gate;
         }
@@ -100,26 +101,20 @@ public sealed class GatewayModelLoadWorkflowService
 
         ValidateProfile(request.Model, request.Profile);
 
-        var loaded = _runtimeSessions.Sessions.SessionForModel(request.Model.Id);
-        if (MatchesProfile(loaded, request.Profile))
+        var loaded = _runtimeSessions.Sessions.SessionForProfile(request.Model.Id, request.Profile.Id);
+        if (loaded is { IsRunning: true })
             return await ResultForRunningSessionAsync(loaded!, request.Profile);
 
-        // Per-model serialization gate prevents concurrent requests from spawning
+        // Per-profile serialization gate prevents concurrent requests from spawning
         // duplicate processes while the first one is still loading.
-        var gate = GetModelLoadGate(request.Model.Id);
+        var gate = GetModelLoadGate(LoadedModelSessionManager.SessionIdFor(request.Model.Id, request.Profile.Id));
         await gate.WaitAsync(cancellationToken);
         try
         {
             // Re-check after acquiring the lock — another request may have loaded it.
-            var alreadyLoaded = _runtimeSessions.Sessions.SessionForModel(request.Model.Id);
-            if (MatchesProfile(alreadyLoaded, request.Profile))
-                return await ResultForRunningSessionAsync(alreadyLoaded!, request.Profile);
-
+            var alreadyLoaded = _runtimeSessions.Sessions.SessionForProfile(request.Model.Id, request.Profile.Id);
             if (alreadyLoaded is { IsRunning: true })
-            {
-                request.ReportPhase?.Invoke($"switching from {ProfileLabel(alreadyLoaded)} to {request.Profile.Name}");
-                await request.StopModelAsync(request.Model, cancellationToken);
-            }
+                return await ResultForRunningSessionAsync(alreadyLoaded!, request.Profile);
 
             return await ExecuteLoadAsync(request, cancellationToken);
         }
@@ -163,11 +158,12 @@ public sealed class GatewayModelLoadWorkflowService
                     request.Model,
                     profile?.Settings,
                     runtime,
-                    _runtimeSessions.Sessions.SessionForModel(request.Model.Id)?.LogPath ?? "",
+                    _runtimeSessions.Sessions.SessionForProfile(request.Model.Id, request.Profile.Id)?.LogPath ?? "",
                     ex,
                     request.Policy,
                     _runtimeSessions.Sessions.Snapshots()
-                        .Where(session => session.IsRunning && !string.Equals(session.ModelId, request.Model.Id, StringComparison.OrdinalIgnoreCase))
+                        .Where(session => session.IsRunning
+                            && !string.Equals(session.SessionId, LoadedModelSessionManager.SessionIdFor(request.Model.Id, request.Profile.Id), StringComparison.OrdinalIgnoreCase))
                         .ToArray()),
                 ex);
         }
@@ -176,7 +172,9 @@ public sealed class GatewayModelLoadWorkflowService
     private async Task StopOtherRunningModelsAsync(GatewayModelLoadWorkflowRequest request, CancellationToken cancellationToken)
     {
         var runningSessions = _runtimeSessions.Sessions.Snapshots()
-            .Where(session => session.IsRunning && !string.Equals(session.ModelId, request.Model.Id, StringComparison.OrdinalIgnoreCase))
+            .Where(session => session.IsRunning)
+            .GroupBy(session => session.ModelId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
             .ToArray();
         foreach (var session in runningSessions)
         {
@@ -222,18 +220,11 @@ public sealed class GatewayModelLoadWorkflowService
                 ?? new RuntimeRecord(session.RuntimeId, session.RuntimeName, session.Mode, session.Backend, "", "{}", DateTimeOffset.UtcNow),
             session.LaunchSettings);
 
-    private static bool MatchesProfile(LoadedModelSessionSnapshot? session, NamedModelLaunchProfile profile)
-        => session is { IsRunning: true }
-            && string.Equals(session.LaunchProfileId, profile.Id, StringComparison.OrdinalIgnoreCase);
-
     private static void ValidateProfile(ModelRecord model, NamedModelLaunchProfile profile)
     {
         if (!string.Equals(profile.ModelId, model.Id, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"Launch profile '{profile.Name}' does not belong to {model.Name}.");
     }
-
-    private static string ProfileLabel(LoadedModelSessionSnapshot session)
-        => string.IsNullOrWhiteSpace(session.LaunchProfileName) ? "the running profile" : session.LaunchProfileName;
 
     private async Task<LoadedModelSessionSnapshot> WaitForReadyAsync(
         GatewayModelLoadWorkflowRequest request,
@@ -245,15 +236,15 @@ public sealed class GatewayModelLoadWorkflowService
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var session = _runtimeSessions.Sessions.SessionForModel(request.Model.Id);
+            var session = _runtimeSessions.Sessions.SessionForProfile(request.Model.Id, request.Profile.Id);
             if (session is not { IsRunning: true })
                 throw new InvalidOperationException($"{request.Model.Name} stopped while loading.");
 
             if (await request.EndpointAliveAsync(launchSettings, cancellationToken))
             {
-                var ready = await request.MarkReadyAsync(request.Model, launchSettings, cancellationToken);
+                var ready = await request.MarkReadyAsync(request.Model, request.Profile, launchSettings, cancellationToken);
                 return ready
-                    ?? _runtimeSessions.Sessions.SessionForModel(request.Model.Id)
+                    ?? _runtimeSessions.Sessions.SessionForProfile(request.Model.Id, request.Profile.Id)
                     ?? throw new InvalidOperationException($"{request.Model.Name} was ready but no session snapshot was available.");
             }
 

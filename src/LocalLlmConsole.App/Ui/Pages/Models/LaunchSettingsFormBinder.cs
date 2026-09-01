@@ -22,10 +22,12 @@ public sealed class LaunchSettingsFormControls
     public LaunchRuntimeOptionsPanel? RuntimeOptions { get; }
 
     public WpfTextBox? LaunchPortBox => Text(nameof(AppSettings.Port));
+    public WpfTextBox? HostBox => Text(nameof(AppSettings.Host));
     public WpfTextBox? ContextSizeBox => Text(nameof(AppSettings.ContextSize));
     public WpfTextBox? GpuLayersBox => Text(nameof(AppSettings.GpuLayers));
     public WpfTextBox? GpuDevicesBox => Text(nameof(AppSettings.GpuDevices));
     public WpfTextBox? GpuSplitBox => Text(nameof(AppSettings.GpuSplit));
+    public WpfTextBox? TensorBufferOverridesBox => Text(nameof(AppSettings.TensorBufferOverrides));
     public WpfTextBox? ParallelSlotsBox => Text(nameof(AppSettings.ParallelSlots));
     public WpfTextBox? BatchSizeBox => Text(nameof(AppSettings.BatchSize));
     public WpfTextBox? MicroBatchSizeBox => Text(nameof(AppSettings.MicroBatchSize));
@@ -92,7 +94,7 @@ public sealed class LaunchSettingsFormControls
 
     public IEnumerable<WpfTextBox?> TextBoxes =>
     [
-        LaunchPortBox, ContextSizeBox, GpuLayersBox, GpuDevicesBox, GpuSplitBox, ParallelSlotsBox, BatchSizeBox, MicroBatchSizeBox,
+        LaunchPortBox, HostBox, ContextSizeBox, GpuLayersBox, GpuDevicesBox, GpuSplitBox, TensorBufferOverridesBox, ParallelSlotsBox, BatchSizeBox, MicroBatchSizeBox,
         ThreadsBox, ReasoningBudgetBox, ReasoningBudgetMessageBox, VisionProjectorPathBox, VisionImageMinTokensBox, VisionImageMaxTokensBox,
         TemperatureBox, TopKBox, TopPBox, MinPBox, MaxTokensBox, SeedBox, RepeatLastNBox,
         RepeatPenaltyBox, PresencePenaltyBox, FrequencyPenaltyBox, RopeScaleBox, RopeFreqBaseBox,
@@ -117,11 +119,13 @@ public static class LaunchSettingsFormBinder
         var next = baseSettings with
         {
             Port = ReadInt(controls.LaunchPortBox, "Port", min: 1, max: 65535),
+            Host = controls.HostBox?.Text.Trim() ?? baseSettings.Host,
             ContextSize = ReadContextSize(controls.ContextSizeBox),
             GpuLayers = ReadInt(controls.GpuLayersBox, "GPU layers", min: 0),
             GpuMode = ComboValue(controls.GpuModeCombo),
             GpuDevices = controls.GpuDevicesBox?.Text.Trim() ?? "",
             GpuSplit = controls.GpuSplitBox?.Text.Trim() ?? "",
+            TensorBufferOverrides = controls.TensorBufferOverridesBox?.Text.Trim() ?? "",
             ParallelSlots = ReadInt(controls.ParallelSlotsBox, "Parallel slots", min: 1),
             BatchSize = ReadInt(controls.BatchSizeBox, "Batch size", min: 1),
             MicroBatchSize = ReadInt(controls.MicroBatchSizeBox, "Micro batch size", min: 1),
@@ -187,10 +191,12 @@ public static class LaunchSettingsFormBinder
     public static void Apply(LaunchSettingsFormControls controls, AppSettings settings)
     {
         SetText(controls.LaunchPortBox, settings.Port);
+        SetText(controls.HostBox, settings.Host);
         SetText(controls.ContextSizeBox, settings.ContextSize);
         SetText(controls.GpuLayersBox, settings.GpuLayers);
         SetText(controls.GpuDevicesBox, settings.GpuDevices);
         SetText(controls.GpuSplitBox, settings.GpuSplit);
+        SetText(controls.TensorBufferOverridesBox, settings.TensorBufferOverrides);
         SetText(controls.ParallelSlotsBox, settings.ParallelSlots);
         SetText(controls.BatchSizeBox, settings.BatchSize);
         SetText(controls.MicroBatchSizeBox, settings.MicroBatchSize);

@@ -15,6 +15,7 @@ public static partial class RuntimeBuildCatalogService
     {
         RuntimeBackend.Cuda => "cuda",
         RuntimeBackend.Vulkan => "vulkan",
+        RuntimeBackend.Rocm => "rocm",
         RuntimeBackend.Sycl => "sycl",
         _ => "cpu"
     };
@@ -33,6 +34,7 @@ public static partial class RuntimeBuildCatalogService
     {
         RuntimeBackend.Cuda => "CUDA",
         RuntimeBackend.Vulkan => "Vulkan",
+        RuntimeBackend.Rocm => "ROCm",
         RuntimeBackend.Sycl => "SYCL",
         _ => "CPU"
     };

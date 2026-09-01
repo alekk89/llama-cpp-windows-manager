@@ -18,6 +18,7 @@ public static class RuntimeInventoryFilterService
         RuntimeBackend.Cuda => Nvidia,
         RuntimeBackend.Sycl => Intel,
         RuntimeBackend.Vulkan => Amd,
+        RuntimeBackend.Rocm => Amd,
         _ => "CPU"
     };
 

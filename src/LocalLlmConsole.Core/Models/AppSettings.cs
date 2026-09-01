@@ -79,6 +79,7 @@ public sealed record AppSettings(
     string GpuMode = "auto",
     string GpuDevices = "",
     string GpuSplit = "",
+    string TensorBufferOverrides = "",
     string ReasoningEffort = "default",
     string ReasoningBudgetMessage = "",
     string ReasoningPreserve = "auto",
@@ -101,7 +102,9 @@ public sealed record AppSettings(
     string ElectricityNightEndLocal = "07:00",
     bool TrackGpuEnergyWhileIdle = false,
     bool BenchmarkPreventSystemSleep = true,
-    bool BenchmarkStopActiveSessions = false)
+    bool BenchmarkStopActiveSessions = false,
+    int UiScalePercent = 100,
+    int FontScalePercent = 100)
 {
     public const int DefaultContextSize = 131_072;
     public const int DefaultGpuLayers = 999;
@@ -134,6 +137,8 @@ public sealed record AppSettings(
     public const int DefaultContextCheckpointCount = 32;
     public const int DefaultContextCheckpointEveryNTokens = 256;
     public const string DefaultGpuMode = "auto";
+    public const int DefaultUiScalePercent = 100;
+    public const int DefaultFontScalePercent = 100;
 
     public static AppSettings CreateDefault(string workspaceRoot) => new(
         WorkspaceRoot: workspaceRoot,
@@ -213,5 +218,6 @@ public sealed record AppSettings(
         UiCulture: "en",
         GpuMode: DefaultGpuMode,
         GpuDevices: "",
-        GpuSplit: "");
+        GpuSplit: "",
+        TensorBufferOverrides: "");
 }

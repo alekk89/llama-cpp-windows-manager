@@ -95,6 +95,12 @@ public sealed class AppSettingsUpdateService
             RequireApiKeyAuth = requireApiKeyAuth,
             ModelApiKey = requireApiKeyAuth ? preservedApiKey : "",
             ModelApiKeyBackup = preservedApiKey,
+            UiScalePercent = AppPreferenceService.ParseUiScalePercent(
+                V("uiScalePercent", current.UiScalePercent.ToString(CultureInfo.InvariantCulture)),
+                current.UiScalePercent),
+            FontScalePercent = AppPreferenceService.ParseFontScalePercent(
+                V("fontScalePercent", current.FontScalePercent.ToString(CultureInfo.InvariantCulture)),
+                current.FontScalePercent),
             ShowOverviewModelStatus = Visibility("showOverviewModelStatus", current.ShowOverviewModelStatus),
             ShowOverviewHardware = Visibility("showOverviewHardware", current.ShowOverviewHardware),
             ShowOverviewSlots = Visibility("showOverviewSlots", current.ShowOverviewSlots),

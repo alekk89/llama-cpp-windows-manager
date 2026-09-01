@@ -83,7 +83,7 @@ public partial class MainWindow
                 route.Profile,
                 policy,
                 _settings,
-                _sessions.SessionForModel(model.Id)),
+                _sessions.SessionForProfile(model.Id, route.Profile.Id)),
                 new GatewayRuntimeLoadApplicationActions(
                 async (loadedModel, _) => await StopModelRuntimeAsync(loadedModel),
                 async (runtime, runtimeModel, profile, launchSettings, _) =>
@@ -97,7 +97,7 @@ public partial class MainWindow
                         launchProfileName: profile.Name);
                 },
                 async (launchSettings, token) => await _coreServices.Runtime.RuntimeEndpointProbe.IsAliveAsync(launchSettings, token),
-                async (runtimeModel, launchSettings, _) => await MarkGatewayModelReadyAsync(runtimeModel, launchSettings),
+                async (runtimeModel, profile, launchSettings, _) => await MarkGatewayModelReadyAsync(runtimeModel, profile, launchSettings),
                 StartGatewayActivity,
                 SetGatewayActivityPhase,
                 CompleteGatewayActivity,
@@ -109,13 +109,20 @@ public partial class MainWindow
             cancellationToken);
     }
 
-    private async Task<LoadedModelSessionSnapshot?> MarkGatewayModelReadyAsync(ModelRecord model, AppSettings launchSettings)
+    private async Task<LoadedModelSessionSnapshot?> MarkGatewayModelReadyAsync(
+        ModelRecord model,
+        NamedModelLaunchProfile profile,
+        AppSettings launchSettings)
     {
-        _sessions.MarkModelLoadedIfRunning(model.Id);
+        var session = _sessions.SessionForProfile(model.Id, profile.Id);
+        if (session is null) return null;
+        _sessions.MarkLoadedIfRunning(session.SessionId);
+        _sessions.SelectSession(session.SessionId);
         await SelectOverviewLoadedModelAsync(model.Id);
+        _sessions.SelectSession(session.SessionId);
         await SaveActiveRuntimeSessionsAsync();
         if (_coreServices.Models.ModelRuntimeStatus.IsLoadingModel(model.Id))
             StopModelLoadingTimer(showLoadedDuration: true, loadedModelName: model.Name);
-        return _sessions.SessionForModel(model.Id);
+        return _sessions.SessionForProfile(model.Id, profile.Id);
     }
 }

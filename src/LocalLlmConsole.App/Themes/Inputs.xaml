@@ -152,7 +152,7 @@
     <Style TargetType="ComboBoxItem">
       <Setter Property="Background" Value="{DynamicResource PanelBackAlt}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
-      <Setter Property="Padding" Value="10,7"/>
+      <Setter Property="Padding" Value="8,2"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ComboBoxItem">

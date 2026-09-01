@@ -56,6 +56,7 @@ public partial class MainWindow
 
     private async Task<AppSettings> ApplyControlSettingsOnUiAsync(AppSettings settings, CancellationToken cancellationToken)
     {
+        _coreServices.Ui.SettingsAutoApply.Cancel();
         var previousCulture = _settings.UiCulture;
         var previousRuntimeLogOrder = _settings.RuntimeLogOrder;
         var persisted = await AppServices.SettingsApplication.PersistAsync(settings, cancellationToken);
@@ -64,6 +65,7 @@ public partial class MainWindow
         ApplyGpuEnergyTrackingBoundary();
         _serviceFactory.CreateWindowsStartupRegistrationService().Apply(persisted.StartWithWindows);
         ApplicationThemeService.Apply(persisted.ThemeMode);
+        ApplicationUiScaleService.Apply(persisted.UiScalePercent); ApplicationFontScaleService.Apply(persisted.FontScalePercent);
         if (!string.Equals(previousCulture, persisted.UiCulture, StringComparison.OrdinalIgnoreCase))
         {
             Loc.LoadLanguage(persisted.UiCulture);
@@ -112,7 +114,7 @@ public partial class MainWindow
             interactivePrompts: false,
             launchProfileId: profileId,
             launchProfileName: profileName);
-        return _sessions.SessionForModel(model.Id)
+        return _sessions.SessionForProfile(model.Id, profileId)
             ?? throw new InvalidOperationException($"The runtime for {model.Name} did not create a managed session.");
     }
 

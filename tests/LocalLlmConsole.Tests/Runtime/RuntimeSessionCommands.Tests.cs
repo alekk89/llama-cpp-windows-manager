@@ -100,7 +100,6 @@ public sealed class RuntimeSessionCommandsTests : ManagerRegressionTestBase
             "busy:Preparing model load...",
             "draft:model",
             "list",
-            "stop:model",
             "read",
             "start:runtime:model:8084",
             "busy:Preparing model load...",

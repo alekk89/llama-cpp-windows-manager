@@ -60,7 +60,7 @@ public static class LogsPageFactory
         logsGrid.SelectionMode = DataGridSelectionMode.Extended;
         logsGrid.SelectionUnit = DataGridSelectionUnit.FullRow;
         PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Open"), nameof(LogFileRow.OpenAction), nameof(LogFileRow.CanOpen), request.Actions.OpenRow, .55, tooltipBinding: nameof(LogFileRow.OpenToolTip));
-        PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Delete"), nameof(LogFileRow.DeleteAction), nameof(LogFileRow.CanDelete), request.Actions.DeleteRow, .65, tooltipBinding: nameof(LogFileRow.DeleteToolTip), visualRole: VisualRole.Danger);
+        PageSectionFactory.AddButtonColumn(logsGrid, Loc.T("Logs.ActionBtn.Delete"), nameof(LogFileRow.DeleteAction), nameof(LogFileRow.CanDelete), request.Actions.DeleteRow, .65, tooltipBinding: nameof(LogFileRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         logsGrid.ItemsSource = request.Rows;
         DataGridRowContextMenu.Attach(
             logsGrid,

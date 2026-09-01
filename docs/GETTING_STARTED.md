@@ -21,5 +21,10 @@ Model:    the loaded model or saved gateway route ID
 Use the shared gateway when one stable client URL should route among profiles.
 See [Gateway and networking](GATEWAY_AND_NETWORKING.md).
 
+Use the stars in model, profile, and runtime lists to keep frequent choices at
+the top of equivalent selectors. To restore one or more saved profiles whenever
+the Manager starts, add them under **Settings → Load profiles on startup** or
+use **Load on startup** from a saved profile's context menu.
+
 For the application architecture and a walkthrough of every page, continue with
 the [User guide](USER_GUIDE.md).

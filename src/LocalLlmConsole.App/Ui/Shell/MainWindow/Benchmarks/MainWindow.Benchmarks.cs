@@ -9,6 +9,7 @@ public partial class MainWindow
     private BenchmarksPageController? _benchmarksController;
     private EventHandler<BenchmarkRunSnapshot>? _benchmarkProgressHandler;
     private IReadOnlyList<NamedModelLaunchProfile> _benchmarkProfiles = [];
+    private BenchmarkPlan? _pendingBenchmarkPlan;
 
     private void ShowBenchmarks()
     {
@@ -38,7 +39,7 @@ public partial class MainWindow
             () => _benchmarksPage?.ClearScopeProfiles(),
             InvalidateBenchmarkPlan,
             RunEventAsync));
-        var controls = BenchmarksPageFactory.Create(_benchmarksController);
+        var controls = SelectorFavoriteBinding.ConfigureBenchmarks(BenchmarksPageFactory.Create(_benchmarksController), () => _stateStore, SetStatus);
         _benchmarksPage.Apply(controls);
         PageHost.Content = controls.Root;
         SubscribeBenchmarkProgress();
@@ -58,6 +59,11 @@ public partial class MainWindow
         if (_benchmarksPage is null) return;
         _benchmarkProfiles = await profilesTask;
         _benchmarksPage.SetCatalog(await modelsTask, _benchmarkProfiles, await runtimesTask);
+        if (_pendingBenchmarkPlan is not null)
+        {
+            BenchmarksPagePlanService.Apply(_benchmarksPage, _pendingBenchmarkPlan, _benchmarkProfiles);
+            _pendingBenchmarkPlan = null;
+        }
         ApplyBenchmarkRuns(await runsTask);
     }
 
@@ -180,5 +186,11 @@ public partial class MainWindow
         => _benchmarksPage?.SelectedRunId is { Length: > 0 } id ? id : throw new InvalidOperationException("Select a benchmark run first.");
 
     private string RequiredActiveBenchmarkRunId() => _benchmarksPage?.ActiveRunId is { Length: > 0 } id ? id : throw new InvalidOperationException("There is no active benchmark run to stop.");
+
+    private void OpenBenchmarkPlan(BenchmarkPlan plan)
+    {
+        _pendingBenchmarkPlan = plan;
+        ShowBenchmarks();
+    }
 
 }

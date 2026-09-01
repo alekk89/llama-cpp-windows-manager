@@ -37,11 +37,24 @@ internal abstract class ControlEndpointHandler
     }
 
     protected LoadedModelSessionSnapshot ResolveSession(string identifier)
-        => _deps.Sessions.Snapshots().FirstOrDefault(session =>
-               session.SessionId.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-               || session.ModelId.Equals(identifier, StringComparison.OrdinalIgnoreCase)
-               || session.ModelName.Equals(identifier, StringComparison.OrdinalIgnoreCase))
-           ?? throw new KeyNotFoundException($"Session '{identifier}' was not found.");
+    {
+        var sessions = _deps.Sessions.Snapshots();
+        var exact = sessions.FirstOrDefault(session =>
+            session.SessionId.Equals(identifier, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null) return exact;
+
+        var matches = sessions.Where(session =>
+                session.ModelId.Equals(identifier, StringComparison.OrdinalIgnoreCase)
+                || session.ModelName.Equals(identifier, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return matches.Length switch
+        {
+            1 => matches[0],
+            > 1 => throw new InvalidOperationException(
+                $"More than one session serves model '{identifier}'. Use the exact session id."),
+            _ => throw new KeyNotFoundException($"Session '{identifier}' was not found.")
+        };
+    }
 
     protected async Task SaveProfileAsync(ModelRecord model, NamedModelLaunchProfile profile)
     {

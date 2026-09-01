@@ -87,6 +87,35 @@ public sealed class RuntimeSessionsTests : ManagerRegressionTestBase
     }
 
     [Fact]
+    public async Task LoadedModelSessionManagerTracksAndStopsSameModelProfilesIndependently()
+    {
+        var root = CreateTempRoot();
+        var settings = AppSettings.CreateDefault(root);
+        var runtime = new RuntimeRecord("runtime", "llama.cpp CUDA", RuntimeMode.Native, RuntimeBackend.Cuda, Path.Combine(root, "llama-server.exe"), "{}", DateTimeOffset.UtcNow);
+        var model = new ModelRecord("model-a", "Model A", Path.Combine(root, "a.gguf"), OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+        using var manager = CreateLoadedModelSessionManager();
+        var firstId = LoadedModelSessionManager.SessionIdFor(model.Id, "profile-a");
+        var secondId = LoadedModelSessionManager.SessionIdFor(model.Id, "profile-b");
+
+        manager.AttachExisting(runtime, model, settings with { Port = 8081 }, "a.log", LlamaRuntimeState.Loaded, "", firstId, DateTimeOffset.UtcNow,
+            launchProfileId: "profile-a", launchProfileName: "GPU 1");
+        manager.AttachExisting(runtime, model, settings with { Port = 8082 }, "b.log", LlamaRuntimeState.Loaded, "", secondId, DateTimeOffset.UtcNow,
+            launchProfileId: "profile-b", launchProfileName: "GPU 2");
+
+        Assert.NotEqual(firstId, secondId);
+        Assert.Equal(2, manager.SessionsForModel(model.Id).Count);
+        Assert.Equal(8081, manager.SessionForProfile(model.Id, "profile-a")?.LaunchSettings.Port);
+        Assert.Equal(8082, manager.SessionForProfile(model.Id, "profile-b")?.LaunchSettings.Port);
+
+        await manager.StopAsync(firstId, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Null(manager.SessionForProfile(model.Id, "profile-a"));
+        Assert.True(manager.SessionForProfile(model.Id, "profile-b")?.IsRunning);
+
+        await manager.StopModelAsync(model.Id);
+        Assert.Empty(manager.SessionsForModel(model.Id));
+    }
+
+    [Fact]
     public void LoadedModelSessionManagerCachesModelSizeForTheSessionLifetime()
     {
         var root = CreateTempRoot();
@@ -290,7 +319,7 @@ public sealed class RuntimeSessionsTests : ManagerRegressionTestBase
             (launchSettings, _) => Task.FromResult(launchSettings.Port == 8081),
             (launchSettings, _) => Task.FromResult(launchSettings.Port == 8082),
             (model, launchSettings) => loadingStatuses.Add($"{model.Id}:{launchSettings.Port}"),
-            (model, launchSettings) => readinessMonitors.Add($"{model.Id}:{launchSettings.Port}"),
+            session => readinessMonitors.Add($"{session.ModelId}:{session.LaunchSettings.Port}"),
             launchSettings => activeSettings = launchSettings,
             statuses.Add,
             () => dashboardRefreshes++,

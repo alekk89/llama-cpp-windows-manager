@@ -27,6 +27,7 @@ public sealed class LaunchSettingsPanelState
     public List<FrameworkElement> AdvancedLaunchSections { get; } = [];
 
     private WpfButton? SaveModelLaunchSettingsButton { get; set; }
+    private WpfButton? FitToAvailableVramButton { get; set; }
 
     private WpfTextBox? SaveAsNewModelNameBox { get; set; }
 
@@ -57,6 +58,7 @@ public sealed class LaunchSettingsPanelState
         LaunchSettingsSearchBox = controls.LaunchSettingsSearchBox;
         AdvancedLaunchSettingsButton = controls.AdvancedLaunchSettingsButton;
         SaveModelLaunchSettingsButton = controls.SaveModelLaunchSettingsButton;
+        FitToAvailableVramButton = controls.FitToAvailableVramButton;
         SaveAsNewModelNameBox = controls.SaveAsNewModelNameBox;
         SaveAsNewModelButton = controls.SaveAsNewModelButton;
         FormControls = controls.FormControls;
@@ -91,6 +93,15 @@ public sealed class LaunchSettingsPanelState
             SaveAsNewModelButton.IsEnabled = enabled;
     }
 
+    public void SetProfileFitCapability(bool enabled, string? explanation = null)
+    {
+        if (FitToAvailableVramButton is null) return;
+        FitToAvailableVramButton.IsEnabled = enabled;
+        FitToAvailableVramButton.ToolTip = string.IsNullOrWhiteSpace(explanation)
+            ? Loc.T("Tooltip.FitVramButton")
+            : explanation;
+    }
+
     public void ApplyControlState(LaunchSettingsControlStatePlan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -109,6 +120,8 @@ public sealed class LaunchSettingsPanelState
             FormControls.GpuDevicesBox.IsEnabled = plan.GpuLayersAvailable;
         if (FormControls.GpuSplitBox is not null)
             FormControls.GpuSplitBox.IsEnabled = plan.GpuLayersAvailable;
+        if (FormControls.TensorBufferOverridesBox is not null)
+            FormControls.TensorBufferOverridesBox.IsEnabled = plan.GpuLayersAvailable;
         if (FormControls.VisionCombo is not null)
             FormControls.VisionCombo.IsEnabled = plan.VisionLaunchSettingsAvailable;
         if (FormControls.VisionProjectorPathBox is not null)

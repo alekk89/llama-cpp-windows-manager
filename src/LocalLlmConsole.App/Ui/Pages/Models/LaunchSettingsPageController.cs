@@ -6,6 +6,7 @@ public sealed record LaunchSettingsPageControllerActions(
     Func<ModelRecord?> SelectedModel,
     Func<string> SelectedProfileId,
     Func<string> SelectedRuntimeId,
+    Func<RuntimeChoice?> SelectedRuntime,
     Func<MainWindowLoadedModelServices> ModelServices,
     Func<string, Func<Task>, Task> RunBusyAsync,
     Action<Func<Task>, string> RunBackground,
@@ -13,6 +14,7 @@ public sealed record LaunchSettingsPageControllerActions(
     Func<ModelRecord?, CancellationToken, Task> ApplyModelCapabilitiesAsync,
     Func<Task> RefreshModelsAsync,
     Action<string> SelectProfileAfterRefresh,
+    Action<string, string?> SelectModelAfterRefresh,
     Func<Task> RefreshOverviewModelsAsync,
     Func<Task> PersistSettingsAsync,
     Action UpdateControlVisibility,
@@ -21,6 +23,9 @@ public sealed record LaunchSettingsPageControllerActions(
     Action NormalizeContextSize,
     Action CancelRuntimeOptionDiscovery,
     Func<OpenFilePickerRequest, string?> PickOpenFile,
+    Action<BenchmarkPlan> OpenBenchmarkPlan,
+    Action ShowModels,
+    Action<string> OpenLog,
     Action<string> SetStatus);
 
 public sealed class LaunchSettingsPageController
@@ -29,6 +34,7 @@ public sealed class LaunchSettingsPageController
     private readonly LaunchSettingsPanelState _panel;
     private readonly MainWindowCoreUiServices _ui;
     private readonly MainWindowCoreModelServices _models;
+    private readonly MainWindowCoreRuntimeServices _runtimes;
     private readonly LaunchSettingsPageControllerActions _actions;
 
     public LaunchSettingsPageController(
@@ -36,12 +42,14 @@ public sealed class LaunchSettingsPageController
         LaunchSettingsPanelState panel,
         MainWindowCoreUiServices ui,
         MainWindowCoreModelServices models,
+        MainWindowCoreRuntimeServices runtimes,
         LaunchSettingsPageControllerActions actions)
     {
         _workspaceRoot = workspaceRoot;
         _panel = panel;
         _ui = ui;
         _models = models;
+        _runtimes = runtimes;
         _actions = actions;
     }
 
@@ -243,6 +251,106 @@ public sealed class LaunchSettingsPageController
         _panel.SetSaveForModelState(content, hasNamedProfile && state.CanSaveForModel, hasNamedProfile);
         _panel.SetSaveAsNewEnabled(state.CanSaveAsNewVariant);
     }
+
+    public Task FitSelectedProfileToAvailableVramAsync()
+        => _actions.RunBusyAsync("Fitting profile to available VRAM...", FitSelectedProfileCoreAsync);
+
+    public void ScheduleProfileFitCapabilityProbe()
+    {
+        var runtime = _actions.SelectedRuntime();
+        if (runtime is null) { _panel.SetProfileFitCapability(false, "Select a runtime first."); return; }
+        if (runtime.Backend == RuntimeBackend.Cpu) { _panel.SetProfileFitCapability(false, "The selected runtime has no GPU backend to fit to VRAM."); return; }
+        var record = CreateRuntimeRecord(runtime);
+        var executable = ProfileFitCapabilityService.ResolveExecutable(record);
+        if (runtime.Mode == RuntimeMode.Native && !File.Exists(executable))
+        {
+            _panel.SetProfileFitCapability(false, "The selected runtime does not provide llama-fit-params beside llama-server.");
+            return;
+        }
+        _panel.SetProfileFitCapability(false, "Checking llama-fit-params support in the selected runtime...");
+        _actions.RunBackground(() => ProbeProfileFitCapabilityAsync(record), "Profile fitting capability probe failed");
+    }
+
+    public async Task OfferOutOfMemoryRecoveryAsync(LoadedModelSessionSnapshot session)
+    {
+        var capture = await _runtimes.RuntimeLogTail.CaptureAsync(session.LogPath, 80_000);
+        if (!RuntimeOutOfMemoryClassifier.IsOutOfMemory(session.StatusReason, capture.RawTail)) return;
+        var owner = System.Windows.Application.Current.MainWindow;
+        var action = OutOfMemoryRecoveryDialog.Show(owner, session.ModelName);
+        if (action == OutOfMemoryRecoveryAction.ViewLog) { _actions.OpenLog(session.LogPath); return; }
+        if (action is not (OutOfMemoryRecoveryAction.CreateFittedProfile or OutOfMemoryRecoveryAction.EditMemorySettings)) return;
+        _actions.ShowModels();
+        await _actions.RefreshModelsAsync();
+        _actions.SelectModelAfterRefresh(session.ModelId, session.LaunchProfileId);
+        await RenderSelectedAsync();
+        if (action == OutOfMemoryRecoveryAction.CreateFittedProfile) await FitSelectedProfileCoreAsync();
+        else _actions.SetStatus("Review context, GPU layers, tensor split, and tensor buffer overrides before retrying the model.");
+    }
+
+    private async Task FitSelectedProfileCoreAsync()
+    {
+        var model = _actions.SelectedModel() ?? throw new InvalidOperationException("Select a model first.");
+        var runtime = _actions.SelectedRuntime() ?? throw new InvalidOperationException("Select a runtime first.");
+        if (runtime.Backend == RuntimeBackend.Cpu) throw new InvalidOperationException("VRAM fitting requires a GPU runtime.");
+        var settings = ReadFromControls();
+        var input = ProfileFitDialog.ShowInput(System.Windows.Application.Current.MainWindow, settings.ContextSize);
+        if (input is null) return;
+        var current = ModelLaunchSettings.FromAppSettings(settings, runtime.Id);
+        var gpuCount = Math.Max(1, Math.Max(CsvCount(current.GpuDevices), CsvCount(current.GpuSplit)));
+        var result = await _runtimes.ProfileFit.FitAsync(new ProfileFitRequest(
+            model.ModelPath, CreateRuntimeRecord(runtime), current, input.DesiredMaximumContext, input.MinimumContext,
+            Enumerable.Repeat(input.ReservedVramMiB, gpuCount).ToArray(), _actions.Settings().WslDistro));
+        if (!result.Success || result.Proposal is null) throw new InvalidOperationException(result.Error);
+        var action = ProfileFitDialog.ShowPreview(System.Windows.Application.Current.MainWindow, current, result);
+        if (action == ProfileFitPreviewAction.Cancel) return;
+        var fitted = current with
+        {
+            ContextSize = result.Proposal.ContextSize,
+            GpuLayers = result.Proposal.GpuLayers,
+            GpuSplit = result.Proposal.GpuSplit,
+            TensorBufferOverrides = result.Proposal.TensorBufferOverrides
+        };
+        var fittedSettings = fitted.ApplyTo(settings);
+        if (action == ProfileFitPreviewAction.ApplyTemporarily)
+        {
+            ApplyToControls(fittedSettings);
+            _actions.SetStatus("Applied fitted settings temporarily. Save the profile when you are satisfied.");
+            return;
+        }
+        var originalProfileId = _actions.SelectedProfileId();
+        var saved = await _actions.ModelServices().LaunchVariants.SaveAsNewAsync(new ModelLaunchVariantWorkflowRequest(
+            model, await UniqueFittedProfileNameAsync(model, gpuCount), fittedSettings, runtime.Id, _actions.Settings()));
+        if (!saved.Success || saved.Profile is null) throw new InvalidOperationException(saved.StatusMessage);
+        _actions.SelectProfileAfterRefresh(saved.Profile.Id);
+        await _actions.RefreshModelsAsync();
+        await _actions.RefreshOverviewModelsAsync();
+        _actions.SetStatus(saved.StatusMessage);
+        if (action == ProfileFitPreviewAction.SaveAndBenchmark)
+            _actions.OpenBenchmarkPlan(ProfileFitBenchmarkPlanService.Create(model, originalProfileId, saved.Profile,
+                _actions.Settings().BenchmarkStopActiveSessions, _actions.Settings().BenchmarkPreventSystemSleep));
+    }
+
+    private async Task<string> UniqueFittedProfileNameAsync(ModelRecord model, int gpuCount)
+    {
+        var stem = $"{model.Name} — fitted {gpuCount}×GPU";
+        var names = (await _actions.ModelServices().LaunchProfiles.ListNamedAsync(model)).Select(profile => profile.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!names.Contains(stem)) return stem;
+        for (var suffix = 2; suffix < 1000; suffix++) if (!names.Contains($"{stem} ({suffix})")) return $"{stem} ({suffix})";
+        return $"{stem} {DateTimeOffset.Now:yyyyMMdd-HHmmss}";
+    }
+
+    private async Task ProbeProfileFitCapabilityAsync(RuntimeRecord runtime)
+    {
+        var capability = await _runtimes.ProfileFitCapabilities.ProbeAsync(runtime, _actions.Settings().WslDistro);
+        if (string.Equals(_actions.SelectedRuntimeId(), runtime.Id, StringComparison.OrdinalIgnoreCase))
+            _panel.SetProfileFitCapability(capability.SupportsFitParams, capability.SupportsFitParams ? null : capability.Error);
+    }
+
+    private static RuntimeRecord CreateRuntimeRecord(RuntimeChoice runtime)
+        => new(runtime.Id, runtime.DisplayName, runtime.Mode, runtime.Backend, runtime.ExecutablePath, "{}", DateTimeOffset.UtcNow);
+
+    private static int CsvCount(string value)
+        => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
 
     private void UpdateSaveAsNewName(ModelRecord? model)
     {
