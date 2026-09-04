@@ -44,6 +44,15 @@ public sealed class RuntimeTelemetryApplicationService
         return _poller.PollSessionsAsync(pollableSessions, cancellationToken);
     }
 
+    public Task<RuntimeMetricPollResult[]> PollSessionsAsync(
+        IEnumerable<LoadedModelSessionSnapshot> sessions,
+        Func<RuntimeMetricPollResult, Task> onCompleted,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sessions);
+        return _poller.PollSessionsAsync(_refreshCoordinator.PollableSessions(sessions), onCompleted, cancellationToken);
+    }
+
     public RuntimeMetricSummaryResult ApplyMetricSummary(
         string runtimeKey,
         IReadOnlyList<PrometheusSample> samples,

@@ -77,65 +77,85 @@ public sealed class RuntimeDashboardRefreshApplicationService
             if (request.RenderOverview)
                 actions.RefreshOverviewSessionRows();
 
-            var pollResults = await _telemetry.PollSessionsAsync(actions.SessionSnapshots(), cancellationToken);
+            RuntimeMetricPollResult? rendered = null;
+            var pollResults = await _telemetry.PollSessionsAsync(actions.SessionSnapshots(), async completed =>
+            {
+                if (request.RenderOverview)
+                    (_, rendered) = await RenderSelectionAsync(request, actions, [completed], rendered, completedOnly: true);
+            }, cancellationToken);
             await actions.ApplyEndpointHealthAsync(pollResults);
             await actions.TrackLifetimeTokenDeltasAsync(pollResults);
             await actions.ApplyIdleUnloadPoliciesAsync(pollResults);
 
-            if (request.RenderOverview)
-                await actions.SetGpuMetricAsync(await actions.CachedGpuSummaryAsync());
-
-            var selectedOverviewModel = actions.SelectedOverviewModel();
-            var selectedOverviewModelSession = selectedOverviewModel is null
-                ? null
-                : actions.SessionForModel(selectedOverviewModel.Id);
-            var selection = _selection.Select(new RuntimeDashboardSelectionRequest(
-                selectedOverviewModel,
-                selectedOverviewModel is not null && actions.IsModelActive(selectedOverviewModel),
-                selectedOverviewModel is not null && actions.IsModelLoaded(selectedOverviewModel),
-                selectedOverviewModelSession,
-                actions.SelectedSession(),
-                actions.ActiveSessionSettings(),
-                actions.ActiveRuntimeSettings(),
-                request.Settings,
-                request.ActiveModelId,
-                request.ActiveRuntimeId));
-            if (selection.SelectedOverviewModelHasNoRunningSession)
-            {
-                await actions.RenderStoppedSelectedOverviewModelAsync(selectedOverviewModel, request.RenderOverview);
-                return RuntimeDashboardRefreshApplicationOutcome.RenderedStoppedSelection;
-            }
-
-            if (selection.SelectSelectedOverviewModel)
-                actions.SetActiveRuntimeSettings(actions.SelectModel(selectedOverviewModel!.Id).ActiveSettings);
-
-            var selectedSession = selection.Session;
-            var runtimeKey = selection.RuntimeKey;
-            var selectedPollResult = selectedSession is null
-                ? null
-                : pollResults.FirstOrDefault(result => string.Equals(result.RuntimeKey, runtimeKey, StringComparison.Ordinal));
-
-            var (modelName, _) = await actions.ActiveRuntimeLabelsAsync();
-            if (request.RenderOverview)
-                actions.RefreshModelStatusMetric(modelName);
-
             if (request.RuntimeState == LlamaRuntimeState.Failed)
                 await actions.SaveActiveRuntimeSessionsAsync();
-
-            await _metricsApplication.ApplyAsync(
-                new RuntimeDashboardMetricsApplicationRequest(
-                    request.RenderOverview,
-                    selectedSession,
-                    selection.MetricsSettings,
-                    selectedPollResult,
-                    runtimeKey),
-                actions.MetricsActions);
-            return RuntimeDashboardRefreshApplicationOutcome.Applied;
+            var (outcome, _) = await RenderSelectionAsync(request, actions, pollResults, rendered, completedOnly: false);
+            if (request.RenderOverview)
+                await actions.SetGpuMetricAsync(await actions.CachedGpuSummaryAsync());
+            return outcome;
         }
         finally
         {
             actions.UpdateOverviewModelActions();
         }
+    }
+
+    private async Task<(RuntimeDashboardRefreshApplicationOutcome Outcome, RuntimeMetricPollResult? Rendered)> RenderSelectionAsync(
+        RuntimeDashboardRefreshApplicationRequest request,
+        RuntimeDashboardRefreshApplicationActions actions,
+        IReadOnlyList<RuntimeMetricPollResult> pollResults,
+        RuntimeMetricPollResult? previouslyRendered,
+        bool completedOnly)
+    {
+        var selectedOverviewModel = actions.SelectedOverviewModel();
+        var selectedOverviewModelSession = selectedOverviewModel is null
+            ? null
+            : actions.SessionForModel(selectedOverviewModel.Id);
+        var selection = _selection.Select(new RuntimeDashboardSelectionRequest(
+            selectedOverviewModel,
+            selectedOverviewModel is not null && actions.IsModelActive(selectedOverviewModel),
+            selectedOverviewModel is not null && actions.IsModelLoaded(selectedOverviewModel),
+            selectedOverviewModelSession,
+            actions.SelectedSession(),
+            actions.ActiveSessionSettings(),
+            actions.ActiveRuntimeSettings(),
+            request.Settings,
+            request.ActiveModelId,
+            request.ActiveRuntimeId));
+        if (selection.SelectedOverviewModelHasNoRunningSession && !completedOnly)
+        {
+            await actions.RenderStoppedSelectedOverviewModelAsync(selectedOverviewModel, request.RenderOverview);
+            return (RuntimeDashboardRefreshApplicationOutcome.RenderedStoppedSelection, null);
+        }
+
+        var selectedSession = selection.Session;
+        var runtimeKey = selection.RuntimeKey;
+        var selectedPollResult = selectedSession is null
+            ? null
+            : pollResults.FirstOrDefault(result => string.Equals(result.RuntimeKey, runtimeKey, StringComparison.Ordinal)
+                && string.Equals(result.Session.SessionId, selectedSession.SessionId, StringComparison.Ordinal));
+
+        if (completedOnly && selectedPollResult is null)
+            return (RuntimeDashboardRefreshApplicationOutcome.Applied, previouslyRendered);
+        if (selectedSession is { IsRunning: true } && selectedPollResult is not null
+            && ReferenceEquals(selectedPollResult, previouslyRendered))
+            return (RuntimeDashboardRefreshApplicationOutcome.Applied, previouslyRendered);
+        if (selection.SelectSelectedOverviewModel)
+            actions.SetActiveRuntimeSettings(actions.SelectModel(selectedOverviewModel!.Id).ActiveSettings);
+
+        var (modelName, _) = await actions.ActiveRuntimeLabelsAsync();
+        if (request.RenderOverview)
+            actions.RefreshModelStatusMetric(modelName);
+
+        await _metricsApplication.ApplyAsync(
+            new RuntimeDashboardMetricsApplicationRequest(
+                request.RenderOverview,
+                selectedSession,
+                selection.MetricsSettings,
+                selectedPollResult,
+                runtimeKey),
+            actions.MetricsActions);
+        return (RuntimeDashboardRefreshApplicationOutcome.Applied, selectedPollResult);
     }
 
     private static void Validate(RuntimeDashboardRefreshApplicationActions actions)

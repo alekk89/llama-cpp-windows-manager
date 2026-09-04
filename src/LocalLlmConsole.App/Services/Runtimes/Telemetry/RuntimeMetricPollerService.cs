@@ -23,6 +23,40 @@ public sealed class RuntimeMetricPollerService
     public static string RuntimeKey(LoadedModelSessionSnapshot session)
         => RuntimeMetricIdentity.RuntimeKey(session);
 
+    public async Task<RuntimeMetricPollResult[]> PollSessionsAsync(
+        IReadOnlyList<LoadedModelSessionSnapshot> sessions,
+        Func<RuntimeMetricPollResult, Task> onCompleted,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onCompleted);
+        using var polling = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var tasks = sessions.Select(session => PollSessionBoundedAsync(session, polling.Token)).ToArray();
+        var pending = tasks.ToList();
+        try
+        {
+            while (pending.Count > 0)
+            {
+                var completed = await Task.WhenAny(pending);
+                pending.Remove(completed);
+                var result = await completed;
+                cancellationToken.ThrowIfCancellationRequested();
+                // Await callbacks serially on the caller's context. HTTP requests
+                // remain concurrent, but UI and counter consumers never overlap.
+                await onCompleted(result);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return await Task.WhenAll(tasks);
+        }
+        catch
+        {
+            polling.Cancel();
+            // Do not release the refresh guard while abandoned polls still run.
+            try { await Task.WhenAll(tasks); }
+            catch { /* Preserve the original polling or callback failure. */ }
+            throw;
+        }
+    }
+
     private async Task<RuntimeMetricPollResult> PollSessionBoundedAsync(
         LoadedModelSessionSnapshot session,
         CancellationToken cancellationToken)

@@ -516,11 +516,6 @@ public sealed class RuntimeTelemetryTests : ManagerRegressionTestBase
             [
                 "mark",
                 "overview",
-                "health:1",
-                "lifetime:1",
-                "idle:1",
-                "gpu-read",
-                "gpu:GPU summary",
                 $"select:{model.Id}",
                 "active:8081",
                 "labels",
@@ -528,6 +523,11 @@ public sealed class RuntimeTelemetryTests : ManagerRegressionTestBase
                 "metrics-log",
                 "metrics-rows",
                 "metrics-summary",
+                "health:1",
+                "lifetime:1",
+                "idle:1",
+                "gpu-read",
+                "gpu:GPU summary",
                 "actions"
             ],
             calls);
