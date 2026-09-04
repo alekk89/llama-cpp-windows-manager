@@ -193,7 +193,15 @@ try {
 
   Set-Content -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary") -Value "preserve" -Encoding ascii
   Set-Content -LiteralPath (Join-Path $ExternalData "external-preserve.canary") -Value "external" -Encoding ascii
-  Invoke-CheckedProcess $Candidate ($installArgs + "/LOG=`"$candidateInstallLog`"") "Candidate upgrade install" $candidateInstallLog
+  $candidateArgs = $installArgs + "/LOG=`"$candidateInstallLog`""
+  if ($env:GITHUB_ACTIONS -eq "true") {
+    # Restart Manager can identify the hosted runner's provjobd.exe as a file user.
+    # Closing that infrastructure process disconnects the job. The Manager was
+    # explicitly shut down above; still reject locked files or a deferred upgrade.
+    Write-Host "Preserving GitHub runner processes during the already-stopped Manager upgrade."
+    $candidateArgs += @("/NOCLOSEAPPLICATIONS", "/NORESTARTAPPLICATIONS", "/RESTARTEXITCODE=3010")
+  }
+  Invoke-CheckedProcess $Candidate $candidateArgs "Candidate upgrade install" $candidateInstallLog
   if (-not (Test-Path -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary"))) { throw "Upgrade removed workspace state." }
   if (-not (Test-Path -LiteralPath (Join-Path $ExternalData "external-preserve.canary"))) { throw "Upgrade removed external user data." }
 
