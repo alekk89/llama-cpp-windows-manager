@@ -27,6 +27,51 @@ bypass, record the reason in an issue. Afterward, open a follow-up pull request,
 run every omitted check, and link the successful run from the issue. Never use a
 bypass for routine feature delivery or to avoid a failing test.
 
+## Release planning
+
+[CONTRIBUTING.md](../CONTRIBUTING.md#issues-and-pull-requests) owns the issue and
+PR-scope rules. Release size is independent of PR size: a release may include
+many features, major improvements, or coordinated changes delivered through
+separate issue PRs.
+
+1. Review release readiness roughly weekly. This is a planning rhythm, not an
+   automatic publishing schedule or deadline: release sooner for an urgent fix,
+   or allow more time for a larger update. Never include unfinished work merely
+   to meet a date.
+2. Use a release-planning issue or milestone to list the intended issue PRs,
+   dependencies, compatibility/migration risks, and manual validation needed.
+   Merge compatible, completed PRs through the normal protected-main checks.
+   A candidate includes every change in its commit history; a milestone does not
+   exclude other changes already merged into `main`. Keep work that must wait
+   on its branch until the appropriate release cycle.
+3. Open a focused release PR linked to the planning issue. Set the version,
+   collect the completed entries from `docs/releases/unreleased` into
+   `docs/releases/v<version>.md`, and update release-specific metadata or baseline
+   expectations when needed. Remove only the entries included in those notes;
+   retain the unreleased directory's README. Keep unrelated implementation out
+   of the release PR.
+4. Select the exact merged commit as the release candidate. Validate the combined
+   application, build its release binaries once, and run the full release gate
+   plus installer lifecycle, pinned-version upgrade, and portable-update checks
+   on those binaries. Complete the recorded manual checks. Independent PR checks
+   do not replace this combined validation.
+5. If validation finds a defect, record it in an issue and fix it through a
+   focused PR. Select a new candidate and rebuild/revalidate its affected paths
+   and required release gates. An unresolved flaky check is a failure to
+   investigate, not a reason to skip the gate. Do not add unrelated features to
+   a candidate being prepared for publication.
+6. Publish only the exact artifacts validated for the selected commit, following
+   the appropriate publication procedure below. Verify draft asset names,
+   download selection, checksums, source version, and notes before publication.
+   An interrupted upload must reconcile the draft against those same verified
+   files before continuing; never blindly publish or rebuild under the same tag.
+   Record the successful checks and final commit in the release-planning issue.
+
+Current CI runs its required build, tests, quality, and packaging checks for every
+PR. The release preparation workflow additionally validates and stages the final
+combined artifacts. This policy does not introduce skipped checks or a new CI
+speed tier. Changes to the checks themselves require their own focused issue PR.
+
 ## Release authority
 
 Unsigned community releases are permitted while signing is unavailable. They

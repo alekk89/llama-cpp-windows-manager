@@ -298,6 +298,13 @@ if ($actual -ne $expected) { throw "Release checksum mismatch: $asset" }
 The canonical source repository is
 [github.com/alekk89/llama-cpp-windows-manager](https://github.com/alekk89/llama-cpp-windows-manager).
 
+For repository contributions, follow the issue-per-PR, compatibility, and
+release-note rules in `CONTRIBUTING.md`, and the release-planning rules in
+`docs/REPOSITORY_GOVERNANCE.md`. Read these in the source checkout before editing;
+in a packaged installation, use the canonical repository for these contributor
+documents. Keep unrelated issues in separate PRs; large releases collect
+completed PRs without changing that contribution rule.
+
 For repository changes, read `docs/DEVELOPMENT.md` and, for architectural work,
 `docs/ARCHITECTURE.md`. Preserve existing worktree changes and generated-data
 boundaries. Run tests proportional to the change and the full gate for control,

@@ -64,6 +64,14 @@ presenters, dialogs, tray notifications, and page factories resolve user-facing
 text with `Loc.T`. Add new English keys first and let incomplete language packs
 use the deliberate English fallback until a real translation is available.
 
+## Contribution and release process
+
+Follow [CONTRIBUTING.md](../CONTRIBUTING.md#issues-and-pull-requests) for focused
+issue PRs, dependency handling, compatibility checks, and release-note entries.
+Follow [release planning](REPOSITORY_GOVERNANCE.md#release-planning) to assemble
+completed PRs into a release of any size and validate the final combined build.
+The commands below define the technical checks used by that process.
+
 ## Local Gate
 
 Run these before opening a release PR or after any architecture-level change:

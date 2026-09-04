@@ -4,10 +4,11 @@ While signing is unavailable, releases use the protected-main PR pipeline and
 manual GitHub publication. Keep `TRUSTED_RELEASE_ENABLED` unset. Do not pass
 `-RequireSigned` or describe the resulting files as signed or publisher-verified.
 
-1. Integrate the intended source and tests, including new files. Finalize the
-   version and short notes in `docs/releases/v<version>.md`.
-2. Run the local source and portable gate. Push the feature branch, open a PR,
-   pass required CI checks, and merge into protected `main`.
+1. Follow [release planning](REPOSITORY_GOVERNANCE.md#release-planning): merge
+   completed issue PRs, then prepare a focused release PR with the version,
+   collected release-note entries, and any release-specific metadata.
+2. Run the local source and portable gate. Pass required checks on the release
+   PR against current `main`, then merge it through branch protection.
 3. Run **Prepare unsigned release** on that exact `main` commit. The workflow
    uses a fresh Windows runner to run the complete release gate, installer
    lifecycle tests, pinned previous-version installer upgrade, and standalone
