@@ -39,7 +39,7 @@ $ExpectedRoot = [System.IO.Path]::GetFullPath($TestRoot).TrimEnd('\') + '\'
 $oldWorkspaceVariable = $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE
 
 function Invoke-CheckedProcess {
-  param([string] $FilePath, [string[]] $ArgumentList, [string] $Label)
+  param([string] $FilePath, [string[]] $ArgumentList, [string] $Label, [string] $LogPath = "")
   $startInfo = [Diagnostics.ProcessStartInfo]::new($FilePath)
   $startInfo.Arguments = $ArgumentList -join ' '
   $startInfo.UseShellExecute = $false
@@ -47,8 +47,23 @@ function Invoke-CheckedProcess {
   $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
   $process = [Diagnostics.Process]::Start($startInfo)
   Write-Host "$Label started as PID $($process.Id)."
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $logLineCount = 0
+  $nextHeartbeat = 15
   try {
-    if (-not $process.WaitForExit(120000)) {
+    do {
+      $exited = $process.WaitForExit(250)
+      if ($LogPath -and (Test-Path -LiteralPath $LogPath)) {
+        $lines = @(Get-Content -LiteralPath $LogPath -ErrorAction SilentlyContinue)
+        for ($line = $logLineCount; $line -lt $lines.Count; $line++) { Write-Host $lines[$line] }
+        $logLineCount = $lines.Count
+      }
+      if (-not $exited -and $watch.Elapsed.TotalSeconds -ge $nextHeartbeat) {
+        Write-Host "$Label is still running after $([int]$watch.Elapsed.TotalSeconds) seconds (PID $($process.Id))."
+        $nextHeartbeat += 15
+      }
+    } while (-not $exited -and $watch.Elapsed.TotalSeconds -lt 120)
+    if (-not $exited) {
       $killInfo = [Diagnostics.ProcessStartInfo]::new('taskkill.exe', "/PID $($process.Id) /T /F")
       $killInfo.UseShellExecute = $false
       $killInfo.CreateNoWindow = $true
@@ -158,8 +173,9 @@ try {
   $actualHash = (Get-FileHash -LiteralPath $PreviousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($actualHash -ne $Baseline.installer.sha256) { throw "Pinned previous installer hash mismatch." }
 
-  $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/DIR=`"$InstallDir`"")
-  Invoke-CheckedProcess $PreviousInstaller $installArgs "Previous-version install"
+  $installLog = Join-Path $TestRoot "installer.log"
+  $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/DIR=`"$InstallDir`"", "/LOG=`"$installLog`"", "/LOGCLOSEAPPLICATIONS")
+  Invoke-CheckedProcess $PreviousInstaller $installArgs "Previous-version install" $installLog
   $previousApp = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   $previousCli = Join-Path $InstallDir "llwmctl.exe"
   $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE = $Workspace
@@ -175,7 +191,7 @@ try {
 
   Set-Content -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary") -Value "preserve" -Encoding ascii
   Set-Content -LiteralPath (Join-Path $ExternalData "external-preserve.canary") -Value "external" -Encoding ascii
-  Invoke-CheckedProcess $Candidate $installArgs "Candidate upgrade install"
+  Invoke-CheckedProcess $Candidate $installArgs "Candidate upgrade install" $installLog
   if (-not (Test-Path -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary"))) { throw "Upgrade removed workspace state." }
   if (-not (Test-Path -LiteralPath (Join-Path $ExternalData "external-preserve.canary"))) { throw "Upgrade removed external user data." }
 
