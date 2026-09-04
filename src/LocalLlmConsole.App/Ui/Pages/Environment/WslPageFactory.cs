@@ -68,7 +68,7 @@ public static class WslPageFactory
 
         var root = new DockPanel { Margin = new Thickness(16) };
         var toolbar = Bar();
-        toolbar.Children.Add(Button(Loc.T("Logs.RefreshButton"), request.Actions.RefreshAsync, request.ButtonToolTip));
+        toolbar.Children.Add(Button(Loc.T("Environment.RefreshButton"), request.Actions.RefreshAsync, request.ButtonToolTip));
         DockPanel.SetDock(toolbar, Dock.Top);
         root.Children.Add(toolbar);
 

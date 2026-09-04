@@ -20,6 +20,7 @@ public sealed class LaunchRuntimeOptionsPanel
     private readonly TextBlock _status;
     private readonly WpfTextBox _preview;
     private readonly TextBlock _commandStatus;
+    private readonly TextBlock _hostStatus;
     private readonly WpfButton _applyCommandButton;
     private readonly Dictionary<string, RuntimeOptionEditor> _editors = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<RuntimeOptionRow> _optionRows = [];
@@ -80,6 +81,15 @@ public sealed class LaunchRuntimeOptionsPanel
             FontSize = 12,
             TextWrapping = TextWrapping.Wrap
         });
+        _hostStatus = new TextBlock
+        {
+            Foreground = ResourceBrush("TextMuted"),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0),
+            Visibility = Visibility.Collapsed
+        };
+        commandContent.Children.Add(_hostStatus);
         commandContent.Children.Add(_preview);
         commandContent.Children.Add(_applyCommandButton);
         commandContent.Children.Add(_commandStatus);
@@ -109,6 +119,17 @@ public sealed class LaunchRuntimeOptionsPanel
     public IReadOnlyList<string> GroupTitles => _optionGroups.Select(group => group.Title).ToArray();
 
     public string StatusText => _status.Text;
+
+    public string HostStatusText => _hostStatus.Text;
+
+    public void UpdateHostStatus(AppSettings settings)
+    {
+        var host = ModelAccessPolicy.RuntimeHost(settings.ModelAccessMode, settings.Host);
+        _hostStatus.Text = ModelAccessPolicy.DirectModelsAllowLanAccess(settings.ModelAccessMode)
+            ? Loc.T("Launch.Command.EffectiveHost", host)
+            : Loc.T("Launch.Command.LocalHost", host);
+        _hostStatus.Visibility = Visibility.Visible;
+    }
 
     public event Action? Changed;
 
@@ -208,8 +229,10 @@ public sealed class LaunchRuntimeOptionsPanel
         return LaunchArgumentText.Format(tokens);
     }
 
-    public void UpdatePreview(string command)
+    public void UpdatePreview(string command, AppSettings? settings = null)
     {
+        if (settings is not null) UpdateHostStatus(settings);
+        else _hostStatus.Visibility = Visibility.Collapsed;
         _lastGeneratedCommand = command ?? "";
         _preview.Text = _lastGeneratedCommand;
         _applyCommandButton.IsEnabled = !string.IsNullOrWhiteSpace(_lastGeneratedCommand)

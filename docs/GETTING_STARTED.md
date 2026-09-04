@@ -1,6 +1,6 @@
 # Getting started
 
-Install the current Windows x64 installer or extract the portable ZIP. Verify the
+Install the current Windows x64 installer or place the portable EXE in its own folder. Verify the
 download first using [release verification](UPDATES_AND_RELEASE_VERIFICATION.md).
 
 1. In **Runtimes**, install a recommended package or register a folder containing

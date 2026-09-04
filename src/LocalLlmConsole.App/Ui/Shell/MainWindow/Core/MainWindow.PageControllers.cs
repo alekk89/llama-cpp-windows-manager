@@ -137,6 +137,8 @@ public partial class MainWindow
                 async () => await ChooseRuntimeFolderAsync(scanAfter: true),
                 async () => await RunEventAsync(ChangeRuntimeCudaPackagePreferenceAsync),
                 async runtime => { await AppServices.StateStore.ToggleSelectorFavoriteAsync(SelectorFavoriteKind.Runtime, runtime.Id); await RefreshRuntimesAsync(); },
+                async runtime => await RunEventAsync(() => RuntimeServices.RuntimeCatalogCommands!.ToggleDefaultRuntimeAsync(
+                    AppServices.StateStore, runtime, RefreshRuntimesAsync, SetStatus)),
                 runtimeRows,
                 SetRuntimeGridColumnSizing,
                 SetRuntimeBuildGridColumnSizing));

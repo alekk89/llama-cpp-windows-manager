@@ -249,6 +249,26 @@ public sealed class RuntimeLaunchOptionsTests
     }
 
     [Fact]
+    public void ProjectorOffloadSwitchesAreDiscoveredWithoutExposingProjectorReplacement()
+    {
+        var parsed = RuntimeLaunchHelpParser.Parse("""
+              --mmproj FILE                     path to a multimodal projector
+              --mmproj-url URL                  download a multimodal projector
+              --mmproj-offload, --no-mmproj-offload
+                                                whether to enable GPU offloading for multimodal projector (default: enabled)
+            """);
+
+        var option = Assert.Single(RuntimeLaunchOptionSwitchService.Normalize(
+            parsed.Where(RuntimeLaunchOptionPolicy.CanRender).ToArray()));
+
+        Assert.Equal("--mmproj-offload", option.EnabledName);
+        Assert.Equal("--no-mmproj-offload", option.DisabledName);
+        Assert.Equal(RuntimeLaunchOptionValueKind.Switch, option.ValueKind);
+        var settings = AppSettings.CreateDefault("workspace") with { CustomParameters = option.DisabledName };
+        Assert.Contains("--no-mmproj-offload", RuntimeLaunchRequestFactory.Preview(settings, null), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RuntimeOptionsAreGroupedIntoStablePolishedSectionsWithoutDroppingUnknownFlags()
     {
         RuntimeLaunchOptionDefinition Option(string name, string description)

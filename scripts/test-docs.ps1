@@ -65,9 +65,11 @@ if ($issueTemplate -notmatch "(?m)^\s*placeholder:\s*$([regex]::Escape($currentT
   $violations.Add(".github/ISSUE_TEMPLATE/bug_report.yml: version placeholder does not match $currentTag")
 }
 
-$releaseNotes = Join-Path $RepoRoot "docs\releases\$currentTag.md"
-if (-not (Test-Path -LiteralPath $releaseNotes -PathType Leaf)) {
-  $violations.Add("docs/releases/$currentTag.md: current release notes are missing")
+# Unreleased notes live in GitHub release drafts, as documented in DEVELOPMENT.md.
+# Starting a development version must not require a duplicate notes file.
+$documentationIndex = Get-Content -LiteralPath (Join-Path $RepoRoot "docs\README.md") -Raw
+if ($documentationIndex -notmatch '\]\(https://github\.com/alekk89/llama-cpp-windows-manager/releases\)') {
+  $violations.Add("docs/README.md: GitHub release notes link is missing")
 }
 
 if ($violations.Count -gt 0) { throw "Documentation validation failed:`n$($violations -join "`n")" }

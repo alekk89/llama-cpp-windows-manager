@@ -195,7 +195,7 @@ public sealed class WpfIsolatedSurfaceTests : WpfUiTestBase
             var settings = AppSettings.CreateDefault(Path.Combine(Path.GetTempPath(), "wpf-runtime-smoke"));
             var viewModel = new MainWindowViewModel();
             var now = DateTimeOffset.UtcNow;
-            var cudaRuntime = new RuntimeRecord("runtime-cuda", "CUDA", RuntimeMode.Native, RuntimeBackend.Cuda, "cuda", "{}", now);
+            var cudaRuntime = new RuntimeRecord("runtime-cuda", "CUDA", RuntimeMode.Native, RuntimeBackend.Cuda, typeof(RuntimeRecord).Assembly.Location, "{}", now);
             var vulkanRuntime = new RuntimeRecord("runtime-vulkan", "Vulkan", RuntimeMode.Wsl, RuntimeBackend.Vulkan, "vulkan", "{}", now);
             viewModel.Runtimes.ReplaceRows([
                 new RuntimeCatalogRow { Name = "Vulkan", Backend = "Vulkan WSL", State = "Built", Location = "vulkan", Details = "Vulkan runtime details", Vendor = RuntimeInventoryFilterService.Amd, Platform = RuntimeInventoryFilterService.Linux, Runtime = vulkanRuntime },
@@ -209,11 +209,18 @@ public sealed class WpfIsolatedSurfaceTests : WpfUiTestBase
             ]);
             var noOp = new RoutedEventHandler((_, _) => { });
             var toggledFavoriteId = "";
+            var defaultRuntimeId = "";
             var controls = LocalLlmConsole.RuntimesPageFactory.Create(new LocalLlmConsole.RuntimesPageRequest(
                 viewModel, settings.RuntimeRoot, settings.CudaPackagePreference,
                 new LocalLlmConsole.RuntimesPageActions(
                     () => Task.CompletedTask, () => Task.CompletedTask,
-                    runtime => { toggledFavoriteId = runtime.Id; return Task.CompletedTask; }, noOp, noOp, noOp,
+                    runtime => { toggledFavoriteId = runtime.Id; return Task.CompletedTask; },
+                    runtime =>
+                    {
+                        defaultRuntimeId = defaultRuntimeId == runtime.Id ? "" : runtime.Id;
+                        viewModel.Runtimes.ReplaceRows(viewModel.Runtimes.Rows.ToArray(), new HashSet<string> { cudaRuntime.Id }, defaultRuntimeId);
+                        return Task.CompletedTask;
+                    }, noOp, noOp, noOp,
                     noOp, noOp, noOp, LocalLlmConsole.MainWindow.SetRuntimeGridColumnSizing, _ => { })));
             Assert.Equal(Visibility.Collapsed, controls.RuntimeSearch.Input.Visibility);
             controls.RuntimeSearch.Toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -262,7 +269,11 @@ public sealed class WpfIsolatedSurfaceTests : WpfUiTestBase
             Assert.Equal(36, Assert.IsType<LocalLlmConsole.ResponsiveActionDataGridColumn>(controls.RuntimePackageGrid.Columns[^1]).MinWidth);
             controls.RuntimeGrid.Columns[^1].Width = new DataGridLength(36);
             controls.RuntimeGrid.UpdateLayout();
-            var deleteButton = Assert.Single(VisualDescendants<LocalLlmConsole.ResponsiveActionButton>(runtimeRow));
+            var deleteButton = Assert.Single(VisualDescendants<LocalLlmConsole.ResponsiveActionButton>(runtimeRow), button => button.CompactLabel == "×");
+            Assert.Contains(VisualDescendants<LocalLlmConsole.ResponsiveActionButton>(runtimeRow), button => button.CompactLabel == "\uE73E");
+            var packageButtons = VisualDescendants<LocalLlmConsole.ResponsiveActionButton>(controls.RuntimePackageGrid).ToArray();
+            Assert.Contains(packageButtons, button => button.CompactLabel == "\uE896");
+            Assert.Contains(packageButtons, button => button.CompactLabel == "\uE72C");
             Assert.Equal("×", deleteButton.Content);
             controls.RuntimeGrid.Columns[^1].Width = new DataGridLength(100);
             controls.RuntimeGrid.UpdateLayout();
@@ -278,7 +289,31 @@ public sealed class WpfIsolatedSurfaceTests : WpfUiTestBase
             favorite.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             Assert.Equal(cudaRuntime.Id, toggledFavoriteId);
             controls.RuntimeGrid.ContextMenu.IsOpen = false;
-            Assert.True(VisualDescendants<Button>(controls.RuntimePackageGrid).Count(button => Equals(button.Content, "Check")) >= 2);
+            controls.RuntimeGrid.SelectedItem = viewModel.Runtimes.Rows[0];
+            var runtimeMenu = OpenContextMenu(controls.RuntimeGrid);
+            var setDefault = runtimeMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Set as default runtime"));
+            Assert.True(setDefault.IsEnabled);
+            setDefault.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            runtimeMenu.IsOpen = false;
+            Assert.Equal(cudaRuntime.Id, defaultRuntimeId);
+            controls.RuntimeGrid.UpdateLayout();
+            controls.RuntimeGrid.SelectedItem = viewModel.Runtimes.Rows[0];
+            var highlightedRow = Assert.IsType<DataGridRow>(controls.RuntimeGrid.ItemContainerGenerator.ContainerFromItem(viewModel.Runtimes.Rows[0]));
+            Assert.Equal(FontWeights.SemiBold, highlightedRow.FontWeight);
+            Assert.Equal(3, highlightedRow.BorderThickness.Left);
+            Assert.Equal("Default runtime for new profiles", highlightedRow.ToolTip);
+            runtimeMenu = OpenContextMenu(controls.RuntimeGrid);
+            runtimeMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            runtimeMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Clear default runtime"))
+                .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            runtimeMenu.IsOpen = false;
+            Assert.Equal("", defaultRuntimeId);
+            controls.RuntimeGrid.SelectedItem = viewModel.Runtimes.Rows[1];
+            runtimeMenu = OpenContextMenu(controls.RuntimeGrid);
+            runtimeMenu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            Assert.False(runtimeMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Set as default runtime")).IsEnabled);
+            runtimeMenu.IsOpen = false;
+            Assert.True(VisualDescendants<LocalLlmConsole.ResponsiveActionButton>(controls.RuntimePackageGrid).Count(button => button.FullLabel == "Check") >= 2);
         });
     }
 

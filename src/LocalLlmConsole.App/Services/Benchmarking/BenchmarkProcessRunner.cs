@@ -11,6 +11,7 @@ public sealed record BenchmarkProcessResult(
 public sealed class BenchmarkProcessRunner
 {
     private const int MaximumDiagnosticCharacters = 262_144;
+    private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(10);
     private readonly WslRuntimeStopService _wslStop;
 
     public BenchmarkProcessRunner(WslRuntimeStopService wslStop)
@@ -53,16 +54,19 @@ public sealed class BenchmarkProcessRunner
             if (ReferenceEquals(first, streamFailure))
                 throw await streamFailure;
             var cancelled = ReferenceEquals(first, cancellation);
+            if (!cancelled)
+            {
+                await processExit;
+                // Descendants can inherit output pipes even after the benchmark parent exits.
+                jobObject?.Dispose();
+                try { await streams.WaitAsync(OutputDrainTimeout, cancellationToken); }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { cancelled = true; }
+            }
             var verifiedStopped = !cancelled || await StopAsync(runtime, wslDistro, marker, process);
             if (cancelled)
             {
-                try { await streams; }
-                catch (Exception ex) { Trace.TraceWarning($"Benchmark output drain failed during cancellation: {ex.Message}"); }
-            }
-            else
-            {
-                await processExit;
-                await streams;
+                jobObject?.Dispose();
+                verifiedStopped &= await DrainOutputAsync(streams);
             }
             var exitCode = TryExitCode(process);
             return new BenchmarkProcessResult(exitCode, cancelled, verifiedStopped, diagnostics.ToString());
@@ -70,14 +74,17 @@ public sealed class BenchmarkProcessRunner
         catch
         {
             if (started) _ = await StopAsync(runtime, wslDistro, marker, process);
+            jobObject?.Dispose();
             if (stdout is not null && stderr is not null)
-            {
-                try { await Task.WhenAll(stdout, stderr); }
-                catch { }
-            }
+                _ = await DrainOutputAsync(Task.WhenAll(stdout, stderr));
             throw;
         }
     }
+
+    private static Task<bool> DrainOutputAsync(Task streams)
+        => BoundedTaskDrain.ObserveWithinAsync(streams, OutputDrainTimeout,
+            "Benchmark output did not close within the shutdown interval.",
+            "Benchmark output drain failed during shutdown.");
 
     private async Task<bool> StopAsync(RuntimeRecord runtime, string distro, string marker, Process process)
     {

@@ -65,7 +65,7 @@ Do not describe a release as signed, trusted, or production-hardened unless:
 1. `LlamaCppWindowsManager.exe` is signed before the installer is compiled.
 2. `llwmctl.exe` and every other shipped PE file is signed by the same publisher.
 3. `LlamaCppWindowsManager-Setup-<version>-win-x64.exe` is signed.
-4. `LlamaCppWindowsManager-win-x64.zip` is generated from signed contents.
+4. The standalone EXE restores the signed CLI and matching bundled sidecars.
 5. The detached signed manifest binds the tag, commit, publisher, names, sizes,
    hashes, and SBOM, and GitHub provenance verifies.
 6. Each uploaded binary/archive has a matching `.sha256` companion asset generated after

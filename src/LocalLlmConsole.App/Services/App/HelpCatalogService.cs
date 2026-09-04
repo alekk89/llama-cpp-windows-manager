@@ -97,6 +97,18 @@ public sealed partial class HelpCatalogService
             ["running model", "unload", "direct port", "session"]),
 
         Article(
+            "benchmark-cleanup",
+            "maintenance",
+            "Stop a benchmark",
+            "Stop the current workload while keeping results already recorded.",
+            [
+                "Choose Stop on the Benchmarks page to cancel the active run. The Manager stops the benchmark's owned processes and waits briefly for remaining output.",
+                "If a Windows runtime leaves child processes behind after its benchmark ends, the Manager closes those children. Inspect Logs if the run reports an output or shutdown failure."
+            ],
+            [Action("Open Logs", "logs")],
+            ["benchmark", "cancel", "stop", "partial results", "child process"]),
+
+        Article(
             "endpoint-inspection",
             "overview",
             "Inspect an endpoint without generating text",
@@ -240,7 +252,7 @@ public sealed partial class HelpCatalogService
             "The Manager control API and model-serving API are separate surfaces with separate credentials.",
             [
                 "llwmctl uses the authenticated loopback Manager control API at /api/v1/*.",
-                "The control token is generated per Manager process, discovered automatically, and is not a user setting.",
+                "The control token is generated per Manager process, discovered automatically, and is not a user setting. Presentation-only settings preserve active gateway streams.",
                 "The gateway and direct model endpoints expose OpenAI-compatible /v1/* routes.",
                 "Model-serving routes use the model API key configured in Settings unless authentication is explicitly disabled in Local-only mode."
             ],
@@ -255,10 +267,10 @@ public sealed partial class HelpCatalogService
             [
                 "Read GET /v1/models from the gateway, send the returned profile route as the model id, and use context_length plus meta to discover its configured context and available GGUF details.",
                 "When API key auth is enabled, send the Settings model API key as Authorization: Bearer <key>; the gateway also accepts x-api-key. Omit credentials only for an explicitly unauthenticated Local-only endpoint.",
-                "A direct endpoint serves only its loaded model; the gateway can load the requested saved profile on demand."
+                "A direct endpoint serves only its loaded model. Set Settings > Network > Auto-load models to No to make the gateway list and serve only loaded profiles too, without starting or swapping models. Yes allows the gateway to load saved profiles on demand."
             ],
             [Action("Open Settings", "gateway-settings"), Action("Open Overview", "loaded-sessions")],
-            ["openai", "base url", "bearer", "x-api-key", "v1 models", "client"]),
+            ["openai", "base url", "bearer", "x-api-key", "v1 models", "client", "manual", "autoload", "JIT", "read-only"]),
 
         Article(
             "network-and-key",
@@ -282,7 +294,7 @@ public sealed partial class HelpCatalogService
             [
                 "The customizable Overview dashboard and UI switches change presentation without disabling telemetry, logs, metrics, or downloads. Use a card's right-click menu for metrics, titles, charts, removal, resizing, and layout locking.",
                 "UI scale enlarges text and controls on top of Windows display scaling; Text scale changes text only. Both apply immediately. The Manager also remembers window bounds, table column widths and order, and page splitter positions in the current workspace.",
-                "Start with Windows, Load profiles on startup, and minimize behavior apply to the current Windows user."
+                "Start with Windows belongs to this executable; unrelated settings preserve another installation’s registration. Load profiles on startup and minimize behavior apply to the current Windows user."
             ],
             [Action("Open Settings", "settings")],
             ["workspace", "portable data", "ui scale", "font size", "dpi", "resolution", "display", "hide metrics", "dashboard", "vram", "power", "temperature", "startup", "tray"]),
@@ -335,7 +347,7 @@ public sealed partial class HelpCatalogService
             "Updates preserve application data and verify staged artifacts before replacement.",
             [
                 "Installer update, repair, and normal uninstall preserve data unless removal is explicitly selected.",
-                "A portable update requires its matching SHA-256 companion and rolls back incomplete replacement.",
+                "Unsigned releases verify the official portable EXE's size and SHA-256 checksum. Signed builds also require a signed manifest and matching publisher. The update helper acknowledges staging before the Manager closes and attempts rollback if replacement fails.",
                 "Use Logs for app, runtime, job, and bounded redacted Control API activity.",
                 "Create Diagnostics Bundle collects safe inventory, environment details, runtime trust state, and sanitized log tails. Review the ZIP before sharing it."
             ],

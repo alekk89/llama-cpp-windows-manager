@@ -93,6 +93,15 @@ Current:
 14. Main-window bounds plus page-scoped DataGrid column widths/order and
     GridSplitter proportions are stored in `ui_layout_state`. Restoration is
     versioned and monitor-safe, and obsolete control identities are ignored.
+15. The default runtime is a singleton foreign-key reference in `default_runtime`.
+    Replacing it is atomic; deleting the referenced runtime clears the preference
+    through the same transaction's cascade. New profiles read this preference
+    without rewriting existing profiles or changing active sessions.
+16. Direct model aliases are resolved inside the serialized session start path.
+    Effective arguments are kept in session snapshots for recovery and gateway
+    forwarding; saved profile arguments are not rewritten. Interactive
+    same-model replacement is an explicit launch-preparation choice; automated
+    and group loads do not apply that UI preference.
 
 ## Architecture Contract
 
@@ -268,6 +277,11 @@ task and at most one Manager-owned benchmark server or `llama-bench` process exi
 to events only while loaded; the run survives page navigation. No benchmark
 poller, hosted worker, dedicated database connection, or idle power request is
 permitted.
+
+`BenchmarkProcessRunner` closes its native process job when the benchmark parent
+exits, before draining output, so descendants cannot hold inherited pipes open.
+Output draining remains cancellable and bounded; cancellation and failure paths
+also close the owned job before waiting for readers to finish.
 
 `LoadedModelSessionManager` is the single compute-admission boundary. A
 benchmark lease stops explicitly authorized sessions before admission, can start
@@ -481,6 +495,7 @@ WPF text while preserving control dimensions, spacing, and existing layout
 transforms.
 `UiLayoutPersistenceService` observes the shell's current page and applies one
 generic persistence policy to every page `DataGrid` and `GridSplitter`. It
+cancels restoration of superseded pages, detaches observers on close, and
 debounces column-width, display-order, splitter, and main-window changes into
 the versioned `ui_layout_state` SQLite table, restores them as pages are
 composed, and clamps obsolete window bounds to the current virtual desktop.
@@ -506,8 +521,9 @@ Current:
 3. Manual checks show either a no-updates popup or an install confirmation.
 4. Install streams the release asset into `cache\app-updates` through its
    manifest size boundary, extracts portable files when the asset is a zip,
-   starts a hidden PowerShell handoff script, closes the app, stages and verifies
-   sibling app/CLI files, atomically replaces both with rollback backups, and
+   starts a hidden PowerShell helper, stages and verifies sibling app/CLI files,
+   waits for the helper’s acknowledgement before closing the app, atomically
+   replaces both with rollback backups, and
    restarts only after the complete replacement succeeds.
 5. A matching SHA-256 companion asset is required and verified before extraction.
 6. If the installed app is signed, the staged update executable must be signed by the same certificate before replacement.
@@ -532,6 +548,9 @@ Current:
 8. Generate compact model manifests from readable GGUF metadata while preserving imported/download metadata.
 9. Bound downloads by their expected size while streaming, then verify expected
    byte counts or SHA-256 before registering downloaded GGUF files.
+   The worker also persists failures from filesystem preparation before transfer
+   begins, so a stopped worker cannot silently leave a queued job. If persistence
+   itself fails, trace both errors and release the active-download registration.
 10. Validate local vision/projector pairing by surfacing missing mmproj files in capability summaries, invalidating cached capabilities when a projector is added or removed, carrying auto-detected, embedded/model-bundled, or explicit per-model Vision head choices, carrying a separate MTP head path for compatible `--mtp-head` runtimes, and carrying per-model dynamic-resolution image token allowances through to `llama-server`.
 11. Save named launch variants per model so users can keep multiple runtime/port/context/vision profiles without duplicating model registration.
 12. Keep model serving local-only unless Settings explicitly enables LAN exposure. Local-only mode may explicitly disable model API-key authentication, which clears the active key while retaining a protected backup for re-enabling it. LAN exposure can be scoped to the auto-load gateway, direct model ports, or both, and always requires a strong key. These settings affect only model-serving endpoints, not the independently authenticated app-local control API.
@@ -542,9 +561,12 @@ Current:
 
 Gateway routing:
 
+- `AppSettings.GatewayAutoLoadModels` defaults to true and is independent of listener enablement. When false, discovery filters the fully named catalog to exact running model/profile pairs, and inference requests can only reuse those sessions. Known unloaded routes return `503 model_not_loaded` before the lifecycle controller is invoked, even with Single active policy. Alias suffixes are assigned before filtering. Settings persistence, control patches, and UI auto-apply reconfigure the listener; manual lifecycle actions and retention remain independent.
+
 - The auto-load gateway listens on one OpenAI-compatible `/v1` port and never serves a model process itself. Local-only mode rejects every non-loopback peer address before authentication or routing. On Windows, an existing wildcard URL reservation may be reused for the listener so switching from LAN mode does not strand the gateway behind an HTTP.sys 503; the peer-address check remains the serving security boundary in that case.
-- `GET /v1/models` exposes one route for every saved launch profile, including a `context_length` extension containing that profile's configured context size and llama.cpp-compatible `meta` values for the GGUF training context, parameter count, and current file size. Metadata inspection is cached by model-file fingerprint, never inferred from names, and reused across profiles for the same model. The default profile retains the registered model id and existing model aliases; non-default profiles receive deterministic route ids derived from the model and saved profile id. Normalization collisions receive a stable hash suffix so no profile disappears from discovery.
+- `GET /v1/models` exposes one route for every saved launch profile, including a `context_length` extension containing that profile's configured context size and llama.cpp-compatible `meta` values for the GGUF training context, parameter count, and current file size. Metadata inspection is cached by model-file fingerprint, never inferred from names, and reused across profiles for the same model. `RuntimeModelAliasService` reads the first nonempty `--alias` / `-a` value from saved custom parameters for the advertised route ID. Duplicate aliases receive `:2`, `:3`, etc., with defaults first, then model/profile names and internal IDs as tie breakers. Assignment depends on the saved catalog, not running sessions or edit timestamps. Explicit names and legacy route IDs are reserved before suffix allocation. Without an alias, the default retains the registered model ID; other profiles retain their model/profile-derived IDs, including legacy normalization hashes. These legacy IDs remain accepted when aliases are configured.
 - Each requested profile launches on its saved direct runtime port. The gateway resolves the requested route to a model/profile pair, ensures that exact profile session is loaded, then proxies the request to that direct port. Under **Prefer keeping loaded models**, another profile backed by the same GGUF starts as an independent session and both routes remain available. Under **Single active model**, all other direct sessions are stopped before the requested profile starts. Concurrent requests for the same profile share one serialized load, while different profile routes may remain loaded together.
+- When an active session has runtime aliases, the gateway rewrites only the request's top-level `model` to an accepted runtime alias before forwarding. This resolves numbered gateway names and legacy IDs without changing saved settings, direct aliases, other request fields, or upstream response streams. The active session's aliases are authoritative even if its saved profile was subsequently edited.
 - Upstream response headers, including any load/swap delay, have a bounded wait.
   After headers arrive, the body stream has no fixed request-duration timeout;
   it ends when the upstream completes, the client disconnects, or app shutdown

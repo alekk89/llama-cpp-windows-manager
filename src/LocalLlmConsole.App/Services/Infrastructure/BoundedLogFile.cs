@@ -16,7 +16,7 @@ public sealed class BoundedLogWriter : IDisposable
     public BoundedLogWriter(string path, long maxBytes)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        _stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        _stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read | FileShare.Delete);
         _maxBytes = Math.Max(0, maxBytes);
         _flushTimer = new System.Threading.Timer(
             _ => FlushFromTimer(),

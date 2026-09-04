@@ -9,6 +9,33 @@ namespace LocalLlmConsole.Tests;
 public sealed class DownloadSafetyTests : ManagerRegressionTestBase
 {
     [Fact]
+    public async Task DownloadPreparationFailureLeavesAnActionableFailedJob()
+    {
+        var root = CreateTempRoot();
+        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
+        await store.InitializeAsync();
+        var jobs = new JobEngine(store, Path.Combine(root, "logs"));
+        using var service = new HuggingFaceService(store, jobs, new ModelCatalogService(store));
+        var settings = AppSettings.CreateDefault(root);
+        // A file at the cache-directory path fails before any HTTP request or partial-file write.
+        await File.WriteAllTextAsync(settings.CacheRoot, "preserve this file", TestContext.Current.CancellationToken);
+        var file = new HuggingFaceFile("owner/repo", "model.gguf", "model.gguf", "", 1_000, 0);
+        var job = await service.StartDownloadAsync(file, settings, TestContext.Current.CancellationToken);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (service.IsDownloadActive(job.Id) && DateTime.UtcNow < deadline)
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+
+        Assert.False(service.IsDownloadActive(job.Id));
+        var persisted = Assert.Single(await store.ListJobsAsync());
+        Assert.Equal(JobStatus.Failed, persisted.Status);
+        var payload = HuggingFaceService.ParseDownloadPayload(persisted.PayloadJson);
+        Assert.NotNull(payload);
+        Assert.False(string.IsNullOrWhiteSpace(payload.Error));
+        Assert.Equal("preserve this file", await File.ReadAllTextAsync(settings.CacheRoot, TestContext.Current.CancellationToken));
+        Assert.Empty(await store.ListModelsAsync());
+    }
+
+    [Fact]
     public void DownloadValidationPrefersAuthoritativeMetadataSizeOverShortResponseLength()
     {
         var file = new HuggingFaceFile("owner/repo", "model.gguf", "model.gguf", "", 1_000, 0);

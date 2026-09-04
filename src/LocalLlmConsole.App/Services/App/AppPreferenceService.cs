@@ -143,8 +143,25 @@ public static class AppPreferenceService
             : "keepLoaded";
     }
 
+    public static string SameModelLoadPolicy(string? text)
+        => text is "alongside" || LocalizedEquals(text ?? "", "Pref.LoadAlongside") ? "alongside"
+            : text is "replace" || LocalizedEquals(text ?? "", "Pref.ReplaceProfiles") ? "replace" : "ask";
+
+    public static string SameModelLoadPolicyLabel(string value) => SameModelLoadPolicy(value) switch
+    {
+        "alongside" => Loc.T("Pref.LoadAlongside"),
+        "replace" => Loc.T("Pref.ReplaceProfiles"),
+        _ => Loc.T("Pref.AskBeforeLoading")
+    };
+
+    public static string[] SameModelLoadPolicyOptions()
+        => [Loc.T("Pref.AskBeforeLoading"), Loc.T("Pref.LoadAlongside"), Loc.T("Pref.ReplaceProfiles")];
+
     public static string GatewaySwapPolicyLabel(string text)
         => GatewaySwapPolicy(text) == "singleActive" ? Loc.T("Pref.SingleActiveModel") : Loc.T("Pref.PreferKeepingLoaded");
+
+    public static string GatewayPolicyLabel(AppSettings settings)
+        => settings.GatewayAutoLoadModels ? GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy) : Loc.T("Pref.GatewayLoadedOnly");
 
     public static IEnumerable<string> GatewaySwapPolicyOptions() =>
     [

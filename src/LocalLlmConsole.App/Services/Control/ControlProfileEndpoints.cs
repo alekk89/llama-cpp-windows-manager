@@ -33,7 +33,11 @@ internal sealed class ControlProfileEndpoints : ControlEndpointHandler
             var profileId = string.IsNullOrWhiteSpace(write.Id) ? $"profile:{model.Id}:{Guid.NewGuid():N}" : write.Id.Trim();
             ControlProfileScope.EnsureCreateIdAvailable(await _deps.StateStore.GetNamedModelLaunchProfileAsync(profileId), model, profileId);
             var defaults = await _deps.LaunchProfiles.EnsureDefaultAsync(model, _deps.Actions.GetSettings());
-            var settings = ProfileSettings(defaults.Settings, write.Settings, write.Replace);
+            var defaultRuntimeId = await _deps.LaunchProfiles.DefaultRuntimeIdAsync();
+            var initialSettings = string.IsNullOrEmpty(defaultRuntimeId)
+                ? defaults.Settings
+                : defaults.Settings with { RuntimeId = defaultRuntimeId };
+            var settings = ProfileSettings(initialSettings, write.Settings, write.Replace);
             var profile = new NamedModelLaunchProfile(
                 profileId,
                 model.Id,

@@ -71,7 +71,8 @@ public sealed record ModelLaunchSettings(
     string ReasoningEffort = "default",
     string ReasoningBudgetMessage = "",
     string ReasoningPreserve = "auto",
-    string Host = "127.0.0.1")
+    string Host = "",
+    int VulkanAllocationBlockSizeMiB = 0)
 {
     public static ModelLaunchSettings FromAppSettings(AppSettings settings, string runtimeId = "") => new(
         settings.ContextSize,
@@ -136,7 +137,8 @@ public sealed record ModelLaunchSettings(
         settings.ReasoningEffort,
         settings.ReasoningBudgetMessage,
         settings.ReasoningPreserve,
-        settings.Host);
+        settings.Host,
+        settings.VulkanAllocationBlockSizeMiB);
 
     public AppSettings ApplyTo(AppSettings settings) => settings with
     {
@@ -201,6 +203,7 @@ public sealed record ModelLaunchSettings(
         GpuDevices = GpuDevices ?? "",
         GpuSplit = GpuSplit ?? "",
         TensorBufferOverrides = TensorBufferOverrides ?? "",
+        VulkanAllocationBlockSizeMiB = VulkanAllocationBlockSizeMiB,
         Host = string.IsNullOrWhiteSpace(Host) ? settings.Host : Host.Trim()
     };
 }

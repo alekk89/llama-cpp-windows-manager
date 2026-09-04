@@ -70,7 +70,9 @@ public sealed class AppSettingsApplicationService
             return AppSettingsSaveApplicationOutcome.Failed;
         }
 
-        var startupRegistration = _startupRegistration.Apply(result.Settings.StartWithWindows);
+        var startupRegistration = request.CurrentSettings.StartWithWindows != result.Settings.StartWithWindows
+            ? _startupRegistration.Apply(result.Settings.StartWithWindows)
+            : new WindowsStartupRegistrationResult(true, "");
         actions.ApplySettings(result.Settings);
         actions.ApplyTheme(result.Settings.ThemeMode);
         actions.ApplyLaunchSettingsToControls();
@@ -92,12 +94,12 @@ public sealed class AppSettingsApplicationService
     }
 
     internal static bool GatewaySettingsChanged(AppSettings current, AppSettings updated)
-        => current.AutoLoadGatewayEnabled != updated.AutoLoadGatewayEnabled
-           || current.AutoLoadGatewayPort != updated.AutoLoadGatewayPort
-           || !string.Equals(current.AutoLoadGatewayPolicy, updated.AutoLoadGatewayPolicy, StringComparison.OrdinalIgnoreCase)
-           || !string.Equals(current.ModelAccessMode, updated.ModelAccessMode, StringComparison.OrdinalIgnoreCase)
-           || current.RequireApiKeyAuth != updated.RequireApiKeyAuth
-           || !string.Equals(current.ModelApiKey, updated.ModelApiKey, StringComparison.Ordinal);
+    {
+        var before = ModelGatewayOptions.FromSettings(current);
+        var after = ModelGatewayOptions.FromSettings(updated);
+        return before with { AccessMode = before.AllowLanAccess ? "gateway" : "local" }
+            != after with { AccessMode = after.AllowLanAccess ? "gateway" : "local" };
+    }
 
     public Task<AppSettingsEnsureApiKeyResult> EnsureModelApiKeyAsync(
         AppSettings persistedSettings,

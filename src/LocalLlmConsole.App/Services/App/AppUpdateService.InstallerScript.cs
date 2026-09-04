@@ -5,6 +5,7 @@ public sealed partial class AppUpdateService
     private static string UpdaterScript() => """
 param(
   [int] $ParentPid,
+  [string] $HandoffName,
   [string] $SourceExe,
   [string] $TargetExe,
   [string] $ObsoleteExe,
@@ -97,29 +98,50 @@ function Restore-CommittedStage {
   }
 }
 
-try { Wait-Process -Id $ParentPid -Timeout 90 } catch {}
-Start-Sleep -Milliseconds 500
 $stages = @()
 $committed = @()
+$handoffReady = $null
+$handoffProceed = $null
+$handoffFailed = $null
+$replacementSucceeded = $false
 try {
+  if ($HandoffName) {
+    $handoffReady = [System.Threading.EventWaitHandle]::OpenExisting($HandoffName + ".ready")
+    $handoffProceed = [System.Threading.EventWaitHandle]::OpenExisting($HandoffName + ".proceed")
+    $handoffFailed = [System.Threading.EventWaitHandle]::OpenExisting($HandoffName + ".failed")
+  }
   $appStage = New-VerifiedStage -Source $SourceExe -Target $TargetExe
   if ($null -eq $appStage) { throw "The staged application executable is missing." }
   $stages += $appStage
   $cliStage = New-VerifiedStage -Source $SourceCli -Target $TargetCli
+  if ($SourceCli -and $null -eq $cliStage) { throw "The staged control executable is missing." }
   if ($null -ne $cliStage) { $stages += $cliStage }
+  if ($handoffReady) {
+    $handoffReady.Set() | Out-Null
+    if (-not $handoffProceed.WaitOne(30000)) { throw "The Manager did not authorize the update handoff." }
+  }
+  $parent = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
+  if ($parent -and -not $parent.WaitForExit(90000)) { throw "The Manager did not exit; replacement was cancelled." }
+  Start-Sleep -Milliseconds 500
   foreach ($stage in $stages) {
     Commit-VerifiedStage -Stage $stage
     $committed += $stage
   }
+  $replacementSucceeded = $true
 } catch {
+  if ($handoffFailed) { $handoffFailed.Set() | Out-Null }
   for ($index = $committed.Count - 1; $index -ge 0; $index--) {
-    try { Restore-CommittedStage -Stage $committed[$index] } catch {}
+    try { Restore-CommittedStage -Stage $committed[$index] }
+    catch { Write-Warning ("Rollback failed; preserve backup '{0}': {1}" -f $committed[$index].Backup, $_.Exception.Message) }
   }
   throw
 } finally {
+  foreach ($event in @($handoffReady, $handoffProceed, $handoffFailed)) {
+    if ($event) { $event.Dispose() }
+  }
   foreach ($stage in $stages) {
     Remove-UpdateArtifact -Path $stage.Temporary
-    Remove-UpdateArtifact -Path $stage.Backup
+    if ($replacementSucceeded) { Remove-UpdateArtifact -Path $stage.Backup }
   }
 }
 try {

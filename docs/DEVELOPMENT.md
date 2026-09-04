@@ -1,6 +1,6 @@
 # Development Guide
 
-Last reviewed: 2026-09-01
+Last reviewed: 2026-09-04
 
 This repo is a Windows-first .NET 10 WPF app. The app should stay easy to run
 from source, but end users should receive the published portable app or
@@ -29,12 +29,15 @@ For GitHub contributions, preserve existing worktree changes, use a feature
 branch, keep generated output and local state out of commits, and run the local
 gate below. Committing, pushing, opening a pull request, or publishing a release
 are separate actions that require the user's authorization. Public trusted
-releases must use the protected signed-release workflow; never label an
+releases must use the protected signed-release workflow. Unsigned community
+releases follow the manual process in UNSIGNED_RELEASE.md; never label an
 unsigned local artifact as signed or trusted.
 
-`main` requires a pull request, an up-to-date branch, resolved conversations,
-and the Build/test/publish, CodeQL, and dependency-review checks. Force pushes,
-deletion, and administrator bypass are disabled. Recovery procedure and release
+The required policy for `main` is a pull request, an up-to-date branch, resolved
+conversations, and the Build/test/publish, CodeQL, and dependency-review checks.
+Force pushes, deletion, and routine administrator bypass must be disabled.
+Verify the live repository settings before release; this document is not proof
+that the settings are currently applied. Recovery procedure and release
 authority are documented in [REPOSITORY_GOVERNANCE.md](REPOSITORY_GOVERNANCE.md).
 
 Before committing, inspect `git status --short` and make sure every intended
@@ -367,8 +370,9 @@ pass:
   architectural guardrails.
 - `docs/RELEASE_READINESS.md` for manual validation steps and latest verified
   command results.
-- GitHub release drafts for unreleased user-visible changes; do not keep
-  copy/paste release notes or internal working notes in the source tree.
+- GitHub release drafts for working user-visible changes. Final release notes
+  belong in `docs/releases/v<version>.md` before tagging; keep internal working
+  notes outside the source tree.
 - `AGENTS.md`, `agent.md`, and `docs/CONTROL_API.md` when an automation-facing
   field or operation changes; these are embedded release sidecars.
 - `Services/App/HelpCatalogService.cs` for concise Help topics and search terms,

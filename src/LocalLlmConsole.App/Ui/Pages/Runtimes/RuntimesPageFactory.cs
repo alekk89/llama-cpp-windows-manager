@@ -7,6 +7,7 @@ using WpfApplication = System.Windows.Application;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
 using WpfComboBox = System.Windows.Controls.ComboBox;
+using Control = System.Windows.Controls.Control;
 
 namespace LocalLlmConsole;
 
@@ -14,6 +15,7 @@ public sealed record RuntimesPageActions(
     Func<Task> ChooseRuntimeFolderAsync,
     Func<Task> ChangeCudaPackagePreferenceAsync,
     Func<RuntimeRecord, Task> ToggleRuntimeFavoriteAsync,
+    Func<RuntimeRecord, Task> ToggleDefaultRuntimeAsync,
     RoutedEventHandler VerifyRuntimeRowClick,
     RoutedEventHandler DeleteRuntimeRowClick,
     RoutedEventHandler RuntimeSourceRowClick,
@@ -142,6 +144,7 @@ public static class RuntimesPageFactory
             (Loc.T("Runtimes.Col.State"), nameof(RuntimeCatalogRow.State), .55),
             (Loc.T("Runtimes.Col.Location"), nameof(RuntimeCatalogRow.Location), 3));
         grid.RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.Collapsed;
+        ApplyDefaultRuntimeStyle(grid);
         grid.RowDetailsTemplate = PageSectionFactory.RowDetailsTemplate(nameof(RuntimeCatalogRow.Details));
         grid.Columns.Insert(0, RuntimeDetailsColumn());
         grid.Columns.Insert(1, SelectorFavoriteGridColumn.Create<RuntimeCatalogRow>(row =>
@@ -149,7 +152,7 @@ public static class RuntimesPageFactory
         grid.LoadingRow += (_, args) => args.Row.DetailsVisibility = args.Row.Item is RuntimeCatalogRow { IsDetailsExpanded: true }
             ? Visibility.Visible
             : Visibility.Collapsed;
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.Col.Trust"), nameof(RuntimeCatalogRow.VerifyAction), nameof(RuntimeCatalogRow.CanVerify), request.Actions.VerifyRuntimeRowClick, .62, tooltipBinding: nameof(RuntimeCatalogRow.VerifyToolTip));
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.Col.Trust"), nameof(RuntimeCatalogRow.VerifyAction), nameof(RuntimeCatalogRow.CanVerify), request.Actions.VerifyRuntimeRowClick, .62, tooltipBinding: nameof(RuntimeCatalogRow.VerifyToolTip), compactContent: "\uE73E", compactFontFamily: "Segoe MDL2 Assets");
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.ActionButton"), nameof(RuntimeCatalogRow.DeleteAction), nameof(RuntimeCatalogRow.CanDelete), request.Actions.DeleteRuntimeRowClick, .65, tooltipBinding: nameof(RuntimeCatalogRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         PageSectionFactory.ApplyGridTextMargin(grid, new Thickness(6, 0, 6, 0));
         request.Actions.ConfigureRuntimeGridColumnSizing(grid);
@@ -160,6 +163,12 @@ public static class RuntimesPageFactory
                 row => row.IsFavorite,
                 row => row.Runtime is not null,
                 row => request.Actions.ToggleRuntimeFavoriteAsync(row.Runtime!)),
+            new(row => Loc.T(((RuntimeCatalogRow)row).IsDefaultRuntime ? "Runtimes.ClearDefault" : "Runtimes.SetDefault"),
+                row => row is RuntimeCatalogRow { Runtime: { } runtime } catalogRow
+                    && (catalogRow.IsDefaultRuntime || RuntimeAvailabilityService.IsAvailable(runtime)),
+                row => request.Actions.ToggleDefaultRuntimeAsync(((RuntimeCatalogRow)row).Runtime!),
+                IsVisible: row => row is RuntimeCatalogRow { Runtime: not null },
+                ToolTip: _ => Loc.T("Runtimes.DefaultHint")),
             new(row => ((RuntimeCatalogRow)row).VerifyAction,
                 row => row is RuntimeCatalogRow { CanVerify: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(request.Actions.VerifyRuntimeRowClick, row),
@@ -170,6 +179,23 @@ public static class RuntimesPageFactory
                 SeparatorBefore: true,
                 ToolTip: row => ((RuntimeCatalogRow)row).DeleteToolTip));
         return grid;
+    }
+
+    private static void ApplyDefaultRuntimeStyle(DataGrid grid)
+    {
+        var style = new Style(typeof(DataGridRow), grid.RowStyle ?? (Style)WpfApplication.Current.FindResource(typeof(DataGridRow)));
+        var trigger = new DataTrigger
+        {
+            Binding = new System.Windows.Data.Binding(nameof(RuntimeCatalogRow.IsDefaultRuntime)),
+            Value = true
+        };
+        trigger.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("AccentSoft")));
+        trigger.Setters.Add(new Setter(Control.BorderBrushProperty, new DynamicResourceExtension("Accent")));
+        trigger.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(3, 0, 0, 0)));
+        trigger.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+        trigger.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, Loc.T("Runtimes.DefaultHint")));
+        style.Triggers.Add(trigger);
+        grid.RowStyle = style;
     }
 
     private static DataGridTemplateColumn RuntimeDetailsColumn()
@@ -215,9 +241,9 @@ public static class RuntimesPageFactory
             (Loc.T("Runtimes.Col.Local"), nameof(RuntimePackagePresetRow.LocalStatus), .78),
             (Loc.T("Runtimes.Col.LatestRelease"), nameof(RuntimePackagePresetRow.LatestRelease), 1.2),
             (Loc.T("Runtimes.Col.Assets"), nameof(RuntimePackagePresetRow.Assets), 2.35));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.BuildFromSourceTitle"), nameof(RuntimePackagePresetRow.BuildSourceAction), nameof(RuntimePackagePresetRow.CanBuildSource), request.Actions.RuntimeSourceRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.BuildSourceToolTip));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.ActionBtn.Install"), nameof(RuntimePackagePresetRow.InstallAction), nameof(RuntimePackagePresetRow.CanInstall), request.Actions.InstallRuntimePackageRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.InstallToolTip));
-        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.ActionBtn.Update"), nameof(RuntimePackagePresetRow.CheckAction), nameof(RuntimePackagePresetRow.CanCheck), request.Actions.CheckRuntimePackageUpdateRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.CheckToolTip));
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.BuildFromSourceTitle"), nameof(RuntimePackagePresetRow.BuildSourceAction), nameof(RuntimePackagePresetRow.CanBuildSource), request.Actions.RuntimeSourceRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.BuildSourceToolTip), compactContent: "\uE90F", compactFontFamily: "Segoe MDL2 Assets");
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.ActionBtn.Install"), nameof(RuntimePackagePresetRow.InstallAction), nameof(RuntimePackagePresetRow.CanInstall), request.Actions.InstallRuntimePackageRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.InstallToolTip), compactContent: "\uE896", compactFontFamily: "Segoe MDL2 Assets");
+        PageSectionFactory.AddButtonColumn(grid, Loc.T("Runtimes.ActionBtn.Update"), nameof(RuntimePackagePresetRow.CheckAction), nameof(RuntimePackagePresetRow.CanCheck), request.Actions.CheckRuntimePackageUpdateRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.CheckToolTip), compactContent: "\uE72C", compactFontFamily: "Segoe MDL2 Assets");
         PageSectionFactory.AddButtonColumn(grid, Loc.T("Common.DeleteButton"), nameof(RuntimePackagePresetRow.DeleteAction), nameof(RuntimePackagePresetRow.CanDelete), request.Actions.DeleteRuntimePackageRowClick, .75, tooltipBinding: nameof(RuntimePackagePresetRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         PageSectionFactory.ApplyGridTextMargin(grid, new Thickness(6, 0, 6, 0));
         request.Actions.ConfigureRuntimeBuildGridColumnSizing(grid);

@@ -115,7 +115,7 @@ public static class BenchmarkSpeedReportService
     {
         var promptRates = rows.Select(row => row.AveragePromptTokensPerSecond).Where(rate => rate > 0).ToArray();
         return new AverageTest(
-            rows[0],
+            rows[0] with { GpuMemoryPeaks = BenchmarkGpuMemoryService.Merge(rows.SelectMany(row => row.GpuMemoryPeaks ?? [])) },
             rows.Average(row => row.AverageTokensPerSecond),
             promptRates.Length == 0 ? 0 : promptRates.Average());
     }
@@ -125,7 +125,7 @@ public static class BenchmarkSpeedReportService
         if (result.ExecutionMode == BenchmarkExecutionMode.ProfileServing)
         {
             var profile = string.IsNullOrWhiteSpace(result.ProfileName) ? "Saved profile" : result.ProfileName;
-            var memory = result.ObservedGpuMemoryUsedMiB > 0 ? $" · VRAM {result.ObservedGpuMemoryUsedMiB:N0} MiB" : "";
+            var memory = " · " + BenchmarkMemoryReportService.Label(result);
             return $"{profile} · {result.PromptTokens}/{result.GenerationTokens} tokens · ctx {result.ContextSize} · batch {result.BatchSize} · concurrency {result.Concurrency}{memory}";
         }
 
@@ -144,6 +144,7 @@ public static class BenchmarkSpeedReportService
                 : $"{result.SplitMode} {result.TensorSplit}");
         if (!string.IsNullOrWhiteSpace(result.FlashAttention)) parts.Add($"flash {result.FlashAttention}");
         if (!string.IsNullOrWhiteSpace(result.CacheTypeK)) parts.Add($"cache {result.CacheTypeK}");
+        parts.Add(BenchmarkMemoryReportService.Label(result));
         return string.Join(" · ", parts);
     }
 

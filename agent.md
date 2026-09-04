@@ -44,10 +44,15 @@ llwmctl benchmarks schema
 llwmctl benchmarks list
 ```
 
-The UI calls `fontScalePercent` **Text scale**. Favorite selectors,
+The UI calls `fontScalePercent` **Text scale**. The default runtime, favorite selectors,
 startup-profile selections, and remembered visual layouts are currently
 UI-managed preferences; do not edit SQLite or automate WPF controls to change
 them.
+
+Set `gatewayAutoLoadModels=false` to keep the gateway listening while serving
+only loaded profiles. Unloaded requests return `503 model_not_loaded` without
+loading or swapping sessions. Manual lifecycle commands and idle retention
+remain independent.
 
 Before running a benchmark, inspect `benchmarks schema`, validate the plan, run
 `self` and `sessions list`, and use a dry run. A real benchmark requires explicit
@@ -56,6 +61,8 @@ setting allow it. The CLI's self-stop protection still applies.
 
 Saved profiles may set `host`, but non-loopback binding remains gated by the
 application's direct-model LAN access policy.
+Profiles without a saved `host` inherit the app host default; explicit loopback
+addresses remain overrides. Endpoint probes use the effective listener address.
 
 Run `self` before any action that can stop or replace a loaded model. Never use
 `--allow-self-stop` or `--confirm` without explicit authorization for the stated

@@ -181,6 +181,18 @@ public abstract partial class WpfUiTestBase
         });
         Assert.Equal(1, applyRequests);
         applyRequests = 0;
+        var gatewayAutoLoad = Assert.Single(networkSettingsGrid.ItemsSource.Cast<EditableSettingRow>(),
+            row => row.Key == "gatewayAutoLoadModels");
+        Assert.Equal("Auto-load models", gatewayAutoLoad.Label);
+        Assert.Equal(new[] { "Yes", "No" }, gatewayAutoLoad.Options);
+        Assert.Equal(AppPreferenceService.YesNoLabel(persistedSettings.GatewayAutoLoadModels), gatewayAutoLoad.Value);
+        var gatewayAutoLoadCombo = Assert.Single(VisualDescendants<ComboBox>(settingsControls.Root),
+            combo => ReferenceEquals(combo.DataContext, gatewayAutoLoad));
+        gatewayAutoLoadCombo.SelectedItem = "No";
+        Assert.Equal("No", gatewayAutoLoad.Value);
+        Assert.True(applyRequests > 0);
+        gatewayAutoLoadCombo.SelectedItem = "Yes";
+        applyRequests = 0;
         Assert.Contains(VisualDescendants<TextBox>(settingsControls.Root), textBox =>
             textBox.Height == 28
             && textBox.MinHeight == 28

@@ -28,6 +28,7 @@ public sealed class LaunchSettingsFormControls
     public WpfTextBox? GpuDevicesBox => Text(nameof(AppSettings.GpuDevices));
     public WpfTextBox? GpuSplitBox => Text(nameof(AppSettings.GpuSplit));
     public WpfTextBox? TensorBufferOverridesBox => Text(nameof(AppSettings.TensorBufferOverrides));
+    public WpfTextBox? VulkanAllocationBlockSizeBox => Text(nameof(AppSettings.VulkanAllocationBlockSizeMiB));
     public WpfTextBox? ParallelSlotsBox => Text(nameof(AppSettings.ParallelSlots));
     public WpfTextBox? BatchSizeBox => Text(nameof(AppSettings.BatchSize));
     public WpfTextBox? MicroBatchSizeBox => Text(nameof(AppSettings.MicroBatchSize));
@@ -94,7 +95,7 @@ public sealed class LaunchSettingsFormControls
 
     public IEnumerable<WpfTextBox?> TextBoxes =>
     [
-        LaunchPortBox, HostBox, ContextSizeBox, GpuLayersBox, GpuDevicesBox, GpuSplitBox, TensorBufferOverridesBox, ParallelSlotsBox, BatchSizeBox, MicroBatchSizeBox,
+        LaunchPortBox, HostBox, ContextSizeBox, GpuLayersBox, GpuDevicesBox, GpuSplitBox, TensorBufferOverridesBox, VulkanAllocationBlockSizeBox, ParallelSlotsBox, BatchSizeBox, MicroBatchSizeBox,
         ThreadsBox, ReasoningBudgetBox, ReasoningBudgetMessageBox, VisionProjectorPathBox, VisionImageMinTokensBox, VisionImageMaxTokensBox,
         TemperatureBox, TopKBox, TopPBox, MinPBox, MaxTokensBox, SeedBox, RepeatLastNBox,
         RepeatPenaltyBox, PresencePenaltyBox, FrequencyPenaltyBox, RopeScaleBox, RopeFreqBaseBox,
@@ -126,6 +127,7 @@ public static class LaunchSettingsFormBinder
             GpuDevices = controls.GpuDevicesBox?.Text.Trim() ?? "",
             GpuSplit = controls.GpuSplitBox?.Text.Trim() ?? "",
             TensorBufferOverrides = controls.TensorBufferOverridesBox?.Text.Trim() ?? "",
+            VulkanAllocationBlockSizeMiB = ReadVulkanAllocation(controls.VulkanAllocationBlockSizeBox, baseSettings.VulkanAllocationBlockSizeMiB),
             ParallelSlots = ReadInt(controls.ParallelSlotsBox, "Parallel slots", min: 1),
             BatchSize = ReadInt(controls.BatchSizeBox, "Batch size", min: 1),
             MicroBatchSize = ReadInt(controls.MicroBatchSizeBox, "Micro batch size", min: 1),
@@ -197,6 +199,8 @@ public static class LaunchSettingsFormBinder
         SetText(controls.GpuDevicesBox, settings.GpuDevices);
         SetText(controls.GpuSplitBox, settings.GpuSplit);
         SetText(controls.TensorBufferOverridesBox, settings.TensorBufferOverrides);
+        SetText(controls.VulkanAllocationBlockSizeBox, settings.VulkanAllocationBlockSizeMiB == 0
+            ? Loc.T("Launch.RuntimeDefault") : settings.VulkanAllocationBlockSizeMiB.ToString(CultureInfo.InvariantCulture));
         SetText(controls.ParallelSlotsBox, settings.ParallelSlots);
         SetText(controls.BatchSizeBox, settings.BatchSize);
         SetText(controls.MicroBatchSizeBox, settings.MicroBatchSize);
@@ -316,6 +320,14 @@ public static class LaunchSettingsFormBinder
 
     private static int ReadContextSize(WpfTextBox? box)
         => LaunchSettingParser.ReadContextSize(box?.Text.Trim() ?? "");
+
+    private static int ReadVulkanAllocation(WpfTextBox? box, int fallback)
+    {
+        if (box is null) return fallback;
+        var text = box.Text.Trim();
+        return text.Length == 0 || text.Equals(Loc.T("Launch.RuntimeDefault"), StringComparison.OrdinalIgnoreCase)
+            ? 0 : ReadInt(box, "Vulkan allocation block size (MiB)", min: 0);
+    }
 
     private static int ReadInt(WpfTextBox? box, string label, int min, int? max = null)
         => LaunchSettingParser.ReadInt(box?.Text.Trim() ?? "", label, min, max);

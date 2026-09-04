@@ -174,7 +174,7 @@ jobs:
         shell: pwsh
         run: >-
           .\scripts\test-portable-update.ps1
-          -CandidateArchivePath "dist/LlamaCppWindowsManager-win-x64.zip"
+          -CandidateExePath "dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe"
           -ManifestPath "dist/release/release-manifest.json"
           -SignaturePath "dist/release/release-manifest.json.sig"
           -ManifestPublicKeySpki "$env:RELEASE_MANIFEST_PUBLIC_KEY_SPKI"
@@ -187,7 +187,6 @@ jobs:
           subject-path: |
             dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe
             dist/LlamaCppWindowsManager-win-x64/llwmctl.exe
-            dist/LlamaCppWindowsManager-win-x64.zip
             dist/installer/LlamaCppWindowsManager-Setup-${{ steps.identity.outputs.version }}-win-x64.exe
             dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json
             dist/release/release-manifest.json
@@ -207,8 +206,6 @@ jobs:
             "dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe.sha256",
             "dist/LlamaCppWindowsManager-win-x64/llwmctl.exe",
             "dist/LlamaCppWindowsManager-win-x64/llwmctl.exe.sha256",
-            "dist/LlamaCppWindowsManager-win-x64.zip",
-            "dist/LlamaCppWindowsManager-win-x64.zip.sha256",
             "dist/installer/LlamaCppWindowsManager-Setup-$version-win-x64.exe",
             "dist/installer/LlamaCppWindowsManager-Setup-$version-win-x64.exe.sha256",
             "dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json",
@@ -229,8 +226,6 @@ jobs:
             dist/LlamaCppWindowsManager-win-x64/LlamaCppWindowsManager.exe.sha256
             dist/LlamaCppWindowsManager-win-x64/llwmctl.exe
             dist/LlamaCppWindowsManager-win-x64/llwmctl.exe.sha256
-            dist/LlamaCppWindowsManager-win-x64.zip
-            dist/LlamaCppWindowsManager-win-x64.zip.sha256
             dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe
             dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe.sha256
             dist/LlamaCppWindowsManager-win-x64/sbom.spdx.json

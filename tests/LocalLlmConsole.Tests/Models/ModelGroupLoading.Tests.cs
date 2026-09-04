@@ -58,6 +58,60 @@ public sealed class ModelGroupLoadingTests : ManagerRegressionTestBase
     }
 
     [Fact]
+    public async Task OverviewGroupLoadKeepsThreeGpuProfilesOfTheSameModelIndependent()
+    {
+        var root = CreateTempRoot();
+        var runtime = Runtime(root, "cuda", RuntimeBackend.Cuda);
+        var defaults = AppSettings.CreateDefault(root) with { ContextSize = 4096, GpuLayers = 999 };
+        var model = Model(root, "model-a", 2L * 1024 * 1024);
+        var profiles = Enumerable.Range(0, 3).Select(index =>
+            Profile(model, runtime, 8091 + index, defaults with { GpuDevices = $"CUDA{index}" }) with
+            {
+                Id = $"profile:model-a:gpu-{index}",
+                Name = $"GPU {index}"
+            }).ToArray();
+        var group = Group("Three GPUs");
+        var planner = new OverviewModelGroupLoadPlanningService();
+        var plan = planner.Plan(
+            group, Snapshot(group, profiles), profiles, [model], [runtime], [], defaults,
+            new VramMemorySnapshot(60, 72));
+
+        Assert.True(plan.CanLoad);
+        var starts = new List<(string ModelId, string ProfileId, string Device, int Port)>();
+        var stops = new List<string>();
+        var started = await new OverviewModelGroupLoadApplicationService().ExecuteAsync(
+            plan, [], [model], [runtime],
+            new OverviewModelGroupLoadApplicationActions(
+                (sessionId, _) =>
+                {
+                    stops.Add(sessionId);
+                    return Task.CompletedTask;
+                },
+                (_, loadedModel, settings, profileId, _, _) =>
+                {
+                    starts.Add((loadedModel.Id, profileId, settings.GpuDevices, settings.Port));
+                    return Task.FromResult(true);
+                }),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, started);
+        Assert.Empty(stops);
+        Assert.Equal(
+            profiles.Select(profile => (model.Id, profile.Id, profile.Settings.GpuDevices, profile.Settings.Port)),
+            starts);
+
+        var conflicting = profiles.Select(profile => profile with
+        {
+            Settings = profile.Settings with { Port = 8091 }
+        }).ToArray();
+        var invalid = planner.Plan(
+            group, Snapshot(group, conflicting), conflicting, [model], [runtime], [], defaults,
+            new VramMemorySnapshot(60, 72));
+        Assert.False(invalid.CanLoad);
+        Assert.Contains(invalid.Errors, error => error.Contains("assigns port 8091", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void OverviewModelChoicesIncludeLoadableGroupsAfterPhysicalModels()
     {
         var root = CreateTempRoot();

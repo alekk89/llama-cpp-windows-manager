@@ -20,6 +20,9 @@ public sealed class AppSettingsUpdateService
         var current = request.CurrentSettings;
         var values = request.Values;
         string V(string key, string fallback) => values.TryGetValue(key, out var value) ? value : fallback;
+        string aliasSuffix;
+        try { aliasSuffix = RuntimeDirectAliasService.ValidateSuffix(V("directModelAliasSuffix", current.DirectModelAliasSuffix)); }
+        catch (InvalidOperationException ex) { return Fail(current, ex.Message); }
 
         var accessMode = AppPreferenceService.ModelAccessMode(V("modelAccessMode", current.ModelAccessMode));
         var requireApiKeyAuth = AppPreferenceService.EnableDisableValue(
@@ -76,6 +79,8 @@ public sealed class AppSettingsUpdateService
 
         var updated = current with
         {
+            DirectModelAliasSuffix = aliasSuffix,
+            SameModelLoadPolicy = AppPreferenceService.SameModelLoadPolicy(V("sameModelLoadPolicy", current.SameModelLoadPolicy)),
             WorkspaceRoot = request.WorkspaceRoot,
             ThemeMode = AppPreferenceService.ThemeMode(request.ThemeMode),
             MinimizeBehavior = AppPreferenceService.MinimizeBehavior(V("minimizeBehavior", current.MinimizeBehavior)),
@@ -88,6 +93,9 @@ public sealed class AppSettingsUpdateService
                 current.DeleteRuntimeSourceAfterSuccessfulBuild),
             ModelAccessMode = accessMode,
             AutoLoadGatewayEnabled = autoLoadGatewayEnabled,
+            GatewayAutoLoadModels = AppPreferenceService.YesNoValue(
+                V("gatewayAutoLoadModels", AppPreferenceService.YesNoLabel(current.GatewayAutoLoadModels)),
+                current.GatewayAutoLoadModels),
             AutoLoadGatewayPort = autoLoadGatewayPort,
             AutoLoadGatewayPolicy = AppPreferenceService.GatewaySwapPolicy(
                 V("autoLoadGatewayPolicy", AppPreferenceService.GatewaySwapPolicyLabel(current.AutoLoadGatewayPolicy))),

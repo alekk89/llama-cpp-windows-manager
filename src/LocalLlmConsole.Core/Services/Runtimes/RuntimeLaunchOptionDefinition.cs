@@ -60,11 +60,17 @@ public static class RuntimeLaunchOptionPolicy
 
     public static bool IsAppManaged(string name) => ManagedNames.Contains(name);
 
+    private static bool IsProjectorOffloadSwitch(RuntimeLaunchOptionDefinition option)
+        => option.ValueKind == RuntimeLaunchOptionValueKind.Switch
+           && option.Aliases.Append(option.Name).All(name =>
+               name is "--mmproj-offload" or "--no-mmproj-offload");
+
     public static bool CanRender(RuntimeLaunchOptionDefinition option)
         => option.Name.StartsWith("--", StringComparison.Ordinal)
            && !option.Aliases.Any(IsAppManaged)
            && !option.Aliases.Any(UnsafeExactNames.Contains)
-           && !option.Aliases.Any(alias => UnsafeFragments.Any(fragment => alias.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+           && (IsProjectorOffloadSwitch(option)
+               || !option.Aliases.Any(alias => UnsafeFragments.Any(fragment => alias.Contains(fragment, StringComparison.OrdinalIgnoreCase))))
            && !UnsupportedDescriptionFragments.Any(fragment => option.Description.Contains(fragment, StringComparison.OrdinalIgnoreCase));
 
     public static void ValidateCustomArguments(IReadOnlyList<string> arguments)

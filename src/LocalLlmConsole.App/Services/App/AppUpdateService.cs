@@ -48,6 +48,7 @@ public sealed partial class AppUpdateService : IDisposable
     private readonly IAppUpdateSignatureVerifier _signatureVerifier;
     private readonly bool _ownsHttpClient;
     private readonly string _currentVersion;
+    private readonly bool _allowUnsignedUpdates;
     private readonly Queue<AppUpdateVerificationDiagnostic> _diagnostics = [];
     private readonly object _diagnosticSync = new();
 
@@ -58,12 +59,15 @@ public sealed partial class AppUpdateService : IDisposable
         IAppUpdateSignatureVerifier? signatureVerifier = null,
         Func<DateTimeOffset>? utcNow = null,
         bool ownsHttpClient = false,
-        Func<string>? currentVersion = null)
+        Func<string>? currentVersion = null,
+        bool? allowUnsignedUpdates = null)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _startProcess = startProcess ?? throw new ArgumentNullException(nameof(startProcess));
         _ownsHttpClient = ownsHttpClient;
         _currentVersion = (currentVersion ?? CurrentVersionLabel)();
+        _allowUnsignedUpdates = allowUnsignedUpdates ??
+            (trustStore is null && !RequiresSignedUpdates());
         _manifestVerifier = new AppReleaseManifestVerifier(
             _http,
             trustStore ?? ReleaseManifestTrustStore.FromAssembly(typeof(AppUpdateService).Assembly),
@@ -101,7 +105,9 @@ public sealed partial class AppUpdateService : IDisposable
         try
         {
             var update = await CheckLatestCoreAsync(cancellationToken);
-            RecordDiagnostic("LLWM-UPDATE-CHECK", "success", update.IsAvailable ? "verified-update-available" : "no-update");
+            RecordDiagnostic("LLWM-UPDATE-CHECK", "success", update.IsAvailable
+                ? update.AuthenticityVerified ? "verified-update-available" : "unsigned-update-available"
+                : "no-update");
             return update;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -128,6 +134,13 @@ public sealed partial class AppUpdateService : IDisposable
             ?? throw AppUpdateVerificationException.Trust("GitHub did not return a release object.");
         var preliminary = AppUpdateReleaseParser.ParseLatestRelease(json, _currentVersion);
         if (!preliminary.IsAvailable) return preliminary;
+        if (_allowUnsignedUpdates && !HasManifestAssets(json))
+        {
+            if (json["draft"]?.GetValue<bool>() == true || json["prerelease"]?.GetValue<bool>() == true)
+                throw AppUpdateVerificationException.Trust("Stable updates cannot install a draft or prerelease.");
+            ValidateUnsignedUpdate(preliminary);
+            return preliminary;
+        }
         var verifiedManifest = await _manifestVerifier.DownloadAndVerifyAsync(json, cancellationToken);
         return AppUpdateReleaseParser.ParseVerifiedLatestRelease(json, _currentVersion, verifiedManifest);
     }
@@ -137,7 +150,8 @@ public sealed partial class AppUpdateService : IDisposable
         try
         {
             var plan = await StageInstallCoreAsync(update, workspaceRoot, currentExecutablePath, cancellationToken);
-            RecordDiagnostic("LLWM-UPDATE-STAGED", "success", "asset-and-publisher-verified");
+            RecordDiagnostic("LLWM-UPDATE-STAGED", "success", update.AuthenticityVerified
+                ? "asset-and-publisher-verified" : "checksum-verified-unsigned");
             return plan;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
@@ -151,11 +165,12 @@ public sealed partial class AppUpdateService : IDisposable
     {
         if (!update.IsAvailable)
             throw AppUpdateVerificationException.Trust("The selected release is not newer than the installed application.");
-        if (!update.AuthenticityVerified)
+        if (!update.AuthenticityVerified && !_allowUnsignedUpdates)
             throw AppUpdateVerificationException.Manifest("Stable updates require a verified signed release manifest. Checksum-only update installation is not allowed.");
-        if (!string.Equals(update.ReleaseChannel, "stable", StringComparison.Ordinal) ||
+        if (!update.AuthenticityVerified) ValidateUnsignedUpdate(update);
+        if (update.AuthenticityVerified && (!string.Equals(update.ReleaseChannel, "stable", StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(update.ManifestKeyId) ||
-            string.IsNullOrWhiteSpace(update.ExpectedWindowsPublisher))
+            string.IsNullOrWhiteSpace(update.ExpectedWindowsPublisher)))
         {
             throw AppUpdateVerificationException.Manifest("Verified stable-update trust metadata is incomplete.");
         }
@@ -179,7 +194,7 @@ public sealed partial class AppUpdateService : IDisposable
 
         var safeVersion = RegexSafeFileName(update.LatestVersion);
         var updateRoot = Path.Combine(workspaceRoot, "cache", "app-updates");
-        var stageRoot = Path.Combine(updateRoot, safeVersion);
+        var stageRoot = Path.Combine(updateRoot, safeVersion, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(stageRoot);
 
         var assetPath = Path.Combine(stageRoot, RegexSafeFileName(update.AssetName));
@@ -190,9 +205,10 @@ public sealed partial class AppUpdateService : IDisposable
         var stagedFiles = await Task.Run(() =>
         {
             var executable = PreparePortableExe(assetPath, stageRoot);
-            _signatureVerifier.Verify(executable, update.ExpectedWindowsPublisher, requestedTargetExe);
+            if (update.AuthenticityVerified)
+                _signatureVerifier.Verify(executable, update.ExpectedWindowsPublisher, requestedTargetExe);
             var controlCli = FindStagedControlCli(executable);
-            if (!string.IsNullOrWhiteSpace(controlCli))
+            if (update.AuthenticityVerified && !string.IsNullOrWhiteSpace(controlCli))
                 _signatureVerifier.Verify(controlCli, update.ExpectedWindowsPublisher, executable);
             return (Executable: executable, ControlCli: controlCli);
         }, cancellationToken);
@@ -249,35 +265,6 @@ public sealed partial class AppUpdateService : IDisposable
         return "LLWM-UPDATE-TRUST";
     }
 
-    public void StartInstaller(AppUpdateInstallPlan plan, int currentProcessId)
-    {
-        var psi = new ProcessStartInfo(HostExecutableResolver.WindowsPowerShellExe())
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
-            WorkingDirectory = Path.GetDirectoryName(plan.TargetExe) ?? AppContext.BaseDirectory
-        };
-        foreach (var arg in new[]
-        {
-            "-NoProfile", "-ExecutionPolicy", "Bypass", "-Scope", "Process", "-File", plan.ScriptPath,
-            "-ParentPid", currentProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "-SourceExe", plan.SourceExe,
-            "-TargetExe", plan.TargetExe,
-            "-ObsoleteExe", plan.ObsoleteExe,
-            "-SourceCli", plan.SourceCli,
-            "-TargetCli", plan.TargetCli,
-            "-NoticeSource", Path.Combine(Path.GetDirectoryName(plan.ScriptPath) ?? "", "installed-update.json"),
-            "-NoticeTarget", plan.NoticePath,
-            "-WorkingDirectory", Path.GetDirectoryName(plan.TargetExe) ?? AppContext.BaseDirectory
-        })
-        {
-            psi.ArgumentList.Add(arg);
-        }
-
-        _startProcess(psi);
-    }
-
     public static async Task<InstalledUpdateNotice?> TryConsumeInstalledNoticeAsync(string workspaceRoot, CancellationToken cancellationToken = default)
     {
         var path = PendingNoticePath(workspaceRoot);
@@ -307,7 +294,7 @@ public sealed partial class AppUpdateService : IDisposable
     private async Task DownloadAssetAsync(string assetUrl, string destination, long expectedBytes, CancellationToken cancellationToken)
     {
         if (expectedBytes <= 0)
-            throw AppUpdateVerificationException.Asset("The signed update manifest did not provide a valid asset size.");
+            throw AppUpdateVerificationException.Asset("The release did not provide a valid asset size.");
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, assetUrl);

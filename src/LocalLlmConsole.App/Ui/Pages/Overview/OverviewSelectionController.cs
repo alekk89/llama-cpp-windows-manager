@@ -158,7 +158,7 @@ public sealed class OverviewSelectionController
             apiKey = settings.ModelApiKey;
             report = await _runtime.EndpointInspection.InspectGatewayAsync(
                 settings,
-                AppPreferenceService.GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy),
+                AppPreferenceService.GatewayPolicyLabel(settings),
                 AppPreferenceService.ModelAccessModeLabel(settings.ModelAccessMode));
         }
         else

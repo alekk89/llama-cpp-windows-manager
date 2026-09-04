@@ -267,7 +267,7 @@ public sealed class GatewayModelLoadingTests : ManagerRegressionTestBase
         Assert.True(started.Started);
         Assert.Same(started, currentGateway);
         Assert.True(result.GatewayStarted);
-        Assert.Contains("Auto-load gateway listening at http://127.0.0.1:8099/v1.", calls);
+        Assert.Contains($"Gateway listening at http://127.0.0.1:8099/v1. {AppPreferenceService.GatewayPolicyLabel(settings)}.", calls);
         Assert.Contains("status", calls);
 
         var disabled = settings with { AutoLoadGatewayEnabled = false };

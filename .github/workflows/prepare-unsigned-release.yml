@@ -1,0 +1,70 @@
+name: Prepare unsigned release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-unsigned-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout selected main commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Install pinned Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Pinned Inno Setup installation failed." }
+          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) { $compiler = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path -LiteralPath $compiler)) { throw "Inno Setup was not found." }
+          "path=$compiler" >> $env:GITHUB_OUTPUT
+      - name: Complete unsigned release gate
+        shell: pwsh
+        run: >-
+          .\scripts\test-release-gate.ps1 -RequireCleanTree -IncludePublish -IncludeInstaller
+          -ReleaseChannel stable -RepositoryCommit "${{ github.sha }}"
+          -InnoSetupPath "${{ steps.inno.outputs.path }}"
+      - name: Verify pinned installer upgrade
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem .\dist\installer\LlamaCppWindowsManager-Setup-*-win-x64.exe -File)
+          if ($installer.Count -ne 1) { throw "Expected exactly one installer." }
+          .\scripts\test-previous-version-upgrade.ps1 -CandidateInstallerPath $installer[0].FullName
+      - name: Verify standalone EXE update
+        shell: pwsh
+        run: .\scripts\test-portable-update.ps1 -CandidateExePath .\dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe
+      - name: Stage release assets
+        id: stage
+        shell: pwsh
+        run: |
+          .\scripts\stage-unsigned-release.ps1
+          $folder = @(Get-ChildItem .\dist\unsigned-v* -Directory)
+          if ($folder.Count -ne 1) { throw "Expected one release asset folder." }
+          "tag=$($folder[0].Name.Substring('unsigned-'.Length))" >> $env:GITHUB_OUTPUT
+          "Unsigned release prepared from commit ${{ github.sha }}. Review this successful run before tagging and publishing." >> $env:GITHUB_STEP_SUMMARY
+      - name: Upload four assets and release notes for review
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: unsigned-release-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/unsigned-v*/*
+            docs/releases/${{ steps.stage.outputs.tag }}.md

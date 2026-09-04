@@ -254,6 +254,13 @@ CREATE TABLE IF NOT EXISTS ui_layout_state (
   layout_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+"""),
+        new(15, "default-runtime", """
+CREATE TABLE IF NOT EXISTS default_runtime (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  runtime_id TEXT NOT NULL,
+  FOREIGN KEY(runtime_id) REFERENCES runtimes(id) ON DELETE CASCADE
+);
 """)
     ];
 

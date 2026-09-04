@@ -64,6 +64,13 @@ public sealed class GatewayActivityStatusTracker
         }
 
         var endpoint = RuntimeEndpointService.GatewayEndpointDisplay(settings);
+        if (!settings.GatewayAutoLoadModels)
+        {
+            return new GatewayActivityStatusSnapshot(
+                $"Gateway: {(gatewayListening ? "listening" : "not listening")} at {endpoint} | Policy: {AppPreferenceService.GatewayPolicyLabel(settings)}",
+                Loc.T("Tooltip.Gateway.LoadedOnly"),
+                GatewayStatusVisualKind.Normal);
+        }
         if (HasActivity)
         {
             var elapsed = DisplayFormatService.Elapsed(now - _startedAt);
@@ -83,7 +90,7 @@ public sealed class GatewayActivityStatusTracker
         }
 
         var state = gatewayListening ? "listening" : "not listening";
-        var policy = AppPreferenceService.GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy);
+        var policy = AppPreferenceService.GatewayPolicyLabel(settings);
         return new GatewayActivityStatusSnapshot(
             $"Gateway: {state} at {endpoint} | Policy: {policy}",
             "The shared OpenAI-compatible endpoint can auto-load the requested registered model. Direct per-model endpoints remain available for loaded sessions.",

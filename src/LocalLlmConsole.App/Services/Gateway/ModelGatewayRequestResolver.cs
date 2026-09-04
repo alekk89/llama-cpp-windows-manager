@@ -46,6 +46,7 @@ public static class ModelGatewayRequestResolver
         if (string.IsNullOrWhiteSpace(requested)) return null;
 
         var exact = models.FirstOrDefault(route => string.Equals(route.Id, requested, StringComparison.OrdinalIgnoreCase))
+            ?? models.FirstOrDefault(route => string.Equals(route.LegacyId, requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(route => string.Equals(route.Name, requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(route => string.Equals(route.Profile.Id, requested, StringComparison.OrdinalIgnoreCase));
         if (exact is not null) return exact;
@@ -67,5 +68,27 @@ public static class ModelGatewayRequestResolver
             ?? models.FirstOrDefault(model => string.Equals(model.Name, requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(model => string.Equals(Path.GetFileName(model.ModelPath), requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(model => string.Equals(Path.GetFileNameWithoutExtension(model.ModelPath), requested, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static byte[] BodyForRuntime(byte[] body, AppSettings launchSettings)
+    {
+        var aliases = RuntimeModelAliasService.ReadAliases(launchSettings.CustomParameters);
+        if (aliases.Count == 0 || aliases.Contains(ExtractRequestedModel(body), StringComparer.Ordinal)) return body;
+
+        // Gateway suffixes select profiles; llama-server only knows its configured aliases.
+        // Use the active session's settings, which may differ from a subsequently edited profile.
+        using var document = JsonDocument.Parse(body);
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.NameEquals("model")) writer.WriteString("model", aliases[0]);
+                else property.WriteTo(writer);
+            }
+            writer.WriteEndObject();
+        }
+        return stream.ToArray();
     }
 }

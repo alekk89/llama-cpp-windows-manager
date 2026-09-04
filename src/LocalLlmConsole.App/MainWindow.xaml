@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LocalLlmConsole"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="llama.cpp Windows Manager v2.6.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
+        Title="llama.cpp Windows Manager v2.7.0" MinWidth="900" MinHeight="600" Width="1200" Height="780"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" ResizeMode="CanResize"
         Background="{DynamicResource AppBack}"
@@ -58,7 +58,7 @@
                   CornerRadius="4"
                   VerticalAlignment="Center">
             <TextBlock x:Name="AppVersionText"
-                       Text="v2.6.0"
+                       Text="v2.7.0"
                        Foreground="{DynamicResource TextMuted}"
                        FontSize="10.5"
                        FontWeight="SemiBold"/>
@@ -124,25 +124,30 @@
                     Margin="0,12,0,0"/>
           </StackPanel>
           <!-- Navigation buttons -->
-          <StackPanel Grid.Row="1" VerticalAlignment="Top">
-            <Button x:Name="OverviewNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE80F;" Click="ShowOverview_Click"/>
-            <Button x:Name="ModelsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE8B7;" Click="ShowModels_Click"/>
-            <Button x:Name="RuntimesNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE943;" Click="ShowRuntimes_Click"/>
-            <Button x:Name="BenchmarksNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE9D2;" Click="ShowBenchmarks_Click"/>
-            <Button x:Name="SettingsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE713;" Click="ShowSettings_Click"/>
-            <Button x:Name="LifetimeNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE823;" Click="ShowLifetime_Click"/>
-            <Button x:Name="LogsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE8A5;" Click="ShowLogs_Click"/>
-            <Border Height="1"
-                    Background="{DynamicResource PanelBorder}"
-                    Margin="0,8,0,10"/>
-            <TextBlock x:Name="ToolsNavLabel"
-                       Foreground="{DynamicResource TextMuted}"
-                       FontSize="11"
-                       FontWeight="SemiBold"
-                       Margin="12,0,0,8"/>
-            <Button x:Name="WindowsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE782;" Click="ShowWindows_Click"/>
-            <Button x:Name="WslLinuxNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE756;" Click="ShowWslLinux_Click"/>
-          </StackPanel>
+          <ScrollViewer Grid.Row="1"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled"
+                        Focusable="False">
+            <StackPanel VerticalAlignment="Top">
+              <Button x:Name="OverviewNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE80F;" Click="ShowOverview_Click"/>
+              <Button x:Name="ModelsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE8B7;" Click="ShowModels_Click"/>
+              <Button x:Name="RuntimesNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE943;" Click="ShowRuntimes_Click"/>
+              <Button x:Name="BenchmarksNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE9D2;" Click="ShowBenchmarks_Click"/>
+              <Button x:Name="SettingsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE713;" Click="ShowSettings_Click"/>
+              <Button x:Name="LifetimeNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE823;" Click="ShowLifetime_Click"/>
+              <Button x:Name="LogsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE8A5;" Click="ShowLogs_Click"/>
+              <Border Height="1"
+                      Background="{DynamicResource PanelBorder}"
+                      Margin="0,8,0,10"/>
+              <TextBlock x:Name="ToolsNavLabel"
+                         Foreground="{DynamicResource TextMuted}"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Margin="12,0,0,8"/>
+              <Button x:Name="WindowsNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE782;" Click="ShowWindows_Click"/>
+              <Button x:Name="WslLinuxNavButton" Style="{StaticResource NavButton}" local:VisualRole.NavGlyph="&#xE756;" Click="ShowWslLinux_Click"/>
+            </StackPanel>
+          </ScrollViewer>
           <Border Grid.Row="3"
                   Background="{DynamicResource InputBack}"
                   BorderBrush="{DynamicResource PanelBorderStrong}"

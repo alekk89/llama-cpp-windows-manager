@@ -7,7 +7,7 @@ public static class LaunchArgumentText
 
     public static string Quote(string argument)
     {
-        if (argument.Length > 0 && !argument.Any(character => char.IsWhiteSpace(character) || character is '"' or '\\')) return argument;
+        if (argument.Length > 0 && !argument.Any(character => char.IsWhiteSpace(character) || character is '"' or '\\' or '\'')) return argument;
         return '"' + argument.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + '"';
     }
 }

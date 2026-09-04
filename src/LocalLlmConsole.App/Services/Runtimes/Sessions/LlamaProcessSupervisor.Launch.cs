@@ -2,7 +2,7 @@ namespace LocalLlmConsole.Services;
 
 public sealed partial class LlamaProcessSupervisor : IDisposable
 {
-    private ProcessStartInfo CreateProcessStartInfo(
+    internal ProcessStartInfo CreateProcessStartInfo(
         RuntimeRecord runtime,
         AppSettings settings,
         string executable,
@@ -12,6 +12,8 @@ public sealed partial class LlamaProcessSupervisor : IDisposable
             ? CreateWslStartInfo(runtime, settings, executable, arguments)
             : CreateNativeStartInfo(runtime, arguments);
         ConfigureSharedStartInfo(startInfo, runtime.Mode);
+        if (runtime.Mode == RuntimeMode.Native)
+            RuntimeVulkanEnvironment.ApplyNative(startInfo, runtime.Backend, settings.VulkanAllocationBlockSizeMiB);
         return startInfo;
     }
 
@@ -30,7 +32,8 @@ public sealed partial class LlamaProcessSupervisor : IDisposable
             ? ""
             : $" -a {BashQuote(_lastWslProcessMarker)}";
         var syclEnvironment = WslSyclEnvironmentPrefix(runtime.Backend);
-        var command = $"{syclEnvironment}export LD_LIBRARY_PATH={libraryPath}; "
+        var command = RuntimeVulkanEnvironment.WslPrefix(runtime.Backend, settings.VulkanAllocationBlockSizeMiB)
+                      + $"{syclEnvironment}export LD_LIBRARY_PATH={libraryPath}; "
                       + $"cd {BashQuote(string.IsNullOrWhiteSpace(executableDir) ? "/" : executableDir)}; "
                       + $"exec{argv0} {BashQuote(executable)} {string.Join(" ", arguments.Select(BashQuote))}";
         var startInfo = new ProcessStartInfo(HostExecutableResolver.WslExe());

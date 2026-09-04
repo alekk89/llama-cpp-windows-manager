@@ -1,11 +1,11 @@
 # Repository Governance
 
-Last reviewed: 2026-08-25
+Last reviewed: 2026-09-04
 
 ## Protected `main`
 
-The `main` branch accepts changes through pull requests. The repository requires
-these checks before merge:
+The required policy is for `main` to accept changes through pull requests with
+these checks before merge. Verify the live settings before release:
 
 - **Build, test, and publish**;
 - **Analyze C#**;
@@ -19,15 +19,22 @@ maintainer is available.
 
 ## Administrator bypass
 
-Administrator bypass is for recovery only: a GitHub service incident, a broken
-required check that cannot be rerun, or an urgent security correction. Before a
+Routine administrator bypass must be disabled. An exceptional recovery requires
+an explicitly authorized temporary policy change and restoration afterward.
+Examples are a GitHub service incident, a broken required check that cannot be
+rerun, or an urgent security correction. Before a
 bypass, record the reason in an issue. Afterward, open a follow-up pull request,
 run every omitted check, and link the successful run from the issue. Never use a
 bypass for routine feature delivery or to avoid a failing test.
 
 ## Release authority
 
-Stable releases originate from signed annotated `v*` tags that point to commits
+Unsigned community releases are permitted while signing is unavailable. They
+use the same protected-main PR and CI checks, an annotated version tag, the
+unsigned preparation workflow, and manual publication after reviewing artifacts.
+See [UNSIGNED_RELEASE.md](UNSIGNED_RELEASE.md). They must be labelled unsigned.
+
+Trusted signed releases originate from signed annotated `v*` tags that point to commits
 reachable from protected `main`. The protected `release` environment owns the
 Windows signing certificate and release-manifest private key. Pull-request jobs
 cannot access either credential.

@@ -7,7 +7,8 @@ public delegate Task<bool> RuntimeLoopbackPortProbe(int port, CancellationToken 
 public sealed record RuntimeLaunchPrerequisiteRequest(
     RuntimeRecord Runtime,
     AppSettings LaunchSettings,
-    RuntimeEndpointRespondingProbe EndpointRespondingAsync);
+    RuntimeEndpointRespondingProbe EndpointRespondingAsync,
+    bool PortWillBeReleased = false);
 
 public sealed class RuntimeLaunchPrerequisiteService
 {
@@ -51,6 +52,7 @@ public sealed class RuntimeLaunchPrerequisiteService
         ArgumentNullException.ThrowIfNull(request.EndpointRespondingAsync);
 
         RuntimeAvailabilityService.EnsureAvailable(request.Runtime);
+        _ = RuntimeVulkanEnvironment.Value(request.Runtime.Backend, request.LaunchSettings.VulkanAllocationBlockSizeMiB);
 
         if (request.Runtime.Mode == RuntimeMode.Wsl)
             await _runtimeTools.EnsureWslDistroReadyAsync(request.LaunchSettings.WslDistro, cancellationToken);
@@ -59,7 +61,7 @@ public sealed class RuntimeLaunchPrerequisiteService
         if (request.Runtime.Mode == RuntimeMode.Native && request.Runtime.Backend == RuntimeBackend.Sycl)
             _runtimeTools.EnsureWindowsSyclToolsReady();
 
-        if (await IsRuntimePortOccupiedAsync(request.LaunchSettings, request.EndpointRespondingAsync, cancellationToken))
+        if (!request.PortWillBeReleased && await IsRuntimePortOccupiedAsync(request.LaunchSettings, request.EndpointRespondingAsync, cancellationToken))
             throw new InvalidOperationException($"Port {request.LaunchSettings.Port} is already in use. Stop the existing process or choose a different model port before launching llama.cpp.");
     }
 

@@ -15,7 +15,7 @@ public partial class MainWindow
             Enabled: enabled,
             Endpoint: enabled ? RuntimeEndpointService.GatewayEndpointDisplay(_settings) : "",
             State: state,
-            Policy: AppPreferenceService.GatewaySwapPolicyLabel(_settings.AutoLoadGatewayPolicy),
+            Policy: AppPreferenceService.GatewayPolicyLabel(_settings),
             Exposure: AppPreferenceService.ModelAccessModeLabel(_settings.ModelAccessMode),
             RunningSessions: sessions.Count(session => session.IsRunning));
     }

@@ -7,7 +7,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
     private readonly ModelGatewayRequestAccessPolicy _accessPolicy;
     private readonly ModelGatewayUpstreamProxy _upstreamProxy;
     private readonly GatewayPerformanceTracker? _performance;
-    private readonly HttpListener _listener = new();
+    private HttpListener _listener = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly SemaphoreSlim _requestSlots;
@@ -73,7 +73,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             var path = context.Request.Url?.AbsolutePath ?? "/";
             if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
             {
-                await ModelGatewayResponseWriter.WriteJsonAsync(context, 200, new { ok = true, gateway = "model-auto-load" }, cancellationToken);
+                await ModelGatewayResponseWriter.WriteJsonAsync(context, 200, new { ok = true, gateway = "model-auto-load", autoLoadModels = _options.AutoLoadModels }, cancellationToken);
                 return;
             }
 
@@ -93,7 +93,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
                 await ModelGatewayResponseWriter.WriteJsonAsync(
                     context,
                     200,
-                    ModelGatewayResponseWriter.ModelsResponse(await _runtime.ListModelsAsync(cancellationToken)),
+                    ModelGatewayResponseWriter.ModelsResponse(await DiscoverableModelsAsync(cancellationToken)),
                     cancellationToken);
                 return;
             }
@@ -167,7 +167,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             route.Model.Id,
             route.Profile.Id,
             cancellationToken);
-        LoadedModelSessionSnapshot session;
+        LoadedModelSessionSnapshot? session;
         try
         {
             session = await EnsureLoadedAsync(route, cancellationToken);
@@ -182,14 +182,25 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             return;
         }
 
+        if (session is null)
+        {
+            ObserveRejectedRequest(started);
+            await ModelGatewayResponseWriter.WriteJsonAsync(context, 503, ModelGatewayResponseWriter.GatewayError(
+                $"{route.Name} is not loaded and gateway auto-loading is disabled. Load this profile in the Manager or choose a loaded profile from /v1/models.",
+                "model_not_loaded",
+                "model_not_loaded"), cancellationToken);
+            return;
+        }
+
         try
         {
-            await _upstreamProxy.ForwardAsync(context, session, body, cancellationToken, started.Elapsed);
+            var upstreamBody = ModelGatewayRequestResolver.BodyForRuntime(body, session.LaunchSettings);
+            await _upstreamProxy.ForwardAsync(context, session, upstreamBody, cancellationToken, started.Elapsed);
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or IOException)
         {
             await ModelGatewayResponseWriter.WriteJsonAsync(context, 502, ModelGatewayResponseWriter.GatewayError(
-                $"Gateway loaded {route.Name}, but the direct endpoint {RuntimeEndpointService.LocalOpenAiBaseUrl(session.LaunchSettings)} did not return a usable response. Details: {ModelGatewayResponseWriter.InnermostMessage(ex)}.",
+                $"The direct endpoint for {route.Name} at {RuntimeEndpointService.LocalOpenAiBaseUrl(session.LaunchSettings)} did not return a usable response. Details: {ModelGatewayResponseWriter.InnermostMessage(ex)}.",
                 "upstream_unavailable",
                 "upstream_unavailable"), cancellationToken);
         }
@@ -198,11 +209,21 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
     private void ObserveRejectedRequest(Stopwatch started)
         => _performance?.Observe(false, started.Elapsed, null, null);
 
-    private async Task<LoadedModelSessionSnapshot> EnsureLoadedAsync(ModelGatewayModelRoute route, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<ModelGatewayModelRoute>> DiscoverableModelsAsync(CancellationToken cancellationToken)
+    {
+        var routes = await _runtime.ListModelsAsync(cancellationToken);
+        if (_options.AutoLoadModels) return routes;
+        var sessions = await _runtime.RunningSessionsAsync(cancellationToken);
+        // Filter after catalog naming so duplicate alias suffixes never change with load state.
+        return routes.Where(route => sessions.Any(route.MatchesRunningSession)).ToArray();
+    }
+
+    private async Task<LoadedModelSessionSnapshot?> EnsureLoadedAsync(ModelGatewayModelRoute route, CancellationToken cancellationToken)
     {
         var running = (await _runtime.RunningSessionsAsync(cancellationToken))
             .FirstOrDefault(session => route.MatchesRunningSession(session));
         if (running is not null) return running;
+        if (!_options.AutoLoadModels) return null;
 
         await _loadGate.WaitAsync(cancellationToken);
         try

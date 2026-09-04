@@ -76,6 +76,8 @@ public sealed class ControlAppSettingsMutationService
         var accessMode = AppPreferenceService.ModelAccessMode(updated.ModelAccessMode);
         var normalized = updated with
         {
+            DirectModelAliasSuffix = RuntimeDirectAliasService.ValidateSuffix(updated.DirectModelAliasSuffix),
+            SameModelLoadPolicy = AppPreferenceService.SameModelLoadPolicy(updated.SameModelLoadPolicy),
             WorkspaceRoot = current.WorkspaceRoot,
             ThemeMode = AppPreferenceService.ThemeMode(updated.ThemeMode),
             MinimizeBehavior = AppPreferenceService.MinimizeBehavior(updated.MinimizeBehavior),

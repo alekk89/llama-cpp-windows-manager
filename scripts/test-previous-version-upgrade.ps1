@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory = $true)]
   [string] $CandidateInstallerPath,
-  [string] $BaselinePath = "tests/release-baselines/v2.4.0.json"
+  [string] $BaselinePath = "tests/release-baselines/v2.6.0.json"
 )
 
 $ErrorActionPreference = "Stop"

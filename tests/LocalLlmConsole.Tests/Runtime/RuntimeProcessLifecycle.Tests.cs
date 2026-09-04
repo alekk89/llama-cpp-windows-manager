@@ -290,6 +290,22 @@ public sealed class RuntimeProcessLifecycleTests : ManagerRegressionTestBase
 
 
     [Fact]
+    public void RuntimeLogAllocationNeverTruncatesAnExistingLog()
+    {
+        var path = Path.Combine(CreateTempRoot(), "session.log");
+        using (var first = new BoundedLogWriter(path, 0))
+        {
+            first.WriteLine("first session");
+            first.Flush();
+            Assert.Throws<IOException>(() => new BoundedLogWriter(path, 0));
+            first.WriteLine("still serving");
+        }
+        Assert.Contains("first session", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Contains("still serving", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Throws<IOException>(() => new BoundedLogWriter(path, 0));
+    }
+
+    [Fact]
     public void LlamaRuntimeOutputObserverWritesRedactedLogsAndDetectsLoadedLines()
     {
         var root = CreateTempRoot();

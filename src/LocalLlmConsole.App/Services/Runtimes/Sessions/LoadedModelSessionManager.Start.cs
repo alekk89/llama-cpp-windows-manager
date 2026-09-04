@@ -21,6 +21,9 @@ public sealed partial class LoadedModelSessionManager
         string launchProfileName = "")
     {
         var sessionId = SessionIdFor(model.Id, launchProfileId);
+        settings = RuntimeDirectAliasService.ForLaunch(settings, model.ModelPath,
+            Snapshots().Where(session => session.IsRunning && session.SessionId != sessionId)
+                .SelectMany(session => RuntimeModelAliasService.ReadAliases(session.LaunchSettings.CustomParameters)));
         await StopCoreAsync(sessionId, "Replaced by a new launch", CancellationToken.None);
         var supervisor = CreateSupervisor();
         try

@@ -59,7 +59,8 @@ public partial class MainWindow
                 IsOverviewPage: () => _viewModel.CurrentPage == "Overview",
                 StopRuntimeDashboardRefresh: StopRuntimeDashboardRefreshTimer,
                 UpdateActionButtons: UpdateOverviewModelActions,
-                SetStatus: SetStatus));
+                SetStatus: SetStatus,
+                ChooseSameModelLoadAsync: (loadingModel, existing, _) => Task.FromResult(SameModelProfileLoadDialog.Show(this, loadingModel, existing, restoreForInteractivePrompts ? RestoreFromTray : null))));
         if (result is { Launched: true, Session: { } session })
         {
             ApplyGpuEnergyTrackingBoundary();

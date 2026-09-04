@@ -94,12 +94,13 @@ public static class RuntimeLaunchRequestFactory
         };
     }
 
-    public static string Preview(AppSettings settings, RuntimeChoice? runtime)
+    public static string Preview(AppSettings settings, RuntimeChoice? runtime, string modelPath = "<model.gguf>")
     {
         var previewSettings = settings with
         {
             ModelApiKey = settings.RequireApiKeyAuth ? new string('x', 32) : ""
         };
+        previewSettings = RuntimeDirectAliasService.ForLaunch(previewSettings, modelPath, []);
         var custom = CustomLaunchParameterParser.Parse(previewSettings.CustomParameters);
         RuntimeLaunchOptionPolicy.ValidateCustomArguments(custom);
         var extra = new List<string>();
@@ -107,9 +108,7 @@ public static class RuntimeLaunchRequestFactory
         extra.AddRange(custom);
         var speculativeType = LaunchSettingMetadataService.NormalizeSpeculativeType(previewSettings.SpeculativeType);
         var allowNetworkAccess = AppPreferenceService.DirectModelsAllowLanAccess(previewSettings.ModelAccessMode);
-        var launchHost = allowNetworkAccess
-            ? string.IsNullOrWhiteSpace(previewSettings.Host) ? "0.0.0.0" : previewSettings.Host.Trim()
-            : "127.0.0.1";
+        var launchHost = ModelAccessPolicy.RuntimeHost(previewSettings.ModelAccessMode, previewSettings.Host);
         var request = Create(previewSettings, new RuntimeLaunchRequestContext(
             runtime?.Mode ?? RuntimeMode.Native,
             runtime?.Backend ?? RuntimeBackend.Cpu,

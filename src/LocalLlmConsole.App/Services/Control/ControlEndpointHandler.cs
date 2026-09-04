@@ -58,6 +58,7 @@ internal abstract class ControlEndpointHandler
 
     protected async Task SaveProfileAsync(ModelRecord model, NamedModelLaunchProfile profile)
     {
+        _ = RuntimeVulkanEnvironment.Value(RuntimeBackend.Vulkan, profile.Settings.VulkanAllocationBlockSizeMiB);
         var profiles = await _deps.LaunchProfiles.ListNamedAsync(model);
         if (profile.IsDefault)
         {

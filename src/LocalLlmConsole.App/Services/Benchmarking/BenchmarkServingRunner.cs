@@ -9,7 +9,7 @@ public sealed class BenchmarkServingRunner : IDisposable
 {
     private readonly HttpClient _http;
     private readonly bool _ownsHttpClient;
-    private readonly Func<CancellationToken, Task<VramMemorySnapshot?>>? _readGpuMemoryAsync;
+    private readonly Func<IGpuMemoryProbe> _createMemoryProbe;
 
     public BenchmarkServingRunner()
         : this(new HttpClient { Timeout = Timeout.InfiniteTimeSpan }, ownsHttpClient: true, null)
@@ -19,11 +19,11 @@ public sealed class BenchmarkServingRunner : IDisposable
     internal BenchmarkServingRunner(
         HttpClient httpClient,
         bool ownsHttpClient = false,
-        Func<CancellationToken, Task<VramMemorySnapshot?>>? readGpuMemoryAsync = null)
+        Func<IGpuMemoryProbe>? createMemoryProbe = null)
     {
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _ownsHttpClient = ownsHttpClient;
-        _readGpuMemoryAsync = readGpuMemoryAsync;
+        _createMemoryProbe = createMemoryProbe ?? (() => new WindowsGpuMemoryProbe());
     }
 
     public async Task<IReadOnlyList<BenchmarkParsedResult>> RunAsync(
@@ -48,6 +48,7 @@ public sealed class BenchmarkServingRunner : IDisposable
             foreach (var concurrency in plan.Serving.Concurrencies.Distinct())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                await using var memorySampler = await BenchmarkGpuMemorySampler.StartAsync(_createMemoryProbe, cancellationToken);
                 onProgress?.Invoke($"Warming profile {item.ProfileNames.FirstOrDefault()} ({workload.PromptTokens}/{workload.GenerationTokens}, c={concurrency})");
                 if (plan.Warmup)
                     await RunBatchAsync(endpoint, servedModel, settings, workload, concurrency, plan.Serving, cancellationToken);
@@ -61,11 +62,9 @@ public sealed class BenchmarkServingRunner : IDisposable
                         await Task.Delay(TimeSpan.FromSeconds(plan.DelaySeconds), cancellationToken);
                 }
 
-                var memory = _readGpuMemoryAsync is null ? null : await _readGpuMemoryAsync(cancellationToken);
-                var observedGpuMemoryMiB = memory is null
-                    ? 0
-                    : (long)Math.Round(Math.Max(0, memory.TotalGiB - memory.FreeGiB) * 1024);
-                var parsed = BuildResult(plan, item, runtime, model, workload, concurrency, samples, observedGpuMemoryMiB);
+                var memoryPeaks = await memorySampler.FinishAsync();
+                cancellationToken.ThrowIfCancellationRequested();
+                var parsed = BuildResult(plan, item, runtime, model, workload, concurrency, samples, memoryPeaks);
                 var speculativeType = SpeculativeTypePolicy.Normalize(parsed.SpeculativeType);
                 if (plan.Serving.RequireSpeculativeMetrics
                     && speculativeType is not ("" or "none")
@@ -197,7 +196,7 @@ public sealed class BenchmarkServingRunner : IDisposable
         BenchmarkPromptGenerationPair workload,
         int concurrency,
         IReadOnlyList<ServingBatchSample> batches,
-        long observedGpuMemoryMiB)
+        IReadOnlyList<BenchmarkGpuMemoryPeak> memoryPeaks)
     {
         var responses = batches.SelectMany(batch => batch.Responses).ToArray();
         var throughput = batches.Select(batch => batch.GenerationThroughput).ToArray();
@@ -255,7 +254,10 @@ public sealed class BenchmarkServingRunner : IDisposable
             speculative_metrics_observed = draft > 0,
             target_prompt_tokens = workload.PromptTokens,
             target_generation_tokens = workload.GenerationTokens,
-            gpu_memory_used_mib = observedGpuMemoryMiB
+            gpu_memory_peaks = memoryPeaks,
+            gpu_memory_measurement_window = "workload",
+            gpu_memory_sample_interval_ms = BenchmarkGpuMemorySampler.IntervalMilliseconds,
+            vulkan_allocation_block_size_mib = item.LaunchSettings?.VulkanAllocationBlockSizeMiB ?? 0
         });
         if (!BenchmarkResultService.TryParse(
                 raw, item.ModelFingerprint, item.EffectiveCommandSignature + $"|c={concurrency}|p={workload.PromptTokens}|g={workload.GenerationTokens}",
@@ -279,7 +281,9 @@ public sealed class BenchmarkServingRunner : IDisposable
             DraftAcceptancePercent = draft > 0 ? accepted * 100d / draft : 0,
             SpeculativeMetricsObserved = draft > 0,
             ContextSize = item.LaunchSettings?.ContextSize ?? 0,
-            ObservedGpuMemoryUsedMiB = observedGpuMemoryMiB
+            GpuMemoryPeaks = memoryPeaks,
+            GpuMemorySampleIntervalMilliseconds = BenchmarkGpuMemorySampler.IntervalMilliseconds,
+            VulkanAllocationBlockSizeMiB = item.LaunchSettings?.VulkanAllocationBlockSizeMiB ?? 0
         };
     }
 

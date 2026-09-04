@@ -23,6 +23,7 @@ public sealed partial class BenchmarkApplicationService
         var job = await _store.GetJobAsync(jobId) ?? throw new InvalidOperationException($"Benchmark job '{jobId}' disappeared.");
         var sequence = 0;
         var validRows = 0;
+        await using var memorySampler = await BenchmarkGpuMemorySampler.StartAsync(() => new WindowsGpuMemoryProbe(), cancellationToken);
         var process = await _processRunner.RunAsync(
             runtime,
             item.WslDistro,
@@ -45,6 +46,8 @@ public sealed partial class BenchmarkApplicationService
             },
             onDiagnostic: line => PublishTransient(job, payload, line.Length <= 300 ? line : line[..300], payload.ResultRows + Volatile.Read(ref validRows)),
             cancellationToken);
+        var memoryPeaks = await memorySampler.FinishAsync();
+        await _store.SetBenchmarkMemoryAsync(jobId, item.Key, attempt, memoryPeaks, BenchmarkGpuMemorySampler.IntervalMilliseconds);
         if (!string.IsNullOrWhiteSpace(process.DiagnosticTail)) await AppendLogAsync(job.LogPath, process.DiagnosticTail);
         return new WorkItemOutcome(process.ExitCode, validRows, process.CancellationRequested, process.VerifiedStopped, "");
     }

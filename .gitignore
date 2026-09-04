@@ -62,3 +62,10 @@ TestResults/
 *.zip
 *.msix
 *.msi
+
+# Python benchmark helper cache
+# Local machine-specific benchmark plans, results, and handoff notes.
+/benchmarks/
+/benchmark-qwen-flash-speed.json
+__pycache__/
+*.py[cod]

@@ -50,7 +50,7 @@ public sealed class WindowsStartupRegistrationService
     }
 
     public bool IsEnabled()
-        => !string.IsNullOrWhiteSpace(_readStartupCommand());
+        => string.Equals(_readStartupCommand()?.Trim(), StartupCommand(), StringComparison.OrdinalIgnoreCase);
 
     public WindowsStartupRegistrationResult Apply(bool startWithWindows)
     {
@@ -58,7 +58,7 @@ public sealed class WindowsStartupRegistrationService
         {
             if (startWithWindows)
                 _writeStartupCommand(StartupCommand());
-            else
+            else if (IsEnabled())
                 _deleteStartupCommand();
 
             return new WindowsStartupRegistrationResult(true, "");

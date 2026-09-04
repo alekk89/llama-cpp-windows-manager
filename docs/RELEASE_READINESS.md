@@ -1,6 +1,17 @@
 # Release Readiness Checklist
 
-Last updated: 2026-08-25
+Last updated: 2026-09-04
+
+The v2.7 release is explicitly unsigned and ships the installer and portable EXE
+with SHA-256 companions. See [UNSIGNED_RELEASE.md](UNSIGNED_RELEASE.md).
+
+The latest unsigned preparation passed 987 tests (933 service/core and 54 WPF),
+the source/publish gate, standalone sidecar restoration, and pinned v2.6 portable
+replacement with data preservation. The packaged updater checked and staged a
+simulated future unsigned release using its real version with commit metadata.
+The installer was rebuilt, but its final clean-Windows lifecycle/upgrade gate
+and the outstanding LAN/manual checks below still need completion. Earlier
+dated test counts in this document describe their respective audit phases.
 
 ## Automated Gate
 
@@ -14,8 +25,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-app.ps
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1
 ```
 
-The same source-level gate can be run through the local wrapper, with packaging
-included when the machine has Inno Setup and any required signing certificate:
+The source and portable gate can run alongside the production Manager with
+`test-release-gate.ps1 -IncludePublish`. Adding `-IncludeInstaller` also exercises
+installer lifecycle operations: use a clean disposable Windows environment with
+Inno Setup and any required signing certificate. The existing-installation guard
+must not be bypassed on a production user profile:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish -IncludeInstaller
@@ -44,14 +58,26 @@ builds and must be described that way.
 
 ## Release Gate
 
-- Publish `dist\LlamaCppWindowsManager-win-x64.zip` and `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.6.0-win-x64.exe` from the published app with Inno Setup 6.
+- Resize action columns until their icons appear, then widen the window and
+  reopen the page. Confirm extra space goes to the leftmost text column while
+  the other widths stay fixed; repeat after reordering and narrowing columns.
+- Confirm Verify, Check and Install have compact icons with full action
+  tooltips, and endpoint model IDs/names remain readable in dark and light themes.
+- Load a profile without an alias and confirm its direct endpoint advertises
+  and copies the short GGUF ID. Set a direct suffix, reload and check the real
+  `/v1/models` value. Load duplicates on separate ports and confirm unique IDs.
+- With a different profile of the same model running, exercise alongside,
+  replace and cancel. Confirm unrelated models remain running and group,
+  gateway and control loads retain their explicit policies.
+
+- Publish the standalone `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout; do not publish a portable ZIP.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.7.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
-- Confirm the portable zip, published executable, and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
+- Confirm the portable EXE and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
   points at an unsigned published executable.
-- Confirm the portable zip contains `LlamaCppWindowsManager.exe` and does not contain the removed `LlamaCppConsole.exe` alias.
-- Confirm the portable zip and installer contain `LICENSE`,
+- Confirm the publish folder contains `LlamaCppWindowsManager.exe` and does not contain the removed `LlamaCppConsole.exe` alias.
+- Confirm the portable EXE bundle and installer contain `LICENSE`,
   `THIRD-PARTY-NOTICES.md`, `licenses\Apache-2.0.txt`, and the bundled .NET
   license/notices. Run executable-only `--bootstrap-agent-sidecars-only`
   verification and confirm all compliance notices are restored beside the app.
@@ -129,6 +155,15 @@ builds and must be described that way.
 - Confirm model serving defaults to local-only `127.0.0.1`.
 - Confirm Settings LAN exposure maps Local only to loopback, Gateway LAN only to the router listener, Direct models LAN only to runtime hosts, and Gateway + direct LAN to both serving surfaces.
 - Confirm Settings LAN exposure changes only model-serving endpoints, not the app-local control service.
+- Set a profile Host IP to a LAN address with Local only or Gateway LAN only:
+  confirm the preview explains the loopback listener, the loaded endpoint uses
+  loopback, and readiness/metrics succeed. Enable Direct models LAN only and
+  restart: confirm the command and endpoint use the saved LAN address.
+- Load a profile whose saved JSON predates Host IP and confirm it inherits the
+  app host default; confirm explicitly saved loopback addresses remain intact.
+- With a runtime advertising projector offload switches, confirm Disabled emits
+  `--no-mmproj-offload`, Enabled emits `--mmproj-offload`, and Default emits
+  neither. Save/reopen the profile and verify its selected value is retained.
 - Confirm the Overview Loaded Model Sessions grid shows an auto-load gateway
   router row with endpoint, policy, LAN exposure, and current direct-session
   count.
@@ -139,6 +174,10 @@ builds and must be described that way.
   Confirm field text and table cells can be selected, **Copy endpoint** copies
   the direct `/v1` URL, **Copy report** includes the visible endpoint details but
   no API key, and **Copy API key** copies the credential used by that session.
+- In both direct and gateway endpoint reports, select model ID and name text
+  independently and use each row's **Copy model ID** button. Confirm it copies
+  the exact ID/alias, including suffixes, without the display name or headers.
+  Check multiple rows, long IDs, and a temporarily unavailable clipboard.
 - Inspect the gateway row and endpoint link. Confirm the report shows advertised
   profile model IDs, running sessions, policy, and exposure, and explains that
   context/reasoning/output defaults belong to each routed model. Confirm a runtime
@@ -282,11 +321,17 @@ builds and must be described that way.
   with Windows GPU performance-counter fallback for unsupported fields and no
   stale cached hardware data after switching runtimes.
 - Confirm the Settings API key Generate action creates a new model API key.
-- Confirm the gateway `/v1/models` response lists every saved launch profile,
+- With **Auto-load models** enabled, confirm the gateway `/v1/models` response lists every saved launch profile,
   reports each profile's configured `context_length`, exposes accurate GGUF
   training context, parameter count, and file size in `meta`, and requesting
   another profile for a running model keeps both profile routes loaded under
   **Prefer keeping loaded models** while **Single active model** stops the others.
+- Set **Auto-load models** to **No**. Confirm discovery lists only running
+  profiles, keeps their alias suffixes, and serves those exact sessions. With
+  either gateway policy, requests for unloaded profiles must return
+  `503 model_not_loaded` without starting or stopping sessions. Check empty
+  discovery when nothing is loaded, persistence after restart, the
+  `gatewayAutoLoadModels` control setting, and re-enabling normal auto-loading.
 - Confirm Settings is separated into named category sections arranged in two
   equal-width columns rather than one large full-width settings grid. Confirm
   Network and UI remain in opposite columns and narrow values/actions do not
@@ -467,6 +512,7 @@ builds and must be described that way.
   but a long streaming completion continues after headers until completion or
   client/app cancellation.
 - Confirm Hugging Face downloads cannot write outside the configured models folder.
+- Confirm a filesystem error while preparing a Hugging Face download records a failed job with its error, releases the active-download slot, and preserves files that were never opened for transfer.
 - Confirm completed downloads are not registered when the final byte count mismatches the expected size or no expected size/SHA-256 metadata exists.
 - Confirm imported external model deletion removes only app registration files.
 - Confirm Settings exposes **API key auth**. With **LAN exposure = Local only**,
@@ -529,10 +575,10 @@ builds and must be described that way.
 - Confirm no harness-specific configuration page or settings appear in the app.
 - Confirm startup update checks change the left-nav Updates item to Install Update when a newer GitHub release exists.
 - Confirm manual Check For Updates shows a no-update popup when current, or an install confirmation when a newer release exists.
-- Confirm the GitHub release includes the portable ZIP and standalone
-  `LlamaCppWindowsManager.exe`, each with its matching SHA-256 companion. The
-  standalone asset preserves in-app updates from v1.x, v2.0, and v2.1; a bad checksum
-  must prevent staging.
+- Confirm the release includes the installer and standalone EXE, each with a
+  matching SHA-256 companion, and no portable ZIP. Checksum failures prevent staging.
+- Install unsigned v2.7 manually from v2.5 or v2.6; their existing updaters require signatures.
+- Confirm unsigned v2.7 can check and stage a subsequent checksum-verified unsigned release.
 - Confirm a signed installed app refuses an unsigned or differently signed staged update.
 - Confirm a completed staged update restarts `LlamaCppWindowsManager.exe` and shows the GitHub release notes.
 - Confirm a non-critical staging-cleanup failure after successful replacement is
@@ -542,7 +588,85 @@ builds and must be described that way.
   failure, bounds background-task drain to 15 seconds, stops runtime sessions
   before tearing down local hosts/state, and records cleanup warnings.
 
-## Latest Local Verification
+## Current 2.7 prerelease status
+
+The stabilized candidate includes the documented profile, naming, benchmark, and
+LAN changes plus the audit reliability fixes. The 2026-09-04 source and portable
+gate passed 972 tests (918 service/core and 54 WPF), with no failures or skips;
+service coverage was 84.4% and model/view-model coverage was 97.7%. These results
+describe that local candidate, not a clean tagged or signed release.
+
+Second-machine LAN checks verified access-mode isolation, missing/wrong-key
+rejection, explicit versus inherited profile hosts, and control-API loopback
+isolation. Successful-key remote inference and streaming remain pending. The
+first-use gateway permission retry also passed in the deployed application: a
+previously unreserved port gained its Windows reservation and became healthy
+without a manual gateway restart. A remote client reached it and received the
+expected missing-key rejection. The appearance and decline behavior of the
+interactive UAC prompt are not certified by that successful grant path.
+
+Portable replacement/restart and locked-file rollback passed on the preceding
+candidate before the gateway-only permission fix. The exact final release
+artifacts still require clean-machine installer install, repair, uninstall, and
+pinned previous-version upgrade validation. Installer compilation is not proof
+of installer lifecycle success.
+
+The default installer and portable upgrade baseline is now the published v2.6.0
+release, with asset sizes and SHA-256 values pinned in
+`tests/release-baselines/v2.6.0.json`. The earlier v2.4.0 baseline remains available
+for explicit compatibility runs. Changing the baseline does not itself validate
+an upgrade. The installer fallback version matches the 2.7.0 app and CLI.
+
+The candidate contains uncommitted and required untracked source files. Integrate
+all intended files, then rerun the release gate from a clean checkout. Signing
+credentials, the release enable switch, and protected repository settings must
+be verified for publication; they are not certified by local tests.
+
+The earlier higher private-memory observation did not reproduce in a matched
+short comparison of v2.6 and the exact deployed v2.7 executable. Each completed
+63 streamed requests after the same UI warmup and then two minutes of idle.
+Post-collection private memory was 267.0 MiB for v2.6 and 259.7 MiB for deployed
+v2.7; retained managed graphs were 25.7 and 25.6 MiB. This is not a full-duration
+soak or proof of leak freedom. A forced-length chat workload also exposed an
+upstream runtime parser error directly and through the gateway; the successful
+comparison used identical plain completions instead.
+
+All three available RTX 3090 devices passed individual CUDA load, 128-token
+generation, and unload checks. Live power and energy readings were visible with
+the installed driver. Other hardware/backend combinations, full Narrator/keyboard
+workflows, per-monitor DPI, and clean-machine checklist items remain unverified
+where they lack explicit evidence.
+
+High-scale visual inspection exposed sidebar navigation hidden behind its footer.
+The release candidate now scrolls that area; a compiled WPF regression verifies
+that the first and last navigation buttons remain reachable at constrained height.
+This sidebar fix is included in the new portable build, not the deployed binary
+used for the resource and GPU checks. This candidate is not yet cleared for publication.
+
+## Historical Local Verification
+
+The following snapshots apply to earlier source and artifact states. Their test
+counts and completed checks must not be substituted for final-artifact evidence.
+
+The 2.7.0 host-policy and projector-offload changes were verified on 2026-09-02.
+Release app and CLI builds passed with zero warnings. All 826 service/unit tests
+and 26 WPF tests passed without skips; service coverage was 83.4% and
+model/view-model coverage was 97.5%. Code shape, formatting, and whitespace
+checks passed. After aligning the documentation check with the GitHub draft
+workflow, `test-release-gate.ps1 -IncludePublish` passed in full. Portable
+packaging and artifact verification passed; the package audit found no known
+vulnerabilities, outdated direct packages, or deprecated dependencies.
+
+Regression coverage includes policy-forced loopback with a saved LAN host,
+matching command/endpoint addresses, legacy profiles without a saved host,
+explicit saved loopback overrides, and discovered projector-offload controls.
+The local installation was updated to the checksum-verified unsigned 2.7.0 app
+and matching CLI. A real Qwen3.8 27B Q4 model with vision enabled loaded through
+`llwmctl` using one-shot host and `--no-mmproj-offload` overrides. Windows socket
+inspection and authenticated Manager probes agreed on the selected LAN address;
+endpoint inspection, telemetry, and gateway health succeeded. An unauthenticated
+inference request returned HTTP 401. Saved profiles and app settings were
+preserved. Access from a second LAN machine and installer checks remain pending.
 
 The repository gate was rerun for the themed tray-profile module on 2026-08-26:
 
@@ -556,7 +680,7 @@ coverage was 83.0% and model/view-model coverage was 97.4%. Formatting,
 documentation, whitespace, and package vulnerability/deprecation/currency checks
 passed. Publish and installer checks were not part of this feature-only rerun.
 
-Current repository-only release candidate audit on 2026-08-25:
+Historical repository-only release candidate audit on 2026-08-25:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish
@@ -597,9 +721,10 @@ remain clean-machine or hardware validation items. Exercising them in this user
 session would require stopping or sharing state with the production Manager and
 was outside this isolated audit.
 
-Local artifacts are unsigned development builds. A v2.6.0 stable release must be
-published only by the protected workflow with configured tag, manifest, and
-Authenticode keys; it must never silently fall back to those local artifacts.
+The original audit above evaluated the signed release path. The maintainer has
+since selected an explicitly unsigned community release for v2.7. Follow
+[UNSIGNED_RELEASE.md](UNSIGNED_RELEASE.md), retaining the same test and PR gates.
+The trusted workflow remains separate and never falls back to unsigned publishing.
 
 ## Manual Clean-Machine Test
 
@@ -610,7 +735,7 @@ either marker already exists, which prevents a temporary test from replacing a
 real installation's uninstall registration or shortcut.
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.6.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.7.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.
@@ -649,8 +774,9 @@ Apply these settings after the workflow files are present on the default branch:
 - Set the project homepage to the latest release or user guide and enable
   Discussions if community support will be monitored.
 - Protect `main`: block force pushes and deletion, require the **Build, test,
-  and publish** check, require branches to be current, allow administrator
-  emergency bypass, and require review for external contributors.
+  and publish** check, require branches to be current, disable routine
+  administrator bypass, and require review for external contributors. Follow
+  [Repository governance](REPOSITORY_GOVERNANCE.md) for exceptional recovery.
 - Confirm CodeQL, dependency review, and Dependabot are enabled and allowed by
   the repository's Actions/security settings.
 
@@ -660,9 +786,32 @@ Apply these settings after the workflow files are present on the default branch:
 - Any wildcard CORS header on a local control API.
 - Any recursive delete not bounded by ownership and path-root checks.
 - Any llama.cpp launch default that binds model serving to `0.0.0.0`.
-- Any model-serving mode that does not require an API key.
+- Any LAN model-serving mode that does not require a strong API key.
 - Any completed download registered without expected-size or SHA-256 validation.
 - Any clean-machine startup path that silently assumes hidden developer setup.
 - Any release artifact described as signed or trusted when it is unsigned.
 - Any signed install that can be replaced by an unsigned or differently signed update.
 - Any installer uninstall, repair, or update path that deletes models, runtimes, logs, cache, or state without explicit user confirmation.
+
+## Stabilization validation
+
+Before release, verify that an update helper acknowledges verified sibling staging
+before the Manager exits; missing sources or cancelled handoffs keep it open.
+Exercise replacement, restart, locked-file failure, and app/CLI rollback in an
+isolated installation. Each supervised session must own a newly created log.
+Decline or cancel a replacement admission warning and verify all old sessions
+remain running. Apply visibility, scale and unchanged settings during a gateway
+stream and verify completion. Test startup registration with two isolated
+executable paths. Endpoint model metadata headers must remain readable at 620 and
+760 DIP in English and German, with horizontal scrolling when necessary. Feed
+malformed numeric benchmark rows followed by a valid row and verify parsing
+continues; the repository workload helper must fail truncated streams and missing
+usage rather than emit successful throughput measurements.
+
+Rapidly switch through pages before they finish loading, then resize the final
+page’s columns and verify those widths survive navigation and restart. Closing
+the window must cancel pending layout restoration and detach layout observers.
+
+Run a native benchmark fixture whose parent exits while a descendant inherits
+its output pipe. Verify the owned descendant stops promptly, output draining
+remains cancellable after parent exit, and no child is left behind.

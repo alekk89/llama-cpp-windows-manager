@@ -30,7 +30,8 @@ public sealed record ModelRuntimeLaunchApplicationActions(
     Func<bool> IsOverviewPage,
     Action StopRuntimeDashboardRefresh,
     Action UpdateActionButtons,
-    Action<string> SetStatus);
+    Action<string> SetStatus,
+    SameModelProfileLoadChooser? ChooseSameModelLoadAsync = null);
 
 public sealed record ModelRuntimeLaunchApplicationResult(
     bool Launched,
@@ -77,7 +78,13 @@ public sealed class ModelRuntimeLaunchApplicationService
                 actions.EndpointRespondingAsync,
                 actions.ConfirmAdmissionAsync,
                 actions.ReadMemoryAsync,
-                request.LaunchProfileId), cancellationToken);
+                request.LaunchProfileId,
+                actions.ChooseSameModelLoadAsync,
+                async () =>
+                {
+                    await actions.SaveActiveRuntimeSessionsAsync();
+                    await actions.RefreshOverviewAsync();
+                }), cancellationToken);
             if (!preparation.CanLaunch)
                 return new ModelRuntimeLaunchApplicationResult(false, null, preparation.LaunchSettings);
 

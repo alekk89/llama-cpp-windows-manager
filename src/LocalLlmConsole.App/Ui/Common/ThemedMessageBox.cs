@@ -15,6 +15,10 @@ public static class ThemedMessageBox
         => Show(System.Windows.Application.Current?.MainWindow, message, title, buttons, image);
 
     public static MessageBoxResult Show(Window? owner, string message, string title, MessageBoxButton buttons = MessageBoxButton.OK, MessageBoxImage image = MessageBoxImage.None)
+        => Show(owner, message, title, buttons, image, null);
+
+    public static MessageBoxResult Show(Window? owner, string message, string title, MessageBoxButton buttons, MessageBoxImage image,
+        IReadOnlyDictionary<MessageBoxResult, string>? buttonLabels)
     {
         var dialog = new Window
         {
@@ -122,15 +126,15 @@ public static class ThemedMessageBox
         {
             var button = new WpfButton
             {
-                Content = label,
+                Content = buttonLabels?.GetValueOrDefault(value) ?? label,
                 MinWidth = 86,
                 Margin = new Thickness(7, 0, 0, 0),
                 IsDefault = isDefault,
-                IsCancel = value is MessageBoxResult.Cancel or MessageBoxResult.No
+                IsCancel = value == MessageBoxResult.Cancel || (value == MessageBoxResult.No && buttons == MessageBoxButton.YesNo)
             };
             if (value is MessageBoxResult.OK or MessageBoxResult.Yes)
                 VisualRole.SetButtonRole(button, VisualRole.Primary);
-            button.ToolTip = DialogButtonToolTip(value);
+            button.ToolTip = buttonLabels?.GetValueOrDefault(value) ?? DialogButtonToolTip(value);
             ToolTipService.SetShowOnDisabled(button, true);
             button.Click += (_, _) =>
             {

@@ -34,12 +34,19 @@ public sealed class StateStoreInitializationService
                     await stateStore.SaveAppSettingsAsync(settings);
                 return new StateStoreInitializationResult(stateStore, settings);
             }
-            catch (SqliteException) when (attempt == 0)
+            // Only SQLITE_CORRUPT (11) and SQLITE_NOTADB (26) justify replacing the database.
+            // Access, locking, disk and migration errors must preserve the existing state.
+            catch (SqliteException error) when (attempt == 0 && error.SqliteErrorCode is 11 or 26)
             {
                 await stateStore.DisposeAsync();
                 await QuarantineDatabaseFilesAsync(
                     request.DatabasePath,
                     request.QuarantineDatabaseFiles ?? StateStore.QuarantineDatabaseFiles);
+            }
+            catch
+            {
+                await stateStore.DisposeAsync();
+                throw;
             }
         }
 

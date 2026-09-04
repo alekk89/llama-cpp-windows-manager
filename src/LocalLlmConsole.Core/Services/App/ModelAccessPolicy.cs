@@ -30,6 +30,8 @@ public static class ModelAccessPolicy
     public static bool AllowsUnauthenticatedAccess(string? text)
         => Normalize(text) == "local";
 
-    public static string RuntimeHost(string? accessMode)
-        => DirectModelsAllowLanAccess(accessMode) ? "0.0.0.0" : "127.0.0.1";
+    public static string RuntimeHost(string? accessMode, string? profileHost = null)
+        => !DirectModelsAllowLanAccess(accessMode)
+            ? "127.0.0.1"
+            : string.IsNullOrWhiteSpace(profileHost) ? "0.0.0.0" : profileHost.Trim();
 }

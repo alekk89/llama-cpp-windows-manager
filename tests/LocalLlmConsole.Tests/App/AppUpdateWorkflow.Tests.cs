@@ -278,7 +278,7 @@ public sealed class AppUpdateWorkflowTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public void AppUpdateServiceStartsInstallerThroughInjectedProcessLauncher()
+    public async Task AppUpdateServiceStartsInstallerThroughInjectedProcessLauncher()
     {
         var source = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Services", "App", "AppUpdateService.cs"));
         var root = CreateTempRoot();
@@ -287,9 +287,15 @@ public sealed class AppUpdateWorkflowTests : ManagerRegressionTestBase
         var targetExe = Path.Combine(root, AppUpdateService.PortableExeName);
         var noticePath = Path.Combine(root, "cache", "app-updates", "installed-update.json");
         var started = new List<ProcessStartInfo>();
-        var service = new AppUpdateService(new HttpClient(), started.Add);
+        var service = new AppUpdateService(new HttpClient(), info =>
+        {
+            started.Add(info);
+            var args = info.ArgumentList.ToArray();
+            using var ready = EventWaitHandle.OpenExisting(args[Array.IndexOf(args, "-HandoffName") + 1] + ".ready");
+            ready.Set();
+        });
 
-        service.StartInstaller(new AppUpdateInstallPlan(scriptPath, sourceExe, targetExe, noticePath), 4321);
+        await service.StartInstallerAsync(new AppUpdateInstallPlan(scriptPath, sourceExe, targetExe, noticePath), 4321, TestContext.Current.CancellationToken);
 
         var process = Assert.Single(started);
         Assert.Equal(HostExecutableResolver.WindowsPowerShellExe(), process.FileName);

@@ -10,6 +10,51 @@ namespace LocalLlmConsole.UiTests;
 public sealed class WpfMainWindowShellTests : WpfUiTestBase
 {
     [Fact]
+    public async Task MainWindowNavigationRemainsReachableWhenHeightIsConstrained()
+    {
+        await RunStaAsync(() =>
+        {
+            LocalLlmConsole.Localization.Loc.LoadLanguage("en");
+            var window = new LocalLlmConsole.MainWindow();
+            DetachLoadedStartup(window);
+            try
+            {
+                var content = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
+                void Layout()
+                {
+                    content.Measure(new Size(1024, 480));
+                    content.Arrange(new Rect(0, 0, 1024, 480));
+                    content.UpdateLayout();
+                }
+
+                Layout();
+                var lastNavigation = Assert.IsType<Button>(window.FindName("WslLinuxNavButton"));
+                var firstNavigation = Assert.IsType<Button>(window.FindName("OverviewNavButton"));
+                var footer = Assert.IsType<Button>(window.FindName("UpdatesNavButton"));
+                foreach (var button in new[] { lastNavigation, firstNavigation })
+                {
+                    button.BringIntoView();
+                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                        () => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    Layout();
+                    var top = button.TranslatePoint(new Point(), content).Y;
+                    var bottom = top + button.ActualHeight;
+                    var footerTop = footer.TranslatePoint(new Point(), content).Y;
+                    Assert.True(button.ActualHeight >= 40);
+                    Assert.True(top >= 0 && bottom <= footerTop,
+                        $"Navigation {button.Name} spans {top}..{bottom}; footer starts at {footerTop}.");
+                }
+            }
+            finally
+            {
+                typeof(LocalLlmConsole.MainWindow)
+                    .GetMethod("DisposeTrayIcon", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .Invoke(window, null);
+            }
+        });
+    }
+
+    [Fact]
     public async Task MainWindowShellComposesNavigationLocalizationAndEndpointInspectionIndependently()
     {
         await RunStaAsync(() =>
@@ -63,7 +108,7 @@ public sealed class WpfMainWindowShellTests : WpfUiTestBase
                 var statusY = statusCard.TranslatePoint(new Point(0, 0), windowContent).Y;
                 Assert.True(statusY > helpY + helpButton.ActualHeight, $"Help bottom {helpY + helpButton.ActualHeight}, status top {statusY}.");
                 Assert.True(statusY + statusCard.ActualHeight <= 680, $"Status bottom {statusY + statusCard.ActualHeight}.");
-                Assert.Equal("v2.6.0", appVersionText.Text);
+                Assert.Equal("v2.7.0", appVersionText.Text);
                 Assert.Equal(28, navigationToggle.Width);
                 var navigationToggleGlyph = Assert.IsType<TextBlock>(navigationToggle.Content);
                 Assert.Equal("\uE700", navigationToggleGlyph.Text);
@@ -137,7 +182,7 @@ public sealed class WpfMainWindowShellTests : WpfUiTestBase
                 var endpointTable = Assert.Single(VisualDescendants<DataGrid>(endpointDialogRoot));
                 Assert.Equal(DataGridSelectionMode.Extended, endpointTable.SelectionMode);
                 Assert.Equal(DataGridSelectionUnit.CellOrRowHeader, endpointTable.SelectionUnit);
-                Assert.Equal(DataGridClipboardCopyMode.IncludeHeader, endpointTable.ClipboardCopyMode);
+                Assert.Equal(DataGridClipboardCopyMode.ExcludeHeader, endpointTable.ClipboardCopyMode);
                 var copyButtons = VisualDescendants<Button>(endpointDialogRoot)
                     .Where(button => AutomationProperties.GetAutomationId(button).StartsWith("EndpointCopy", StringComparison.Ordinal))
                     .ToDictionary(AutomationProperties.GetAutomationId, StringComparer.Ordinal);

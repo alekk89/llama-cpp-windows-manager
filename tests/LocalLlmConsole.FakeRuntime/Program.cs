@@ -1,8 +1,27 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 
 var options = ParseArguments(args);
+if (options.TryGetValue("--fake-pipe-child", out var childPidPath))
+{
+    File.WriteAllText(childPidPath, Environment.ProcessId.ToString());
+    await Task.Delay(6000);
+    File.WriteAllText(childPidPath + ".completed", "Child outlived benchmark parent.");
+    return 0;
+}
+if (options.TryGetValue("--fake-exit-with-child", out var inheritedPipePidPath))
+{
+    var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+    start.ArgumentList.Add("--fake-pipe-child");
+    start.ArgumentList.Add(inheritedPipePidPath);
+    using var child = Process.Start(start)!;
+    var deadline = DateTime.UtcNow.AddSeconds(5);
+    while (!File.Exists(inheritedPipePidPath) && DateTime.UtcNow < deadline) await Task.Delay(10);
+    Console.WriteLine("parent exiting");
+    return 0;
+}
 if (args.Contains("--help", StringComparer.OrdinalIgnoreCase))
 {
     Console.WriteLine("llama-bench fake: --model --offline --output --progress --repetitions --delay --no-warmup --list-devices --n-prompt --n-gen -pg --n-depth --threads --batch-size --ubatch-size --n-gpu-layers --n-cpu-moe --flash-attn --cache-type-k --cache-type-v --no-kv-offload --split-mode --main-gpu --device --tensor-split --load-mode --fit-target --fit-ctx --numa --prio --cpu-mask --cpu-strict --poll --embeddings --no-op-offload --no-host --override-tensor --fake-delay-ms");
@@ -27,7 +46,7 @@ if (options.TryGetValue("--fake-exit-code", out var configuredExitCode)
 var host = Value(options, "--host", "127.0.0.1");
 var port = int.Parse(Value(options, "--port", "8081"), System.Globalization.CultureInfo.InvariantCulture);
 var modelPath = Value(options, "--model", "fake-model.gguf");
-var model = Path.GetFileNameWithoutExtension(modelPath);
+var model = Value(options, "--alias", Path.GetFileNameWithoutExtension(modelPath)).Split(',')[0];
 var apiKey = (Environment.GetEnvironmentVariable("LLAMA_API_KEY") ?? "").Trim();
 
 using var listener = new HttpListener();
@@ -44,6 +63,8 @@ catch (HttpListenerException ex)
 }
 
 Console.WriteLine($"HTTP server listening on http://{host}:{port}");
+if (Environment.GetEnvironmentVariable("GGML_VK_SUBALLOCATION_BLOCK_SIZE") is { } allocationBlock)
+    Console.WriteLine($"fixture Vulkan allocation block bytes: {allocationBlock}");
 
 while (listener.IsListening)
 {

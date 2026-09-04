@@ -55,7 +55,7 @@ public sealed class ModelGatewayLifecycleApplicationService
         try
         {
             await gateway.StartAsync(cancellationToken);
-            actions.SetStatus($"Auto-load gateway listening at {RuntimeEndpointService.GatewayEndpointDisplay(settings)}.");
+            actions.SetStatus($"Gateway listening at {RuntimeEndpointService.GatewayEndpointDisplay(settings)}. {AppPreferenceService.GatewayPolicyLabel(settings)}.");
             actions.UpdateGatewayStatusText();
             return new ModelGatewayLifecycleRestartResult(settings, GatewayStarted: true);
         }

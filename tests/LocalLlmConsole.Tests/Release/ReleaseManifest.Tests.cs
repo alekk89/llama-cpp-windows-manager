@@ -170,7 +170,7 @@ public sealed class ReleaseManifestTests : ManagerRegressionTestBase
         var service = new AppUpdateService(
             new HttpClient(),
             _ => { },
-            signatureVerifier: new AcceptingManifestSignatureVerifier());
+            signatureVerifier: new AcceptingManifestSignatureVerifier(), allowUnsignedUpdates: false);
         var checksumOnly = new AppUpdateInfo(
             true, "v2.5.0", "v2.5.1", "release", "", "", AppUpdateService.PortableExeName,
             "https://example.invalid/app.exe", 1024 * 1024, ExpectedSha256: new string('a', 64));
