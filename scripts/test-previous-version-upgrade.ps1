@@ -59,9 +59,22 @@ function Invoke-CheckedProcess {
       throw "$Label exceeded the 120-second timeout."
     }
     if ($process.ExitCode -ne 0) { throw "$Label failed with exit code $($process.ExitCode)." }
+    Write-Host "$Label completed."
   } finally {
     $process.Dispose()
   }
+}
+
+function Start-IsolatedManager([string] $FilePath) {
+  Write-Host "Starting isolated Manager: $FilePath"
+  $startInfo = [Diagnostics.ProcessStartInfo]::new($FilePath)
+  $startInfo.WorkingDirectory = $InstallDir
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  $process = [Diagnostics.Process]::Start($startInfo)
+  Write-Host "Isolated Manager started as PID $($process.Id)."
+  return $process
 }
 
 function Invoke-Ctl {
@@ -88,7 +101,10 @@ function Wait-ForStatus([string] $Cli) {
     } finally {
       $ErrorActionPreference = $previousPreference
     }
-    if ($exitCode -eq 0) { return $output -join [Environment]::NewLine }
+    if ($exitCode -eq 0) {
+      Write-Host 'Isolated Manager control API is ready.'
+      return $output -join [Environment]::NewLine
+    }
     Start-Sleep -Milliseconds 500
   }
   throw "The isolated Manager control API did not become ready."
@@ -147,7 +163,7 @@ try {
   $previousApp = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   $previousCli = Join-Path $InstallDir "llwmctl.exe"
   $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE = $Workspace
-  $oldProcess = Start-Process -FilePath $previousApp -WorkingDirectory $InstallDir -WindowStyle Hidden -PassThru
+  $oldProcess = Start-IsolatedManager $previousApp
   $oldStatus = Wait-ForStatus $previousCli
   Invoke-FirstContact $previousCli $oldProcess.Id "Previous Manager"
   $previousVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($previousApp).FileVersion
@@ -165,7 +181,7 @@ try {
 
   $candidateApp = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   $candidateCli = Join-Path $InstallDir "llwmctl.exe"
-  $candidateProcess = Start-Process -FilePath $candidateApp -WorkingDirectory $InstallDir -WindowStyle Hidden -PassThru
+  $candidateProcess = Start-IsolatedManager $candidateApp
   $candidateStatus = Wait-ForStatus $candidateCli
   Invoke-FirstContact $candidateCli $candidateProcess.Id "Candidate Manager"
   $candidateVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($candidateApp).FileVersion
@@ -174,7 +190,7 @@ try {
   Invoke-Ctl $candidateCli @("operations", "run", "app.shutdown", "--confirm", "--allow-self-stop", "--process-id", $candidateProcess.Id.ToString(), "--workspace", $Workspace) "Candidate Manager shutdown" | Out-Null
   if (-not $candidateProcess.WaitForExit(15000)) { throw "Candidate Manager did not complete its verified shutdown." }
 
-  $candidateProcess = Start-Process -FilePath $candidateApp -WorkingDirectory $InstallDir -WindowStyle Hidden -PassThru
+  $candidateProcess = Start-IsolatedManager $candidateApp
   $candidateStatus = Wait-ForStatus $candidateCli
   Invoke-FirstContact $candidateCli $candidateProcess.Id "Restarted candidate Manager"
   Assert-HardwareCardSetting $candidateCli $false "Restarted candidate Manager"
