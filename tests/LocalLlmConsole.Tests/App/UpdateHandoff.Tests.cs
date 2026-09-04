@@ -23,6 +23,8 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
         await File.WriteAllTextAsync(sourceCli, "new-cli", TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(targetCli, "old-cli", TestContext.Current.CancellationToken);
         Process? helper = null;
+        Task<string>? output = null;
+        Task<string>? error = null;
         using var http = new HttpClient();
         using var service = new AppUpdateService(http, info =>
         {
@@ -30,9 +32,13 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
             info.RedirectStandardOutput = true;
             info.RedirectStandardError = true;
             helper = Process.Start(info) ?? throw new InvalidOperationException("No updater process");
+            output = helper.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+            error = helper.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
         });
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        // Allow the production 30-second acknowledgement deadline plus replacement
+        // and process cleanup; coverage on a shared runner can delay PowerShell startup.
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
         try
         {
             var plan = new AppUpdateInstallPlan(script, source, target, Path.Combine(root, "notice.json"), SourceCli: sourceCli, TargetCli: targetCli);
@@ -41,15 +47,19 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
             else
                 await service.StartInstallerAsync(plan, 999999, timeout.Token);
             Assert.NotNull(helper);
-            var output = helper.StandardOutput.ReadToEndAsync(timeout.Token);
-            var error = helper.StandardError.ReadToEndAsync(timeout.Token);
             await helper.WaitForExitAsync(timeout.Token);
-            var diagnostics = (await output) + (await error);
+            var diagnostics = (await output!) + (await error!);
             Assert.Equal(missingSource ? "old-app" : "new-app", await File.ReadAllTextAsync(target, timeout.Token));
             Assert.Equal(missingSource ? "old-cli" : "new-cli", await File.ReadAllTextAsync(targetCli, timeout.Token));
             Assert.True(missingSource ? helper.ExitCode != 0 : helper.ExitCode == 0, diagnostics);
             Assert.Empty(Directory.EnumerateFiles(root, ".*.new"));
             Assert.Empty(Directory.EnumerateFiles(root, ".*.bak"));
+        }
+        catch (Exception ex)
+        {
+            if (helper is { HasExited: false }) { helper.Kill(entireProcessTree: true); await helper.WaitForExitAsync(TestContext.Current.CancellationToken); }
+            var diagnostics = (output is null ? "" : await output) + (error is null ? "" : await error);
+            throw new InvalidOperationException($"Updater handoff failed. Helper output: {diagnostics}", ex);
         }
         finally
         {
