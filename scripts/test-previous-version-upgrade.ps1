@@ -251,7 +251,7 @@ finally {
   }
   $resolved = [System.IO.Path]::GetFullPath($TestRoot)
   if ($cleanupUninstallFailed -or $upgradeFailed) {
-    Write-Warning "Preserving the failed upgrade-test root and diagnostics: $resolved"
+    Write-Warning "Preserving the temporary upgrade-test root and failure diagnostics: $resolved"
   } elseif (($resolved + '\').StartsWith($ExpectedRoot, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolved)) {
     Remove-TestRootWithRetry $resolved
   }
