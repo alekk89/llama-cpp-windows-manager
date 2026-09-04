@@ -114,6 +114,14 @@ publish-only gate is safe beside an installed Manager:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish
 ```
 
+On GitHub Actions, the previous-version upgrade test shuts the Manager down
+through its control API, then prevents Inno Setup from closing or restarting
+other processes. Windows Restart Manager can identify the hosted runner's
+`provjobd.exe` as using the installed files; closing it disconnects the job.
+The test still rejects failed or reboot-deferred upgrades and verifies the new
+version, saved settings, restart, and uninstall. Normal installer behavior and
+local disposable-environment tests retain their default process handling.
+
 Use `-RequireCleanTree` on `scripts/test-release-gate.ps1`,
 `scripts/publish-app.ps1`, or `scripts/build-installer.ps1` when producing release artifacts that must come from a
 clean Git worktree.
