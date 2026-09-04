@@ -125,6 +125,13 @@ try {
   Assert-NoExistingInstallerIdentity
   Assert-TrustedSignature -Path $Installer -Label "Installer"
   New-Item -ItemType Directory -Path $SmokeRoot -Force | Out-Null
+  $runnerArgs = @()
+  if ($env:GITHUB_ACTIONS -eq "true") {
+    # A completed sidecar bootstrap can leave provjobd.exe visible to Restart
+    # Manager. Preserve hosted runner processes during both install and repair.
+    Write-Host "Preserving GitHub runner processes during installer smoke checks."
+    $runnerArgs = @("/NOCLOSEAPPLICATIONS", "/NORESTARTAPPLICATIONS", "/RESTARTEXITCODE=3010")
+  }
   $installArgs = @(
     "/VERYSILENT",
     "/SUPPRESSMSGBOXES",
@@ -133,7 +140,7 @@ try {
     "/DIR=`"$InstallDir`"",
     "/LOG=`"$InstallLog`""
   )
-  Invoke-CheckedProcess -FilePath $Installer -ArgumentList $installArgs -Label "Silent clean install"
+  Invoke-CheckedProcess -FilePath $Installer -ArgumentList ($installArgs + $runnerArgs) -Label "Silent clean install"
   Assert-InstalledFiles
   Assert-TrustedSignature -Path (Join-Path $InstallDir "LlamaCppWindowsManager.exe") -Label "Installed application"
   Assert-TrustedSignature -Path (Join-Path $InstallDir "llwmctl.exe") -Label "Installed control CLI"
@@ -154,7 +161,7 @@ try {
     "/DIR=`"$InstallDir`"",
     "/LOG=`"$RepairLog`""
   )
-  Invoke-CheckedProcess -FilePath $Installer -ArgumentList $repairArgs -Label "Silent repair install"
+  Invoke-CheckedProcess -FilePath $Installer -ArgumentList ($repairArgs + $runnerArgs) -Label "Silent repair install"
   Assert-InstalledFiles
   Assert-TrustedSignature -Path (Join-Path $InstallDir "LlamaCppWindowsManager.exe") -Label "Repaired application"
   Assert-TrustedSignature -Path (Join-Path $InstallDir "llwmctl.exe") -Label "Repaired control CLI"
