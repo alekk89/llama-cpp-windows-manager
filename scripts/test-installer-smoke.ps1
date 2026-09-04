@@ -58,16 +58,36 @@ function Invoke-CheckedProcess {
     [Parameter(Mandatory = $true)][string] $Label
   )
   Write-Host "$Label..."
-  $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru -WindowStyle Hidden
-  if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) {
-    & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
-    if (-not $process.HasExited) {
-      Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+  $startInfo = [Diagnostics.ProcessStartInfo]::new($FilePath)
+  $startInfo.Arguments = $ArgumentList -join ' '
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  $process = [Diagnostics.Process]::Start($startInfo)
+  Write-Host "$Label started as PID $($process.Id)."
+  try {
+    if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) {
+      Write-Warning "$Label timed out; terminating PID $($process.Id)."
+      $killInfo = [Diagnostics.ProcessStartInfo]::new('taskkill.exe', "/PID $($process.Id) /T /F")
+      $killInfo.UseShellExecute = $false
+      $killInfo.CreateNoWindow = $true
+      $killer = [Diagnostics.Process]::Start($killInfo)
+      try {
+        if (-not $killer.WaitForExit(10000)) { $killer.Kill() }
+      } finally { $killer.Dispose() }
+      throw "$Label exceeded the $ProcessTimeoutSeconds-second timeout."
     }
-    throw "$Label exceeded the $ProcessTimeoutSeconds-second timeout."
-  }
-  if ($process.ExitCode -ne 0) {
-    throw "$Label failed with exit code $($process.ExitCode)."
+    if ($process.ExitCode -ne 0) {
+      throw "$Label failed with exit code $($process.ExitCode)."
+    }
+  } catch {
+    foreach ($log in @(Get-ChildItem -LiteralPath $SmokeRoot -Filter *.log -File -ErrorAction SilentlyContinue)) {
+      Write-Host "Installer diagnostic: $($log.Name)"
+      Get-Content -LiteralPath $log.FullName -Tail 80
+    }
+    throw
+  } finally {
+    $process.Dispose()
   }
   Write-Host "$Label completed."
 }

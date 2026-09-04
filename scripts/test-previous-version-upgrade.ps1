@@ -40,8 +40,28 @@ $oldWorkspaceVariable = $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE
 
 function Invoke-CheckedProcess {
   param([string] $FilePath, [string[]] $ArgumentList, [string] $Label)
-  $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Wait -PassThru -WindowStyle Hidden
-  if ($process.ExitCode -ne 0) { throw "$Label failed with exit code $($process.ExitCode)." }
+  $startInfo = [Diagnostics.ProcessStartInfo]::new($FilePath)
+  $startInfo.Arguments = $ArgumentList -join ' '
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  $process = [Diagnostics.Process]::Start($startInfo)
+  Write-Host "$Label started as PID $($process.Id)."
+  try {
+    if (-not $process.WaitForExit(120000)) {
+      $killInfo = [Diagnostics.ProcessStartInfo]::new('taskkill.exe', "/PID $($process.Id) /T /F")
+      $killInfo.UseShellExecute = $false
+      $killInfo.CreateNoWindow = $true
+      $killer = [Diagnostics.Process]::Start($killInfo)
+      try {
+        if (-not $killer.WaitForExit(10000)) { $killer.Kill() }
+      } finally { $killer.Dispose() }
+      throw "$Label exceeded the 120-second timeout."
+    }
+    if ($process.ExitCode -ne 0) { throw "$Label failed with exit code $($process.ExitCode)." }
+  } finally {
+    $process.Dispose()
+  }
 }
 
 function Invoke-Ctl {
