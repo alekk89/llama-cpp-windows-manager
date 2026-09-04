@@ -39,7 +39,7 @@ $ExpectedRoot = [System.IO.Path]::GetFullPath($TestRoot).TrimEnd('\') + '\'
 $oldWorkspaceVariable = $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE
 
 function Invoke-CheckedProcess {
-  param([string] $FilePath, [string[]] $ArgumentList, [string] $Label)
+  param([string] $FilePath, [string[]] $ArgumentList, [string] $Label, [string] $LogPath = "")
   $startInfo = [Diagnostics.ProcessStartInfo]::new($FilePath)
   $startInfo.Arguments = $ArgumentList -join ' '
   $startInfo.UseShellExecute = $false
@@ -47,8 +47,23 @@ function Invoke-CheckedProcess {
   $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
   $process = [Diagnostics.Process]::Start($startInfo)
   Write-Host "$Label started as PID $($process.Id)."
+  $watch = [Diagnostics.Stopwatch]::StartNew()
+  $logLineCount = 0
+  $nextHeartbeat = 15
   try {
-    if (-not $process.WaitForExit(120000)) {
+    do {
+      $exited = $process.WaitForExit(250)
+      if ($LogPath -and (Test-Path -LiteralPath $LogPath)) {
+        $lines = @(Get-Content -LiteralPath $LogPath -ErrorAction SilentlyContinue)
+        for ($line = $logLineCount; $line -lt $lines.Count; $line++) { Write-Host $lines[$line] }
+        $logLineCount = $lines.Count
+      }
+      if (-not $exited -and $watch.Elapsed.TotalSeconds -ge $nextHeartbeat) {
+        Write-Host "$Label is still running after $([int]$watch.Elapsed.TotalSeconds) seconds (PID $($process.Id))."
+        $nextHeartbeat += 15
+      }
+    } while (-not $exited -and $watch.Elapsed.TotalSeconds -lt 120)
+    if (-not $exited) {
       $killInfo = [Diagnostics.ProcessStartInfo]::new('taskkill.exe', "/PID $($process.Id) /T /F")
       $killInfo.UseShellExecute = $false
       $killInfo.CreateNoWindow = $true
@@ -59,9 +74,22 @@ function Invoke-CheckedProcess {
       throw "$Label exceeded the 120-second timeout."
     }
     if ($process.ExitCode -ne 0) { throw "$Label failed with exit code $($process.ExitCode)." }
+    Write-Host "$Label completed."
   } finally {
     $process.Dispose()
   }
+}
+
+function Start-IsolatedManager([string] $FilePath) {
+  Write-Host "Starting isolated Manager: $FilePath"
+  $startInfo = [Diagnostics.ProcessStartInfo]::new($FilePath)
+  $startInfo.WorkingDirectory = $InstallDir
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  $process = [Diagnostics.Process]::Start($startInfo)
+  Write-Host "Isolated Manager started as PID $($process.Id)."
+  return $process
 }
 
 function Invoke-Ctl {
@@ -88,7 +116,10 @@ function Wait-ForStatus([string] $Cli) {
     } finally {
       $ErrorActionPreference = $previousPreference
     }
-    if ($exitCode -eq 0) { return $output -join [Environment]::NewLine }
+    if ($exitCode -eq 0) {
+      Write-Host 'Isolated Manager control API is ready.'
+      return $output -join [Environment]::NewLine
+    }
     Start-Sleep -Milliseconds 500
   }
   throw "The isolated Manager control API did not become ready."
@@ -142,12 +173,13 @@ try {
   $actualHash = (Get-FileHash -LiteralPath $PreviousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($actualHash -ne $Baseline.installer.sha256) { throw "Pinned previous installer hash mismatch." }
 
-  $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/DIR=`"$InstallDir`"")
-  Invoke-CheckedProcess $PreviousInstaller $installArgs "Previous-version install"
+  $installLog = Join-Path $TestRoot "installer.log"
+  $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/DIR=`"$InstallDir`"", "/LOG=`"$installLog`"", "/LOGCLOSEAPPLICATIONS")
+  Invoke-CheckedProcess $PreviousInstaller $installArgs "Previous-version install" $installLog
   $previousApp = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   $previousCli = Join-Path $InstallDir "llwmctl.exe"
   $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE = $Workspace
-  $oldProcess = Start-Process -FilePath $previousApp -WorkingDirectory $InstallDir -WindowStyle Hidden -PassThru
+  $oldProcess = Start-IsolatedManager $previousApp
   $oldStatus = Wait-ForStatus $previousCli
   Invoke-FirstContact $previousCli $oldProcess.Id "Previous Manager"
   $previousVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($previousApp).FileVersion
@@ -159,13 +191,13 @@ try {
 
   Set-Content -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary") -Value "preserve" -Encoding ascii
   Set-Content -LiteralPath (Join-Path $ExternalData "external-preserve.canary") -Value "external" -Encoding ascii
-  Invoke-CheckedProcess $Candidate $installArgs "Candidate upgrade install"
+  Invoke-CheckedProcess $Candidate $installArgs "Candidate upgrade install" $installLog
   if (-not (Test-Path -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary"))) { throw "Upgrade removed workspace state." }
   if (-not (Test-Path -LiteralPath (Join-Path $ExternalData "external-preserve.canary"))) { throw "Upgrade removed external user data." }
 
   $candidateApp = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   $candidateCli = Join-Path $InstallDir "llwmctl.exe"
-  $candidateProcess = Start-Process -FilePath $candidateApp -WorkingDirectory $InstallDir -WindowStyle Hidden -PassThru
+  $candidateProcess = Start-IsolatedManager $candidateApp
   $candidateStatus = Wait-ForStatus $candidateCli
   Invoke-FirstContact $candidateCli $candidateProcess.Id "Candidate Manager"
   $candidateVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($candidateApp).FileVersion
@@ -174,7 +206,7 @@ try {
   Invoke-Ctl $candidateCli @("operations", "run", "app.shutdown", "--confirm", "--allow-self-stop", "--process-id", $candidateProcess.Id.ToString(), "--workspace", $Workspace) "Candidate Manager shutdown" | Out-Null
   if (-not $candidateProcess.WaitForExit(15000)) { throw "Candidate Manager did not complete its verified shutdown." }
 
-  $candidateProcess = Start-Process -FilePath $candidateApp -WorkingDirectory $InstallDir -WindowStyle Hidden -PassThru
+  $candidateProcess = Start-IsolatedManager $candidateApp
   $candidateStatus = Wait-ForStatus $candidateCli
   Invoke-FirstContact $candidateCli $candidateProcess.Id "Restarted candidate Manager"
   Assert-HardwareCardSetting $candidateCli $false "Restarted candidate Manager"
