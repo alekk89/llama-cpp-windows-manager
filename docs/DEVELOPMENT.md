@@ -114,9 +114,10 @@ publish-only gate is safe beside an installed Manager:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -IncludePublish
 ```
 
-On GitHub Actions, the previous-version upgrade test shuts the Manager down
-through its control API, then prevents Inno Setup from closing or restarting
-other processes. Windows Restart Manager can identify the hosted runner's
+On GitHub Actions, installer smoke and previous-version upgrade tests prevent
+Inno Setup from closing or restarting other processes. The upgrade test shuts
+the Manager down through its control API first; the smoke test only runs the
+sidecar bootstrap and waits for it to exit. Windows Restart Manager can identify the hosted runner's
 `provjobd.exe` as using the installed files; closing it disconnects the job.
 The test still rejects failed or reboot-deferred upgrades and verifies the new
 version, saved settings, restart, and uninstall. Normal installer behavior and
