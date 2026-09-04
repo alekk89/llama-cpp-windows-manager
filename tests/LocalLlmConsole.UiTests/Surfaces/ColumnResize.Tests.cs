@@ -27,7 +27,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
             await store.InitializeAsync();
             var (root, grid) = BuildPage(page);
             var host = new ContentControl { Content = root };
-            var window = new Window { Content = host, Width = 1600, Height = 800, ShowInTaskbar = false };
+            var window = CreateResizeWindow(host, 1600);
             window.Show();
             try
             {
@@ -79,7 +79,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
             await store.InitializeAsync();
             var (root, grid) = BuildPage(page);
             var host = new ContentControl { Content = root };
-            var window = new Window { Content = host, Width = 1600, Height = 800, ShowInTaskbar = false };
+            var window = CreateResizeWindow(host, 1600);
             window.Show();
             try
             {
@@ -119,7 +119,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
             await store.InitializeAsync();
             var (root, grid) = BuildPage(page);
             var host = new ContentControl { Content = root };
-            var window = new Window { Content = host, Width = 1600, Height = 800, ShowInTaskbar = false };
+            var window = CreateResizeWindow(host, 1600);
             window.Show();
             try
             {
@@ -129,9 +129,12 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                 window.Close();
                 (root, grid) = BuildPage(page);
                 host = new ContentControl { Content = root };
-                window = new Window { Content = host, Width = 1200, Height = 800, ShowInTaskbar = false };
+                window = CreateResizeWindow(host, 1200);
                 window.Show();
                 await new UiLayoutPersistenceService(store).AttachShellAsync(window, host, () => page);
+                // Shell restoration correctly clamps to the runner's desktop. Give
+                // this column-resize test its intended viewport after restoration.
+                window.Width = 1600;
                 await SettleAsync(window);
                 foreach (var column in grid.Columns.Where(column => column.CanUserResize && column.MaxWidth > column.MinWidth))
                 {
@@ -175,7 +178,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
             await store.InitializeAsync();
             var (root, grid) = BuildPage(page);
             var host = new ContentControl { Content = root };
-            var window = new Window { Content = host, Width = 1200, Height = 800, ShowInTaskbar = false };
+            var window = CreateResizeWindow(host, 1200);
             var service = new UiLayoutPersistenceService(store);
             window.Show();
             try
@@ -201,7 +204,8 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                 var widths = grid.Columns.ToDictionary(column => column, column => column.ActualWidth);
                 window.Width = 1600;
                 await SettleAsync(window);
-                Assert.True(name.ActualWidth > widths[name]);
+                Assert.True(name.ActualWidth > widths[name],
+                    $"{page}: requested window {window.Width}, actual {window.ActualWidth}, grid {grid.ActualWidth}, name {widths[name]} -> {name.ActualWidth}, desktop {SystemParameters.VirtualScreenWidth}.");
                 foreach (var column in grid.Columns.Where(column => !ReferenceEquals(column, name)))
                     Assert.Equal(widths[column], column.ActualWidth, precision: 1);
                 Assert.All(grid.Columns, column => Assert.True(column.Width.IsAbsolute));
@@ -220,7 +224,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                 window.Close();
                 var restored = BuildPage(page);
                 host = new ContentControl { Content = restored.Root };
-                window = new Window { Content = host, Width = 1200, Height = 800, ShowInTaskbar = false };
+                window = CreateResizeWindow(host, 1200);
                 window.Show();
                 await new UiLayoutPersistenceService(store).AttachShellAsync(window, host, () => page);
                 await SettleAsync(window);
@@ -258,6 +262,11 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
 
     private static async Task SettleAsync(Window window)
         => await window.Dispatcher.InvokeAsync(window.UpdateLayout, DispatcherPriority.ContextIdle);
+
+    private static Window CreateResizeWindow(ContentControl host, double width)
+        // Explicit tracking limits let the test window exceed a headless runner's
+        // small desktop; otherwise Win32 caps both resize widths to the same size.
+        => new() { Content = host, Width = width, Height = 800, MaxWidth = 2400, MaxHeight = 1600, ShowInTaskbar = false };
 
     private static (FrameworkElement Root, DataGrid Grid) BuildPage(string page)
     {

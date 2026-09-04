@@ -275,6 +275,10 @@ Invoke-GateStep "Build app" {
   & powershell.exe @buildArgs
 }
 
+Invoke-GateStep "Verify updater handoff without instrumentation" {
+  & $dotnet test --project (Join-Path $RepoRoot "tests\LocalLlmConsole.Tests") --no-restore --filter-class '*UpdateHandoffTests'
+}
+
 Invoke-GateStep "Run tests and enforce coverage" {
   # Release binaries deliberately omit PDBs. Coverage is collected from the same
   # source in Debug while the separate build step enforces Release compilation.
