@@ -55,7 +55,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                     Assert.Equal(widths[column], column.ActualWidth, precision: 1);
                 DragBoundary(grid, useLeftGripper ? delete : preceding, useLeftGripper, -40);
                 await SettleAsync(window);
-                window.Width += 200;
+                host.Width += 200;
                 await SettleAsync(window);
                 Assert.Equal(widths[delete] + 40, delete.ActualWidth, precision: 1);
             }
@@ -132,9 +132,9 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                 window = CreateResizeWindow(host, 1200);
                 window.Show();
                 await new UiLayoutPersistenceService(store).AttachShellAsync(window, host, () => page);
-                // Shell restoration correctly clamps to the runner's desktop. Give
-                // this column-resize test its intended viewport after restoration.
-                window.Width = 1600;
+                // Shell restoration can clamp the native window to the desktop.
+                // Resize the explicit content viewport independently of that limit.
+                host.Width = 1600;
                 await SettleAsync(window);
                 foreach (var column in grid.Columns.Where(column => column.CanUserResize && column.MaxWidth > column.MinWidth))
                 {
@@ -155,7 +155,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                 DragBoundary(grid, delete, false, 20);
                 await SettleAsync(window);
                 Assert.Equal(delete.MinWidth + 50, delete.ActualWidth, precision: 1);
-                window.Width += 200;
+                host.Width += 200;
                 await SettleAsync(window);
                 Assert.Equal(delete.MinWidth + 50, delete.ActualWidth, precision: 1);
             }
@@ -170,7 +170,7 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
     [InlineData("Models", true)]
     [InlineData("Runtimes", true)]
     [InlineData("Packages", true)]
-    public async Task DraggingActionColumnsThenGrowingWindowOnlyExpandsName(string page, bool resizeNeighbor)
+    public async Task DraggingActionColumnsThenGrowingViewportOnlyExpandsName(string page, bool resizeNeighbor)
     {
         await RunStaAsync(async () =>
         {
@@ -202,20 +202,21 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
 
                 var name = grid.Columns.OfType<DataGridTextColumn>().First();
                 var widths = grid.Columns.ToDictionary(column => column, column => column.ActualWidth);
-                window.Width = 1600;
+                host.Width = 1600;
                 await SettleAsync(window);
+                Assert.Equal(host.Width, host.ActualWidth, precision: 1);
                 Assert.True(name.ActualWidth > widths[name],
-                    $"{page}: requested window {window.Width}, actual {window.ActualWidth}, grid {grid.ActualWidth}, name {widths[name]} -> {name.ActualWidth}, desktop {SystemParameters.VirtualScreenWidth}.");
+                    $"{page}: requested viewport {host.Width}, actual {host.ActualWidth}, grid {grid.ActualWidth}, name {widths[name]} -> {name.ActualWidth}.");
                 foreach (var column in grid.Columns.Where(column => !ReferenceEquals(column, name)))
                     Assert.Equal(widths[column], column.ActualWidth, precision: 1);
                 Assert.All(grid.Columns, column => Assert.True(column.Width.IsAbsolute));
 
-                window.Width = 1000;
+                host.Width = 1000;
                 await SettleAsync(window);
                 var narrowed = grid.Columns.Select(column => column.ActualWidth).ToArray();
                 foreach (var column in grid.Columns.Where(column => !ReferenceEquals(column, name)))
                     Assert.Equal(widths[column], column.ActualWidth, precision: 1);
-                window.Width = 1600;
+                host.Width = 1600;
                 await SettleAsync(window);
                 foreach (var column in grid.Columns.Where(column => !ReferenceEquals(column, name)))
                     Assert.Equal(narrowed[grid.Columns.IndexOf(column)], column.ActualWidth, precision: 1);
@@ -264,9 +265,15 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
         => await window.Dispatcher.InvokeAsync(window.UpdateLayout, DispatcherPriority.ContextIdle);
 
     private static Window CreateResizeWindow(ContentControl host, double width)
-        // Explicit tracking limits let the test window exceed a headless runner's
-        // small desktop; otherwise Win32 caps both resize widths to the same size.
-        => new() { Content = host, Width = width, Height = 800, MaxWidth = 2400, MaxHeight = 1600, ShowInTaskbar = false };
+    {
+        // Exercise real loaded controls and SizeChanged events with an explicit
+        // layout viewport; a native window cannot exceed the CI desktop bounds.
+        host.Width = width;
+        host.Height = 760;
+        host.HorizontalAlignment = HorizontalAlignment.Left;
+        host.VerticalAlignment = VerticalAlignment.Top;
+        return new Window { Content = host, Width = 800, Height = 600, ShowInTaskbar = false };
+    }
 
     private static (FrameworkElement Root, DataGrid Grid) BuildPage(string page)
     {

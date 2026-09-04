@@ -77,6 +77,7 @@ That wrapper runs the same gate as the individual commands below:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-app.ps1 -Restore
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-code-shape.ps1
+dotnet test --project tests/LocalLlmConsole.Tests --no-restore --filter-class "*UpdateHandoffTests"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-coverage.ps1
 dotnet format LocalLlmConsole.sln --verify-no-changes --no-restore --verbosity minimal
 git diff --check

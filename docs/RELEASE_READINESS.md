@@ -5,13 +5,23 @@ Last updated: 2026-09-04
 The v2.7 release is explicitly unsigned and ships the installer and portable EXE
 with SHA-256 companions. See [UNSIGNED_RELEASE.md](UNSIGNED_RELEASE.md).
 
-The latest unsigned preparation passed 987 tests (933 service/core and 54 WPF),
+The local unsigned preparation passed 987 tests (933 service/core and 54 WPF),
 the source/publish gate, standalone sidecar restoration, and pinned v2.6 portable
 replacement with data preservation. The packaged updater checked and staged a
 simulated future unsigned release using its real version with commit metadata.
-The installer was rebuilt, but its final clean-Windows lifecycle/upgrade gate
-and the outstanding LAN/manual checks below still need completion. Earlier
-dated test counts in this document describe their respective audit phases.
+Live Proxmox-to-Manager tests passed missing/invalid/valid key handling, model
+discovery, inference and streaming through both the gateway and direct LAN
+endpoint. Changing text scale during a live stream did not interrupt it.
+
+Keyboard navigation, endpoint copying, light/dark readability and the candidate's
+large-scale sidebar were exercised. Cross-monitor dragging was confirmed by the
+owner. Spoken Narrator and Windows high-contrast presentation remain unverified;
+these are disclosed accessibility validation limits, not confirmed defects.
+
+Before publication, the final commit must pass required PR checks and the clean
+Windows unsigned preparation workflow, including installer lifecycle, pinned
+v2.6 installer upgrade and portable replacement. Release assets must embed that
+exact source commit. Earlier dated counts below describe their audit phases.
 
 ## Automated Gate
 
