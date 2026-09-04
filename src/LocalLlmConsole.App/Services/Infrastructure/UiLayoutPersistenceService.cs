@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -36,11 +35,12 @@ public sealed class UiLayoutPersistenceService
     public Task SaveShellAsync()
         => _shell?.SaveNowAsync() ?? Task.CompletedTask;
 
-    private async Task<PageAttachment> RestorePageAsync(string page, FrameworkElement root)
+    private async Task<PageAttachment> RestorePageAsync(string page, FrameworkElement root, CancellationToken cancellationToken)
     {
-        await WaitUntilLoadedAsync(root);
+        await WaitUntilLoadedAsync(root, cancellationToken);
         var scope = PageScope(page);
         var json = await _stateStore.GetUiLayoutStateAsync(scope);
+        cancellationToken.ThrowIfCancellationRequested();
         var attachment = new PageAttachment(this, scope, root);
         if (!string.IsNullOrWhiteSpace(json))
         {
@@ -82,7 +82,7 @@ public sealed class UiLayoutPersistenceService
             "window.main",
             JsonSerializer.Serialize(WindowLayout.Capture(window), JsonOptions));
 
-    private static async Task WaitUntilLoadedAsync(FrameworkElement root)
+    private static async Task WaitUntilLoadedAsync(FrameworkElement root, CancellationToken cancellationToken)
     {
         if (!root.IsLoaded)
         {
@@ -94,10 +94,11 @@ public sealed class UiLayoutPersistenceService
                 loaded.TrySetResult();
             };
             root.Loaded += handler;
-            await loaded.Task;
+            try { await loaded.Task.WaitAsync(cancellationToken); }
+            finally { root.Loaded -= handler; }
         }
 
-        await root.Dispatcher.InvokeAsync(root.UpdateLayout, DispatcherPriority.Loaded);
+        await root.Dispatcher.InvokeAsync(root.UpdateLayout, DispatcherPriority.Loaded, cancellationToken);
     }
 
     private static string PageScope(string page)
@@ -146,6 +147,8 @@ public sealed class UiLayoutPersistenceService
         private readonly SemaphoreSlim _pageSwitchGate = new(1, 1);
         private readonly DependencyPropertyDescriptor _contentDescriptor;
         private PageAttachment? _page;
+        private CancellationTokenSource? _pageRestore;
+        private bool _closed;
 
         public ShellAttachment(
             UiLayoutPersistenceService owner,
@@ -171,7 +174,8 @@ public sealed class UiLayoutPersistenceService
             _window.SizeChanged += WindowLayoutChanged;
             _window.StateChanged += WindowLayoutChanged;
             _contentDescriptor.AddValueChanged(_pageHost, PageContentChanged);
-            await SwitchPageAsync();
+            _window.Closed += WindowClosed;
+            await QueuePageSwitchAsync();
         }
 
         public async Task SaveNowAsync()
@@ -197,28 +201,59 @@ public sealed class UiLayoutPersistenceService
         }
 
         private void PageContentChanged(object? sender, EventArgs args)
-            => _ = SwitchPageSafelyAsync();
+            => _ = QueuePageSwitchAsync();
 
-        private async Task SwitchPageSafelyAsync()
+        private Task QueuePageSwitchAsync()
         {
-            try { await SwitchPageAsync(); }
-            catch (Exception ex) { Trace.TraceWarning($"Could not restore the page layout: {ex.Message}"); }
+            if (_closed) return Task.CompletedTask;
+            _pageRestore?.Cancel();
+            var cancellation = new CancellationTokenSource();
+            _pageRestore = cancellation;
+            return SwitchPageSafelyAsync(cancellation);
         }
 
-        private async Task SwitchPageAsync()
+        private async Task SwitchPageSafelyAsync(CancellationTokenSource cancellation)
         {
-            await _pageSwitchGate.WaitAsync();
+            try { await SwitchPageAsync(cancellation.Token); }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            catch (Exception ex) { Trace.TraceWarning($"Could not restore the page layout: {ex.Message}"); }
+            finally
+            {
+                if (ReferenceEquals(_pageRestore, cancellation)) _pageRestore = null;
+                cancellation.Dispose();
+            }
+        }
+
+        private void WindowClosed(object? sender, EventArgs args)
+        {
+            _closed = true;
+            _pageRestore?.Cancel();
+            _windowSaveTimer.Stop();
+            _window.LocationChanged -= WindowLayoutChanged;
+            _window.SizeChanged -= WindowLayoutChanged;
+            _window.StateChanged -= WindowLayoutChanged;
+            _window.Closed -= WindowClosed;
+            _contentDescriptor.RemoveValueChanged(_pageHost, PageContentChanged);
+            _page?.Dispose();
+            _page = null;
+        }
+
+        private async Task SwitchPageAsync(CancellationToken cancellationToken)
+        {
+            await _pageSwitchGate.WaitAsync(cancellationToken);
             try
             {
                 if (_page is not null)
                 {
-                    await _page.SaveNowAsync();
-                    _page.Dispose();
-                    _page = null;
+                    var previous = _page;
+                    await previous.SaveNowAsync();
+                    previous.Dispose();
+                    if (ReferenceEquals(_page, previous)) _page = null;
                 }
 
+                cancellationToken.ThrowIfCancellationRequested();
                 if (_pageHost.Content is FrameworkElement root)
-                    _page = await _owner.RestorePageAsync(_currentPage(), root);
+                    _page = await _owner.RestorePageAsync(_currentPage(), root, cancellationToken);
             }
             finally
             {
@@ -233,11 +268,10 @@ public sealed class UiLayoutPersistenceService
         private readonly string _scope;
         private readonly FrameworkElement _root;
         private readonly DispatcherTimer _saveTimer;
-        private readonly Dictionary<DataGrid, HashSet<DataGridColumn>> _proportionalColumns;
+        private readonly HashSet<DataGrid> _fillGrids;
         private readonly List<(DataGridColumn Column, EventHandler Handler)> _columnHandlers = [];
         private readonly List<(DataGrid Grid, EventHandler<DataGridColumnEventArgs> Handler)> _displayHandlers = [];
-        private readonly List<(DataGrid Grid, MouseButtonEventHandler Pressed, DragCompletedEventHandler Completed)> _columnResizeHandlers = [];
-        private readonly Dictionary<DataGrid, (DataGridColumn Column, double MaxWidth)> _activeColumnResizes = [];
+        private readonly List<DataGridColumnResizeBehavior> _columnResizes = [];
         private readonly List<(GridSplitter Splitter, DragCompletedEventHandler Handler)> _splitterHandlers = [];
         private bool _restoring;
         private bool _disposed;
@@ -247,9 +281,7 @@ public sealed class UiLayoutPersistenceService
             _owner = owner;
             _scope = scope;
             _root = root;
-            _proportionalColumns = Descendants<DataGrid>(root).ToDictionary(
-                grid => grid,
-                grid => grid.Columns.Where(column => column.Width.IsStar).ToHashSet());
+            _fillGrids = Descendants<DataGrid>(root).Where(DataGridColumnSizing.UsesFillColumn).ToHashSet();
             _saveTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(350), DispatcherPriority.Background, SaveTimerTick, root.Dispatcher)
             {
                 IsEnabled = false
@@ -271,7 +303,7 @@ public sealed class UiLayoutPersistenceService
                     ApplySplitter(splitters[index], layout.Splitters[index]);
                 _root.UpdateLayout();
                 foreach (var grid in grids)
-                    RestoreProportionalColumns(grid);
+                    RestoreColumnSizing(grid);
                 _root.UpdateLayout();
             }
             finally
@@ -285,6 +317,7 @@ public sealed class UiLayoutPersistenceService
             var descriptor = DependencyPropertyDescriptor.FromProperty(DataGridColumn.WidthProperty, typeof(DataGridColumn));
             foreach (var grid in Descendants<DataGrid>(_root))
             {
+                RestoreColumnSizing(grid);
                 foreach (var column in grid.Columns)
                 {
                     EventHandler handler = (_, _) => ScheduleSave();
@@ -292,15 +325,15 @@ public sealed class UiLayoutPersistenceService
                     _columnHandlers.Add((column, handler));
                 }
 
-                EventHandler<DataGridColumnEventArgs> displayHandler = (_, _) => ScheduleSave();
+                EventHandler<DataGridColumnEventArgs> displayHandler = (_, _) =>
+                {
+                    RestoreColumnSizing(grid);
+                    ScheduleSave();
+                };
                 grid.ColumnDisplayIndexChanged += displayHandler;
                 _displayHandlers.Add((grid, displayHandler));
 
-                MouseButtonEventHandler resizePressed = (_, args) => BeginColumnResize(grid, args);
-                DragCompletedEventHandler resizeCompleted = (_, args) => CompleteColumnResize(grid, args);
-                grid.AddHandler(Mouse.PreviewMouseDownEvent, resizePressed, handledEventsToo: true);
-                grid.AddHandler(Thumb.DragCompletedEvent, resizeCompleted, handledEventsToo: true);
-                _columnResizeHandlers.Add((grid, resizePressed, resizeCompleted));
+                if (_fillGrids.Contains(grid)) _columnResizes.Add(new DataGridColumnResizeBehavior(grid, ScheduleSave));
             }
 
             foreach (var splitter in Descendants<GridSplitter>(_root))
@@ -328,82 +361,15 @@ public sealed class UiLayoutPersistenceService
                 descriptor.RemoveValueChanged(column, handler);
             foreach (var (grid, handler) in _displayHandlers)
                 grid.ColumnDisplayIndexChanged -= handler;
-            foreach (var (grid, pressed, completed) in _columnResizeHandlers)
-            {
-                grid.RemoveHandler(Mouse.PreviewMouseDownEvent, pressed);
-                grid.RemoveHandler(Thumb.DragCompletedEvent, completed);
-            }
-            foreach (var (_, active) in _activeColumnResizes)
-                active.Column.MaxWidth = active.MaxWidth;
-            _activeColumnResizes.Clear();
+            foreach (var resize in _columnResizes) resize.Dispose();
+            _columnResizes.Clear();
             foreach (var (splitter, handler) in _splitterHandlers)
                 splitter.DragCompleted -= handler;
         }
 
-        private void BeginColumnResize(DataGrid grid, MouseButtonEventArgs args)
+        private void RestoreColumnSizing(DataGrid grid)
         {
-            if (_restoring || _disposed || args.ChangedButton != MouseButton.Left
-                || args.OriginalSource is not DependencyObject source
-                || ResizedColumn(grid, source) is not { } resizedColumn
-                || !FinitePositive(resizedColumn.ActualWidth))
-                return;
-
-            if (_activeColumnResizes.Remove(grid, out var previous))
-                previous.Column.MaxWidth = previous.MaxWidth;
-
-            var originalMaxWidth = resizedColumn.MaxWidth;
-            var availableGrowth = _proportionalColumns.TryGetValue(grid, out var proportionalColumns)
-                ? proportionalColumns
-                    .Where(column => !ReferenceEquals(column, resizedColumn))
-                    .Sum(column => Math.Max(0, column.ActualWidth - column.MinWidth))
-                : 0;
-            var viewportLimit = resizedColumn.ActualWidth + availableGrowth;
-            if (double.IsFinite(viewportLimit) && viewportLimit >= resizedColumn.ActualWidth)
-            {
-                resizedColumn.MaxWidth = Math.Min(originalMaxWidth, viewportLimit);
-                _activeColumnResizes[grid] = (resizedColumn, originalMaxWidth);
-            }
-
-            resizedColumn.Width = new DataGridLength(resizedColumn.ActualWidth, DataGridLengthUnitType.Pixel);
-        }
-
-        private void CompleteColumnResize(DataGrid grid, DragCompletedEventArgs args)
-        {
-            if (_restoring || _disposed || !_activeColumnResizes.Remove(grid, out var active))
-                return;
-
-            var renderedWidth = active.Column.ActualWidth;
-            active.Column.MaxWidth = active.MaxWidth;
-            if (!FinitePositive(renderedWidth)) return;
-
-            active.Column.Width = new DataGridLength(renderedWidth, DataGridLengthUnitType.Pixel);
-            RestoreProportionalColumns(grid);
-            grid.UpdateLayout();
-            ScheduleSave();
-        }
-
-        private static DataGridColumn? ResizedColumn(DataGrid grid, DependencyObject source)
-        {
-            if (source is not FrameworkElement { Name: "PART_LeftHeaderGripper" or "PART_RightHeaderGripper" } gripper
-                || VisualTreeTraversal.FindAncestor<DataGridColumnHeader>(source) is not { Column: { } headerColumn } header)
-                return null;
-
-            return gripper.Name == "PART_LeftHeaderGripper"
-                ? grid.Columns.FirstOrDefault(column => column.DisplayIndex == headerColumn.DisplayIndex - 1)
-                : header.Column;
-        }
-
-        private void RestoreProportionalColumns(DataGrid grid)
-        {
-            if (_proportionalColumns.TryGetValue(grid, out var proportionalColumns))
-            {
-                var renderedWidths = grid.Columns.ToDictionary(column => column, column => column.ActualWidth);
-                foreach (var column in proportionalColumns)
-                {
-                    if (renderedWidths.TryGetValue(column, out var width) && FinitePositive(width))
-                        column.Width = new DataGridLength(width, DataGridLengthUnitType.Star);
-                }
-            }
+            if (_fillGrids.Contains(grid)) DataGridColumnSizing.FillLeftColumn(grid);
         }
 
         private void ScheduleSave()

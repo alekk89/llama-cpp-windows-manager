@@ -9,12 +9,13 @@ public static class BenchmarkRuntimeToolAdapter
         string wslDistro,
         string benchmarkExecutable,
         IReadOnlyList<string> arguments,
-        string processMarker)
+        string processMarker,
+        int vulkanAllocationBlockSizeMiB = 0)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentException.ThrowIfNullOrWhiteSpace(benchmarkExecutable);
         var startInfo = runtime.Mode == RuntimeMode.Wsl
-            ? CreateWslStartInfo(runtime, wslDistro, benchmarkExecutable, arguments, processMarker)
+            ? CreateWslStartInfo(runtime, wslDistro, benchmarkExecutable, arguments, processMarker, vulkanAllocationBlockSizeMiB)
             : CreateNativeStartInfo(runtime, benchmarkExecutable, arguments);
         startInfo.UseShellExecute = false;
         startInfo.CreateNoWindow = true;
@@ -23,6 +24,8 @@ public static class BenchmarkRuntimeToolAdapter
         startInfo.RedirectStandardError = true;
         startInfo.StandardOutputEncoding = Encoding.UTF8;
         startInfo.StandardErrorEncoding = Encoding.UTF8;
+        if (runtime.Mode == RuntimeMode.Native)
+            RuntimeVulkanEnvironment.ApplyNative(startInfo, runtime.Backend, vulkanAllocationBlockSizeMiB);
         return startInfo;
     }
 
@@ -60,7 +63,8 @@ public static class BenchmarkRuntimeToolAdapter
         string wslDistro,
         string benchmarkExecutable,
         IReadOnlyList<string> arguments,
-        string processMarker)
+        string processMarker,
+        int vulkanAllocationBlockSizeMiB)
     {
         if (string.IsNullOrWhiteSpace(wslDistro))
             throw new InvalidOperationException("The selected WSL runtime requires a distro name.");
@@ -72,7 +76,8 @@ public static class BenchmarkRuntimeToolAdapter
             : "";
         var libraryPath = $"{CommandLineService.BashQuote(bin)}:{CommandLineService.BashQuote(lib)}:\"${{LD_LIBRARY_PATH:-}}\"";
         var marker = string.IsNullOrWhiteSpace(processMarker) ? "" : $" -a {CommandLineService.BashQuote(processMarker)}";
-        var command = $"{sycl}export LD_LIBRARY_PATH={libraryPath}; "
+        var command = RuntimeVulkanEnvironment.WslPrefix(runtime.Backend, vulkanAllocationBlockSizeMiB)
+            + $"{sycl}export LD_LIBRARY_PATH={libraryPath}; "
             + $"cd {CommandLineService.BashQuote(string.IsNullOrWhiteSpace(bin) ? "/" : bin)}; "
             + $"exec{marker} {CommandLineService.BashQuote(executable)} {string.Join(" ", arguments.Select(CommandLineService.BashQuote))}";
         var startInfo = new ProcessStartInfo(HostExecutableResolver.WslExe());

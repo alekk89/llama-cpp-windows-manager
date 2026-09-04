@@ -46,7 +46,7 @@ application data by default.
 
 ## Install and run your first model
 
-Download the installer or portable ZIP from
+Download the installer or standalone portable EXE from
 [GitHub Releases](https://github.com/alekk89/llama-cpp-windows-manager/releases/latest)
 and follow [release verification](UPDATES_AND_RELEASE_VERIFICATION.md).
 
@@ -402,9 +402,10 @@ and installs a newer supported build. Startup checks run in the background; the
 navigation action changes from **Check For Updates** to **Install Update** when
 an update is available.
 
-Stable updates verify the signed manifest, version/channel policy, asset name,
-size, SHA-256, and expected Authenticode publisher before replacement. The app
-restarts only after replacement succeeds. See
+Unsigned v2.7 updates verify the official release EXE, version, size, and SHA-256
+companion before replacement. Signed builds additionally require a signed manifest
+and expected Authenticode publisher. Upgrading from v2.5 or v2.6 to unsigned v2.7 requires
+a one-time manual installation. The app restarts after successful replacement. See
 [Updates and release verification](UPDATES_AND_RELEASE_VERIFICATION.md).
 
 ### Help

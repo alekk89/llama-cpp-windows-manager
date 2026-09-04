@@ -22,7 +22,10 @@ public sealed partial class ModelGatewayService
                 _options.AllowLanAccess,
                 cancellationToken);
             if (registered)
-                _listener.Start();
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                _listener = StartListenerAfterPermission(_listener, listenerPrefix);
+            }
             else
                 throw new InvalidOperationException(
                     $"Cannot start the auto-load gateway on port {_options.Port}.{Environment.NewLine}" +
@@ -42,6 +45,24 @@ public sealed partial class ModelGatewayService
         }
 
         _loop = ListenAsync(_stop.Token);
+    }
+
+    internal static HttpListener StartListenerAfterPermission(HttpListener failedListener, string listenerPrefix)
+    {
+        // HttpListener.Start closes its Windows instance on failure, including access denied.
+        failedListener.Close();
+        var replacement = new HttpListener();
+        try
+        {
+            replacement.Prefixes.Add(listenerPrefix);
+            replacement.Start();
+            return replacement;
+        }
+        catch
+        {
+            replacement.Close();
+            throw;
+        }
     }
 
     private void ValidateOptions()

@@ -136,6 +136,7 @@ public static class LaunchSettingMetadataService
 
     public static string Tooltip(string label) => label switch
     {
+        var value when value == Loc.T("Launch.Field.VulkanAllocationBlockSize") => Loc.T("Tooltip.Field.VulkanAllocationBlockSize"),
         "Context size" => Loc.T("Tooltip.Field.ContextSize"),
         "Parallel slots" => Loc.T("Tooltip.Field.ParallelSlots"),
         "Batch size" => Loc.T("Tooltip.Field.BatchSize"),

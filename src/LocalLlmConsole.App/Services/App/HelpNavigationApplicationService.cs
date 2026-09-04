@@ -67,7 +67,7 @@ public sealed class HelpNavigationApplicationService
             "settings" => Settings(
                 "Help: Settings stores app preferences, network behavior, secrets, gateway options, and log limits."),
             "gateway-settings" => Settings(
-                "Help: Network settings include Auto-load gateway, Gateway port, and Gateway policy."),
+                "Help: Network settings include Model gateway, Auto-load models, Gateway port, and Gateway policy."),
             "logs" => Logs(
                 "Help: open logs to inspect app, model runtime, and runtime job output."),
             "lifetime" => Lifetime(

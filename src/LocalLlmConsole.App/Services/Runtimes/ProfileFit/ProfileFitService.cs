@@ -33,7 +33,8 @@ public sealed class ProfileFitService : IProfileFitService
             request.WslDistro,
             capability.FitParamsExecutablePath,
             arguments,
-            "");
+            "",
+            request.CurrentProfile.VulkanAllocationBlockSizeMiB);
         var result = await _processRunner.RunAsync(start, FitTimeout, cancellationToken);
         if (result.ExitCode != 0)
             return new ProfileFitResult(false, null, [], [], "", result.Error,

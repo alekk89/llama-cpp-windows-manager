@@ -77,7 +77,8 @@ public partial class MainWindow
             _runtimeCatalogState.RuntimeUpdateStates,
             _runtimeCatalogState.RuntimePackageUpdateStates));
         var favoriteRuntimeIds = await AppServices.StateStore.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Runtime);
-        _viewModel.Runtimes.ReplaceRows(result.Rows.Runtimes, favoriteRuntimeIds);
+        var defaultRuntimeId = await AppServices.StateStore.GetDefaultRuntimeIdAsync();
+        _viewModel.Runtimes.ReplaceRows(result.Rows.Runtimes, favoriteRuntimeIds, defaultRuntimeId);
         _viewModel.RuntimePackages.ReplaceRows(result.Rows.PackagePresets);
         _viewModel.RuntimeBuilds.ReplaceRows(result.Rows.BuildPresets);
         _runtimesPage.RestoreRuntimeSelection(selectedId, _viewModel.Runtimes.Rows);

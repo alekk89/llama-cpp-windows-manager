@@ -104,7 +104,11 @@ public sealed record AppSettings(
     bool BenchmarkPreventSystemSleep = true,
     bool BenchmarkStopActiveSessions = false,
     int UiScalePercent = 100,
-    int FontScalePercent = 100)
+    int FontScalePercent = 100,
+    bool GatewayAutoLoadModels = true,
+    string DirectModelAliasSuffix = "",
+    string SameModelLoadPolicy = "ask",
+    int VulkanAllocationBlockSizeMiB = 0)
 {
     public const int DefaultContextSize = 131_072;
     public const int DefaultGpuLayers = 999;

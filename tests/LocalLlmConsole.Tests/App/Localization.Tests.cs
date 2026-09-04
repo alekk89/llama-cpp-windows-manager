@@ -188,7 +188,7 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
                           || key.StartsWith("EndpointInspection.", StringComparison.Ordinal))
             .ToArray();
 
-        Assert.Equal(130, requiredKeys.Length);
+        Assert.Equal(131, requiredKeys.Length);
         foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
         {
             var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
@@ -224,7 +224,9 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
             "Dialog.Accessibility.Yes", "Dialog.Accessibility.No", "Dialog.Accessibility.Close",
             "Overview.EndpointInspectionTooltip", "Launch.SaveProfileTooltip"
         };
-        var articleKeys = english.Keys.Where(key => key.StartsWith("Help.Article.", StringComparison.Ordinal)).ToArray();
+        // Preserve the translated release contract while new help uses documented English fallback.
+        var articleKeys = english.Keys.Where(key => key.StartsWith("Help.Article.", StringComparison.Ordinal)
+            && !key.StartsWith("Help.Article.benchmark-cleanup.", StringComparison.Ordinal)).ToArray();
         var requiredKeys = fixedKeys.Concat(articleKeys).Distinct(StringComparer.Ordinal).ToArray();
         var currentSettingsKeys = new[]
         {
@@ -255,6 +257,37 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
                 var englishFallbacks = requiredKeys.Count(key => pack[key] == english[key]);
                 Assert.InRange(englishFallbacks, 1, requiredKeys.Length - 1);
             }
+        }
+    }
+
+    [Fact]
+    public void BenchmarkCleanupHelpUsesLocalizedValuesOrEnglishFallbackInEveryPack()
+    {
+        var localizationRoot = Path.GetDirectoryName(FindRepositoryFile(
+            "src", "LocalLlmConsole.App", "Localization", "Strings.en.json"))!;
+        var english = ReadLocalizationPack(Path.Combine(localizationRoot, "Strings.en.json"));
+        var keys = new[]
+        {
+            "Help.Article.benchmark-cleanup.Title", "Help.Article.benchmark-cleanup.Summary",
+            "Help.Article.benchmark-cleanup.Detail.1", "Help.Article.benchmark-cleanup.Detail.2"
+        };
+        Assert.Equal(keys.Order(), english.Keys.Where(key => key.StartsWith("Help.Article.benchmark-cleanup.", StringComparison.Ordinal)).Order());
+        try
+        {
+            foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
+            {
+                var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
+                var pack = ReadLocalizationPack(path);
+                Loc.LoadLanguage(code);
+                foreach (var key in keys)
+                {
+                    Assert.Equal(pack.GetValueOrDefault(key, english[key]), Loc.T(key));
+                }
+            }
+        }
+        finally
+        {
+            Loc.LoadLanguage("en");
         }
     }
 

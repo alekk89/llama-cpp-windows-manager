@@ -34,6 +34,7 @@ public static class LaunchSettingUiSchema
         Choice(nameof(AppSettings.CacheTypeK), "PerformanceMemory", "KCache", LaunchSettingMetadataService.CacheTypeOptions),
         Choice(nameof(AppSettings.CacheTypeV), "PerformanceMemory", "VCache", LaunchSettingMetadataService.CacheTypeOptions),
         Text(nameof(AppSettings.TensorBufferOverrides), "PerformanceMemory", "TensorBufferOverrides", advanced: true),
+        Text(nameof(AppSettings.VulkanAllocationBlockSizeMiB), "PerformanceMemory", "VulkanAllocationBlockSize", advanced: true),
         Choice(nameof(AppSettings.KvOffload), "PerformanceMemory", "KvOffload", LaunchSettingMetadataService.AutoOnOffOptions, true),
         Choice(nameof(AppSettings.KvUnified), "PerformanceMemory", "UnifiedKv", LaunchSettingMetadataService.AutoOnOffOptions, true),
         Choice(nameof(AppSettings.PromptCacheMode), "PerformanceMemory", "PromptCache", LaunchSettingMetadataService.AutoOnOffOptions, true),

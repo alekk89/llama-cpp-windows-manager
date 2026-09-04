@@ -247,8 +247,9 @@ public sealed class AgentSidecarsTests : ManagerRegressionTestBase
         Assert.Contains("THIRD-PARTY-NOTICES.md", publish, StringComparison.Ordinal);
         Assert.Contains("licenses/Apache-2.0.txt", publish, StringComparison.Ordinal);
         Assert.Contains("Assert-HashCompanion -Path $controlCli", releaseGate, StringComparison.Ordinal);
-        Assert.Contains("-ExpectedEntry \"docs/CONTROL_API.md\"", releaseGate, StringComparison.Ordinal);
-        Assert.Contains("-ExpectedEntry \"LICENSE\"", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("--bootstrap-agent-sidecars-only", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("\"docs/CONTROL_API.md\"", releaseGate, StringComparison.Ordinal);
+        Assert.Contains("\"LICENSE\"", releaseGate, StringComparison.Ordinal);
         Assert.Contains("-IncludePublish -IncludeInstaller", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("dist/installer/LlamaCppWindowsManager-Setup-*-win-x64.exe", releaseWorkflow, StringComparison.Ordinal);
         Assert.Contains("choco install innosetup --version=6.7.1", releaseWorkflow, StringComparison.Ordinal);

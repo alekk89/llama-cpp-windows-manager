@@ -271,4 +271,8 @@ public sealed record BenchmarkParsedResult(
     double DraftAcceptancePercent = 0,
     bool SpeculativeMetricsObserved = false,
     int ContextSize = 0,
-    long ObservedGpuMemoryUsedMiB = 0);
+    long ObservedGpuMemoryUsedMiB = 0,
+    IReadOnlyList<BenchmarkGpuMemoryPeak>? GpuMemoryPeaks = null,
+    int GpuMemorySampleIntervalMilliseconds = 0,
+    int VulkanAllocationBlockSizeMiB = 0,
+    string GpuMemoryMeasurementWindow = "");

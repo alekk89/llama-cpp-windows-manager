@@ -266,6 +266,7 @@ public enum RuntimeCatalogRowKind
 
 public sealed class RuntimeCatalogRow
 {
+    public bool IsDefaultRuntime { get; set; }
     public RuntimeCatalogRowKind Kind { get; init; }
     public required string Name { get; init; }
     public required string Backend { get; init; }

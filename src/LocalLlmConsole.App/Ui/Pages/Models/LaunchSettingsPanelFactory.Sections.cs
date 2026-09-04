@@ -107,6 +107,8 @@ public static partial class LaunchSettingsPanelFactory
         var property = typeof(AppSettings).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)
             ?? throw new InvalidOperationException($"Unknown launch setting '{propertyName}'.");
         var value = property.GetValue(settings);
+        if (propertyName == nameof(AppSettings.VulkanAllocationBlockSizeMiB) && value is 0)
+            return Loc.T("Launch.RuntimeDefault");
         return value switch
         {
             bool flag => flag ? "on" : "off",

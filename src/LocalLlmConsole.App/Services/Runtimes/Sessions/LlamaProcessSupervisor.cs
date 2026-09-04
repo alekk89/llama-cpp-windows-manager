@@ -69,11 +69,13 @@ public sealed partial class LlamaProcessSupervisor : IDisposable, IAsyncDisposab
     public async Task StartAsync(RuntimeRecord runtime, ModelRecord model, AppSettings settings, string logRoot)
     {
         RuntimeAvailabilityService.EnsureAvailable(runtime);
+        if (RuntimeModelAliasService.ReadAliases(settings.CustomParameters).Count == 0)
+            settings = RuntimeDirectAliasService.ForLaunch(settings, model.ModelPath, []);
         var previousStop = await StopVerifiedAsync();
         if (!previousStop.VerifiedStopped)
             throw new InvalidOperationException(previousStop.Error);
         Directory.CreateDirectory(logRoot);
-        LogPath = Path.Combine(logRoot, $"llama-server-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.log");
+        LogPath = Path.Combine(logRoot, $"llama-server-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.log");
         _log = new BoundedLogWriter(LogPath, BoundedLogFile.MegabytesToBytes(settings.MaxLogFileSizeMb));
         State = LlamaRuntimeState.Loading;
         LastExitCode = null;
@@ -126,9 +128,7 @@ public sealed partial class LlamaProcessSupervisor : IDisposable, IAsyncDisposab
             ? null
             : runtime.Mode == RuntimeMode.Wsl ? ToWslPath(mtpHeadPath) : mtpHeadPath;
         var allowDirectLanAccess = AppPreferenceService.DirectModelsAllowLanAccess(settings.ModelAccessMode);
-        var launchHost = allowDirectLanAccess
-            ? string.IsNullOrWhiteSpace(settings.Host) ? "0.0.0.0" : settings.Host
-            : "127.0.0.1";
+        var launchHost = ModelAccessPolicy.RuntimeHost(settings.ModelAccessMode, settings.Host);
         var customArgs = CustomLaunchParameterParser.Parse(settings.CustomParameters);
         ValidateCustomArgs(customArgs);
         var extraArgs = new List<string>();

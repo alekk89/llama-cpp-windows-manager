@@ -40,7 +40,7 @@ public sealed class AppUpdateWorkflowService
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         var plan = await _updates.StageInstallAsync(update, _workspaceRoot, currentExecutablePath, linked.Token);
-        _updates.StartInstaller(plan, currentProcessId);
+        await _updates.StartInstallerAsync(plan, currentProcessId, linked.Token);
         return "Update staged. Closing to install...";
     }
 
@@ -57,7 +57,9 @@ public sealed class AppUpdateWorkflowService
                 ShouldPromptInstall: manual,
                 ShouldShowNoUpdateDialog: false,
                 "Install update",
-                $"Update {update.CurrentVersion} -> {update.LatestVersion} is available.\n\n{update.ReleaseName}\n\nInstall it now?");
+                $"Update {update.CurrentVersion} -> {update.LatestVersion} is available.\n\n{update.ReleaseName}\n\n" +
+                (update.AuthenticityVerified ? "" : "This release is unsigned. Its SHA-256 checksum will be checked before installation.\n\n") +
+                "Install it now?");
         }
 
         return new AppUpdateCheckWorkflowResult(

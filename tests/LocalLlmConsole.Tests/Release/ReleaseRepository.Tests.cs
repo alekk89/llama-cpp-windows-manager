@@ -35,10 +35,10 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
     {
         var project = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "LocalLlmConsole.App.csproj"));
 
-        Assert.Contains("<Version>2.6.0</Version>", project, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>2.6.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>2.6.0.0</FileVersion>", project, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>v2.6.0</InformationalVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<Version>2.7.0</Version>", project, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>2.7.0.0</AssemblyVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>2.7.0.0</FileVersion>", project, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>v2.7.0</InformationalVersion>", project, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -82,7 +82,8 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         Assert.Contains("LLAMA_CPP_CONSOLE_DOTNET", buildScript, StringComparison.Ordinal);
         Assert.Contains("LlamaCppWindowsManager-$Runtime", publishScript, StringComparison.Ordinal);
         Assert.DoesNotContain("LlamaCppConsole.exe", publishScript, StringComparison.Ordinal);
-        Assert.Contains("LlamaCppWindowsManager-$Runtime.zip", publishScript, StringComparison.Ordinal);
+        Assert.Contains("RequireSignedUpdates=", publishScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("Compress-Archive -Path (Join-Path $PublishDir", publishScript, StringComparison.Ordinal);
         Assert.Contains("[string] $TimestampServer = \"https://timestamp.digicert.com\"", publishScript, StringComparison.Ordinal);
         Assert.DoesNotContain("http://timestamp.digicert.com", publishScript, StringComparison.Ordinal);
         Assert.Contains("sha256", publishScript, StringComparison.OrdinalIgnoreCase);
@@ -221,6 +222,8 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
                 "new-release-manifest.ps1",
                 "new-sbom.ps1",
                 "publish-app.ps1",
+                "publish-unsigned-release.ps1",
+                "stage-unsigned-release.ps1",
                 "start-app.ps1",
                 "test-app.ps1",
                 "test-coverage.ps1",

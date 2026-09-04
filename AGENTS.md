@@ -86,6 +86,9 @@ complete setting names and accepted values from `capabilities`.
 `host` is a saved per-profile launch field. A non-loopback value is effective
 only when the application `modelAccessMode` permits direct-model LAN access;
 do not weaken that application policy merely to make a profile load.
+Profiles whose saved data omits `host`, or leaves it blank, inherit the app host
+default. Explicit saved addresses, including loopback, remain overrides. Launch
+commands and endpoint probes both apply the same LAN access policy.
 
 Before any restart or unload, identify the current model with `self`. Never
 stop the session serving the current operation unless the user explicitly asks
@@ -202,6 +205,20 @@ requires explicit authorization plus `benchmarks delete <run> --confirm`.
 
 ## Application settings and UI visibility
 
+`directModelAliasSuffix` is an optional direct-endpoint ID suffix, such as
+`-direct`; its default is empty. New loads without an explicit alias advertise
+the short GGUF name, and duplicate running IDs receive `:2`, `:3`, etc. Always
+read the endpoint's advertised IDs. Existing sessions keep their current IDs
+until reloaded. `sameModelLoadPolicy` accepts `ask`, `alongside`, or `replace`
+for individual interactive UI loads only; it does not change control or gateway
+lifecycle policies or authorize an agent to stop sessions.
+
+Set `gatewayAutoLoadModels=false` to keep the gateway available for already-loaded
+profiles only. This disables request-triggered loads and swaps, independently
+of `autoLoadGatewayEnabled` and the saved gateway policy. Unloaded profiles are
+omitted from discovery and return `503 model_not_loaded` if requested. Manual
+lifecycle commands and idle-unload policies still apply.
+
 Patch settings through the running Manager, never its database:
 
 ```powershell
@@ -222,7 +239,7 @@ The visibility fields are `showOverviewModelStatus`,
 `showModelsHuggingFace`. They apply automatically and do not disable the
 underlying telemetry, logs, or downloads.
 
-Favorite models/profiles/runtimes, **Load profiles on startup** selections, and
+The default runtime, favorite models/profiles/runtimes, **Load profiles on startup** selections, and
 remembered window/table/splitter layouts are UI-owned preferences and are not
 part of the current settings-patch contract. Do not edit their SQLite tables or
 automate WPF controls to change them.
@@ -266,13 +283,13 @@ LlamaCppWindowsManager.exe --bootstrap-agent-sidecars-only
 
 ## Working from GitHub or source
 
-For end-user installation, prefer the installer or portable ZIP from
+For end-user installation, prefer the installer or portable EXE from
 [GitHub Releases](https://github.com/alekk89/llama-cpp-windows-manager/releases/latest)
 and verify its matching `.sha256` file. Do not describe an unsigned artifact as
 trusted or signed.
 
 ```powershell
-$asset = "LlamaCppWindowsManager-win-x64.zip"
+$asset = "LlamaCppWindowsManager.exe"
 $expected = ((Get-Content "$asset.sha256" -Raw).Trim() -split "\s+")[0]
 $actual = (Get-FileHash $asset -Algorithm SHA256).Hash
 if ($actual -ne $expected) { throw "Release checksum mismatch: $asset" }

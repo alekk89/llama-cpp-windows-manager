@@ -137,12 +137,8 @@ public partial class MainWindow
             ModelRuntimeLoadActions(() => _settings, profile.Id, profile.Name));
     }
 
-    private void BeginNewLaunchProfile()
-    {
-        _launchSettingsPanel.SetSaveAsNewModelName("");
-        _launchSettingsPanel.FocusSaveAsNewModelName();
-        SetStatus(Loc.T("Models.Profile.NewInstructions"));
-    }
+    private async void BeginNewLaunchProfile()
+        => await RunEventAsync(_launchSettingsController.BeginNewProfileAsync);
 
     private ModelRuntimeLoadApplicationActions ModelRuntimeLoadActions(
         Func<AppSettings> readLaunchSettings,

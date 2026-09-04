@@ -40,6 +40,7 @@
       </Setter>
     </Style>
     <Style x:Key="EndpointReportSelectableText" TargetType="TextBox">
+      <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Background" Value="Transparent"/>

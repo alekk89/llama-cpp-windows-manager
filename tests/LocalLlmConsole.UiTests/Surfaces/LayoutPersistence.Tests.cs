@@ -50,7 +50,7 @@ public sealed class WpfLayoutPersistenceTests : WpfUiTestBase
     }
 
     [Fact]
-    public async Task ColumnResizeStaysStablePersistsProportionsAndRefillsViewport()
+    public async Task ColumnResizeKeepsCompactWidthsAndGivesGrowthToLeftColumn()
     {
         await RunStaAsync(async () =>
         {
@@ -78,20 +78,18 @@ public sealed class WpfLayoutPersistenceTests : WpfUiTestBase
                 RoutedEvent = Mouse.PreviewMouseDownEvent
             });
 
-            Assert.True(first.Grid.Columns[0].Width.IsStar);
+            Assert.True(first.Grid.Columns[0].Width.IsAbsolute);
             Assert.True(compactColumn.Width.IsAbsolute);
             Assert.Equal(compactWidth, compactColumn.Width.Value, precision: 1);
-            Assert.Equal(
-                compactWidth + nameColumnWidth - first.Grid.Columns[0].MinWidth,
-                compactColumn.MaxWidth,
-                precision: 1);
+            Assert.Equal(compactMaxWidth, compactColumn.MaxWidth);
             gripper.RaiseEvent(new DragCompletedEventArgs(0, 0, false)
             {
                 RoutedEvent = Thumb.DragCompletedEvent
             });
             first.Window.UpdateLayout();
 
-            Assert.All(first.Grid.Columns, column => Assert.True(column.Width.IsStar));
+            Assert.True(first.Grid.Columns[0].Width.IsAbsolute);
+            Assert.True(compactColumn.Width.IsAbsolute);
             Assert.Equal(compactMaxWidth, compactColumn.MaxWidth);
             Assert.Equal(compactWidth, compactColumn.ActualWidth, precision: 1);
             string? savedLayout = null;
@@ -108,22 +106,30 @@ public sealed class WpfLayoutPersistenceTests : WpfUiTestBase
             second.Window.Show();
             await secondService.AttachShellAsync(second.Window, second.Host, () => "Models");
 
-            Assert.All(second.Grid.Columns, column => Assert.True(column.Width.IsStar));
+            Assert.True(second.Grid.Columns[0].Width.IsAbsolute);
+            Assert.True(second.Grid.Columns[1].Width.IsAbsolute);
             Assert.Equal(compactWidth, second.Grid.Columns[1].ActualWidth, precision: 1);
 
             second.Window.Width = 1000;
             await second.Window.Dispatcher.InvokeAsync(second.Window.UpdateLayout, DispatcherPriority.Loaded);
-            Assert.True(second.Grid.Columns[1].ActualWidth > compactWidth);
+            Assert.Equal(compactWidth, second.Grid.Columns[1].ActualWidth, precision: 1);
+            Assert.True(second.Grid.Columns[0].ActualWidth > nameColumnWidth);
             Assert.InRange(
                 Math.Abs(second.Grid.Columns.Sum(column => column.ActualWidth) - second.Grid.ActualWidth),
                 0,
                 2);
+            second.Window.Width = 600;
+            await second.Window.Dispatcher.InvokeAsync(second.Window.UpdateLayout, DispatcherPriority.Loaded);
+            var narrowedWidth = second.Grid.Columns[1].ActualWidth;
+            second.Window.Width = 1100;
+            await second.Window.Dispatcher.InvokeAsync(second.Window.UpdateLayout, DispatcherPriority.Loaded);
+            Assert.Equal(narrowedWidth, second.Grid.Columns[1].ActualWidth, precision: 1);
             second.Window.Close();
         });
     }
 
     [Fact]
-    public async Task PreviouslySavedPixelLayoutRestoresOriginallyFlexibleColumnsAsProportions()
+    public async Task PreviouslySavedPixelLayoutKeepsRightWidthsAndRefillsLeftColumn()
     {
         await RunStaAsync(async () =>
         {
@@ -147,12 +153,55 @@ public sealed class WpfLayoutPersistenceTests : WpfUiTestBase
             second.Window.Show();
             await secondService.AttachShellAsync(second.Window, second.Host, () => "Models");
 
-            Assert.All(second.Grid.Columns, column => Assert.True(column.Width.IsStar));
+            Assert.True(second.Grid.Columns[0].Width.IsAbsolute);
+            Assert.True(second.Grid.Columns[1].Width.IsAbsolute);
             Assert.Equal(renderedWidths[1], second.Grid.Columns[1].ActualWidth, precision: 1);
             second.Window.Width = 1000;
             await second.Window.Dispatcher.InvokeAsync(second.Window.UpdateLayout, DispatcherPriority.Loaded);
-            Assert.True(second.Grid.Columns[1].ActualWidth > renderedWidths[1]);
+            Assert.Equal(renderedWidths[1], second.Grid.Columns[1].ActualWidth, precision: 1);
             second.Window.Close();
+        });
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(100)]
+    public async Task RapidNavigationPersistsTheFinalPageAfterAnIntermediatePageNeverLoads(int switches)
+    {
+        await RunStaAsync(async () =>
+        {
+            await using var store = new StateStore(Path.Combine(TestWorkspace, $"rapid-layout-{Guid.NewGuid():N}.db"));
+            await store.InitializeAsync();
+            var shell = BuildShell();
+            var page = "initial";
+            var service = new UiLayoutPersistenceService(store);
+            shell.Window.Show();
+            try
+            {
+                await service.AttachShellAsync(shell.Window, shell.Host, () => page);
+                var intermediate = BuildShell();
+                var final = BuildShell();
+                intermediate.Host.Content = null;
+                final.Host.Content = null;
+                for (var index = 0; index < switches; index++)
+                {
+                    page = "intermediate";
+                    shell.Host.Content = index % 2 == 0 ? intermediate.Root : new Grid();
+                }
+                page = "final";
+                shell.Host.Content = final.Root;
+                await shell.Window.Dispatcher.InvokeAsync(shell.Window.UpdateLayout, DispatcherPriority.ApplicationIdle);
+                await Task.Delay(100);
+                final.Grid.Columns[0].Width = new DataGridLength(333);
+                await Task.Delay(500);
+                await service.SaveShellAsync();
+                var saved = await store.GetUiLayoutStateAsync("page.final");
+                Assert.False(string.IsNullOrWhiteSpace(saved), "Rapid navigation stranded layout persistence on a page that never loaded.");
+                Assert.Contains("333", saved, StringComparison.Ordinal);
+                intermediate.Window.Close();
+                final.Window.Close();
+            }
+            finally { shell.Window.Close(); }
         });
     }
 

@@ -7,7 +7,7 @@ public static class RuntimeEndpointService
 {
     public static string LocalServerBaseUrl(AppSettings settings)
     {
-        var host = string.IsNullOrWhiteSpace(settings.Host) ? "127.0.0.1" : settings.Host.Trim();
+        var host = ModelAccessPolicy.RuntimeHost(settings.ModelAccessMode, settings.Host);
         if (string.Equals(host, "0.0.0.0", StringComparison.Ordinal)) host = "127.0.0.1";
         if (string.Equals(host, "::", StringComparison.Ordinal)) host = "::1";
         if (settings.Port <= 0 || settings.Port > 65535)
@@ -110,7 +110,7 @@ public static class RuntimeEndpointService
 
     public static string LanServerBaseUrl(AppSettings settings)
     {
-        var host = string.IsNullOrWhiteSpace(settings.Host) ? "0.0.0.0" : settings.Host.Trim();
+        var host = ModelAccessPolicy.RuntimeHost(settings.ModelAccessMode, settings.Host);
         if (string.Equals(host, "0.0.0.0", StringComparison.Ordinal) || string.Equals(host, "::", StringComparison.Ordinal))
             host = PreferredLanAddress() ?? Environment.MachineName;
         return $"http://{UrlHost(host)}:{settings.Port.ToString(CultureInfo.InvariantCulture)}";

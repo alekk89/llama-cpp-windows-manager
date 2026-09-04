@@ -11,18 +11,20 @@
     <AssemblyTitle>llama.cpp Windows Manager</AssemblyTitle>
     <Product>llama.cpp Windows Manager</Product>
     <RepositoryUrl>https://github.com/alekk89/llama-cpp-windows-manager</RepositoryUrl>
-    <Version>2.6.0</Version>
-    <AssemblyVersion>2.6.0.0</AssemblyVersion>
-    <FileVersion>2.6.0.0</FileVersion>
-    <InformationalVersion>v2.6.0</InformationalVersion>
+    <Version>2.7.0</Version>
+    <AssemblyVersion>2.7.0.0</AssemblyVersion>
+    <FileVersion>2.7.0.0</FileVersion>
+    <InformationalVersion>v2.7.0</InformationalVersion>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+    <RequireSignedUpdates Condition="'$(RequireSignedUpdates)' == ''">false</RequireSignedUpdates>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyMetadata Include="RequireSignedUpdates" Value="$(RequireSignedUpdates)" />
     <AssemblyMetadata Include="RepositoryCommit" Value="$(RepositoryCommit)" Condition="'$(RepositoryCommit)' != ''" />
     <AssemblyMetadata Include="ReleaseChannel" Value="$(ReleaseChannel)" Condition="'$(ReleaseChannel)' != ''" />
     <AssemblyMetadata Include="ReleaseManifestKey.$(ReleaseManifestKeyId)" Value="$(ReleaseManifestPublicKeySpki)" Condition="'$(ReleaseManifestKeyId)' != '' and '$(ReleaseManifestPublicKeySpki)' != ''" />

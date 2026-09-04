@@ -59,12 +59,13 @@ public static partial class EndpointInspectionDialogFactory
         layout.Children.Add(header);
 
         var body = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var copy = copyToClipboard ?? System.Windows.Clipboard.SetText;
         body.Children.Add(EndpointInspectionCopyBarFactory.Create(
             report,
             apiKey,
-            copyToClipboard ?? System.Windows.Clipboard.SetText));
+            copy));
         body.Children.Add(ConnectionCard(report, apiKey));
-        body.Children.Add(ModelsCard(report));
+        body.Children.Add(ModelsCard(report, copy));
         if (report.Defaults is not null)
             body.Children.Add(DefaultsCard(report.Defaults));
         if (report.Kind == EndpointInspectionKind.DirectModel)
@@ -142,45 +143,6 @@ public static partial class EndpointInspectionDialogFactory
                 ? "/health · /v1/models · /props · /slots"
                 : "/health · /v1/models · /running"));
         return Card(Loc.T("EndpointInspection.Connection"), fields);
-    }
-
-    private static WpfBorder ModelsCard(EndpointInspectionReport report)
-    {
-        if (report.Models.Count == 0)
-            return Card(
-                report.Kind == EndpointInspectionKind.Gateway
-                    ? Loc.T("EndpointInspection.AdvertisedModels")
-                    : Loc.T("EndpointInspection.EndpointModel"),
-                Muted(Loc.T("EndpointInspection.NoModels")));
-
-        var rows = report.Models.Select(model =>
-        {
-            var context = report.Kind == EndpointInspectionKind.Gateway
-                ? model.ConfiguredContext
-                : model.TrainingContext;
-            return new DisplayRow(
-                model.NameOrId(),
-                Empty(model.Profile),
-                Empty(model.Owner),
-                context.HasValue ? Tokens(context.Value) : "—",
-                model.ParameterCount.HasValue ? CompactCount(model.ParameterCount.Value) : "—",
-                model.SizeBytes.HasValue ? DisplayFormatService.Bytes(model.SizeBytes.Value) : "—");
-        });
-        var grid = Table(
-            rows,
-            (Loc.T("EndpointInspection.ModelIdName"), nameof(DisplayRow.C1), 1.85),
-            (Loc.T("EndpointInspection.Profile"), nameof(DisplayRow.C2), .9),
-            (Loc.T("EndpointInspection.Owner"), nameof(DisplayRow.C3), .8),
-            (report.Kind == EndpointInspectionKind.Gateway
-                ? Loc.T("EndpointInspection.ContextSize")
-                : Loc.T("EndpointInspection.TrainingContext"), nameof(DisplayRow.C4), .65),
-            (Loc.T("EndpointInspection.Parameters"), nameof(DisplayRow.C5), .65),
-            (Loc.T("Models.Col.Size"), nameof(DisplayRow.C6), .6));
-        return Card(
-            report.Kind == EndpointInspectionKind.Gateway
-                ? Loc.T("EndpointInspection.AdvertisedModelsCount", report.Models.Count)
-                : Loc.T("EndpointInspection.EndpointModel"),
-            grid);
     }
 
     private static WpfBorder DefaultsCard(EndpointInspectionDefaults defaults)
@@ -293,12 +255,12 @@ public static partial class EndpointInspectionDialogFactory
         return grid;
     }
 
-    private static DataGrid Table(
-        IEnumerable<DisplayRow> rows,
+    private static DataGrid Table<T>(
+        IEnumerable<T> rows,
         params (string Header, string Binding, double Width)[] columns)
     {
         var grid = PageSectionFactory.GridFor(columns);
-        grid.ItemsSource = new ObservableCollection<DisplayRow>(rows);
+        grid.ItemsSource = new ObservableCollection<T>(rows);
         grid.IsReadOnly = true;
         grid.CanUserAddRows = false;
         grid.CanUserDeleteRows = false;

@@ -116,7 +116,7 @@ public partial class MainWindow
         try
         {
             var settings = LaunchSettingsFormBinder.Read(_settings, _launchSettingsPanel.FormControls);
-            panel.UpdatePreview(RuntimeLaunchRequestFactory.Preview(settings, _launchSettingsPanel.RuntimeCombo?.SelectedItem as RuntimeChoice));
+            panel.UpdatePreview(RuntimeLaunchRequestFactory.Preview(settings, _launchSettingsPanel.RuntimeCombo?.SelectedItem as RuntimeChoice, SelectedModel()?.ModelPath ?? "<model.gguf>"), settings);
         }
         catch (Exception ex)
         {

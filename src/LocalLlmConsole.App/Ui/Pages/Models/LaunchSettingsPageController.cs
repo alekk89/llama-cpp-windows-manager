@@ -115,6 +115,22 @@ public sealed class LaunchSettingsPageController
         await _actions.RefreshModelsAsync();
     }
 
+    public async Task BeginNewProfileAsync()
+    {
+        var model = _actions.SelectedModel();
+        if (model is null) return;
+        var profileId = _actions.SelectedProfileId();
+        CancelRefresh();
+        if (!_ui.LaunchSettingsEditor.IsLoadedFor(model.Id, profileId)) await RenderSelectedAsync();
+        var runtimeId = await _actions.ModelServices().LaunchProfiles.DefaultRuntimeIdAsync();
+        if (_actions.SelectedModel()?.Id != model.Id || _actions.SelectedProfileId() != profileId) return;
+        if (!string.IsNullOrEmpty(runtimeId)) await _actions.RefreshRuntimeSelectorAsync(runtimeId);
+        _panel.SetSaveAsNewModelName("");
+        _panel.FocusSaveAsNewModelName();
+        UpdateSaveButtonState();
+        _actions.SetStatus(Loc.T("Models.Profile.NewInstructions"));
+    }
+
     public async Task SaveAsNewModelAsync()
     {
         await _models.ModelLaunchVariantSaveApplication.SaveSelectedAsNewAsync(

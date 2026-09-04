@@ -294,6 +294,7 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
                     ChooseRuntimeFolderAsync: () => Task.CompletedTask,
                     ChangeCudaPackagePreferenceAsync: () => Task.CompletedTask,
                     ToggleRuntimeFavoriteAsync: _ => Task.CompletedTask,
+                    ToggleDefaultRuntimeAsync: _ => Task.CompletedTask,
                     VerifyRuntimeRowClick: noOp,
                     DeleteRuntimeRowClick: noOp,
                     RuntimeSourceRowClick: noOp,
@@ -330,7 +331,7 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
             runtimesControls.Root.Arrange(new Rect(0, 0, 1024, 680));
             runtimesControls.Root.UpdateLayout();
             var runtimeCheckButtons = VisualDescendants<Button>(runtimesControls.RuntimePackageGrid)
-                .Where(button => Equals(button.Content, "Check"))
+                .Where(button => button is LocalLlmConsole.ResponsiveActionButton { FullLabel: "Check" })
                 .ToArray();
             Assert.True(runtimeCheckButtons.Length >= 2);
             Assert.All(runtimeCheckButtons, button => Assert.Equal("", LocalLlmConsole.VisualRole.GetButtonRole(button)));

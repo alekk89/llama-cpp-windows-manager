@@ -37,6 +37,10 @@ jobs:
         shell: pwsh
         run: .\scripts\build-app.ps1 -Restore -LockedRestore
 
+      - name: Verify updater handoff without instrumentation
+        shell: pwsh
+        run: dotnet test --project tests/LocalLlmConsole.Tests --no-restore --filter-class '*UpdateHandoffTests'
+
       - name: Test and enforce coverage
         shell: pwsh
         run: .\scripts\test-coverage.ps1
@@ -74,8 +78,7 @@ jobs:
             if (-not (Test-Path -LiteralPath $sidecarPath -PathType Leaf)) { throw "Required control sidecar was not produced: $sidecarPath" }
           }
           if (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $exe) "LlamaCppConsole.exe")) { throw "Removed legacy executable alias was published." }
-          if (-not (Test-Path -LiteralPath $zip)) { throw "Portable release archive was not produced: $zip" }
-          if (-not (Test-Path -LiteralPath "$zip.sha256")) { throw "Portable release archive checksum was not produced: $zip.sha256" }
+          if (Test-Path -LiteralPath $zip) { throw "Obsolete portable ZIP was published." }
           $pdbs = Get-ChildItem -Path (Split-Path -Parent $exe) -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue
           if ($pdbs) { throw "Release publish contains PDB files." }
 
@@ -100,3 +103,14 @@ jobs:
           $installer = Get-ChildItem .\dist\installer\LlamaCppWindowsManager-Setup-*-win-x64.exe -File
           if ($installer.Count -ne 1) { throw "Expected exactly one installer, found $($installer.Count)." }
           .\scripts\test-installer-smoke.ps1 -InstallerPath $installer.FullName
+
+      - name: Test previous stable installer upgrade
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem .\dist\installer\LlamaCppWindowsManager-Setup-*-win-x64.exe -File)
+          if ($installer.Count -ne 1) { throw "Expected exactly one installer." }
+          .\scripts\test-previous-version-upgrade.ps1 -CandidateInstallerPath $installer[0].FullName
+
+      - name: Test standalone portable EXE update
+        shell: pwsh
+        run: .\scripts\test-portable-update.ps1 -CandidateExePath .\dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe

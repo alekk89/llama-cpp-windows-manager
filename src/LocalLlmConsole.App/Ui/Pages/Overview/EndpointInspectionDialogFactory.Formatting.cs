@@ -60,6 +60,4 @@ public static partial class EndpointInspectionDialogFactory
     private static string FriendlyCapability(string key)
         => key.Replace("supports_", "", StringComparison.OrdinalIgnoreCase).Replace('_', ' ');
 
-    private static string NameOrId(this EndpointInspectionModel model)
-        => !string.IsNullOrWhiteSpace(model.Name) ? $"{model.Name} ({model.Id})" : Empty(model.Id);
 }

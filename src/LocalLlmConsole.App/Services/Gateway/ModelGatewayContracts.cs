@@ -15,7 +15,8 @@ public sealed record ModelGatewayOptions(
     ModelGatewaySwapPolicy SwapPolicy,
     long MaxRequestBodyBytes = 64L * 1024 * 1024,
     int MaxConcurrentRequests = 8,
-    int RequestBodyTimeoutSeconds = 120)
+    int RequestBodyTimeoutSeconds = 120,
+    bool AutoLoadModels = true)
 {
     public bool AllowLanAccess
         => AppPreferenceService.GatewayAllowsLanAccess(AccessMode);
@@ -35,7 +36,8 @@ public sealed record ModelGatewayOptions(
             settings.RequireApiKeyAuth,
             AppPreferenceService.GatewaySwapPolicy(settings.AutoLoadGatewayPolicy) == "singleActive"
                 ? ModelGatewaySwapPolicy.SingleActive
-                : ModelGatewaySwapPolicy.KeepLoaded);
+                : ModelGatewaySwapPolicy.KeepLoaded,
+            AutoLoadModels: settings.GatewayAutoLoadModels);
 }
 
 public sealed record ModelGatewayModelRoute(
@@ -46,6 +48,13 @@ public sealed record ModelGatewayModelRoute(
     public string Id
         => !string.IsNullOrWhiteSpace(RouteId)
             ? RouteId
+            : RuntimeModelAliasService.ReadAliases(Profile.Settings.CustomParameters).FirstOrDefault() ?? LegacyId;
+
+    public string LegacyRouteId { get; init; } = "";
+
+    public string LegacyId
+        => !string.IsNullOrWhiteSpace(LegacyRouteId)
+            ? LegacyRouteId
             : Profile.IsDefault
             ? Model.Id
             : $"{Model.Id}--{ModelGatewayRouteId.SafeSegment(Profile.Id)}";
@@ -66,16 +75,48 @@ public static class ModelGatewayRouteId
     public static IReadOnlyList<ModelGatewayModelRoute> EnsureUnique(IReadOnlyList<ModelGatewayModelRoute> routes)
     {
         ArgumentNullException.ThrowIfNull(routes);
-        var collisions = routes
-            .GroupBy(route => route.Id, StringComparer.OrdinalIgnoreCase)
+        var legacyCollisions = routes
+            .GroupBy(route => route.LegacyId, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1)
             .Select(group => group.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (collisions.Count == 0) return routes;
-
-        return routes.Select(route => collisions.Contains(route.Id)
-            ? route with { RouteId = $"{route.Id}-{StableHash(route.Profile.Id)}" }
+        var result = routes.Select(route => legacyCollisions.Contains(route.LegacyId)
+            ? route with { LegacyRouteId = $"{route.LegacyId}-{StableHash(route.Profile.Id)}" }
             : route).ToArray();
+
+        // Reserve explicit names and old IDs before assigning suffixes. For example,
+        // a real alias "qwen:2" must not be taken by a duplicate alias "qwen".
+        var legacyIds = result.Select(route => route.LegacyId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var preferredIds = result.Select(route => route.Id).ToArray();
+        var reserved = preferredIds.Concat(legacyIds).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var assigned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var nextSuffix = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var ordered = Enumerable.Range(0, result.Length)
+            .OrderByDescending(index => result[index].Profile.IsDefault)
+            .ThenBy(index => result[index].Model.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(index => result[index].Profile.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(index => result[index].Model.Id, StringComparer.Ordinal)
+            .ThenBy(index => result[index].Profile.Id, StringComparer.Ordinal);
+        foreach (var index in ordered)
+        {
+            var route = result[index];
+            var preferredId = preferredIds[index];
+            var candidate = preferredId;
+            if (assigned.Contains(candidate)
+                || (legacyIds.Contains(candidate) && !candidate.Equals(route.LegacyId, StringComparison.OrdinalIgnoreCase)))
+            {
+                var suffix = nextSuffix.GetValueOrDefault(preferredId, 2);
+                do
+                {
+                    candidate = $"{preferredId}:{suffix.ToString(CultureInfo.InvariantCulture)}";
+                    suffix++;
+                } while (reserved.Contains(candidate) || assigned.Contains(candidate));
+                nextSuffix[preferredId] = suffix;
+            }
+            assigned.Add(candidate);
+            result[index] = route with { RouteId = candidate };
+        }
+        return result;
     }
 
     public static string SafeSegment(string? value)

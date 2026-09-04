@@ -60,6 +60,18 @@ public sealed class RuntimeCatalogCommandApplicationService
         return new RuntimeCatalogPreferenceCommandResult(RuntimeCatalogCommandOutcome.Applied, persisted, preference, status);
     }
 
+    public async Task<string> ToggleDefaultRuntimeAsync(
+        StateStore stateStore, RuntimeRecord runtime, Func<Task> refreshRuntimesAsync, Action<string> setStatus)
+    {
+        var current = await stateStore.GetDefaultRuntimeIdAsync();
+        var next = string.Equals(current, runtime.Id, StringComparison.OrdinalIgnoreCase) ? "" : runtime.Id;
+        if (next.Length > 0) RuntimeAvailabilityService.EnsureAvailable(runtime);
+        await stateStore.SetDefaultRuntimeAsync(next);
+        await refreshRuntimesAsync();
+        setStatus(next.Length == 0 ? Loc.T("Runtimes.DefaultCleared") : Loc.T("Runtimes.DefaultSelected", runtime.Name));
+        return next;
+    }
+
     public async Task<RuntimeCatalogCustomRepositoryCommandResult> AddCustomRepositoryAsync(
         string runtimeRoot,
         RuntimeCustomRepositoryDraft? draft,

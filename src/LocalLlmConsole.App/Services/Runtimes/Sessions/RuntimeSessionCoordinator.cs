@@ -28,10 +28,12 @@ public sealed class RuntimeSessionCoordinator
         AppSettings launchSettings,
         bool autoLoadGatewayEnabled,
         int autoLoadGatewayPort,
-        string launchProfileId = "")
+        string launchProfileId = "",
+        IReadOnlySet<string>? replacingSessionIds = null)
     {
         var sessionId = LoadedModelSessionManager.SessionIdFor(modelId, launchProfileId);
-        if (_sessions.ReservedPorts(sessionId).Contains(launchSettings.Port))
+        if (_sessions.Snapshots().Any(session => !string.Equals(session.SessionId, sessionId, StringComparison.OrdinalIgnoreCase)
+            && replacingSessionIds?.Contains(session.SessionId) != true && session.LaunchSettings.Port == launchSettings.Port))
             throw new InvalidOperationException($"Port {launchSettings.Port} is already assigned to another loaded model. Set a unique model port next to the runtime before launching.");
         if (autoLoadGatewayEnabled && launchSettings.Port == autoLoadGatewayPort)
             throw new InvalidOperationException($"Port {launchSettings.Port} is reserved for the auto-load gateway. Choose a different model port.");

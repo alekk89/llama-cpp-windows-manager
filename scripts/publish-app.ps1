@@ -281,6 +281,8 @@ $publishArgs = @(
 )
 $publishArgs += "-p:RepositoryCommit=$RepositoryCommit"
 $publishArgs += "-p:ReleaseChannel=$ReleaseChannel"
+$signedUpdates = $RequireSigned.IsPresent -or -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)
+$publishArgs += "-p:RequireSignedUpdates=$($signedUpdates.ToString().ToLowerInvariant())"
 if (-not [string]::IsNullOrWhiteSpace($ReleaseManifestKeyId)) {
   $publishArgs += "-p:ReleaseManifestKeyId=$ReleaseManifestKeyId"
 }
@@ -352,10 +354,7 @@ $ZipPath = Join-Path $DistRoot "LlamaCppWindowsManager-$Runtime.zip"
 if (Test-Path -LiteralPath $ZipPath) {
   Remove-DistPath -Path $ZipPath -Label "portable release archive"
 }
-Compress-Archive -Path (Join-Path $PublishDir "*") -DestinationPath $ZipPath -Force
-$ZipHash = (Get-FileHash -LiteralPath $ZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$ZipHashPath = "$ZipPath.sha256"
-Set-Content -LiteralPath $ZipHashPath -Value "$ZipHash  $(Split-Path -Leaf $ZipPath)" -Encoding ascii
+Remove-DistPath -Path "$ZipPath.sha256" -Label "obsolete portable archive checksum"
 
 Remove-DistPath -Path $CliPublishDir -Label "temporary llwmctl publish folder" -Recurse
 Remove-DistPath -Path $BundleStageDir -Label "temporary agent-sidecar folder" -Recurse
@@ -364,5 +363,5 @@ Remove-DistPath -Path $BundleZip -Label "temporary agent-sidecar archive"
 Write-Host "Published llama.cpp Windows Manager self-contained app to $PublishDir" -ForegroundColor Green
 Write-Host "Wrote SHA-256 companion file to $ExeHashPath" -ForegroundColor Green
 Write-Host "Wrote llwmctl SHA-256 companion file to $CliExeHashPath" -ForegroundColor Green
-Write-Host "Wrote portable release archive to $ZipPath" -ForegroundColor Green
+Write-Host "Portable release download is the standalone executable (no ZIP)." -ForegroundColor Green
 Write-Host "Wrote SPDX SBOM to $SbomPath" -ForegroundColor Green

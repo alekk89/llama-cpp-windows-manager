@@ -36,8 +36,7 @@ public sealed partial class BenchmarkApplicationService : IAsyncDisposable
         BenchmarkCapabilityService capabilities,
         BenchmarkProcessRunner processRunner,
         string workspaceRoot = "",
-        long maximumLogBytes = 16 * 1024 * 1024,
-        GpuStatusProbeService? gpuStatus = null)
+        long maximumLogBytes = 16 * 1024 * 1024)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _jobs = jobs ?? throw new ArgumentNullException(nameof(jobs));
@@ -46,8 +45,7 @@ public sealed partial class BenchmarkApplicationService : IAsyncDisposable
         _processRunner = processRunner ?? throw new ArgumentNullException(nameof(processRunner));
         _servingRunner = new BenchmarkServingRunner(
             new HttpClient { Timeout = Timeout.InfiniteTimeSpan },
-            ownsHttpClient: true,
-            gpuStatus is null ? null : gpuStatus.MemoryAsync);
+            ownsHttpClient: true);
         _workspaceRoot = workspaceRoot ?? "";
         _planner = new BenchmarkPlanService();
         _maximumLogBytes = Math.Max(maximumLogBytes, 1024 * 1024);

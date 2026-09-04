@@ -41,6 +41,12 @@ The full help output is deliberately not persisted. This keeps diagnostics usefu
 
 Additional structured values serialize into the existing `CustomParameters` profile field. This keeps global defaults, per-model profiles, and existing databases backward compatible.
 
+When the runtime advertises `--mmproj-offload` / `--no-mmproj-offload`, the
+projector GPU offload switch is available in the additional settings. Default
+emits nothing, Enabled requests GPU offload, and Disabled requests CPU projector
+execution. This switch does not change the selected projector file or disable
+vision.
+
 On profile load, known tokens hydrate their structured runtime editors and unknown tokens remain in the raw fallback field. When the selected runtime changes, structured values are materialized before the old editor set is removed, so settings are not lost. Unsupported aliases remain raw rather than being silently rewritten.
 
 The Runtime Command panel remains visible in Basic and Advanced modes. Its generated portion is editable only as a staging surface: users append one or more flags and select **Apply added flags**. The app rejects changes to the generated prefix, validates the appended tokens against the application-owned argument policy, hydrates matching discovered controls, and preserves safe unknown tokens in **Custom params**.
@@ -57,6 +63,15 @@ settings, round-trips through `ModelLaunchSettings`, and is projected to
 cannot use a non-loopback host while direct LAN serving is disabled.
 
 ## Adding a polished setting
+
+The advanced Vulkan **Allocation block size (MiB)** field uses the typed
+`vulkanAllocationBlockSizeMiB` profile value. Zero (shown as **Runtime default**)
+or a blank editor leaves the inherited runtime environment unchanged. A positive
+integer is converted to bytes with 64-bit arithmetic and passed as
+`GGML_VK_SUBALLOCATION_BLOCK_SIZE` only to Vulkan child processes. Native servers,
+WSL servers, profile benchmarks, and `llama-fit-params` use the same conversion.
+It is an environment setting, not a command-line argument. Older profiles default
+to zero; the value is preserved when switching runtimes but inactive outside Vulkan.
 
 1. Add the persistent value to `AppSettings` and, when model-specific, `ModelLaunchSettings`.
 2. Add a `LaunchSettingUiDefinition` to `LaunchSettingUiSchema` with the appropriate section and editor metadata.

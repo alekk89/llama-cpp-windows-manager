@@ -28,7 +28,12 @@ public sealed class ModelLaunchProfileService
         => _stateStore.ListNamedModelLaunchProfilesAsync(model.Id);
 
     public Task SaveNamedAsync(NamedModelLaunchProfile profile)
-        => _stateStore.SaveNamedModelLaunchProfileAsync(profile);
+    {
+        _ = RuntimeVulkanEnvironment.Value(RuntimeBackend.Vulkan, profile.Settings.VulkanAllocationBlockSizeMiB);
+        return _stateStore.SaveNamedModelLaunchProfileAsync(profile);
+    }
+
+    public Task<string> DefaultRuntimeIdAsync() => _stateStore.GetDefaultRuntimeIdAsync();
 
     public async Task<NamedModelLaunchProfile?> DeleteNamedAsync(string profileId)
     {
@@ -76,6 +81,7 @@ public sealed class ModelLaunchProfileService
             usedPorts.Add(defaults.AutoLoadGatewayPort);
 
         var ensured = new List<NamedModelLaunchProfile>(models.Count);
+        var defaultRuntimeId = await DefaultRuntimeIdAsync();
         foreach (var model in models)
         {
             var modelProfiles = profilesByModel.GetValueOrDefault(model.Id) ?? [];
@@ -104,7 +110,7 @@ public sealed class ModelLaunchProfileService
                 id,
                 model.Id,
                 DefaultProfileName,
-                ModelLaunchSettings.FromAppSettings(defaults) with { Port = port },
+                ModelLaunchSettings.FromAppSettings(defaults, defaultRuntimeId) with { Port = port },
                 DateTimeOffset.UtcNow,
                 IsDefault: true);
             await SaveNamedAsync(created);
@@ -122,7 +128,7 @@ public sealed class ModelLaunchProfileService
         if (profile is not null) return profile;
 
         var port = await NextAvailablePortAsync(model.Id, defaults, profileId);
-        return ModelLaunchSettings.FromAppSettings(defaults) with { Port = port };
+        return ModelLaunchSettings.FromAppSettings(defaults, await DefaultRuntimeIdAsync()) with { Port = port };
     }
 
     public async Task<ModelLaunchSettings?> EnsureAsync(ModelRecord model, AppSettings defaults)

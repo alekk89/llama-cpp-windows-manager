@@ -47,7 +47,7 @@ internal sealed class ControlSessionEndpoints : ControlEndpointHandler
         var settings = _deps.Actions.GetSettings();
         var report = await _deps.EndpointInspection.InspectGatewayAsync(
             settings,
-            AppPreferenceService.GatewaySwapPolicyLabel(settings.AutoLoadGatewayPolicy),
+            AppPreferenceService.GatewayPolicyLabel(settings),
             AppPreferenceService.ModelAccessModeLabel(settings.ModelAccessMode),
             cancellationToken);
         return Ok(new { ok = true, report });

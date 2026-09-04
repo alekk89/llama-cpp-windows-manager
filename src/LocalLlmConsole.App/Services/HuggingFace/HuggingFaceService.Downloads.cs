@@ -234,9 +234,20 @@ public sealed partial class HuggingFaceService
         {
             await DownloadAsync(job, file, settings, destination, active.Cancellation.Token);
         }
-        catch
+        catch (Exception ex)
         {
-            // The job table is the user-visible source of truth; failures are recorded there.
+            // Preparation can fail before DownloadAsync enters its transfer error handler.
+            // Keep the job actionable even when no network request or file write began.
+            var payload = ParseDownloadPayload(job.PayloadJson) ?? new DownloadJobPayload(file, destination);
+            try
+            {
+                await _jobs.UpdateAsync(job, JobStatus.Failed,
+                    JsonSerializer.Serialize(payload with { Error = ex.Message }, JsonOptions), CancellationToken.None);
+            }
+            catch (Exception persistenceError)
+            {
+                Trace.TraceError($"Hugging Face download failed: {ex}. Could not persist its failure: {persistenceError}");
+            }
         }
         finally
         {

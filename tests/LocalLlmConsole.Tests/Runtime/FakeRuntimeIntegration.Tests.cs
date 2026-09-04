@@ -8,7 +8,53 @@ namespace LocalLlmConsole.Tests;
 public sealed class FakeRuntimeIntegrationTests : ManagerRegressionTestBase
 {
     [Fact]
-    public async Task NativeSupervisorLaunchesAuthenticatedRuntimeProbesItAndStopsItCleanly()
+    public async Task ConcurrentProfilesAdvertiseDistinctDirectIdsAndKeepEffectiveAliasesForForwarding()
+    {
+        var root = CreateTempRoot();
+        var modelPath = Path.Combine(root, "Qwen-00001-of-00003.gguf");
+        await File.WriteAllTextAsync(modelPath, "fake", TestContext.Current.CancellationToken);
+        var model = new ModelRecord("model", "Qwen", modelPath, OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+        var runtime = new RuntimeRecord("cpu", "CPU", RuntimeMode.Native, RuntimeBackend.Cpu, FakeRuntimeExecutable(), "{}", DateTimeOffset.UtcNow);
+        var settings = AppSettings.CreateDefault(root) with
+        {
+            Port = FreeFakeRuntimePort(),
+            GpuLayers = 0,
+            RequireApiKeyAuth = false,
+            DirectModelAliasSuffix = "-direct"
+        };
+        using var sessions = CreateLoadedModelSessionManager();
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+        var probe = new RuntimeEndpointProbeService(http);
+        try
+        {
+            var first = await sessions.StartAsync(runtime, model, settings, Path.Combine(root, "logs"), "first");
+            await WaitForFakeRuntimeAsync(() => probe.IsAliveAsync(first.LaunchSettings, TestContext.Current.CancellationToken));
+            var secondPort = FreeFakeRuntimePort();
+            while (secondPort == settings.Port) secondPort = FreeFakeRuntimePort();
+            var second = await sessions.StartAsync(runtime, model, settings with { Port = secondPort }, Path.Combine(root, "logs"), "second");
+            await WaitForFakeRuntimeAsync(() => probe.IsAliveAsync(second.LaunchSettings, TestContext.Current.CancellationToken));
+            Assert.Equal(["Qwen-direct"], await probe.ServedModelsAsync(first.LaunchSettings, TestContext.Current.CancellationToken));
+            Assert.Equal(["Qwen-direct:2"], await probe.ServedModelsAsync(second.LaunchSettings, TestContext.Current.CancellationToken));
+            Assert.Equal(["Qwen-direct:2"], RuntimeModelAliasService.ReadAliases(second.LaunchSettings.CustomParameters));
+            Assert.Equal("", settings.CustomParameters);
+            Assert.Equal(2, sessions.Snapshots().Count(session => session.IsRunning));
+            Assert.NotEqual(first.LogPath, second.LogPath);
+            Assert.True(File.Exists(first.LogPath));
+            Assert.True(File.Exists(second.LogPath));
+        }
+        finally
+        {
+            await sessions.StopAllAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData("local", "127.0.0.1")]
+    [InlineData("local", "10.10.10.21")]
+    [InlineData("gateway", "10.10.10.21")]
+    [InlineData("models", "127.0.0.2")]
+    [InlineData("both", "127.0.0.2")]
+    public async Task NativeSupervisorLaunchesAuthenticatedRuntimeProbesItAndStopsItCleanly(string accessMode, string host)
     {
         var root = CreateTempRoot();
         var modelPath = Path.Combine(root, "fixture-model.gguf");
@@ -19,12 +65,14 @@ public sealed class FakeRuntimeIntegrationTests : ManagerRegressionTestBase
         var settings = AppSettings.CreateDefault(root) with
         {
             Port = port,
-            Host = "127.0.0.1",
+            Host = host,
+            ModelAccessMode = accessMode,
             ModelApiKey = apiKey,
             ModelApiKeyBackup = apiKey,
             RequireApiKeyAuth = true,
             GpuLayers = 0,
-            EnableMetrics = true
+            EnableMetrics = true,
+            DirectModelAliasSuffix = "-direct"
         };
         var runtime = new RuntimeRecord(
             "fake-native-runtime",
@@ -58,10 +106,10 @@ public sealed class FakeRuntimeIntegrationTests : ManagerRegressionTestBase
             Assert.True(supervisor.ProcessId > 0);
             Assert.Equal(model.Id, supervisor.ActiveModelId);
             Assert.Equal(runtime.Id, supervisor.ActiveRuntimeId);
-            Assert.Equal(["fixture-model"], await probe.ServedModelsAsync(settings, TestContext.Current.CancellationToken));
+            Assert.Equal(["fixture-model-direct"], await probe.ServedModelsAsync(settings, TestContext.Current.CancellationToken));
 
             using var unauthenticated = await http.GetAsync(
-                $"http://127.0.0.1:{port}/health",
+                $"{RuntimeEndpointService.LocalServerBaseUrl(settings)}/health",
                 TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
 

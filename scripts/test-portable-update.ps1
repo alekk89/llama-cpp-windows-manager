@@ -1,10 +1,10 @@
 param(
-  [Parameter(Mandatory = $true)][string] $CandidateArchivePath,
-  [Parameter(Mandatory = $true)][string] $ManifestPath,
-  [Parameter(Mandatory = $true)][string] $SignaturePath,
-  [Parameter(Mandatory = $true)][string] $ManifestPublicKeySpki,
-  [Parameter(Mandatory = $true)][string] $ExpectedPublisher,
-  [string] $BaselinePath = "tests/release-baselines/v2.4.0.json",
+  [Parameter(Mandatory = $true)][string] $CandidateExePath,
+  [string] $ManifestPath = "",
+  [string] $SignaturePath = "",
+  [string] $ManifestPublicKeySpki = "",
+  [string] $ExpectedPublisher = "",
+  [string] $BaselinePath = "tests/release-baselines/v2.6.0.json",
   [switch] $RequireSigned
 )
 
@@ -23,37 +23,36 @@ function Test-CertificatePublisher {
     [string]::Equals($Certificate.Subject, $Publisher, [StringComparison]::OrdinalIgnoreCase)
 }
 $RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$CandidateArchive = [IO.Path]::GetFullPath($CandidateArchivePath)
-$ManifestFile = [IO.Path]::GetFullPath($ManifestPath)
-$SignatureFile = [IO.Path]::GetFullPath($SignaturePath)
+$CandidateExe = [IO.Path]::GetFullPath($CandidateExePath)
 $BaselineFile = [IO.Path]::GetFullPath((Join-Path $RepoRoot $BaselinePath))
-foreach ($required in @($CandidateArchive, $ManifestFile, $SignatureFile, $BaselineFile)) {
+foreach ($required in @($CandidateExe, "$CandidateExe.sha256", $BaselineFile)) {
   if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Portable-update input was not found: $required" }
 }
-
-$manifestBytes = [IO.File]::ReadAllBytes($ManifestFile)
-$signature = Get-Content -LiteralPath $SignatureFile -Raw | ConvertFrom-Json
-if ($signature.algorithm -ne "ECDSA_P256_SHA256") { throw "Unsupported release-manifest signature algorithm." }
-$ecdsa = [Security.Cryptography.ECDsa]::Create()
-try {
-  $read = 0
-  $ecdsa.ImportSubjectPublicKeyInfo([Convert]::FromBase64String($ManifestPublicKeySpki), [ref]$read)
-  if (-not $ecdsa.VerifyData(
-      $manifestBytes,
-      [Convert]::FromBase64String($signature.signature),
-      [Security.Cryptography.HashAlgorithmName]::SHA256,
-      [Security.Cryptography.DSASignatureFormat]::Rfc3279DerSequence)) {
-    throw "Release-manifest signature verification failed."
+$candidateItem = Get-Item -LiteralPath $CandidateExe
+if ($candidateItem.Name -ne "LlamaCppWindowsManager.exe") { throw "Expected standalone portable EXE." }
+$hash = (Get-FileHash -LiteralPath $CandidateExe -Algorithm SHA256).Hash.ToLowerInvariant()
+$expectedHash = ((Get-Content -LiteralPath "$CandidateExe.sha256" -Raw).Trim() -split "\s+")[0]
+if ($expectedHash -notmatch '^[a-fA-F0-9]{64}$' -or $hash -ne $expectedHash) { throw "Candidate portable EXE hash mismatch." }
+if ($RequireSigned -or $ManifestPath -or $SignaturePath) {
+  foreach ($value in @($ManifestPath, $SignaturePath, $ManifestPublicKeySpki, $ExpectedPublisher)) {
+    if ([string]::IsNullOrWhiteSpace($value)) { throw "Signed validation requires manifest, signature, public key, and publisher." }
   }
-} finally { $ecdsa.Dispose() }
-
-$manifest = [Text.Encoding]::UTF8.GetString($manifestBytes) | ConvertFrom-Json
-$candidateItem = Get-Item -LiteralPath $CandidateArchive
-$artifact = @($manifest.artifacts | Where-Object { $_.name -eq $candidateItem.Name -and $_.role -eq "portable-archive" })
-if ($artifact.Count -ne 1) { throw "Candidate archive is not uniquely listed by the signed manifest." }
-if ([long]$artifact[0].size -ne $candidateItem.Length) { throw "Candidate portable archive size mismatch." }
-if ($artifact[0].sha256 -ne (Get-FileHash -LiteralPath $CandidateArchive -Algorithm SHA256).Hash.ToLowerInvariant()) {
-  throw "Candidate portable archive hash mismatch."
+  $manifestBytes = [IO.File]::ReadAllBytes([IO.Path]::GetFullPath($ManifestPath))
+  $signature = Get-Content -LiteralPath $SignaturePath -Raw | ConvertFrom-Json
+  if ($signature.algorithm -ne "ECDSA_P256_SHA256") { throw "Unsupported release-manifest signature algorithm." }
+  $ecdsa = [Security.Cryptography.ECDsa]::Create()
+  try {
+    $read = 0
+    $ecdsa.ImportSubjectPublicKeyInfo([Convert]::FromBase64String($ManifestPublicKeySpki), [ref]$read)
+    if (-not $ecdsa.VerifyData($manifestBytes, [Convert]::FromBase64String($signature.signature),
+        [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.DSASignatureFormat]::Rfc3279DerSequence)) {
+      throw "Release-manifest signature verification failed."
+    }
+  } finally { $ecdsa.Dispose() }
+  $manifest = [Text.Encoding]::UTF8.GetString($manifestBytes) | ConvertFrom-Json
+  $artifact = @($manifest.artifacts | Where-Object { $_.name -eq $candidateItem.Name -and $_.role -eq "application" })
+  if ($artifact.Count -ne 1) { throw "Candidate EXE is not uniquely listed by the signed manifest." }
+  if ([long]$artifact[0].size -ne $candidateItem.Length -or $artifact[0].sha256 -ne $hash) { throw "Candidate EXE manifest mismatch." }
 }
 
 $baseline = Get-Content -LiteralPath $BaselineFile -Raw | ConvertFrom-Json
@@ -70,7 +69,10 @@ try {
     throw "Pinned old portable hash mismatch."
   }
   Expand-Archive -LiteralPath $oldArchive -DestinationPath $oldRoot
-  Expand-Archive -LiteralPath $CandidateArchive -DestinationPath $candidateRoot
+  $candidateBootstrapExe = Join-Path $candidateRoot "LlamaCppWindowsManager.exe"
+  Copy-Item -LiteralPath $CandidateExe -Destination $candidateBootstrapExe
+  $bootstrap = Start-Process -FilePath $candidateBootstrapExe -ArgumentList "--bootstrap-agent-sidecars-only" -WindowStyle Hidden -Wait -PassThru
+  if ($bootstrap.ExitCode -ne 0) { throw "Candidate EXE sidecar bootstrap failed." }
   $sourceExe = Get-ChildItem -LiteralPath $candidateRoot -Recurse -Filter LlamaCppWindowsManager.exe -File | Select-Object -First 1
   $sourceCli = Get-ChildItem -LiteralPath $candidateRoot -Recurse -Filter llwmctl.exe -File | Select-Object -First 1
   $targetExe = Get-ChildItem -LiteralPath $oldRoot -Recurse -Filter LlamaCppWindowsManager.exe -File | Select-Object -First 1
@@ -104,7 +106,6 @@ try {
   $updaterOutput = & powershell.exe @(
     "-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", $script,
     "-ParentPid", "999999", "-SourceExe", $sourceExe.FullName, "-TargetExe", $targetExe.FullName,
-    "-SourceCli", $sourceCli.FullName, "-TargetCli", $targetCli.FullName,
     "-NoticeSource", $noticeSource, "-NoticeTarget", $noticeTarget,
     "-WorkingDirectory", $oldRoot, "-SkipRestart") 2>&1
   if ($LASTEXITCODE -ne 0) {
@@ -113,6 +114,8 @@ try {
   if ((Get-FileHash $targetExe.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $sourceExe.FullName -Algorithm SHA256).Hash) {
     throw "Updated application does not match the verified candidate."
   }
+  $restore = Start-Process -FilePath $targetExe.FullName -ArgumentList "--bootstrap-agent-sidecars-only" -WindowStyle Hidden -Wait -PassThru
+  if ($restore.ExitCode -ne 0) { throw "Updated EXE sidecar restoration failed." }
   if ((Get-FileHash $targetCli.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $sourceCli.FullName -Algorithm SHA256).Hash) {
     throw "Updated control CLI does not match the verified candidate."
   }

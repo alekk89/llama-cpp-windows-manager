@@ -16,12 +16,13 @@ public sealed class RuntimesPageViewModel
 
     public string SelectedPlatformFilter { get; private set; } = RuntimeInventoryFilterService.All;
 
-    public void ReplaceRows(IEnumerable<RuntimeCatalogRow> rows, IReadOnlySet<string>? favoriteRuntimeIds = null)
+    public void ReplaceRows(IEnumerable<RuntimeCatalogRow> rows, IReadOnlySet<string>? favoriteRuntimeIds = null, string defaultRuntimeId = "")
     {
         _allRows.Clear();
         foreach (var row in rows)
         {
             row.IsFavorite = row.Runtime is not null && favoriteRuntimeIds?.Contains(row.Runtime.Id) == true;
+            row.IsDefaultRuntime = row.Runtime is not null && string.Equals(row.Runtime.Id, defaultRuntimeId, StringComparison.OrdinalIgnoreCase);
             _allRows.Add(row);
         }
         ApplyFilters(SelectedVendorFilter, SelectedPlatformFilter);

@@ -32,10 +32,11 @@ public static class BenchmarkResultService
             }
             if (!TryInt(root, "n_prompt", out var prompt)
                 || !TryInt(root, "n_gen", out var generation)
-                || !TryDouble(root, "avg_ts", out _)
+                || !TryDouble(root, "avg_ts", out var throughput)
+                || throughput < 0
                 || prompt < 0
                 || generation < 0
-                || prompt + generation == 0)
+                || (prompt == 0 && generation == 0))
             {
                 error = "Benchmark output row did not contain a valid llama-bench workload and throughput.";
                 return false;
@@ -109,12 +110,17 @@ public static class BenchmarkResultService
                 Double(root, "draft_acceptance_percent"),
                 Bool(root, "speculative_metrics_observed"),
                 Int(root, "n_ctx"),
-                Long(root, "gpu_memory_used_mib"));
+                Long(root, "gpu_memory_used_mib"),
+                root.TryGetProperty("gpu_memory_peaks", out var peaks)
+                    ? peaks.Deserialize<BenchmarkGpuMemoryPeak[]>() : null,
+                Int(root, "gpu_memory_sample_interval_ms"),
+                Int(root, "vulkan_allocation_block_size_mib"),
+                String(root, "gpu_memory_measurement_window"));
             return true;
         }
         catch (JsonException ex)
         {
-            error = $"Malformed benchmark JSONL: {ex.Message}";
+            error = $"Malformed benchmark JSONL: {ex.Message[..Math.Min(ex.Message.Length, 256)]}";
             return false;
         }
     }
@@ -133,20 +139,20 @@ public static class BenchmarkResultService
     private static string StringAny(JsonElement root, params string[] names)
         => names.Select(name => String(root, name)).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "";
     private static int Int(JsonElement root, string name)
-        => root.TryGetProperty(name, out var value) && value.TryGetInt32(out var parsed) ? parsed : 0;
+        => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var parsed) ? parsed : 0;
     private static bool TryInt(JsonElement root, string name, out int parsed)
     {
         parsed = 0;
-        return root.TryGetProperty(name, out var value) && value.TryGetInt32(out parsed);
+        return root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out parsed);
     }
     private static long Long(JsonElement root, string name)
-        => root.TryGetProperty(name, out var value) && value.TryGetInt64(out var parsed) ? parsed : 0;
+        => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var parsed) ? parsed : 0;
     private static double Double(JsonElement root, string name)
-        => root.TryGetProperty(name, out var value) && value.TryGetDouble(out var parsed) && double.IsFinite(parsed) ? parsed : 0;
+        => root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var parsed) && double.IsFinite(parsed) ? parsed : 0;
     private static bool TryDouble(JsonElement root, string name, out double parsed)
     {
         parsed = 0;
-        return root.TryGetProperty(name, out var value) && value.TryGetDouble(out parsed) && double.IsFinite(parsed);
+        return root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out parsed) && double.IsFinite(parsed);
     }
     private static bool Bool(JsonElement root, string name)
         => root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True;

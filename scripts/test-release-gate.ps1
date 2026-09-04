@@ -150,21 +150,6 @@ function Assert-TrustedSignature {
   }
 }
 
-function Assert-ZipContainsEntry {
-  param(
-    [Parameter(Mandatory = $true)]
-    [string[]] $Entries,
-    [Parameter(Mandatory = $true)]
-    [string] $ExpectedEntry,
-    [Parameter(Mandatory = $true)]
-    [string] $ZipPath
-  )
-
-  if (-not ($Entries -contains $ExpectedEntry)) {
-    throw "Release archive is missing $ExpectedEntry`: $ZipPath"
-  }
-}
-
 function Assert-PublishArtifacts {
   param(
     [Parameter(Mandatory = $true)]
@@ -187,6 +172,9 @@ function Assert-PublishArtifacts {
   if (-not (Test-Path -LiteralPath $publishDir -PathType Container)) {
     throw "Publish folder was not produced: $publishDir"
   }
+  if (Test-Path -LiteralPath (Join-Path $publishDir "LlamaCppConsole.exe")) {
+    throw "Publish folder contains the removed legacy executable alias."
+  }
 
   Assert-HashCompanion -Path $appExe
   Assert-HashCompanion -Path $controlCli
@@ -200,37 +188,33 @@ function Assert-PublishArtifacts {
   Assert-FileExists -Path $sbom -Label "SPDX software bill of materials"
   Assert-FileExists -Path $apacheLicense -Label "Apache License 2.0"
   Assert-FileExists -Path $dotnetNotices -Label ".NET third-party notices"
-  Assert-HashCompanion -Path $zipPath
+  if (Test-Path -LiteralPath $zipPath) { throw "Obsolete portable ZIP remains in dist: $zipPath" }
 
   $pdbs = @(Get-ChildItem -LiteralPath $publishDir -Recurse -Filter *.pdb -File -ErrorAction SilentlyContinue)
   if ($pdbs.Count -ne 0) {
     throw "Publish folder contains PDB files: $($pdbs[0].FullName)"
   }
 
-  Add-Type -AssemblyName System.IO.Compression.FileSystem
-  $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+  # Verify the actual standalone download restores its embedded sidecars.
+  $bootstrapRoot = Join-Path $RepoRoot ("workspace/portable-bootstrap-" + [Guid]::NewGuid().ToString("N"))
+  New-Item -ItemType Directory -Path $bootstrapRoot -Force | Out-Null
   try {
-    $entries = @($zip.Entries | ForEach-Object { $_.FullName -replace "\\", "/" })
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "LlamaCppWindowsManager.exe" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "llwmctl.exe" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "llwmctl.exe.sha256" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "AGENTS.md" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "agent.md" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "docs/CONTROL_API.md" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "LICENSE" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "THIRD-PARTY-NOTICES.md" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "sbom.spdx.json" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "licenses/Apache-2.0.txt" -ZipPath $zipPath
-    Assert-ZipContainsEntry -Entries $entries -ExpectedEntry "licenses/dotnet/ThirdPartyNotices.txt" -ZipPath $zipPath
-    if ($entries -contains "LlamaCppConsole.exe") {
-      throw "Release archive contains the removed legacy executable alias: $zipPath"
-    }
-    $pdbEntry = $entries | Where-Object { $_.EndsWith(".pdb", [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
-    if ($pdbEntry) {
-      throw "Release archive contains a PDB file: $pdbEntry"
+    $bootstrapExe = Join-Path $bootstrapRoot "LlamaCppWindowsManager.exe"
+    Copy-Item -LiteralPath $appExe -Destination $bootstrapExe
+    $process = Start-Process -FilePath $bootstrapExe -ArgumentList "--bootstrap-agent-sidecars-only" -WindowStyle Hidden -PassThru -Wait
+    if ($process.ExitCode -ne 0) { throw "Standalone EXE sidecar bootstrap failed: $($process.ExitCode)" }
+    foreach ($relative in @("llwmctl.exe", "AGENTS.md", "agent.md", "docs/CONTROL_API.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "licenses/Apache-2.0.txt", "licenses/dotnet/LICENSE.txt", "licenses/dotnet/ThirdPartyNotices.txt")) {
+      $restored = Join-Path $bootstrapRoot $relative
+      Assert-FileExists -Path $restored -Label "Restored standalone sidecar"
+      if ((Get-FileHash -LiteralPath $restored).Hash -ne (Get-FileHash -LiteralPath (Join-Path $publishDir $relative)).Hash) {
+        throw "Standalone sidecar differs from published input: $relative"
+      }
     }
   } finally {
-    $zip.Dispose()
+    $resolvedBootstrap = [IO.Path]::GetFullPath($bootstrapRoot)
+    $allowedRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot "workspace")).TrimEnd('\') + '\'
+    if (-not $resolvedBootstrap.StartsWith($allowedRoot, [StringComparison]::OrdinalIgnoreCase)) { throw "Invalid bootstrap cleanup path" }
+    Remove-Item -LiteralPath $resolvedBootstrap -Recurse -Force
   }
 }
 
@@ -289,6 +273,10 @@ if (-not $SkipRestore) {
 
 Invoke-GateStep "Build app" {
   & powershell.exe @buildArgs
+}
+
+Invoke-GateStep "Verify updater handoff without instrumentation" {
+  & $dotnet test --project (Join-Path $RepoRoot "tests\LocalLlmConsole.Tests") --no-restore --filter-class '*UpdateHandoffTests'
 }
 
 Invoke-GateStep "Run tests and enforce coverage" {

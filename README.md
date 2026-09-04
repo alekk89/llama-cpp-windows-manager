@@ -50,14 +50,14 @@ and monitoring, this is what the Manager is built for.
 
 ## Install
 
-Download the Windows x64 installer or portable ZIP from
+Download the Windows x64 installer or portable EXE from
 [GitHub Releases](https://github.com/alekk89/llama-cpp-windows-manager/releases/latest).
 Both versions include everything needed to run the app. You do not need to
 install .NET separately.
 
 * **Installer:** adds Start Menu integration, app updates, and optional startup
   with Windows.
-* **Portable ZIP:** runs without an installer and normally keeps its data in
+* **Portable EXE:** runs without an installer and normally keeps its data in
   `data` beside `LlamaCppWindowsManager.exe`.
 * **Requirements:** Windows 10 or 11 x64. GPU and WSL runtimes also need the
   matching drivers and environment.

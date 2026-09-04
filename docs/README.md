@@ -17,5 +17,7 @@ instead of repeating settings or operational procedures.
 | Automation | [Control API and `llwmctl`](CONTROL_API.md) |
 | Contributor workflow | [Development](DEVELOPMENT.md) |
 | Architecture | [Architecture](ARCHITECTURE.md) and [decisions](decisions/) |
-| Current release draft | [v2.6.0 release notes](releases/v2.6.0.md) |
+| Release notes and drafts | [GitHub Releases](https://github.com/alekk89/llama-cpp-windows-manager/releases) |
 | Release engineering | [Release readiness](RELEASE_READINESS.md), [code-signing policy](CODE_SIGNING_POLICY.md), [signing](SIGNING.md), and [governance](REPOSITORY_GOVERNANCE.md) |
+
+- [Unsigned community release procedure](UNSIGNED_RELEASE.md)

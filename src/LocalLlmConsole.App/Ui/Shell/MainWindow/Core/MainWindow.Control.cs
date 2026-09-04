@@ -1,15 +1,3 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-using Forms = System.Windows.Forms;
-using WpfApplication = System.Windows.Application;
-using WpfBinding = System.Windows.Data.Binding;
-using WpfButton = System.Windows.Controls.Button;
-using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
-using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public partial class MainWindow
@@ -57,13 +45,15 @@ public partial class MainWindow
     private async Task<AppSettings> ApplyControlSettingsOnUiAsync(AppSettings settings, CancellationToken cancellationToken)
     {
         _coreServices.Ui.SettingsAutoApply.Cancel();
+        var previousSettings = _settings;
         var previousCulture = _settings.UiCulture;
         var previousRuntimeLogOrder = _settings.RuntimeLogOrder;
         var persisted = await AppServices.SettingsApplication.PersistAsync(settings, cancellationToken);
         _settings = persisted;
         ApplyTrayIconVisibilityPreference();
         ApplyGpuEnergyTrackingBoundary();
-        _serviceFactory.CreateWindowsStartupRegistrationService().Apply(persisted.StartWithWindows);
+        if (previousSettings.StartWithWindows != persisted.StartWithWindows)
+            _serviceFactory.CreateWindowsStartupRegistrationService().Apply(persisted.StartWithWindows);
         ApplicationThemeService.Apply(persisted.ThemeMode);
         ApplicationUiScaleService.Apply(persisted.UiScalePercent); ApplicationFontScaleService.Apply(persisted.FontScalePercent);
         if (!string.Equals(previousCulture, persisted.UiCulture, StringComparison.OrdinalIgnoreCase))
@@ -73,7 +63,8 @@ public partial class MainWindow
             PopulateLanguageSelector();
         }
         ApplyLaunchSettingsToControls();
-        await RestartModelGatewayAsync();
+        if (AppSettingsApplicationService.GatewaySettingsChanged(previousSettings, persisted))
+            await RestartModelGatewayAsync();
         if (_viewModel.CurrentPage == "Settings")
             ShowSettings();
         await RefreshAllAsync();

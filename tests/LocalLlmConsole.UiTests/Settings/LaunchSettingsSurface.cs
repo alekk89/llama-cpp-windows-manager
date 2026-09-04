@@ -61,6 +61,15 @@ public abstract partial class WpfUiTestBase
         Assert.Equal("127.0.0.1", panel.FormControls.HostBox.Text);
         panel.FormControls.HostBox.Text = "10.10.10.21";
         Assert.Equal("10.10.10.21", LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls).Host);
+        var allocation = panel.FormControls.VulkanAllocationBlockSizeBox!;
+        Assert.Equal("Runtime default", allocation.Text);
+        allocation.Text = "4096";
+        Assert.Equal(4096, LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls).VulkanAllocationBlockSizeMiB);
+        allocation.Text = "-1";
+        Assert.Throws<InvalidOperationException>(() => LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls));
+        allocation.Text = "";
+        Assert.Equal(0, LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls).VulkanAllocationBlockSizeMiB);
+        allocation.Text = "Runtime default";
         Assert.All(
             panelState.LaunchSettingElements.SelectMany(pair => pair.Value),
             element =>

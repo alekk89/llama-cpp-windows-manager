@@ -10,7 +10,7 @@ body:
     id: version
     attributes:
       label: Application version
-      placeholder: v2.6.0
+      placeholder: v2.7.0
     validations:
       required: true
   - type: dropdown

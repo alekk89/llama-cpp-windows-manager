@@ -147,7 +147,7 @@ llwmctl profiles delete --model <model> --id <profile-id>
 llwmctl profiles update --model <model> --id <profile-id> --settings-file profile-patch.json
 ```
 
-The full profile surface includes runtime, host, and port, context, GPU layers/mode/devices/split, parallelism, batches, threads, flash attention, K/V cache types and offload, prompt cache, checkpoints, continuous batching, reasoning mode/format/effort/budget/budget-message/preservation controls, template options, vision image tokens, mmap/mlock, sampling and penalties, RoPE, speculative mode and draft controls, vision/MTP/draft paths, metrics, and validated custom parameters. A non-loopback profile host is honored only when direct-model LAN access is enabled. Reasoning effort is passed to the llama.cpp chat template; non-default levels only affect models and templates that support them.
+The full profile surface includes runtime, host, and port, context, GPU layers/mode/devices/split, parallelism, batches, threads, flash attention, K/V cache types and offload, prompt cache, checkpoints, continuous batching, reasoning mode/format/effort/budget/budget-message/preservation controls, template options, vision image tokens, mmap/mlock, sampling and penalties, RoPE, speculative mode and draft controls, vision/MTP/draft paths, metrics, and validated custom parameters. A non-loopback profile host is honored only when direct-model LAN access is enabled. Profiles whose saved data omits `host` or leaves it blank inherit the app host default; explicitly saved addresses remain overrides. Launch commands, readiness probes, and endpoint links use the same effective host after applying LAN policy. Reasoning effort is passed to the llama.cpp chat template; non-default levels only affect models and templates that support them.
 
 ## Shared model-serving gateway
 
@@ -325,9 +325,22 @@ persisted results and requires explicit authorization.
 
 ## Application settings
 
+Profile settings accept `vulkanAllocationBlockSizeMiB`: an integer of zero for
+runtime default, or a positive MiB count (for example `4096`). It becomes a
+Vulkan-only child-process environment override on the next launch and also
+applies to profile fitting and serving benchmarks. It is not a generic shell
+command or environment editor.
+
+Benchmark results expose `gpuMemoryPeaks` per device, the measurement window
+(`workload` for serving, `process` for llama-bench), and the sampling interval.
+Peaks are device-wide and include other applications. Null readings mean
+unavailable. CSV adds numeric columns per device; see
+[benchmark memory semantics](TELEMETRY_AND_ENERGY.md#benchmark-gpu-memory).
+
 ```powershell
 llwmctl settings get
 llwmctl settings set --set autoUnloadIdleMinutes=30 --set autoLoadGatewayPolicy=singleActive
+llwmctl settings set --set gatewayAutoLoadModels=false
 llwmctl settings set --set showOverviewLiveRuntimeLog=false --set showOverviewAllMetrics=false
 llwmctl settings set --set uiScalePercent=125
 llwmctl settings set --set fontScalePercent=125
@@ -335,6 +348,13 @@ llwmctl settings rotate-key
 ```
 
 Settings changes are persisted through the Manager, applied to the live UI, and update Start with Windows. The gateway restarts only when a gateway, access, authentication, or API-key field changes. API-key material is redacted. The running process workspace root is immutable; model API keys can only be rotated, not retrieved or injected through a general patch.
+
+`gatewayAutoLoadModels` defaults to `true`. Set it to `false` to keep the gateway
+listening while listing and serving only already-loaded profiles. Requests for
+unloaded profiles return `503 model_not_loaded` without loading or swapping
+sessions; `autoLoadGatewayPolicy` applies only while auto-loading is enabled.
+`autoLoadGatewayEnabled` separately controls whether the listener is enabled.
+Explicit lifecycle commands and idle-unload policies remain independent.
 
 `uiScalePercent` accepts a bounded percentage from `75` through `175`; the UI
 offers a slider in 1% steps and displays its current percentage. Slider changes
@@ -378,7 +398,7 @@ table above.
 
 ### UI-managed preferences
 
-Favorite model/profile/runtime choices, **Load profiles on startup** selections,
+The default runtime, favorite model/profile/runtime choices, **Load profiles on startup** selections,
 and remembered main-window/table/splitter layouts are persisted Manager state but
 are not currently exposed as `AppSettings` patch fields or dedicated control
 routes. Agents must not edit their SQLite tables or automate the WPF interface.
@@ -432,6 +452,12 @@ The complete live route and settings list is returned by `GET /api/v1/capabiliti
 - `PUT|DELETE /api/v1/models/{model}/profiles/{profile}`
 - `GET /api/v1/models/{model}/companions`
 - `GET|PATCH /api/v1/settings`
+  - `directModelAliasSuffix` optionally adds a suffix to direct endpoint IDs on
+    the next load; empty preserves explicit aliases. Missing aliases use the
+    short GGUF filename. Running duplicates are numbered `:2`, `:3`, etc.
+  - `sameModelLoadPolicy` (`ask`, `alongside`, `replace`) controls individual UI
+    loads only. Control commands and gateway requests retain their existing
+    explicit lifecycle and current-session safeguards.
 - `GET /api/v1/huggingface/search` and `POST /api/v1/huggingface/download`
 - `POST /api/v1/jobs/{job}/pause|resume|cancel` for Hugging Face downloads only
 - `GET /api/v1/benchmarks`, `/benchmarks/schema`, `/benchmarks/presets`, and `/benchmarks/capabilities`
@@ -449,3 +475,8 @@ llwmctl request POST /api/v1/models/MODEL/load --body '{"waitForReady":true}'
 ```
 
 Raw requests sent through `llwmctl request` still enforce the CLI's current-session protection for model unload/restart/delete, `unloadOthers`, and operations that can stop the active runtime or Manager. `--allow-self-stop` is required for the same explicitly authorized cases as the named commands; CLI raw mode is not a safety bypass.
+
+Settings patches that only change presentation, or repeat the effective gateway
+configuration, preserve the listener and active requests. Start-with-Windows
+registration changes only when that preference changes; disabling it never
+removes another executable’s registration.

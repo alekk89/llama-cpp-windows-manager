@@ -97,6 +97,69 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
     }
 
     [Fact]
+    public async Task NativeProcessRunnerClosesInheritedPipesAfterParentExit()
+    {
+        var root = CreateTempRoot();
+        CopyFakeRuntime(root);
+        var executable = Path.Combine(root, "LocalLlmConsole.FakeRuntime.exe");
+        var pidFile = Path.Combine(root, "descendant.pid");
+        var runtime = new RuntimeRecord("runtime", "Runtime", RuntimeMode.Native, RuntimeBackend.Cpu,
+            executable, "{}", DateTimeOffset.UtcNow);
+        var runner = new BenchmarkProcessRunner(new WslRuntimeStopService(
+            new ScriptedProcessRunner(_ => new ProcessRunResult(0, "", ""))));
+        var result = await runner.RunAsync(runtime, "", executable, ["--fake-exit-with-child", pidFile],
+            _ => Task.CompletedTask, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.VerifiedStopped);
+        Assert.True(File.Exists(pidFile), "The pipe-inheriting child did not start.");
+        Assert.False(File.Exists(pidFile + ".completed"), "The runner waited for an orphan's lifetime instead of closing its owned process job.");
+        var childPid = int.Parse(await File.ReadAllTextAsync(pidFile, TestContext.Current.CancellationToken));
+        try
+        {
+            using var child = Process.GetProcessById(childPid);
+            await child.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        }
+        catch (ArgumentException) { }
+    }
+
+    [Fact]
+    public async Task NativeProcessRunnerHonorsCancellationWhileDrainingAfterParentExit()
+    {
+        var root = CreateTempRoot();
+        var pidFile = Path.Combine(root, "parent.pid");
+        var script = Path.Combine(root, "emit.ps1");
+        await File.WriteAllTextAsync(script, "param([string]$PidFile)\n[IO.File]::WriteAllText($PidFile,[string]$PID)\n[Console]::Out.WriteLine('row')", TestContext.Current.CancellationToken);
+        var executable = HostExecutableResolver.WindowsPowerShellExe();
+        var runtime = new RuntimeRecord("runtime", "Runtime", RuntimeMode.Native, RuntimeBackend.Cpu, executable, "{}", DateTimeOffset.UtcNow);
+        var runner = new BenchmarkProcessRunner(new WslRuntimeStopService(new ScriptedProcessRunner(_ => new ProcessRunResult(0, "", ""))));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var run = runner.RunAsync(runtime, "", executable, ["-NoProfile", "-File", script, "-PidFile", pidFile],
+            async _ => { received.TrySetResult(); await release.Task; }, null, cancellation.Token);
+        try
+        {
+            await received.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var pid = int.Parse(await File.ReadAllTextAsync(pidFile, TestContext.Current.CancellationToken));
+            try
+            {
+                using var parent = Process.GetProcessById(pid);
+                await parent.WaitForExitAsync(TestContext.Current.CancellationToken);
+            }
+            catch (ArgumentException) { }
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+            cancellation.Cancel();
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+            release.TrySetResult();
+            var result = await run.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.True(result.CancellationRequested);
+            Assert.True(result.VerifiedStopped);
+        }
+        finally { cancellation.Cancel(); release.TrySetResult(); }
+    }
+
+    [Fact]
     public async Task NativeProcessRunnerStreamsJsonlAndDiagnostics()
     {
         var runtime = new RuntimeRecord("runtime", "Runtime", RuntimeMode.Native, RuntimeBackend.Cpu,
@@ -221,7 +284,7 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
 
         await using var store = new StateStore(Path.Combine(root, "state", "manager.db"));
         await store.InitializeAsync();
-        var runtime = new RuntimeRecord("runtime", "Fake runtime", RuntimeMode.Native, RuntimeBackend.Cpu, server, "{}", DateTimeOffset.UtcNow);
+        var runtime = new RuntimeRecord("runtime", "Fake runtime", RuntimeMode.Native, RuntimeBackend.Vulkan, server, "{}", DateTimeOffset.UtcNow);
         var model = new ModelRecord("model", "Fake model", modelPath, OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
         await store.UpsertRuntimeAsync(runtime);
         await store.UpsertModelAsync(model);
@@ -234,7 +297,8 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
             ParallelSlots = 2,
             SpeculativeType = "draft-mtp",
             SpecDraftModelPath = modelPath,
-            SpecDraftMaxTokens = 4
+            SpecDraftMaxTokens = 4,
+            VulkanAllocationBlockSizeMiB = 4096
         };
         await store.SaveModelLaunchSettingsAsync(model.Id, profile);
 
@@ -275,10 +339,16 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
             Assert.Equal(4096, row.Result.ContextSize);
             Assert.Equal(1024, row.Result.BatchSize);
             Assert.Equal(512, row.Result.MicroBatchSize);
+            Assert.Equal(4096, row.Result.VulkanAllocationBlockSizeMiB);
+            Assert.Equal("workload", row.Result.GpuMemoryMeasurementWindow);
+            Assert.Equal(1000, row.Result.GpuMemorySampleIntervalMilliseconds);
+            Assert.NotNull(row.Result.GpuMemoryPeaks);
             Assert.True(row.Result.SpeculativeMetricsObserved);
             Assert.Equal(50, row.Result.DraftAcceptancePercent);
             Assert.True(row.Result.DraftTokens > 0);
         });
+        Assert.Contains(Directory.GetFiles(Path.Combine(root, "logs"), "llama-server-*.log"),
+            path => File.ReadAllText(path).Contains("fixture Vulkan allocation block bytes: 4294967296", StringComparison.Ordinal));
         Assert.False(sessions.HasRunningSessions);
         Assert.False(sessions.HasBenchmarkLease);
     }
