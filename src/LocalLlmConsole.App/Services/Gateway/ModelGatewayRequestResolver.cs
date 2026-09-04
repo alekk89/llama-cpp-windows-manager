@@ -73,22 +73,50 @@ public static class ModelGatewayRequestResolver
     public static byte[] BodyForRuntime(byte[] body, AppSettings launchSettings)
     {
         var aliases = RuntimeModelAliasService.ReadAliases(launchSettings.CustomParameters);
-        if (aliases.Count == 0 || aliases.Contains(ExtractRequestedModel(body), StringComparer.Ordinal)) return body;
+        if (aliases.Count == 0) return body;
 
-        // Gateway suffixes select profiles; llama-server only knows its configured aliases.
-        // Use the active session's settings, which may differ from a subsequently edited profile.
-        using var document = JsonDocument.Parse(body);
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream))
+        // Scan once and replace only top-level model values. Keeping all other
+        // bytes avoids decoding/re-encoding large prompts and multimodal payloads.
+        var reader = new Utf8JsonReader(body);
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            throw new JsonException("Gateway request body must be a JSON object.");
+        var ranges = new List<(int Start, int Length)>();
+        var requestedModel = "";
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
         {
-            writer.WriteStartObject();
-            foreach (var property in document.RootElement.EnumerateObject())
-            {
-                if (property.NameEquals("model")) writer.WriteString("model", aliases[0]);
-                else property.WriteTo(writer);
-            }
-            writer.WriteEndObject();
+            var isModel = reader.ValueTextEquals("model"u8);
+            if (!reader.Read()) throw new JsonException("Missing property value.");
+            var start = checked((int)reader.TokenStartIndex);
+            if (isModel)
+                requestedModel = reader.TokenType == JsonTokenType.String ? reader.GetString()?.Trim() ?? "" : "";
+            reader.Skip();
+            if (isModel) ranges.Add((start, checked((int)reader.BytesConsumed) - start));
         }
-        return stream.ToArray();
+        if (reader.TokenType != JsonTokenType.EndObject)
+            throw new JsonException("Incomplete gateway request body.");
+        // Validate trailing input even when the runtime already accepts the alias.
+        if (reader.Read()) throw new JsonException("Unexpected trailing JSON value.");
+        if (ranges.Count == 0 || aliases.Contains(requestedModel, StringComparer.Ordinal)) return body;
+
+        // Gateway suffixes select profiles; use the active session's alias, which
+        // may differ from a subsequently edited saved profile.
+        var replacement = JsonSerializer.SerializeToUtf8Bytes(aliases[0]);
+        var length = body.Length;
+        foreach (var range in ranges)
+            length = checked(length - range.Length + replacement.Length);
+        var rewritten = new byte[length];
+        var sourceOffset = 0;
+        var destinationOffset = 0;
+        foreach (var range in ranges)
+        {
+            var unchanged = range.Start - sourceOffset;
+            body.AsSpan(sourceOffset, unchanged).CopyTo(rewritten.AsSpan(destinationOffset));
+            destinationOffset += unchanged;
+            replacement.CopyTo(rewritten.AsSpan(destinationOffset));
+            destinationOffset += replacement.Length;
+            sourceOffset = range.Start + range.Length;
+        }
+        body.AsSpan(sourceOffset).CopyTo(rewritten.AsSpan(destinationOffset));
+        return rewritten;
     }
 }
