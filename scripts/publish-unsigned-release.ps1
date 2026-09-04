@@ -21,9 +21,10 @@ $tagCommit = & git -C $repoRoot rev-parse "$Tag^{commit}"
 if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $headCommit) { throw "Release tag must identify the checked-out, validated commit." }
 
 # v1.0/v1.1 clients fall back to the first EXE when the old filename is absent.
-# Upload the portable EXE first and verify GitHub's returned asset order before publication.
+# GitHub sorts assets by filename; the Setup- prefix keeps the portable EXE first.
+# Verify the returned order as well as the uploaded bytes before publication.
 $names = @("LlamaCppWindowsManager.exe", "LlamaCppWindowsManager.exe.sha256",
-  "LlamaCppWindowsManager-Setup-$version-win-x64.exe", "LlamaCppWindowsManager-Setup-$version-win-x64.exe.sha256")
+  "Setup-LlamaCppWindowsManager-$version-win-x64.exe", "Setup-LlamaCppWindowsManager-$version-win-x64.exe.sha256")
 $files = @($names | ForEach-Object { Join-Path ([IO.Path]::GetFullPath($AssetDirectory)) $_ })
 foreach ($file in $files) {
   if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing release asset: $file" }
@@ -35,10 +36,10 @@ foreach ($file in @($files[0], $files[2])) {
 }
 $productVersion = (Get-Item -LiteralPath $files[0]).VersionInfo.ProductVersion.Trim()
 if ($productVersion -ne "$Tag+$headCommit") { throw "Portable EXE must be built from tagged commit $headCommit; found $productVersion." }
-$releasesJson = & gh release list --repo $repository --limit 100 --json tagName,isDraft
+$releasesJson = & gh api "repos/$repository/releases?per_page=100"
 if ($LASTEXITCODE -ne 0) { throw "Could not read GitHub releases." }
-$existing = @($releasesJson | ConvertFrom-Json | Where-Object { $_.tagName -eq $Tag })
-if ($existing.Count -gt 0 -and -not $existing[0].isDraft) { throw "Release is already published; never replace its assets." }
+$existing = @($releasesJson | ConvertFrom-Json | Where-Object { $_.tag_name -eq $Tag })
+if ($existing.Count -gt 0 -and -not $existing[0].draft) { throw "Release is already published; never replace its assets." }
 if ($existing.Count -eq 0) {
   & gh release create $Tag --repo $repository --verify-tag --draft --title "llama.cpp Windows Manager $Tag" --notes-file $notes
   if ($LASTEXITCODE -ne 0) { throw "Could not create release draft." }
@@ -47,7 +48,13 @@ if ($existing.Count -eq 0) {
     if ($LASTEXITCODE -ne 0) { throw "Asset upload failed; draft remains unpublished." }
   }
 }
-$releaseJson = & gh api "repos/$repository/releases/tags/$Tag"
+# The by-tag REST endpoint does not resolve unpublished drafts. Find the draft
+# in the authenticated release list, then verify it through its numeric ID.
+$draftsJson = & gh api "repos/$repository/releases?per_page=100"
+if ($LASTEXITCODE -ne 0) { throw "Could not locate the release draft." }
+$drafts = @($draftsJson | ConvertFrom-Json | Where-Object { $_.tag_name -eq $Tag -and $_.draft })
+if ($drafts.Count -ne 1) { throw "Expected exactly one unpublished release draft for $Tag." }
+$releaseJson = & gh api "repos/$repository/releases/$($drafts[0].id)"
 if ($LASTEXITCODE -ne 0) { throw "Could not verify the draft assets." }
 $release = $releaseJson | ConvertFrom-Json
 if (-not $release.draft -or $release.assets.Count -ne 4) { throw "Expected an unpublished draft containing exactly four assets." }
