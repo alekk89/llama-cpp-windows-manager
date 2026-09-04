@@ -28,9 +28,16 @@ foreach ($file in @($app, $installer)) {
   }
 }
 New-Item -ItemType Directory -Path $output | Out-Null
-foreach ($file in @($app, "$app.sha256", $installer, "$installer.sha256")) {
+foreach ($file in @($app, "$app.sha256")) {
   Copy-Item -LiteralPath $file -Destination $output
 }
+# GitHub sorts release assets by name. Keep the portable EXE ahead of the
+# installer for old clients that fall back to the first executable.
+$publicInstallerName = "Setup-LlamaCppWindowsManager-$version-win-x64.exe"
+$publicInstaller = Join-Path $output $publicInstallerName
+Copy-Item -LiteralPath $installer -Destination $publicInstaller
+$installerHash = (Get-FileHash -LiteralPath $publicInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText("$publicInstaller.sha256", "$installerHash  $publicInstallerName`n", [Text.UTF8Encoding]::new($false))
 Write-Host "Staged four unsigned release assets in $output" -ForegroundColor Green
 Write-Host "Release notes: $notes"
 Write-Host "Staging does not publish or certify validation. Review the release gate and upgrade results before upload."

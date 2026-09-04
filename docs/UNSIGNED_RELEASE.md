@@ -24,15 +24,20 @@ manual GitHub publication. Keep `TRUSTED_RELEASE_ENABLED` unset. Do not pass
 
 For v2.7.0, the release assets are exactly:
 
-- `LlamaCppWindowsManager-Setup-2.7.0-win-x64.exe`
-- `LlamaCppWindowsManager-Setup-2.7.0-win-x64.exe.sha256`
+- `Setup-LlamaCppWindowsManager-2.7.0-win-x64.exe`
+- `Setup-LlamaCppWindowsManager-2.7.0-win-x64.exe.sha256`
 - `LlamaCppWindowsManager.exe`
 - `LlamaCppWindowsManager.exe.sha256`
 
-The portable EXE is uploaded first. Older v1.0/v1.1 clients can select the first
-EXE when their legacy filename is missing; the publisher refuses to proceed if
-GitHub returns the installer first. This prevents the known asset-selection error
-but does not certify every historical installation path.
+GitHub sorts release assets by filename, regardless of upload order. Staging
+names the public installer with a `Setup-` prefix so the portable EXE sorts first;
+the local build output keeps its existing name. Older v1.0/v1.1 clients can select
+the first EXE when their legacy filename is missing, and the publisher verifies
+the returned order before publication. This prevents the known asset-selection
+error but does not certify every historical installation path.
+
+Draft verification resolves the numeric release ID from the authenticated release
+list. GitHub's by-tag REST endpoint does not resolve unpublished drafts.
 
 The workflow artifact may be transported by GitHub as a ZIP; that transport
 container is not a portable product download and must not be attached to the
