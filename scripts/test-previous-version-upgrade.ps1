@@ -37,6 +37,7 @@ $ExternalData = Join-Path $TestRoot "user-owned-external"
 $PreviousInstaller = Join-Path $TestRoot $Baseline.installer.name
 $ExpectedRoot = [System.IO.Path]::GetFullPath($TestRoot).TrimEnd('\') + '\'
 $oldWorkspaceVariable = $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE
+$upgradeFailed = $false
 
 function Invoke-CheckedProcess {
   param([string] $FilePath, [string[]] $ArgumentList, [string] $Label, [string] $LogPath = "")
@@ -173,9 +174,10 @@ try {
   $actualHash = (Get-FileHash -LiteralPath $PreviousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($actualHash -ne $Baseline.installer.sha256) { throw "Pinned previous installer hash mismatch." }
 
-  $installLog = Join-Path $TestRoot "installer.log"
-  $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/DIR=`"$InstallDir`"", "/LOG=`"$installLog`"", "/LOGCLOSEAPPLICATIONS")
-  Invoke-CheckedProcess $PreviousInstaller $installArgs "Previous-version install" $installLog
+  $previousInstallLog = Join-Path $TestRoot "previous-install.log"
+  $candidateInstallLog = Join-Path $TestRoot "candidate-install.log"
+  $installArgs = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/DIR=`"$InstallDir`"", "/LOGCLOSEAPPLICATIONS")
+  Invoke-CheckedProcess $PreviousInstaller ($installArgs + "/LOG=`"$previousInstallLog`"") "Previous-version install" $previousInstallLog
   $previousApp = Join-Path $InstallDir "LlamaCppWindowsManager.exe"
   $previousCli = Join-Path $InstallDir "llwmctl.exe"
   $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE = $Workspace
@@ -191,7 +193,7 @@ try {
 
   Set-Content -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary") -Value "preserve" -Encoding ascii
   Set-Content -LiteralPath (Join-Path $ExternalData "external-preserve.canary") -Value "external" -Encoding ascii
-  Invoke-CheckedProcess $Candidate $installArgs "Candidate upgrade install" $installLog
+  Invoke-CheckedProcess $Candidate ($installArgs + "/LOG=`"$candidateInstallLog`"") "Candidate upgrade install" $candidateInstallLog
   if (-not (Test-Path -LiteralPath (Join-Path $Workspace "upgrade-preserve.canary"))) { throw "Upgrade removed workspace state." }
   if (-not (Test-Path -LiteralPath (Join-Path $ExternalData "external-preserve.canary"))) { throw "Upgrade removed external user data." }
 
@@ -218,6 +220,22 @@ try {
   if (-not (Test-Path -LiteralPath (Join-Path $ExternalData "external-preserve.canary"))) { throw "Uninstall removed external user data." }
   Write-Host "Pinned $($Baseline.tag) to candidate installer upgrade validation passed." -ForegroundColor Green
 }
+catch {
+  $upgradeFailed = $true
+  Write-Host "Installer upgrade failed before cleanup: $($_.Exception.Message)"
+  Write-Host $_.ScriptStackTrace
+  $diagnosticRoot = Join-Path $RepoRoot "TestResults/installer-upgrade"
+  $upgradeError = $_
+  try {
+    New-Item -ItemType Directory -Path $diagnosticRoot -Force | Out-Null
+    $upgradeError | Out-String | Set-Content -LiteralPath (Join-Path $diagnosticRoot "failure.txt")
+    Get-ChildItem -LiteralPath $TestRoot -Filter *.log -File -ErrorAction SilentlyContinue |
+      Copy-Item -Destination $diagnosticRoot -ErrorAction Continue
+  } catch {
+    Write-Warning "Could not save installer diagnostics: $($_.Exception.Message)"
+  }
+  throw $upgradeError
+}
 finally {
   $env:LLAMA_CPP_WINDOWS_MANAGER_WORKSPACE = $oldWorkspaceVariable
   Stop-IsolatedManagers
@@ -232,8 +250,8 @@ finally {
     }
   }
   $resolved = [System.IO.Path]::GetFullPath($TestRoot)
-  if ($cleanupUninstallFailed) {
-    Write-Warning "Preserving the temporary upgrade-test root so its uninstaller remains available: $resolved"
+  if ($cleanupUninstallFailed -or $upgradeFailed) {
+    Write-Warning "Preserving the failed upgrade-test root and diagnostics: $resolved"
   } elseif (($resolved + '\').StartsWith($ExpectedRoot, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolved)) {
     Remove-TestRootWithRetry $resolved
   }

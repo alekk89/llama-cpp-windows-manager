@@ -68,3 +68,12 @@ jobs:
           path: |
             dist/unsigned-v*/*
             docs/releases/${{ steps.stage.outputs.tag }}.md
+
+      - name: Upload installer failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: installer-diagnostics-${{ github.run_id }}
+          path: TestResults/installer-upgrade
+          if-no-files-found: ignore
+          retention-days: 14
