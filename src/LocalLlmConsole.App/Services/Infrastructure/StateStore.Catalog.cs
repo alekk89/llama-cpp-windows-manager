@@ -6,6 +6,7 @@ public sealed partial class StateStore
     {
         await WithConnectionAsync(async () =>
         {
+            InvalidateCatalog();
             await using var command = _connection.CreateCommand();
             command.CommandText = """
 INSERT INTO models (id, name, model_path, ownership, metadata_json, updated_at)
@@ -53,6 +54,7 @@ ON CONFLICT(id) DO UPDATE SET
     {
         await WithConnectionAsync(async () =>
         {
+            InvalidateCatalog();
             await using var command = _connection.CreateCommand();
             command.CommandText = "DELETE FROM models WHERE id = $id;";
             command.Parameters.AddWithValue("$id", id);
@@ -94,6 +96,7 @@ LIMIT 1;
                 var migrated = MigrateLegacyModelLaunchDefaults(settings, LooksLikeLegacyModelLaunchDefaultsJson(json), out var changed);
                 if (changed)
                 {
+                    InvalidateCatalog();
                     await using var update = _connection.CreateCommand();
                     update.CommandText = """
 UPDATE model_launch_profiles
@@ -126,6 +129,7 @@ WHERE model_id = $model_id;
 
     private async Task SaveDefaultProfileUnlockedAsync(string modelId, ModelLaunchSettings settings)
     {
+        InvalidateCatalog();
         var now = DateTimeOffset.UtcNow.ToString("O");
         var json = JsonSerializer.Serialize(settings);
         await using var update = _connection.CreateCommand();
@@ -201,6 +205,7 @@ VALUES ($id, $model_id, 'Default', $settings_json, $updated_at, 1);
         ArgumentNullException.ThrowIfNull(profile);
         await WithConnectionAsync(async () =>
         {
+            InvalidateCatalog();
             await using var command = _connection.CreateCommand();
             command.CommandText = """
 INSERT INTO model_launch_profiles (id, model_id, name, settings_json, updated_at, is_default)
@@ -226,6 +231,7 @@ ON CONFLICT(id) DO UPDATE SET
     {
         await WithConnectionAsync(async () =>
         {
+            InvalidateCatalog();
             await using var command = _connection.CreateCommand();
             command.CommandText = "DELETE FROM model_launch_profiles WHERE id = $id;";
             command.Parameters.AddWithValue("$id", profileId);

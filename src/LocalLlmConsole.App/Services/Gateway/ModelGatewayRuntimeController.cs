@@ -33,7 +33,9 @@ public sealed record ModelGatewayRouteCatalogActions(
 public sealed class ModelGatewayRouteCatalogApplicationService
 {
     private readonly StateStore _stateStore;
-    private readonly SemaphoreSlim _defaultRepairGate = new(1, 1);
+    private readonly SemaphoreSlim _catalogGate = new(1, 1);
+    private CachedCatalog? _cached;
+    private sealed record CachedCatalog(long Revision, ModelGatewayRouteSnapshot Routes);
 
     public ModelGatewayRouteCatalogApplicationService(StateStore stateStore)
     {
@@ -48,48 +50,42 @@ public sealed class ModelGatewayRouteCatalogApplicationService
         ArgumentNullException.ThrowIfNull(actions.EnsureDefaultProfilesAsync);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var models = await _stateStore.ListModelsAsync();
-        cancellationToken.ThrowIfCancellationRequested();
-        var profiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
-        var missingDefaults = ModelsMissingDefaultProfiles(models, profiles);
-        if (missingDefaults.Count > 0)
-            profiles = await RepairDefaultProfilesAsync(models, profiles, actions, cancellationToken);
+        var cached = Volatile.Read(ref _cached);
+        if (cached?.Revision == _stateStore.CatalogRevision) return cached.Routes;
 
-        return BuildRoutes(models, profiles, cancellationToken);
-    }
-
-    private async Task<IReadOnlyList<NamedModelLaunchProfile>> RepairDefaultProfilesAsync(
-        IReadOnlyList<ModelRecord> models,
-        IReadOnlyList<NamedModelLaunchProfile> observedProfiles,
-        ModelGatewayRouteCatalogActions actions,
-        CancellationToken cancellationToken)
-    {
-        await _defaultRepairGate.WaitAsync(cancellationToken);
+        await _catalogGate.WaitAsync(cancellationToken);
         try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var profiles = observedProfiles;
-            var missingDefaults = ModelsMissingDefaultProfiles(models, profiles);
-            if (missingDefaults.Count == 0)
-                return profiles;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var revision = _stateStore.CatalogRevision;
+                cached = _cached;
+                if (cached?.Revision == revision) return cached.Routes;
 
-            // Recheck under the gate so simultaneous gateway requests do not all
-            // dispatch the same default-profile repair to the UI thread.
-            profiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
-            missingDefaults = ModelsMissingDefaultProfiles(models, profiles);
-            if (missingDefaults.Count == 0)
-                return profiles;
+                var models = await _stateStore.ListModelsAsync();
+                var profiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (revision != _stateStore.CatalogRevision) continue;
+                var missingDefaults = ModelsMissingDefaultProfiles(models, profiles);
+                if (missingDefaults.Count > 0)
+                {
+                    await actions.EnsureDefaultProfilesAsync(missingDefaults, cancellationToken);
+                    profiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
+                }
 
-            await actions.EnsureDefaultProfilesAsync(missingDefaults, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            return await _stateStore.ListNamedModelLaunchProfilesAsync();
+                var routes = new ModelGatewayRouteSnapshot(BuildRoutes(models, profiles, cancellationToken));
+                // Both reads, repair, and route construction must describe one revision.
+                if (revision != _stateStore.CatalogRevision) continue;
+                Volatile.Write(ref _cached, new CachedCatalog(revision, routes));
+                return routes;
+            }
         }
         finally
         {
-            _defaultRepairGate.Release();
+            _catalogGate.Release();
         }
     }
-
     private static IReadOnlyList<ModelRecord> ModelsMissingDefaultProfiles(
         IReadOnlyList<ModelRecord> models,
         IReadOnlyList<NamedModelLaunchProfile> profiles)

@@ -103,6 +103,14 @@ Current:
     same-model replacement is an explicit launch-preparation choice; automated
     and group loads do not apply that UI preference.
 
+Gateway route catalogs are immutable snapshots indexed by the existing alias,
+legacy ID, name, profile ID, and filename lookup precedence. `StateStore` advances
+a catalog revision under its database gate before model/profile writes, including
+legacy repairs. Catalog readers reuse an unchanged revision and retry construction
+if a write overlaps the model/profile reads or default repair. Add invalidation
+when introducing another catalog write path. Running sessions remain live reads;
+the route cache does not change admission or lifecycle policy.
+
 ## Architecture Contract
 
 Finished architecture means a feature can be changed through its feature module,

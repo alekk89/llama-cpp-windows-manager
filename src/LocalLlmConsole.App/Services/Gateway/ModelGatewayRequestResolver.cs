@@ -44,6 +44,7 @@ public static class ModelGatewayRequestResolver
     {
         var requested = (requestedModel ?? "").Trim();
         if (string.IsNullOrWhiteSpace(requested)) return null;
+        if (models is ModelGatewayRouteSnapshot snapshot) return snapshot.Resolve(requested);
 
         var exact = models.FirstOrDefault(route => string.Equals(route.Id, requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(route => string.Equals(route.LegacyId, requested, StringComparison.OrdinalIgnoreCase))

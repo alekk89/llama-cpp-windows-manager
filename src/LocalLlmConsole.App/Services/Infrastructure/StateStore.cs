@@ -8,6 +8,13 @@ public sealed partial class StateStore : IAsyncDisposable
     private readonly SqliteConnection _connection;
     private readonly SemaphoreSlim _dbLock = new(1, 1);
     private bool _disposed;
+    private long _catalogRevision;
+
+    // Changed under the database gate before any catalog write, including writes
+    // that might partially succeed. Readers retry snapshots spanning a revision.
+    public long CatalogRevision => Interlocked.Read(ref _catalogRevision);
+
+    private void InvalidateCatalog() => Interlocked.Increment(ref _catalogRevision);
 
     public string DatabasePath { get; }
 
@@ -39,6 +46,7 @@ public sealed partial class StateStore : IAsyncDisposable
     {
         await WithConnectionAsync(async () =>
         {
+            InvalidateCatalog();
             await ExecuteUnlockedAsync("PRAGMA journal_mode=WAL;");
             await ExecuteUnlockedAsync("PRAGMA foreign_keys=ON;");
             await ExecuteUnlockedAsync("PRAGMA busy_timeout=5000;");
