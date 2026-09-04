@@ -13,7 +13,10 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
     {
         var root = CreateTempRoot();
         var script = Path.Combine(root, "update.ps1");
-        await File.WriteAllTextAsync(script, (string)typeof(AppUpdateService).GetMethod("UpdaterScript", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, null)!, TestContext.Current.CancellationToken);
+        var scriptText = (string)typeof(AppUpdateService).GetMethod("UpdaterScript", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, null)!;
+        foreach (var marker in new[] { "$ErrorActionPreference = \"Stop\"", "$appStage = New-VerifiedStage", "Copy-Item -LiteralPath $Source", "$handoffReady.Set() | Out-Null" })
+            scriptText = scriptText.Replace(marker, $"[Console]::Error.WriteLine('handoff checkpoint: {marker.Replace("'", "''")}')\n" + marker, StringComparison.Ordinal);
+        await File.WriteAllTextAsync(script, scriptText, TestContext.Current.CancellationToken);
         var source = Path.Combine(root, "source.exe");
         var target = Path.Combine(root, "target.exe");
         var sourceCli = Path.Combine(root, "source-cli.exe");
@@ -31,10 +34,6 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
             info.ArgumentList.Add("-SkipRestart");
             info.RedirectStandardOutput = true;
             info.RedirectStandardError = true;
-            // PowerShell runs script assertions, not instrumentable application C#.
-            // Keep its CLR startup independent of the test host's coverage profiler.
-            info.Environment["COR_ENABLE_PROFILING"] = "0";
-            info.Environment["CORECLR_ENABLE_PROFILING"] = "0";
             helper = Process.Start(info) ?? throw new InvalidOperationException("No updater process");
             output = helper.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             error = helper.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);

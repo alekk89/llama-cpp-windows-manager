@@ -37,6 +37,10 @@ jobs:
         shell: pwsh
         run: .\scripts\build-app.ps1 -Restore -LockedRestore
 
+      - name: Verify updater handoff without instrumentation
+        shell: pwsh
+        run: dotnet test --project tests/LocalLlmConsole.Tests --no-restore --filter-class '*UpdateHandoffTests'
+
       - name: Test and enforce coverage
         shell: pwsh
         run: .\scripts\test-coverage.ps1
