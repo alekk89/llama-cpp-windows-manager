@@ -31,6 +31,10 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
             info.ArgumentList.Add("-SkipRestart");
             info.RedirectStandardOutput = true;
             info.RedirectStandardError = true;
+            // PowerShell runs script assertions, not instrumentable application C#.
+            // Keep its CLR startup independent of the test host's coverage profiler.
+            info.Environment["COR_ENABLE_PROFILING"] = "0";
+            info.Environment["CORECLR_ENABLE_PROFILING"] = "0";
             helper = Process.Start(info) ?? throw new InvalidOperationException("No updater process");
             output = helper.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             error = helper.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
