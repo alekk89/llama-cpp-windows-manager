@@ -98,6 +98,7 @@ public abstract partial class ManagerRegressionTestBase
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             RequestUri = request.RequestUri;
             return Task.FromResult(respond(request));
         }

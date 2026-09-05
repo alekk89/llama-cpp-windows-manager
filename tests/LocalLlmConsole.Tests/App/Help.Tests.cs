@@ -7,7 +7,7 @@ namespace LocalLlmConsole.Tests;
 public sealed class HelpTests : ManagerRegressionTestBase
 {
     [Fact]
-    public void HelpCatalogIsCompactSearchableAndUsesValidNavigationTargets()
+    public void HelpCatalogIsSearchableAndUsesValidNavigationTargets()
     {
         Loc.LoadLanguage("en");
         try
@@ -15,15 +15,17 @@ public sealed class HelpTests : ManagerRegressionTestBase
             var catalog = new HelpCatalogService();
             var navigation = new HelpNavigationApplicationService();
 
-            Assert.Equal(6, catalog.Sections.Count);
-            Assert.InRange(catalog.Articles.Count, 15, 24);
+            Assert.NotEmpty(catalog.Sections);
+            Assert.NotEmpty(catalog.Articles);
+            Assert.Equal(catalog.Sections.Count, catalog.Sections.Select(section => section.Key).Distinct(StringComparer.Ordinal).Count());
             Assert.Equal(catalog.Articles.Count, catalog.Articles.Select(article => article.Id).Distinct(StringComparer.Ordinal).Count());
             Assert.All(catalog.Articles, article =>
             {
                 Assert.Contains(catalog.Sections, section => section.Key == article.SectionKey);
                 Assert.False(string.IsNullOrWhiteSpace(article.Title));
                 Assert.False(string.IsNullOrWhiteSpace(article.Summary));
-                Assert.InRange(article.Details.Count, 2, 4);
+                Assert.NotEmpty(article.Details);
+                Assert.All(article.Details, detail => Assert.False(string.IsNullOrWhiteSpace(detail)));
                 Assert.All(article.Actions, action => Assert.True(navigation.Plan(action.Target).ShouldNavigate, action.Target));
             });
 

@@ -22,6 +22,12 @@ public sealed record RuntimeReadinessWorkflowRequest(
 public sealed class RuntimeReadinessWorkflowService
 {
     private static readonly TimeSpan DefaultPollInterval = TimeSpan.FromSeconds(2);
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+
+    public RuntimeReadinessWorkflowService() : this(Task.Delay) { }
+
+    internal RuntimeReadinessWorkflowService(Func<TimeSpan, CancellationToken, Task> delay)
+        => _delay = delay ?? throw new ArgumentNullException(nameof(delay));
 
     public async Task<RuntimeReadinessResult> WaitUntilReadyAsync(
         RuntimeReadinessWorkflowRequest request,
@@ -35,7 +41,7 @@ public sealed class RuntimeReadinessWorkflowService
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await Task.Delay(request.PollInterval ?? DefaultPollInterval, cancellationToken);
+            await _delay(request.PollInterval ?? DefaultPollInterval, cancellationToken);
 
             var session = request.SessionForModel(request.ModelId);
             if (session is not { IsRunning: true, Status: LoadedModelSessionStatus.Loading })

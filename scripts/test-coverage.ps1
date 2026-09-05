@@ -1,7 +1,8 @@
 param(
   [string] $Configuration = "Debug",
   [double] $MinimumServiceLineCoverage = 80.0,
-  [double] $MinimumModelLineCoverage = 95.0
+  [double] $MinimumModelLineCoverage = 95.0,
+  [double] $MinimumCliLineCoverage = 80.0
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,63 +55,10 @@ foreach ($Trx in $TrxFiles) {
 }
 if ($Skipped -ne 0) { throw "Skipped or not-executed tests are not allowed: $Skipped" }
 
-$CoverageFiles = @(
-  Get-ChildItem -LiteralPath $ResultsRoot -Filter coverage-*.cobertura.xml -File
-)
+$CoverageFiles = @(Get-ChildItem -LiteralPath $ResultsRoot -Filter coverage-*.cobertura.xml -File)
 if ($CoverageFiles.Count -ne $TestProjects.Count) { throw "The coverage test run did not produce one coverage report per test project." }
-
-function Measure-LineCoverage {
-  param(
-    [Parameter(Mandatory = $true)] [string] $Name,
-    [Parameter(Mandatory = $true)] [scriptblock] $Include
-  )
-
-  $lines = @{}
-  foreach ($CoverageFile in $CoverageFiles) {
-    [xml] $Coverage = Get-Content -LiteralPath $CoverageFile.FullName
-    foreach ($class in $Coverage.coverage.packages.package.classes.class) {
-      $file = ([string] $class.filename).Replace('\', '/')
-      foreach ($sourceMarker in @("/src/LocalLlmConsole.App/", "/src/LocalLlmConsole.Core/", "/src/LocalLlmConsole.ControlCli/")) {
-        $markerIndex = $file.IndexOf($sourceMarker, [StringComparison]::OrdinalIgnoreCase)
-        if ($markerIndex -ge 0) {
-          $file = $file.Substring($markerIndex + $sourceMarker.Length)
-          break
-        }
-      }
-      foreach ($projectPrefix in @("LocalLlmConsole.App/", "LocalLlmConsole.Core/", "LocalLlmConsole.ControlCli/")) {
-        if ($file.StartsWith($projectPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-          $file = $file.Substring($projectPrefix.Length)
-          break
-        }
-      }
-      if (-not (& $Include $file)) { continue }
-      foreach ($line in @($class.lines.line)) {
-        $key = "$file|$($line.number)"
-        $hits = [int] $line.hits
-        if (-not $lines.ContainsKey($key) -or $hits -gt $lines[$key]) { $lines[$key] = $hits }
-      }
-    }
-  }
-
-  if ($lines.Count -eq 0) { throw "Coverage scope '$Name' matched no source lines." }
-  $covered = @($lines.Values | Where-Object { $_ -gt 0 }).Count
-  $percent = [Math]::Round(100.0 * $covered / $lines.Count, 1)
-  return [pscustomobject]@{ Name = $Name; Covered = $covered; Lines = $lines.Count; Percent = $percent }
-}
-
-$Services = Measure-LineCoverage -Name "Services" -Include { param($file) $file.StartsWith("Services/", [StringComparison]::OrdinalIgnoreCase) }
-$Models = Measure-LineCoverage -Name "Models + ViewModels" -Include {
-  param($file)
-  $file.StartsWith("Models/", [StringComparison]::OrdinalIgnoreCase) -or
-    $file.StartsWith("ViewModels/", [StringComparison]::OrdinalIgnoreCase)
-}
-
-$Services, $Models | Format-Table Name, Covered, Lines, Percent -AutoSize
-if ($Services.Percent -lt $MinimumServiceLineCoverage) {
-  throw "Service line coverage $($Services.Percent)% is below the required $MinimumServiceLineCoverage%."
-}
-if ($Models.Percent -lt $MinimumModelLineCoverage) {
-  throw "Model/view-model line coverage $($Models.Percent)% is below the required $MinimumModelLineCoverage%."
-}
-
-Write-Host "Coverage thresholds passed; skipped tests: 0." -ForegroundColor Green
+& (Join-Path $PSScriptRoot "measure-test-coverage.ps1") -ResultsRoot $ResultsRoot `
+  -MinimumServiceLineCoverage $MinimumServiceLineCoverage `
+  -MinimumModelLineCoverage $MinimumModelLineCoverage `
+  -MinimumCliLineCoverage $MinimumCliLineCoverage
+Write-Host "Skipped tests: 0." -ForegroundColor Green
