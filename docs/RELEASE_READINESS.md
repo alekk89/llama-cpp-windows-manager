@@ -274,6 +274,11 @@ builds and must be described that way.
   KV-cache values, and currently visible raw Prometheus metrics. Mix unrelated
   metrics in one card, confirm cards have no fixed type, reset restores the default
   layout, and confirm all choices survive restart.
+- With a speculative runtime exposing both aggregate and per-position accepted
+  token counters, confirm Overview counts only the aggregate. For 40,968 draft
+  tokens, 33,439 accepted tokens, and position counts of 17,941 and 15,498, expect
+  33,439 accepted and 81.6% acceptance. Confirm the raw metrics still include
+  the position breakdown and aggregate-only runtimes retain their totals.
 - With multiple models loaded, switch the Overview telemetry source and confirm
   the matching Loaded Model Sessions row remains highlighted across refreshes.
   Unload all models and confirm the grid has no highlighted row.

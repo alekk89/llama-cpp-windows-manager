@@ -32,6 +32,8 @@ endpoints on native Windows or Ubuntu/WSL.
 * Runs and supervises several model servers on separate ports.
 * Provides direct endpoints and an optional shared gateway.
 * Tracks runtime health, logs, token usage, hardware metrics, and GPU energy.
+  Draft acceptance uses accepted and generated token totals without counting
+  the per-position breakdown a second time.
 * Adds independent live UI and Text scaling on top of Windows per-monitor DPI
   scaling, remembers resized tables and page sections, and keeps Settings
   responsive between one and two columns.
