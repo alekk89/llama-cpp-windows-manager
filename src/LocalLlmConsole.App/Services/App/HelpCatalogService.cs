@@ -125,7 +125,7 @@ public sealed partial class HelpCatalogService
             "metrics",
             "overview",
             "Read live metrics",
-            "Customizable cards combine live status, runtime summaries, and available raw metrics.",
+            "Customizable cards combine live status, runtime summaries, and available raw metrics. Draft acceptance counts each accepted token once, without adding per-position breakdowns.",
             [
                 "Right-click a card to add or remove metrics, set an optional title, manage charts, remove it, or restore the default layout; drag or resize its visible border directly. Choose Lock beside Add card to keep the current card dimensions while resizing the window; cards wrap before shrinking and border resizing returns when you unlock them.",
                 "Cards keep a minimum gap, and matching top or bottom edges align when adjacent cards are resized. Overview retains its cards, charts, and latest readings while you visit another page, so returning does not wait for a full dashboard rebuild.",
@@ -133,7 +133,7 @@ public sealed partial class HelpCatalogService
                 "If loading stalls or throughput collapses, inspect the live runtime log first. Settings can place its latest entry at the top or bottom without changing the stored log."
             ],
             [Action("Open Overview", "overview"), Action("Open Logs", "logs")],
-            ["tokens per second", "gpu", "kv cache", "slow", "telemetry"]),
+            ["tokens per second", "gpu", "kv cache", "slow", "telemetry", "draft acceptance", "per-position"]),
 
         Article(
             "usage-history",

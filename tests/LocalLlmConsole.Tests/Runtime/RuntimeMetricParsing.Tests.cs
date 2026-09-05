@@ -363,6 +363,63 @@ public sealed class RuntimeMetricParsingTests : ManagerRegressionTestBase
         Assert.Equal(11, tracker.LastKnownSamples("model|runtime|8081").Count);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RuntimeMetricSummaryTrackerCountsAcceptedDraftTokensOnce(bool includePerPositionCounters)
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot()) with { SpeculativeType = "draft-mtp" };
+        var tracker = new RuntimeMetricSummaryTracker();
+        var capturedAt = DateTimeOffset.Parse("2026-09-05T12:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+
+        IReadOnlyList<PrometheusSample> Samples(int generated, int accepted, int positionZero, int positionOne)
+        {
+            var raw = $"""
+                llamacpp:spec_decode_num_draft_tokens_total {generated}
+                llamacpp:spec_decode_num_accepted_tokens_total {accepted}
+                llamacpp:spec_decode_num_drafts_total 20484
+                """;
+            if (includePerPositionCounters)
+            {
+                raw += $"\nllamacpp:spec_decode_num_accepted_tokens_per_pos_total{{position=\"0\"}} {positionZero}"
+                    + $"\nllamacpp:spec_decode_num_accepted_tokens_per_pos_total{{position=\"1\"}} {positionOne}";
+            }
+            return RuntimeMetrics.ParsePrometheus(raw);
+        }
+
+        var first = tracker.Apply("runtime", Samples(40968, 33439, 17941, 15498), settings, null, null, capturedAt);
+
+        Assert.NotNull(first.Atomic);
+        Assert.Equal(40968, first.Atomic.MtpGeneratedTokens);
+        Assert.Equal(33439, first.Atomic.MtpAcceptedTokens);
+        Assert.Equal(81.622242, first.Atomic.DraftAcceptancePercent!.Value, 6);
+
+        var second = tracker.Apply("runtime", Samples(41068, 33519, 17986, 15533), settings, null, null, capturedAt.AddSeconds(2));
+
+        Assert.NotNull(second.Atomic);
+        Assert.Equal(41068, second.Atomic.MtpGeneratedTokens);
+        Assert.Equal(33519, second.Atomic.MtpAcceptedTokens);
+        Assert.Equal(50, second.GraphSample.SpeculativeGeneratedRate);
+        Assert.Equal(40, second.GraphSample.SpeculativeAcceptedRate);
+        Assert.Equal(40, second.Atomic.MtpAcceptedRate);
+    }
+
+    [Theory]
+    [InlineData("mtp")]
+    [InlineData("draft")]
+    [InlineData("speculative")]
+    [InlineData("spec")]
+    public void RuntimeAcceptedDraftCounterPreservesLabeledTotals(string family)
+    {
+        var samples = RuntimeMetrics.ParsePrometheus($$"""
+            llama_{{family}}_tokens_accepted_total{slot="0"} 30
+            llama_{{family}}_tokens_accepted_total{slot="1"} 45
+            llama_{{family}}_tokens_accepted_seconds_total 2
+            """);
+
+        Assert.Equal(75, RuntimeDashboardService.MtpAcceptedTokenCounter(samples));
+    }
+
     [Fact]
     public void RuntimeMetricSummaryTrackerUsesPerSlotRatesAcrossParallelSlotResets()
     {
