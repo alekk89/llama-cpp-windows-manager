@@ -1100,7 +1100,7 @@
   "Help.Article.endpoint-inspection.Detail.3": "Gateway inspection reads /health, /v1/models, and /running.",
   "Help.Article.endpoint-inspection.Action.1": "Open Overview",
   "Help.Article.metrics.Title": "Read live metrics",
-  "Help.Article.metrics.Summary": "Customizable cards combine live status, runtime summaries, and available raw metrics.",
+  "Help.Article.metrics.Summary": "Customizable cards combine live status, runtime summaries, and available raw metrics. Draft acceptance counts each accepted token once, without adding per-position breakdowns.",
   "Help.Article.metrics.Detail.1": "Choose Customize or right-click a card to add or remove metrics, move cards, select snapped sizes, and restore the default layout.",
   "Help.Article.metrics.Detail.2": "Charts are offered for compatible summaries and raw gauges; the searchable picker follows the metrics exposed by the selected runtime.",
   "Help.Article.metrics.Detail.3": "If loading stalls or throughput collapses, inspect the live runtime log first.",

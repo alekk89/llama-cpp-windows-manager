@@ -228,7 +228,7 @@ public static class RuntimeDashboardService
         => RuntimeMetrics.Sum(samples, ["mtp", "tokens", "accepted", "total"], ["seconds", "duration"])
            ?? RuntimeMetrics.Sum(samples, ["draft", "tokens", "accepted", "total"], ["seconds", "duration"])
            ?? RuntimeMetrics.Sum(samples, ["speculative", "tokens", "accepted", "total"], ["seconds", "duration"])
-           ?? RuntimeMetrics.Sum(samples, ["spec", "tokens", "accepted", "total"], ["seconds", "duration"])
+           ?? RuntimeMetrics.Sum(samples, ["spec", "tokens", "accepted", "total"], ["seconds", "duration", "per_pos"])
            ?? RuntimeMetrics.Sum(samples, ["mtp", "acc", "tokens", "total"], ["seconds", "duration"])
            ?? RuntimeMetrics.Sum(samples, ["draft", "acc", "tokens", "total"], ["seconds", "duration"])
            ?? RuntimeMetrics.Sum(samples, ["speculative", "acc", "tokens", "total"], ["seconds", "duration"]);
