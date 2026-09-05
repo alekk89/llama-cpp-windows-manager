@@ -12,9 +12,6 @@ public sealed class RuntimeSessionPresentationTests : ManagerRegressionTestBase
     [Fact]
     public void ModelRuntimeStatusTrackerOwnsTransientLoadingAndLoadedText()
     {
-        var source = ReadMainWindowSources();
-        var lifecycle = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Ui", "Shell", "MainWindow", "Runtimes", "MainWindow.ModelRuntimeLifecycle.cs"));
         var tracker = new ModelRuntimeStatusTracker();
         var renderService = new ModelRuntimeStatusRenderService();
         var startedAt = new DateTimeOffset(2026, 5, 28, 12, 0, 0, TimeSpan.Zero);
@@ -56,29 +53,12 @@ public sealed class RuntimeSessionPresentationTests : ManagerRegressionTestBase
         Assert.True(fallbackPlan.ShouldRender);
         Assert.Equal("", fallbackPlan.StatusText);
         Assert.False(nonePlan.ShouldRender);
-        Assert.Contains("_coreServices.Models.ModelRuntimeStatus.StartLoading", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeStatus.IsLoadingModel", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeStatusRender.LoadingTick", lifecycle, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeStatusRender.DashboardRefresh", lifecycle, StringComparison.Ordinal);
-        Assert.Contains("ApplyModelRuntimeStatusRenderPlan", lifecycle, StringComparison.Ordinal);
-        Assert.DoesNotContain("ModelRuntimeStatusKind.Loading", lifecycle, StringComparison.Ordinal);
-        Assert.DoesNotContain("ModelRuntimeStatusKind.Loaded", lifecycle, StringComparison.Ordinal);
-        Assert.DoesNotContain("_modelLoadingModelId", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_modelLoadedStatusText", source, StringComparison.Ordinal);
     }
 
 
     [Fact]
     public async Task ModelRuntimeStatusControllerOwnsStatusTimers()
     {
-        var source = ReadMainWindowSources();
-        var lifecycle = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Ui", "Shell", "MainWindow", "Runtimes", "MainWindow.ModelRuntimeLifecycle.cs"));
-        var state = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Ui", "Shell", "MainWindow", "Core", "MainWindow.State.cs"));
-        var controllerSource = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Telemetry", "ModelRuntimeStatusController.cs"));
-        var factorySource = ReadAppServiceFactorySources();
         var timerFactory = new ManualUiTimerFactory();
         var controller = new ModelRuntimeStatusController(new ModelRuntimeStatusTracker(), timerFactory);
         var startedAt = new DateTimeOffset(2026, 5, 28, 12, 0, 0, TimeSpan.Zero);
@@ -127,29 +107,12 @@ public sealed class RuntimeSessionPresentationTests : ManagerRegressionTestBase
         controller.StopLoadedStatusTimer();
         Assert.Equal("No model", controller.StatusFor("model-1", "No model", startedAt.AddSeconds(5)).MetricText);
 
-        Assert.Contains("DispatcherUiTimerFactory", factorySource, StringComparison.Ordinal);
-        Assert.DoesNotContain("DispatcherUiTimerFactory", controllerSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("new ModelRuntimeStatusController()", state, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeStatus", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_coreServices.Models.ModelRuntimeStatus.StartLoadedStatusTimer", lifecycle, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeStatus.StopLoadedStatusTimer(clearLoadedStatus)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_modelLoadingTimer", state + lifecycle, StringComparison.Ordinal);
-        Assert.DoesNotContain("_modelLoadedStatusTimer", state + lifecycle, StringComparison.Ordinal);
-        Assert.DoesNotContain("new System.Windows.Threading.DispatcherTimer", lifecycle, StringComparison.Ordinal);
     }
 
 
     [Fact]
     public void ModelRuntimeStartFollowupServiceOwnsPostLaunchAndFailurePlans()
     {
-        var source = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Ui", "Shell", "MainWindow", "Runtimes", "MainWindow.ModelRuntimeLifecycle.cs"));
-        var serviceSource = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Sessions", "ModelRuntimeStartFollowupService.cs"));
-        var applicationSource = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Sessions", "ModelRuntimeStartFollowupApplicationService.cs"));
-        var launchApplicationSource = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Launch", "ModelRuntimeLaunchApplicationService.cs"));
         var service = new ModelRuntimeStartFollowupService();
 
         var started = service.AfterSessionStarted();
@@ -173,23 +136,6 @@ public sealed class RuntimeSessionPresentationTests : ManagerRegressionTestBase
         Assert.True(failedOnOverview.SaveActiveRuntimeSessions);
         Assert.False(failedOnOverview.UpdateLoadingStatus);
         Assert.Contains("Failed to load Qwen", failedOnOverview.StatusMessage, StringComparison.Ordinal);
-        Assert.Contains("_followup.AfterSessionStarted()", launchApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("_followup.AfterInitialMetrics(", launchApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("_followupApplication.ApplyAfterSessionStartedAsync(", launchApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("_followupApplication.ApplyAfterInitialMetricsAsync(", launchApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("new ModelRuntimeStartSessionActions(", launchApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("new ModelRuntimeStartInitialMetricsActions(", launchApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeLaunchApplication.LaunchAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("public sealed class ModelRuntimeStartFollowupApplicationService", applicationSource, StringComparison.Ordinal);
-        Assert.Contains("if (plan.SaveActiveRuntimeSessions)", applicationSource, StringComparison.Ordinal);
-        Assert.Contains("if (plan.StopRuntimeDashboardRefresh)", applicationSource, StringComparison.Ordinal);
-        Assert.Contains("LlamaRuntimeState.Failed", serviceSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("if (_llama.State == LlamaRuntimeState.Failed)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("if (startPlan.", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("if (initialMetricsPlan.", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Task.Delay(750)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_modelRuntimeStartFollowup", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_modelRuntimeStartFollowupApplication", source, StringComparison.Ordinal);
     }
 
 

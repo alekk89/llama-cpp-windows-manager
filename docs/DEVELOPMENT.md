@@ -94,7 +94,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-vulnerabi
 ```
 
 The coverage gate collects instrumented Debug binaries (public Release binaries intentionally omit PDBs), rejects skipped tests, and requires at least 80% service line
-coverage and 95% model/view-model line coverage. WPF composition is additionally
+coverage, 95% model/view-model line coverage, and 80% Control CLI line coverage.
+The gate writes `coverage-by-file.csv` alongside its TRX/Cobertura reports so
+aggregate percentages do not hide feature-level gaps. See [Testing](TESTING.md)
+for workspace cleanup, focused runs, and assertion guidance. WPF composition is additionally
 exercised on an STA thread because global coverage is distorted by generated
 markup and code-behind. Tests use the .NET 10 Microsoft Testing Platform runner
 selected in `global.json`; project-specific commands therefore use `dotnet test

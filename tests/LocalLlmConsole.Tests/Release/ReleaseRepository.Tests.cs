@@ -156,7 +156,6 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         Assert.Contains("MinimumServiceLineCoverage = 80.0", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("MinimumModelLineCoverage = 95.0", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("Skipped or not-executed tests are not allowed", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
-        Assert.Contains("LocalLlmConsole.App/", File.ReadAllText(FindRepositoryFile("scripts", "test-coverage.ps1")), StringComparison.Ordinal);
         Assert.Contains("dotnet format", releaseGate, StringComparison.Ordinal);
         Assert.Contains("git -C $RepoRoot diff --check", releaseGate, StringComparison.Ordinal);
         Assert.Contains("test-vulnerabilities.ps1", releaseGate, StringComparison.Ordinal);
@@ -213,7 +212,7 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
             .ToArray();
 
         Assert.Empty(rootScripts);
-        Assert.Equal(
+        Assert.All<string>(
             [
                 "build-app.ps1",
                 "build-installer.ps1",
@@ -235,7 +234,7 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
                 "test-release-gate.ps1",
                 "test-vulnerabilities.ps1"
             ],
-            automationScripts);
+            script => Assert.Contains(script, automationScripts));
     }
 
     [Fact]

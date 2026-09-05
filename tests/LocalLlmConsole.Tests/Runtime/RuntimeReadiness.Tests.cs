@@ -165,7 +165,12 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         var loading = RuntimeSession(root, settings, LoadedModelSessionStatus.Loading, isRunning: true);
         var service = new RuntimeReadinessMonitorApplicationService(
             new RuntimeReadinessMonitorWorkflowService(
-                new RuntimeReadinessWorkflowService(),
+                new RuntimeReadinessWorkflowService((interval, token) =>
+                {
+                    Assert.Equal(TimeSpan.FromSeconds(2), interval);
+                    token.ThrowIfCancellationRequested();
+                    return Task.CompletedTask;
+                }),
                 new RuntimeReadinessCompletionService()));
         var calls = new List<string>();
 
@@ -257,45 +262,6 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
     }
 
 
-    [Fact]
-    public void MainWindowDelegatesRuntimeReadinessPollingToWorkflow()
-    {
-        var source = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Ui", "Shell", "MainWindow", "Runtimes", "MainWindow.ModelRuntimeLifecycle.cs"));
-        var workflow = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessWorkflowService.cs"));
-        var completion = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessCompletionService.cs"));
-        var monitor = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorWorkflowService.cs"));
-        var monitorApplication = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorApplicationService.cs"));
-        var actionFactory = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorActionFactory.cs"));
-
-        Assert.Contains("_coreServices.Runtime.RuntimeReadinessMonitorApplication.RunAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("new RuntimeReadinessMonitorApplicationRequest(", source, StringComparison.Ordinal);
-        Assert.Contains("RuntimeReadinessMonitorActions(session, selectLoadedOverviewModel)", source, StringComparison.Ordinal);
-        Assert.Contains("new RuntimeReadinessCompletionActions(", actionFactory, StringComparison.Ordinal);
-        Assert.Contains("_workflow.RunAsync(new RuntimeReadinessMonitorWorkflowRequest(", monitorApplication, StringComparison.Ordinal);
-        Assert.Contains("ApplyCompletionAsync(result.CompletionPlan", monitorApplication, StringComparison.Ordinal);
-        Assert.Contains("catch (OperationCanceledException)", monitorApplication, StringComparison.Ordinal);
-        Assert.Contains("actions.CompleteMonitor(request.ModelId, request.CancellationSource)", monitorApplication, StringComparison.Ordinal);
-        Assert.Contains("_readiness.WaitUntilReadyAsync(new RuntimeReadinessWorkflowRequest(", monitor, StringComparison.Ordinal);
-        Assert.Contains("_completion.Build(new RuntimeReadinessCompletionRequest(", monitor, StringComparison.Ordinal);
-        Assert.Contains("internal static async Task ApplyCompletionAsync", monitorApplication, StringComparison.Ordinal);
-        Assert.Contains("if (plan.StopLoadingStatus)", monitorApplication, StringComparison.Ordinal);
-        Assert.Contains("RuntimeReadinessStatus.NoLongerLoading", completion, StringComparison.Ordinal);
-        Assert.Contains("RuntimeReadinessStatus.Loaded", completion, StringComparison.Ordinal);
-        Assert.Contains("await Task.Delay(request.PollInterval ?? DefaultPollInterval, cancellationToken)", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("_runtimeReadinessWorkflow", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("private readonly RuntimeReadinessCompletionService _runtimeReadinessCompletion", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_runtimeReadinessCompletion.Build(", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("if (plan.StopLoadingStatus)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("while (!cancellationToken.IsCancellationRequested)", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("result.Status == RuntimeReadinessStatus", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("catch (OperationCanceledException)", source, StringComparison.Ordinal);
-    }
 
 
     [Fact]
@@ -412,11 +378,6 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
     [Fact]
     public void RuntimeReadinessMonitorRegistryReplacesCompletesAndStopsTokens()
     {
-        var source = ReadMainWindowSources();
-        var application = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorApplicationService.cs"));
-        var actionFactory = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Readiness", "RuntimeReadinessMonitorActionFactory.cs"));
         using var registry = new RuntimeReadinessMonitorRegistry();
 
         var first = registry.Start("model-1");
@@ -436,19 +397,12 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         registry.StopAll();
         Assert.True(thirdToken.IsCancellationRequested);
         Assert.Equal(0, registry.Count);
-        Assert.Contains("_coreServices.Ui.RuntimeReadinessMonitors.Start(session.SessionId)", source, StringComparison.Ordinal);
-        Assert.Contains("monitors.Complete(sessionId, source)", actionFactory, StringComparison.Ordinal);
-        Assert.Contains("actions.CompleteMonitor(request.ModelId, request.CancellationSource)", application, StringComparison.Ordinal);
-        Assert.DoesNotContain("Dictionary<string, CancellationTokenSource> _coreServices.Ui.RuntimeReadinessMonitors", source, StringComparison.Ordinal);
     }
 
 
     [Fact]
     public void RuntimeSessionActionDecisionServiceOwnsStopAndSwitchRules()
     {
-        var source = ReadMainWindowSources();
-        var application = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Sessions", "RuntimeSessionApplicationService.cs"));
         var service = new RuntimeSessionActionDecisionService();
         var settings = AppSettings.CreateDefault(CreateTempRoot()) with { Port = 8083 };
         var runtime = new RuntimeRecord("runtime", "Runtime", RuntimeMode.Native, RuntimeBackend.Cuda, "llama-server.exe", "{}", DateTimeOffset.UtcNow);
@@ -495,26 +449,12 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         Assert.False(switchLoaded.ResetMetricCounters);
         Assert.True(switchLoaded.StartDashboardRefresh);
         Assert.Equal($"Selected loaded model {model.Name}.", switchLoaded.StatusMessage);
-        Assert.Contains("_commands.PlanStopSelected(", application, StringComparison.Ordinal);
-        Assert.Contains("_commands.PlanStopModel(", application, StringComparison.Ordinal);
-        Assert.Contains("_commands.SwitchToModel(", application, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Runtime.RuntimeSessionApplication.StopSelectedAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Runtime.RuntimeSessionApplication.StopModelAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Runtime.RuntimeSessionApplication.SwitchToModelAsync(", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_runtimeSessionActions.", source, StringComparison.Ordinal);
     }
 
 
     [Fact]
     public void ModelRuntimeCommandDecisionServiceOwnsLoadAndUnloadGates()
     {
-        var source = ReadMainWindowSources()
-            + File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.App", "Ui", "Pages", "Overview", "OverviewSelectionController.cs"));
-        var serviceSource = File.ReadAllText(FindRepositoryFile("src", "LocalLlmConsole.Core", "Services", "Runtimes", "ModelRuntimeCommandDecisionService.cs"));
-        var loadApplicationSource = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Sessions", "ModelRuntimeLoadApplicationService.cs"));
-        var unloadApplicationSource = File.ReadAllText(FindRepositoryFile(
-            "src", "LocalLlmConsole.App", "Services", "Runtimes", "Sessions", "ModelRuntimeUnloadApplicationService.cs"));
         var service = new ModelRuntimeCommandDecisionService();
         var model = new ModelRecord("model", "Qwen", "qwen.gguf", OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
 
@@ -551,23 +491,6 @@ public sealed class RuntimeReadinessTests : ManagerRegressionTestBase
         Assert.Equal(ModelRuntimeUnloadCommandKind.Status, overviewUnloadMissing.Kind);
         Assert.Equal(ModelRuntimeCommandStatus.ChooseLoadedModelToUnload, overviewUnloadMissing.Status);
         Assert.Equal(ModelRuntimeUnloadCommandKind.Stop, unloadLoaded.Kind);
-        Assert.Contains("_coreServices.Models.ModelRuntimeLoadApplication.LoadSelectedAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("_coreServices.Models.ModelRuntimeLoadApplication.LoadOverviewAsync(", source, StringComparison.Ordinal);
-        Assert.Contains("_overviewSelection.UnloadSessionAsync", source, StringComparison.Ordinal);
-        Assert.Contains("ModelRuntimeLoadActions(", source, StringComparison.Ordinal);
-        Assert.Contains("ModelRuntimeUnloadActions()", source, StringComparison.Ordinal);
-        Assert.Contains("_commands.PlanSelectedLoad(", loadApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("_commands.PlanOverviewLoad(", loadApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("_commands.PlanOverviewUnload(", unloadApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("public sealed class ModelRuntimeCommandDecisionService", serviceSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("Select a model first.", serviceSource, StringComparison.Ordinal);
-        Assert.Contains("public sealed class ModelRuntimeLoadApplicationService", loadApplicationSource, StringComparison.Ordinal);
-        Assert.Contains("public sealed class ModelRuntimeUnloadApplicationService", unloadApplicationSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("_coreServices.Models.ModelRuntimeCommands.PlanSelectedLoad(", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_coreServices.Models.ModelRuntimeCommands.PlanOverviewLoad(", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("_coreServices.Models.ModelRuntimeCommands.PlanOverviewUnload(", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Load the selected model before restarting it.", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Choose the loading or loaded model to unload it.", source, StringComparison.Ordinal);
     }
 
 

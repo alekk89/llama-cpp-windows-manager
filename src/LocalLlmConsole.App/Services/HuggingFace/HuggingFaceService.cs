@@ -42,7 +42,7 @@ public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations,
 
     private const int RepoInfoCacheLimit = 256;
     private static readonly TimeSpan RepoInfoCacheTtl = TimeSpan.FromMinutes(30);
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(60) };
+    private readonly HttpClient _http;
     private readonly StateStore _store;
     private readonly JobEngine _jobs;
     private readonly ModelCatalogService _catalog;
@@ -58,7 +58,14 @@ public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations,
     };
 
     public HuggingFaceService(StateStore store, JobEngine jobs, ModelCatalogService catalog)
+        : this(store, jobs, catalog, null)
     {
+    }
+
+    internal HuggingFaceService(StateStore store, JobEngine jobs, ModelCatalogService catalog, HttpMessageHandler? handler)
+    {
+        _http = handler is null ? new HttpClient() : new HttpClient(handler);
+        _http.Timeout = TimeSpan.FromSeconds(60);
         _store = store;
         _jobs = jobs;
         _catalog = catalog;

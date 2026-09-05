@@ -7,8 +7,10 @@ using Microsoft.Data.Sqlite;
 namespace LocalLlmConsole.Tests;
 
 
-public abstract partial class ManagerRegressionTestBase
+public abstract partial class ManagerRegressionTestBase : IDisposable
 {
+    private readonly TestWorkspace _workspace = new();
+
     protected ManagerRegressionTestBase()
         => Loc.LoadLanguage("en");
 
@@ -64,10 +66,15 @@ public abstract partial class ManagerRegressionTestBase
 
     protected static string CreateTempRoot()
     {
-        var root = Path.Combine(Path.GetTempPath(), "LocalLlmConsole.Tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        return root;
+        var owner = TestContext.Current.TestClassInstance as ManagerRegressionTestBase
+            ?? throw new InvalidOperationException("Test workspaces must be created during test execution, not discovery.");
+        return owner._workspace.CreateDirectory();
     }
+
+    public void Dispose()
+        => _workspace.Complete(
+            TestContext.Current.TestState?.Result == TestResult.Passed,
+            message => TestContext.Current.TestOutputHelper?.WriteLine(message));
 
     protected static string CreateRuntimeExecutable(string root, params string[] segments)
     {
