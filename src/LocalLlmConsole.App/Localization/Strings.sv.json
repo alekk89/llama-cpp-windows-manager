@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Visa modelldetaljer",
+  "EndpointInspection.CollapseDetails": "Dölj modelldetaljer",
+  "EndpointInspection.PartialDetails": "Vissa detaljer är inte tillgängliga",
+  "EndpointInspection.SlotSummary": "{0} aktiva / {1} totalt",
+  "EndpointInspection.ModelId": "Modell-ID",
+  "EndpointInspection.RunningDetails": "Tillstånd / Körtid / Slutpunkt",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan-allokeringsblockets storlek (MiB)",
   "Launch.RuntimeDefault": "Körmiljöns standardvärde",
   "Benchmark.Memory.Legacy": "Ögonblicksbild av GPU-minne: {0} MiB (hela enheten; toppvärde saknas)",

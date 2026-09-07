@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Развернуть сведения о модели",
+  "EndpointInspection.CollapseDetails": "Свернуть сведения о модели",
+  "EndpointInspection.PartialDetails": "Некоторые сведения недоступны",
+  "EndpointInspection.SlotSummary": "{0} активных / {1} всего",
+  "EndpointInspection.ModelId": "Идентификатор модели",
+  "EndpointInspection.RunningDetails": "Состояние / Среда выполнения / Конечная точка",
   "Launch.Field.VulkanAllocationBlockSize": "Размер блока выделения Vulkan (MiB)",
   "Launch.RuntimeDefault": "По умолчанию для среды",
   "Benchmark.Memory.Legacy": "Мгновенный замер памяти GPU: {0} MiB (всё устройство; пик недоступен)",

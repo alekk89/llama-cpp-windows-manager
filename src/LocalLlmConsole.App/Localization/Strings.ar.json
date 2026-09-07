@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "توسيع تفاصيل النموذج",
+  "EndpointInspection.CollapseDetails": "طي تفاصيل النموذج",
+  "EndpointInspection.PartialDetails": "بعض التفاصيل غير متاحة",
+  "EndpointInspection.SlotSummary": "{0} نشط / {1} إجمالي",
+  "EndpointInspection.ModelId": "معرّف النموذج",
+  "EndpointInspection.RunningDetails": "State / Runtime / نقطة النهاية",
   "Launch.Field.VulkanAllocationBlockSize": "حجم كتلة تخصيص Vulkan (MiB)",
   "Launch.RuntimeDefault": "القيمة الافتراضية لبيئة التشغيل",
   "Benchmark.Memory.Legacy": "لقطة ذاكرة GPU ‏{0} MiB (الجهاز بالكامل؛ الذروة غير متاحة)",

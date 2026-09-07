@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "展开模型详情",
+  "EndpointInspection.CollapseDetails": "折叠模型详情",
+  "EndpointInspection.PartialDetails": "部分详情不可用",
+  "EndpointInspection.SlotSummary": "{0} 个活动 / 共 {1} 个",
+  "EndpointInspection.ModelId": "模型 ID",
+  "EndpointInspection.RunningDetails": "状态 / 运行时 / 端点",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan 分配块大小 (MiB)",
   "Launch.RuntimeDefault": "运行时默认值",
   "Benchmark.Memory.Legacy": "GPU 内存瞬时值 {0} MiB（整个设备；峰值不可用）",

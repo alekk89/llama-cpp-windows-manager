@@ -30,7 +30,7 @@ endpoints on native Windows or Ubuntu/WSL.
 * Searches and favourites models, saved profiles, and runtimes consistently,
   including quick profile control from the themed tray menu.
 * Runs and supervises several model servers on separate ports.
-* Provides direct endpoints and an optional shared gateway.
+* Provides direct endpoints and an optional shared gateway, with compact endpoint reports for status, copyable connection details and model IDs, size, context, and reported settings.
 * Tracks runtime health, logs, token usage, hardware metrics, and GPU energy.
   Draft acceptance uses accepted and generated token totals without counting
   the per-position breakdown a second time.

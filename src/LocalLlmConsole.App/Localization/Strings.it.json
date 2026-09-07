@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Espandi dettagli del modello",
+  "EndpointInspection.CollapseDetails": "Comprimi dettagli del modello",
+  "EndpointInspection.PartialDetails": "Alcuni dettagli non sono disponibili",
+  "EndpointInspection.SlotSummary": "{0} attivi / {1} totali",
+  "EndpointInspection.ModelId": "ID del modello",
+  "EndpointInspection.RunningDetails": "Stato / Runtime / Punto finale",
   "Launch.Field.VulkanAllocationBlockSize": "Dimensione blocco di allocazione Vulkan (MiB)",
   "Launch.RuntimeDefault": "Predefinito del runtime",
   "Benchmark.Memory.Legacy": "Istantanea memoria GPU: {0} MiB (intero dispositivo; picco non disponibile)",

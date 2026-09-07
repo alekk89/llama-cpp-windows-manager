@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Model ayrıntılarını genişlet",
+  "EndpointInspection.CollapseDetails": "Model ayrıntılarını daralt",
+  "EndpointInspection.PartialDetails": "Bazı ayrıntılar kullanılamıyor",
+  "EndpointInspection.SlotSummary": "{0} etkin / {1} toplam",
+  "EndpointInspection.ModelId": "Model kimliği",
+  "EndpointInspection.RunningDetails": "Durum / Çalışma Ortamı / Uç nokta",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan ayırma bloğu boyutu (MiB)",
   "Launch.RuntimeDefault": "Çalışma ortamı varsayılanı",
   "Benchmark.Memory.Legacy": "Anlık GPU belleği: {0} MiB (tüm cihaz; tepe değeri yok)",

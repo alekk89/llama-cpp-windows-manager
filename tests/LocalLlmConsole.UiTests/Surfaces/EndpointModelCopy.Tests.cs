@@ -40,6 +40,10 @@ public sealed class WpfEndpointModelCopyTests : WpfUiTestBase
                     Assert.Equal(id, copied[^1]);
                     Assert.Equal(id, table.Columns[0].OnCopyingCellClipboardContent(idText.DataContext));
                 }
+                var expand = VisualDescendants<Button>(table).First(button =>
+                    AutomationProperties.GetAutomationId(button) == "EndpointModelDetailsButton");
+                expand.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                content.UpdateLayout();
                 var name = Assert.Single(VisualDescendants<TextBox>(table), text => text.Text == "Friendly model 0");
                 name.Select(0, 8);
                 Assert.Equal("Friendly", name.SelectedText);
@@ -99,7 +103,7 @@ public sealed class WpfEndpointModelCopyTests : WpfUiTestBase
                 content.Arrange(new Rect(0, 0, width, 560));
                 content.UpdateLayout();
                 var table = Assert.Single(VisualDescendants<DataGrid>(content), grid => AutomationProperties.GetAutomationId(grid) == "EndpointModelsTable");
-                foreach (var column in table.Columns.Take(6))
+                foreach (var column in table.Columns.Where(column => column.Header is not null && column.Visibility == Visibility.Visible))
                 {
                     var header = Assert.Single(VisualDescendants<System.Windows.Controls.Primitives.DataGridColumnHeader>(table), item => item.Column == column);
                     var label = new TextBlock { Text = column.Header?.ToString(), FontSize = header.FontSize, FontFamily = header.FontFamily, FontWeight = header.FontWeight };

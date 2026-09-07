@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Rozbalit podrobnosti modelu",
+  "EndpointInspection.CollapseDetails": "Sbalit podrobnosti modelu",
+  "EndpointInspection.PartialDetails": "Některé podrobnosti nejsou dostupné",
+  "EndpointInspection.SlotSummary": "{0} aktivních / {1} celkem",
+  "EndpointInspection.ModelId": "ID modelu",
+  "EndpointInspection.RunningDetails": "Stav / Prostředí běhu / Koncový bod",
   "Launch.Field.VulkanAllocationBlockSize": "Velikost alokačního bloku Vulkan (MiB)",
   "Launch.RuntimeDefault": "Výchozí hodnota běhového prostředí",
   "Benchmark.Memory.Legacy": "Snímek paměti GPU {0} MiB (celé zařízení; maximum není dostupné)",

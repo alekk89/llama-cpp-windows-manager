@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "모델 세부 정보 펼치기",
+  "EndpointInspection.CollapseDetails": "모델 세부 정보 접기",
+  "EndpointInspection.PartialDetails": "일부 세부 정보를 사용할 수 없습니다",
+  "EndpointInspection.SlotSummary": "활성 {0} / 전체 {1}",
+  "EndpointInspection.ModelId": "모델 ID",
+  "EndpointInspection.RunningDetails": "상태 / 런타임 / 엔드포인트",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan 할당 블록 크기 (MiB)",
   "Launch.RuntimeDefault": "런타임 기본값",
   "Benchmark.Memory.Legacy": "GPU 메모리 순간값 {0} MiB (장치 전체, 최고값 확인 불가)",

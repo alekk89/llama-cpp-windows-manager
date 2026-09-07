@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "باز کردن جزئیات مدل",
+  "EndpointInspection.CollapseDetails": "بستن جزئیات مدل",
+  "EndpointInspection.PartialDetails": "برخی جزئیات در دسترس نیستند",
+  "EndpointInspection.SlotSummary": "{0} فعال / {1} کل",
+  "EndpointInspection.ModelId": "شناسه مدل",
+  "EndpointInspection.RunningDetails": "وضعیت / محیط اجرا / نقطه پایانی",
   "Launch.Field.VulkanAllocationBlockSize": "اندازه بلوک تخصیص Vulkan (MiB)",
   "Launch.RuntimeDefault": "پیش‌فرض محیط اجرا",
   "Benchmark.Memory.Legacy": "نمونه لحظه‌ای حافظه GPU برابر {0} MiB (کل دستگاه؛ اوج نامشخص)",

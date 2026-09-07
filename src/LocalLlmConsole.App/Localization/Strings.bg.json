@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Разгъни подробностите за модела",
+  "EndpointInspection.CollapseDetails": "Свий подробностите за модела",
+  "EndpointInspection.PartialDetails": "Някои подробности не са налични",
+  "EndpointInspection.SlotSummary": "{0} активни / {1} общо",
+  "EndpointInspection.ModelId": "Идентификатор на модела",
+  "EndpointInspection.RunningDetails": "Състояние / Рънтайм / Крайна точка",
   "Launch.Field.VulkanAllocationBlockSize": "Размер на блока за разпределяне във Vulkan (MiB)",
   "Launch.RuntimeDefault": "По подразбиране за средата",
   "Benchmark.Memory.Legacy": "Моментна GPU памет {0} MiB (за цялото устройство; пикът не е наличен)",
