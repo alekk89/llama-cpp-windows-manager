@@ -10,6 +10,7 @@ public partial class MainWindow
     private EventHandler<BenchmarkRunSnapshot>? _benchmarkProgressHandler;
     private IReadOnlyList<NamedModelLaunchProfile> _benchmarkProfiles = [];
     private BenchmarkPlan? _pendingBenchmarkPlan;
+    private int? _pendingBenchmarkDepth;
 
     private void ShowBenchmarks()
     {
@@ -41,7 +42,9 @@ public partial class MainWindow
             RunEventAsync));
         var controls = SelectorFavoriteBinding.ConfigureBenchmarks(BenchmarksPageFactory.Create(_benchmarksController), () => _stateStore, SetStatus);
         _benchmarksPage.Apply(controls);
-        PageHost.Content = controls.Root;
+        if (controls.Workspace is { } workspace)
+            workspace.RuntimeOptions.DiscoverRequested += () => RunBackground(() => BenchmarkWorkspaceDiscoveryService.DiscoverAsync(_benchmarksPage, () => _benchmarksPage, AppServices.Benchmarks.Value, _runtimeLaunchOptionDiscovery, _settings.WslDistro), "Benchmark option discovery failed");
+        PageHost.Content = controls.Workspace?.Root ?? (object)controls.Root;
         SubscribeBenchmarkProgress();
         RunBackground(RefreshBenchmarksAsync, "Benchmark refresh failed");
     }
@@ -62,9 +65,12 @@ public partial class MainWindow
         if (_pendingBenchmarkPlan is not null)
         {
             BenchmarksPagePlanService.Apply(_benchmarksPage, _pendingBenchmarkPlan, _benchmarkProfiles);
+            if (_pendingBenchmarkDepth is { } depth && _benchmarksPage.Workspace is { } view) view.SetupDepth = depth;
+            _pendingBenchmarkDepth = null;
             _pendingBenchmarkPlan = null;
         }
         ApplyBenchmarkRuns(await runsTask);
+        _benchmarksPage.UpdateWorkspacePreview();
     }
 
     private Task BenchmarkSelectionChangedAsync()
@@ -108,13 +114,12 @@ public partial class MainWindow
         await AppServices.Benchmarks.Value.CancelAsync(id);
     }
 
-    private Task ShowBenchmarkDetailsAsync() => BenchmarksPageHistoryService.ShowDetailsAsync(AppServices.Benchmarks.Value, _stateStore!, RequiredBenchmarkRunId(), this);
+    private Task ShowBenchmarkDetailsAsync() => BenchmarkWorkspaceHistoryService.ShowAsync(AppServices.Benchmarks.Value, _stateStore!, RequiredBenchmarkRunId(), _benchmarksPage, () => _benchmarksPage);
 
     private Task ExportBenchmarkAsync() => BenchmarksPageHistoryService.ExportAsync(
         AppServices.Benchmarks.Value, _stateStore!, RequiredBenchmarkRunId(), SetStatus);
 
-    private Task CompareBenchmarksAsync() => BenchmarksPageHistoryService.ShowComparisonAsync(
-        _stateStore!, _benchmarksPage?.SelectedRunIds ?? [], this, _coreServices.App.Dialogs);
+    private Task CompareBenchmarksAsync() => BenchmarkWorkspaceHistoryService.CompareAsync(AppServices.Benchmarks.Value, _stateStore!, _benchmarksPage, () => _benchmarksPage);
 
     private Task CloneBenchmarkPlanAsync() => BenchmarksPageWorkflowService.CloneAndValidateAsync(
         AppServices.Benchmarks.Value, RequiredBenchmarkRunId(), _benchmarksPage!, _benchmarkProfiles, _settings.WslDistro);
@@ -139,7 +144,8 @@ public partial class MainWindow
     private void InvalidateBenchmarkPlan()
     {
         if (_benchmarksPage?.RunButton is not null) _benchmarksPage.RunButton.IsEnabled = !_benchmarksPage.IsRunActive;
-        if (_benchmarksPage?.Summary is not null) _benchmarksPage.Summary.Text = Loc.T("Benchmarks.PlanChanged");
+        if (_benchmarksPage?.Summary is not null) _benchmarksPage.Summary.Text = "";
+        _benchmarksPage?.UpdateWorkspacePreview();
     }
 
     private BenchmarkPlan BuildBenchmarkPlan() => BenchmarksPagePlanService.Build(
@@ -162,6 +168,8 @@ public partial class MainWindow
 
     private void ReleaseBenchmarksPage()
     {
+        if (_benchmarksPage is not null && _pendingBenchmarkPlan is null)
+            (_pendingBenchmarkPlan, _pendingBenchmarkDepth) = _benchmarksPage.CaptureDraft(_settings.WslDistro);
         if (_benchmarkProgressHandler is not null && _appServices?.Benchmarks.IsValueCreated == true)
             _appServices.Benchmarks.Value.ProgressChanged -= _benchmarkProgressHandler;
         _benchmarkProgressHandler = null;
@@ -190,6 +198,7 @@ public partial class MainWindow
     private void OpenBenchmarkPlan(BenchmarkPlan plan)
     {
         _pendingBenchmarkPlan = plan;
+        _pendingBenchmarkDepth = null;
         ShowBenchmarks();
     }
 

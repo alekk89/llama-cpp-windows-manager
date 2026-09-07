@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "tokenów/s",
   "EndpointInspection.ExpandDetails": "Rozwiń szczegóły modelu",
   "EndpointInspection.CollapseDetails": "Zwiń szczegóły modelu",
   "EndpointInspection.PartialDetails": "Niektóre szczegóły są niedostępne",
@@ -1112,5 +1113,17 @@
   "Runtimes.ClearDefault": "Usuń domyślne środowisko",
   "Runtimes.DefaultHint": "Domyślne środowisko dla nowych profili",
   "Runtimes.DefaultSelected": "{0} jest teraz domyślnym środowiskiem dla nowych profili.",
-  "Runtimes.DefaultCleared": "Domyślne środowisko zostało usunięte."
+  "Runtimes.DefaultCleared": "Domyślne środowisko zostało usunięte.",
+  "Benchmarks.NewBenchmark": "Nowy benchmark",
+  "Benchmarks.Results": "Wyniki",
+  "Benchmarks.ProfileToTest": "Profil do testowania",
+  "Benchmarks.CompareSettings": "Porównaj ustawienia",
+  "Benchmarks.Workload": "Obciążenie",
+  "Benchmarks.ReviewRun": "Sprawdź i uruchom",
+  "Benchmarks.SelectedConfiguration": "Wybrana konfiguracja",
+  "Benchmarks.MeasurementDetails": "Szczegóły pomiaru · JSON",
+  "Benchmarks.PreviewLaunches": "Podgląd uruchomień",
+  "Benchmarks.TemporaryProfileSettings": "Tymczasowe ustawienia profilu",
+  "Benchmarks.RuntimeOptions": "Opcje tego środowiska wykonawczego",
+  "Benchmarks.ValidationDetails": "Szczegóły walidacji"
 }

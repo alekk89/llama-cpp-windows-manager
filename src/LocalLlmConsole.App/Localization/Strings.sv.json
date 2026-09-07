@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "token/s",
   "EndpointInspection.ExpandDetails": "Visa modelldetaljer",
   "EndpointInspection.CollapseDetails": "Dölj modelldetaljer",
   "EndpointInspection.PartialDetails": "Vissa detaljer är inte tillgängliga",
@@ -1109,5 +1110,17 @@
   "Runtimes.ClearDefault": "Rensa standardkörmiljö",
   "Runtimes.DefaultHint": "Standardkörmiljö för nya profiler",
   "Runtimes.DefaultSelected": "{0} är nu standardkörmiljö för nya profiler.",
-  "Runtimes.DefaultCleared": "Standardkörmiljön har rensats."
+  "Runtimes.DefaultCleared": "Standardkörmiljön har rensats.",
+  "Benchmarks.NewBenchmark": "Nytt benchmark",
+  "Benchmarks.Results": "Resultat",
+  "Benchmarks.ProfileToTest": "Profil att testa",
+  "Benchmarks.CompareSettings": "Jämför inställningar",
+  "Benchmarks.Workload": "Arbetsbelastning",
+  "Benchmarks.ReviewRun": "Granska och kör",
+  "Benchmarks.SelectedConfiguration": "Vald konfiguration",
+  "Benchmarks.MeasurementDetails": "Mätdetaljer · JSON",
+  "Benchmarks.PreviewLaunches": "Förhandsvisa starter",
+  "Benchmarks.TemporaryProfileSettings": "Tillfälliga profilinställningar",
+  "Benchmarks.RuntimeOptions": "Alternativ för denna körmiljö",
+  "Benchmarks.ValidationDetails": "Valideringsdetaljer"
 }

@@ -4,9 +4,23 @@ namespace LocalLlmConsole.Services;
 
 public sealed partial class BenchmarkPlanService
 {
+    private static int ServingVariantCount(BenchmarkPlan plan)
+    {
+        if (plan.ExecutionMode != BenchmarkExecutionMode.ProfileServing) return 1;
+        var counts = new[] { plan.Serving.ContextSizes.Count, plan.Options.BatchSizes.Count,
+            plan.Options.MicroBatchSizes.Count, plan.Options.Threads.Count, plan.Options.GpuLayers.Count,
+            plan.Options.FlashAttention.Count, plan.Options.CacheTypesKv.Count, plan.Options.CacheTypesK.Count,
+            plan.Options.CacheTypesV.Count, plan.Options.KvOffload.Count, plan.Options.GpuConfigurations.Count,
+            plan.Options.SplitModes.Count, plan.Options.TensorSplits.Count, plan.Serving.SpeculativeConfigurations.Count,
+            plan.Serving.SpeculativeTypes.Count, plan.Serving.SpeculativeCompanionModes.Count };
+        var total = 1;
+        foreach (var count in counts) total = SaturatingMultiply(total, Math.Max(1, count), MaximumWorkItems + 1);
+        return total;
+    }
     private static IReadOnlyList<ModelLaunchSettings> LaunchVariants(BenchmarkPlan plan, ModelLaunchSettings profile)
     {
         if (plan.ExecutionMode != BenchmarkExecutionMode.ProfileServing) return [profile];
+        profile = BenchmarkProfileOverrides.Apply(profile, plan.Serving.ProfileOverrides);
         IEnumerable<ModelLaunchSettings> variants = [profile];
         variants = Expand(variants, plan.Serving.ContextSizes, profile.ContextSize,
             (settings, value) => settings with { ContextSize = value });
@@ -129,7 +143,7 @@ public sealed partial class BenchmarkPlanService
 
     private static string NormalizeGpuSplit(string value)
         => string.Join(',', (value ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            .Split([',', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     private static ModelLaunchSettings NormalizeServingGpuSettings(ModelLaunchSettings settings)
     {
@@ -159,10 +173,8 @@ public sealed partial class BenchmarkPlanService
         => StableHash(JsonSerializer.Serialize(new
         {
             mode = plan.ExecutionMode,
-            settings,
-            workloads = ServingWorkloads(plan),
-            plan.Serving,
-            plan.Repetitions,
-            plan.Warmup
+            settings = settings with { RuntimeId = "", Port = 0, Host = "", Temperature = plan.Serving.Temperature, Seed = plan.Serving.Seed },
+            plan.Serving.Seed,
+            plan.Serving.Temperature
         }));
 }

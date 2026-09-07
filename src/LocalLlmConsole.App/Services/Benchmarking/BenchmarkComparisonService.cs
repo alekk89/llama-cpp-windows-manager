@@ -56,7 +56,7 @@ public static class BenchmarkComparisonService
         IReadOnlyList<StoredBenchmarkResult> rows,
         bool includePartialAttempts)
         => rows.Where(row => includePartialAttempts || !row.IsPartialAttempt)
-            .GroupBy(row => row.Result.WorkloadSignature, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(row => BenchmarkResultIdentity.StoredConfiguration(row.Result), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 group => group.Key,
                 group => new AverageRow(group.First().Result, group.Average(row => row.Result.AverageTokensPerSecond)),

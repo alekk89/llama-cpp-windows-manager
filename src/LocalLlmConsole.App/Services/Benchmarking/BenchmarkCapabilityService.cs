@@ -13,7 +13,10 @@ public sealed record BenchmarkRuntimeCapability(
     IReadOnlyList<string> AvailableDevices,
     string HelpFingerprint,
     string DeviceProbeWarning,
-    string Error);
+    string Error)
+{
+    public IReadOnlyList<RuntimeLaunchOptionDefinition> OptionDefinitions { get; init; } = [];
+}
 
 public sealed partial class BenchmarkCapabilityService
 {
@@ -52,7 +55,8 @@ public sealed partial class BenchmarkCapabilityService
             if (!options.Contains("--model") || !options.Contains("--output"))
                 return Cache(cacheKey, new BenchmarkRuntimeCapability(runtime.Id, false, executable, options, [], Hash(help), "", "The executable help did not identify a compatible llama-bench command surface."));
             var (devices, deviceWarning) = await ProbeDevicesAsync(runtime, wslDistro, executable, options, cancellationToken);
-            return Cache(cacheKey, new BenchmarkRuntimeCapability(runtime.Id, true, executable, options, devices, Hash(help), deviceWarning, ""));
+            return Cache(cacheKey, new BenchmarkRuntimeCapability(runtime.Id, true, executable, options, devices, Hash(help), deviceWarning, "")
+            { OptionDefinitions = RuntimeLaunchHelpParser.Parse(help) });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

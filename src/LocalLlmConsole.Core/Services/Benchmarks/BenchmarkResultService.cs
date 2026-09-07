@@ -49,7 +49,7 @@ public static class BenchmarkResultService
             result = new BenchmarkParsedResult(
                 classification,
                 jsonLine,
-                Hash($"{modelFingerprint}|{classification}|{prompt}|{generation}|{Int(root, "n_depth")}|{effectiveCommandSignature}"),
+                BenchmarkResultIdentity.Workload(root, modelFingerprint, effectiveCommandSignature),
                 Hash(environment),
                 managerVersion,
                 operatingEnvironment,
@@ -115,7 +115,11 @@ public static class BenchmarkResultService
                     ? peaks.Deserialize<BenchmarkGpuMemoryPeak[]>() : null,
                 Int(root, "gpu_memory_sample_interval_ms"),
                 Int(root, "vulkan_allocation_block_size_mib"),
-                String(root, "gpu_memory_measurement_window"));
+                String(root, "gpu_memory_measurement_window"),
+                Double(root, "avg_generation_ts"),
+                String(root, "manager_model_name"),
+                String(root, "manager_runtime_name"),
+                String(root, "lazy_mode"));
             return true;
         }
         catch (JsonException ex)

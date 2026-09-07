@@ -32,20 +32,35 @@ public sealed partial class BenchmarkApplicationService
             async line =>
             {
                 if (!BenchmarkResultService.TryParse(
-                        line, item.ModelFingerprint, item.EffectiveCommandSignature, runtime.Mode, runtime.Backend,
+                        line, item.ModelFingerprint, BenchmarkCommandBuilder.ResultSignature(item.Options), runtime.Mode, runtime.Backend,
                         out var parsed, out var error, AppUpdateService.CurrentVersionLabel(), RuntimeInformation.OSDescription)
                     || parsed is null)
                 {
                     await AppendLogAsync((await _store.GetJobAsync(jobId))?.LogPath, $"Ignored output: {error}");
                     return;
                 }
+                var enriched = JsonNode.Parse(parsed.RawJson)!.AsObject();
+                enriched["manager_model_name"] = item.ModelName;
+                enriched["manager_runtime_name"] = item.RuntimeName;
+                enriched["profile_name"] = string.Join(", ", item.ProfileNames);
+                enriched["profile_id"] = string.Join(",", item.ProfileIds);
+                enriched["vulkan_allocation_block_size_mib"] = item.LaunchSettings?.VulkanAllocationBlockSizeMiB ?? 0;
+                parsed = parsed with
+                {
+                    RawJson = enriched.ToJsonString(),
+                    ManagerModelName = item.ModelName,
+                    ManagerRuntimeName = item.RuntimeName,
+                    ProfileName = string.Join(", ", item.ProfileNames),
+                    ProfileId = string.Join(",", item.ProfileIds),
+                    VulkanAllocationBlockSizeMiB = item.LaunchSettings?.VulkanAllocationBlockSizeMiB ?? 0
+                };
                 sequence++;
                 await _store.InsertBenchmarkResultAsync(jobId, item.Key, attempt, sequence, parsed);
                 validRows++;
                 PublishTransient(job, payload, $"Latest {parsed.Classification}: {parsed.AverageTokensPerSecond:0.00} tok/s", payload.ResultRows + validRows);
             },
             onDiagnostic: line => PublishTransient(job, payload, line.Length <= 300 ? line : line[..300], payload.ResultRows + Volatile.Read(ref validRows)),
-            cancellationToken);
+            cancellationToken, item.LaunchSettings?.VulkanAllocationBlockSizeMiB ?? 0);
         var memoryPeaks = await memorySampler.FinishAsync();
         await _store.SetBenchmarkMemoryAsync(jobId, item.Key, attempt, memoryPeaks, BenchmarkGpuMemorySampler.IntervalMilliseconds);
         if (!string.IsNullOrWhiteSpace(process.DiagnosticTail)) await AppendLogAsync(job.LogPath, process.DiagnosticTail);

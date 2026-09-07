@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "토큰/초",
   "EndpointInspection.ExpandDetails": "모델 세부 정보 펼치기",
   "EndpointInspection.CollapseDetails": "모델 세부 정보 접기",
   "EndpointInspection.PartialDetails": "일부 세부 정보를 사용할 수 없습니다",
@@ -1094,5 +1095,17 @@
   "Runtimes.ClearDefault": "기본 런타임 해제",
   "Runtimes.DefaultHint": "새 프로필의 기본 런타임",
   "Runtimes.DefaultSelected": "{0}이(가) 새 프로필의 기본 런타임으로 설정되었습니다.",
-  "Runtimes.DefaultCleared": "기본 런타임이 해제되었습니다."
+  "Runtimes.DefaultCleared": "기본 런타임이 해제되었습니다.",
+  "Benchmarks.NewBenchmark": "새 벤치마크",
+  "Benchmarks.Results": "결과",
+  "Benchmarks.ProfileToTest": "테스트할 프로필",
+  "Benchmarks.CompareSettings": "설정 비교",
+  "Benchmarks.Workload": "워크로드",
+  "Benchmarks.ReviewRun": "검토 및 실행",
+  "Benchmarks.SelectedConfiguration": "선택한 구성",
+  "Benchmarks.MeasurementDetails": "측정 세부 정보 · JSON",
+  "Benchmarks.PreviewLaunches": "실행 미리 보기",
+  "Benchmarks.TemporaryProfileSettings": "임시 프로필 설정",
+  "Benchmarks.RuntimeOptions": "이 런타임의 옵션",
+  "Benchmarks.ValidationDetails": "검증 세부 정보"
 }

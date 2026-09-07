@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "トークン/秒",
   "EndpointInspection.ExpandDetails": "モデルの詳細を展開",
   "EndpointInspection.CollapseDetails": "モデルの詳細を折りたたむ",
   "EndpointInspection.PartialDetails": "一部の詳細は取得できません",
@@ -1046,5 +1047,17 @@
   "Runtimes.ClearDefault": "既定のランタイムを解除",
   "Runtimes.DefaultHint": "新しいプロファイルの既定のランタイム",
   "Runtimes.DefaultSelected": "新しいプロファイルの既定のランタイムを {0} に設定しました。",
-  "Runtimes.DefaultCleared": "既定のランタイムを解除しました。"
+  "Runtimes.DefaultCleared": "既定のランタイムを解除しました。",
+  "Benchmarks.NewBenchmark": "新しいベンチマーク",
+  "Benchmarks.Results": "結果",
+  "Benchmarks.ProfileToTest": "テストするプロファイル",
+  "Benchmarks.CompareSettings": "設定を比較",
+  "Benchmarks.Workload": "ワークロード",
+  "Benchmarks.ReviewRun": "確認して実行",
+  "Benchmarks.SelectedConfiguration": "選択した構成",
+  "Benchmarks.MeasurementDetails": "測定の詳細 · JSON",
+  "Benchmarks.PreviewLaunches": "起動のプレビュー",
+  "Benchmarks.TemporaryProfileSettings": "一時的なプロファイル設定",
+  "Benchmarks.RuntimeOptions": "このランタイムのオプション",
+  "Benchmarks.ValidationDetails": "検証の詳細"
 }

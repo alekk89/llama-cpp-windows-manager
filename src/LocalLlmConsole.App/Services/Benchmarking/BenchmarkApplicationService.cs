@@ -170,6 +170,12 @@ public sealed partial class BenchmarkApplicationService : IAsyncDisposable
             var snapshot = await InspectAsync(jobId, cancellationToken);
             if (snapshot.Job.Status == JobStatus.Completed) throw new InvalidOperationException("Completed benchmark runs cannot be resumed.");
             if (_activeRuns.ContainsKey(jobId)) return;
+            if (_sessions.Snapshots().Any(session => session.IsRunning))
+                throw new InvalidOperationException("Stop active model sessions before resuming a benchmark. Resume never stops newly loaded sessions.");
+            var preview = await ValidateAsync(snapshot.Payload.Plan, cancellationToken);
+            if (!preview.IsValid) throw new InvalidOperationException(string.Join(Environment.NewLine, preview.Errors));
+            if (snapshot.Payload.WorkItems.Any(item => !preview.WorkItems.Any(current => current.Key == item.Key)))
+                throw new InvalidOperationException("The saved profiles or runtime selection changed since this run. Clone the plan to benchmark the new configuration.");
             if (!_activeRuns.IsEmpty) throw new InvalidOperationException("Another benchmark run is already active.");
             var payload = snapshot.Payload with { Outcome = null, Message = "Queued to resume", CompletedAt = null, Revision = snapshot.Payload.Revision + 1 };
             await _jobs.UpdateAsync(snapshot.Job, JobStatus.Queued, Serialize(payload), cancellationToken);
@@ -201,7 +207,7 @@ public sealed partial class BenchmarkApplicationService : IAsyncDisposable
                 Revision = snapshot.Payload.Revision + 1
             };
             await PublishMessageAsync(snapshot.Job, payload, JobStatus.Running);
-            await using var computeLease = await _sessions.AcquireBenchmarkLeaseAsync(payload.Plan.StopActiveSessions, active.Cancellation.Token);
+            await using var computeLease = await _sessions.AcquireBenchmarkLeaseAsync(!isResume && payload.Plan.StopActiveSessions, active.Cancellation.Token);
             using var awake = BenchmarkSystemAwakeLease.Acquire(payload.Plan.PreventSystemSleep);
             for (var index = 0; index < payload.WorkItems.Count; index++)
             {
@@ -229,7 +235,7 @@ public sealed partial class BenchmarkApplicationService : IAsyncDisposable
                     if (!outcome.VerifiedStopped) throw new InvalidOperationException("Cancellation could not verify that llama-bench stopped.");
                     throw new OperationCanceledException(active.Cancellation.Token);
                 }
-                if (outcome.ExitCode == 0 && outcome.ResultRows > 0)
+                if (outcome.ExitCode == 0 && outcome.ResultRows == item.ExpectedResultRows && outcome.ResultRows > 0)
                 {
                     await _store.CompleteBenchmarkAttemptAsync(jobId, item.Key, attempt);
                     payload = UpdateCheckpoint(payload, index, new BenchmarkWorkItemCheckpoint(item.Key, BenchmarkWorkItemStatus.Passed, attempt, outcome.ResultRows));
@@ -238,8 +244,10 @@ public sealed partial class BenchmarkApplicationService : IAsyncDisposable
                 {
                     var error = !string.IsNullOrWhiteSpace(outcome.Error)
                         ? outcome.Error
-                        : outcome.ExitCode == 0 ? "The benchmark emitted no valid result rows." : $"The benchmark runner exited with code {outcome.ExitCode}.";
+                        : outcome.ExitCode == 0 ? $"Incomplete benchmark output: expected {item.ExpectedResultRows} result rows, received {outcome.ResultRows}." : $"The benchmark runner exited with code {outcome.ExitCode}.";
                     payload = UpdateCheckpoint(payload, index, new BenchmarkWorkItemCheckpoint(item.Key, BenchmarkWorkItemStatus.Failed, attempt, outcome.ResultRows, error));
+                    payload = Recalculate(payload) with { Revision = payload.Revision + 1 };
+                    await PublishMessageAsync((await InspectAsync(jobId)).Job, payload, JobStatus.Running);
                     if (ShouldRetry(payload.Plan.FailurePolicy, attempt))
                     {
                         index--;

@@ -6,6 +6,38 @@ namespace LocalLlmConsole;
 
 public sealed partial class BenchmarksPageState
 {
+    public (BenchmarkPlan? Plan, int? Depth) CaptureDraft(string wslDistro)
+    {
+        try { return (BenchmarksPagePlanService.Build(this, wslDistro), Workspace?.SetupDepth); }
+        catch (InvalidOperationException) { return (null, null); }
+    }
+    public RuntimeRecord? SelectedRuntime
+    {
+        get
+        {
+            var id = (Runtime?.SelectedItem as BenchmarkSelectionItem)?.Id;
+            if (string.IsNullOrEmpty(id)) id = _profiles.FirstOrDefault(profile => profile.Id == (Profile?.SelectedItem as BenchmarkSelectionItem)?.Id)?.Settings.RuntimeId;
+            return _runtimes.FirstOrDefault(runtime => runtime.Id == id);
+        }
+    }
+    public IReadOnlyList<BenchmarkScopeRow> SelectedScopeRows => Model?.SelectedItem is BenchmarkSelectionItem model
+        && Profile?.SelectedItem is BenchmarkSelectionItem profile && Runtime?.SelectedItem is BenchmarkSelectionItem runtime
+        ? [new(model.Id, model.Name, profile.Id, profile.Name, runtime.Id, runtime.Name, "")] : [];
+
+    public void UpdateWorkspacePreview()
+    {
+        var selected = _profiles.FirstOrDefault(profile => profile.Id == (Profile?.SelectedItem as BenchmarkSelectionItem)?.Id);
+        Workspace?.UpdateSelection(selected?.Settings, _models.FirstOrDefault(model => model.Id == selected?.ModelId));
+        try
+        {
+            var plan = BenchmarksPagePlanService.Build(this, "");
+            Workspace?.ShowPreview(new Services.BenchmarkPlanService().Preview(plan, _models, _profiles, _runtimes));
+        }
+        catch (InvalidOperationException error)
+        {
+            Workspace?.ShowPreview(new(false, [error.Message], [], [], 0, 0, 0));
+        }
+    }
     public void AddSelectedProfile()
     {
         if (Model?.SelectedItem is not BenchmarkSelectionItem model

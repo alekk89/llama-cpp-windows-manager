@@ -210,6 +210,8 @@ public sealed class BenchmarkServingRunner : IDisposable
         var raw = JsonSerializer.Serialize(new
         {
             build_commit = RuntimeMetadata(runtime, "commit"),
+            manager_model_name = model.Name,
+            manager_runtime_name = runtime.Name,
             build_number = 0,
             cpu_info = "",
             gpu_info = "",
@@ -246,6 +248,7 @@ public sealed class BenchmarkServingRunner : IDisposable
             request_count = responses.Length,
             failed_request_count = 0,
             avg_prompt_ts = Mean(responses.Select(response => response.PromptTokensPerSecond).Where(value => value > 0).ToArray()),
+            avg_generation_ts = Mean(responses.Select(response => response.GenerationTokensPerSecond).Where(value => value > 0).ToArray()),
             avg_latency_ms = avgLatency,
             stddev_latency_ms = StandardDeviation(latencies),
             draft_tokens = draft,
