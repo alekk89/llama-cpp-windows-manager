@@ -35,6 +35,7 @@ public sealed record BenchmarkRunRow(
     string Progress,
     string Message)
 {
+    public string Name { get; init; } = "";
     public string RemoveAction => "Delete";
     public bool CanRemove => Status is not ("Queued" or "Running" or "Paused");
     public string RemoveToolTip => CanRemove ? "Delete this benchmark run and its results" : "Stop this run before deleting it";
@@ -45,17 +46,20 @@ public sealed partial class BenchmarksPageState
     private readonly Func<(bool StopActiveSessions, bool PreventSystemSleep)>? _runPolicies;
     private bool _stopActiveSessions;
     private bool _preventSystemSleep = true;
+    private bool _hasRunPolicyOverride;
 
     public BenchmarksPageState(Func<(bool StopActiveSessions, bool PreventSystemSleep)>? runPolicies = null)
         => _runPolicies = runPolicies;
 
     public ScrollViewer? Root { get; private set; }
+    public BenchmarkWorkspaceView? Workspace { get; private set; }
+    public BenchmarkPlan OriginalPlan { get; set; } = new();
     public ComboBox? Model { get; private set; }
     public ComboBox? Profile { get; private set; }
     public ComboBox? Runtime { get; private set; }
     public DataGrid? ScopeProfiles { get; private set; }
-    public bool StopActiveSessions => _runPolicies?.Invoke().StopActiveSessions ?? _stopActiveSessions;
-    public bool PreventSystemSleep => _runPolicies?.Invoke().PreventSystemSleep ?? _preventSystemSleep;
+    public bool StopActiveSessions => _hasRunPolicyOverride ? _stopActiveSessions : _runPolicies?.Invoke().StopActiveSessions ?? _stopActiveSessions;
+    public bool PreventSystemSleep => _hasRunPolicyOverride ? _preventSystemSleep : _runPolicies?.Invoke().PreventSystemSleep ?? _preventSystemSleep;
     public ComboBox? Warmup { get; private set; }
     public CheckBox? RepeatEquivalentProfiles { get; private set; }
     public TextBox? Name { get; private set; }
@@ -134,6 +138,7 @@ public sealed partial class BenchmarksPageState
     public void Apply(BenchmarksPageControls controls)
     {
         Root = controls.Root;
+        Workspace = controls.Workspace;
         Model = controls.Model;
         Profile = controls.Profile;
         Runtime = controls.Runtime;
@@ -218,6 +223,7 @@ public sealed partial class BenchmarksPageState
 
     public void SetRunPolicies(bool stopActiveSessions, bool preventSystemSleep)
     {
+        _hasRunPolicyOverride = true;
         _stopActiveSessions = stopActiveSessions;
         _preventSystemSleep = preventSystemSleep;
     }
@@ -233,6 +239,7 @@ public sealed partial class BenchmarksPageState
     public void ReleaseView()
     {
         Root = null;
+        Workspace = null;
         Model = null;
         Profile = null;
         Runtime = null;

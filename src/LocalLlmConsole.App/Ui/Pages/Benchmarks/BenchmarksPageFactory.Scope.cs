@@ -51,6 +51,7 @@ public static partial class BenchmarksPageFactory
             ("Environment", nameof(BenchmarkScopeRow.Environment), .75));
         PageSectionFactory.AddButtonColumn(scopeProfiles, "", nameof(BenchmarkScopeRow.RemoveAction), nameof(BenchmarkScopeRow.CanRemove),
             controller.RemoveProfile, .65, tooltipBinding: nameof(BenchmarkScopeRow.RemoveToolTip), visualRole: VisualRole.Danger, compactContent: "×");
+        scopeProfiles.Columns[^1].Width = DataGridLength.SizeToCells;
         scopeProfiles.MinHeight = 118;
         scopeProfiles.MaxHeight = 220;
         scopeProfiles.SelectionMode = DataGridSelectionMode.Extended;

@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "token/giây",
   "EndpointInspection.ExpandDetails": "Mở rộng chi tiết mô hình",
   "EndpointInspection.CollapseDetails": "Thu gọn chi tiết mô hình",
   "EndpointInspection.PartialDetails": "Một số chi tiết không khả dụng",
@@ -1106,5 +1107,17 @@
   "Runtimes.ClearDefault": "Xóa môi trường chạy mặc định",
   "Runtimes.DefaultHint": "Môi trường chạy mặc định cho hồ sơ mới",
   "Runtimes.DefaultSelected": "{0} hiện là môi trường chạy mặc định cho hồ sơ mới.",
-  "Runtimes.DefaultCleared": "Đã xóa môi trường chạy mặc định."
+  "Runtimes.DefaultCleared": "Đã xóa môi trường chạy mặc định.",
+  "Benchmarks.NewBenchmark": "Phép đo hiệu năng mới",
+  "Benchmarks.Results": "Kết quả",
+  "Benchmarks.ProfileToTest": "Hồ sơ cần kiểm tra",
+  "Benchmarks.CompareSettings": "So sánh cài đặt",
+  "Benchmarks.Workload": "Khối lượng công việc",
+  "Benchmarks.ReviewRun": "Xem lại và chạy",
+  "Benchmarks.SelectedConfiguration": "Cấu hình đã chọn",
+  "Benchmarks.MeasurementDetails": "Chi tiết phép đo · JSON",
+  "Benchmarks.PreviewLaunches": "Xem trước các lần khởi chạy",
+  "Benchmarks.TemporaryProfileSettings": "Cài đặt hồ sơ tạm thời",
+  "Benchmarks.RuntimeOptions": "Tùy chọn của môi trường thực thi này",
+  "Benchmarks.ValidationDetails": "Chi tiết xác thực"
 }

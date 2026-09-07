@@ -80,7 +80,10 @@ public sealed record BenchmarksPageControls(
     Button HistoryPrevious,
     Button HistoryNext,
     Button RunButton,
-    Button StopButton);
+    Button StopButton)
+{
+    public BenchmarkWorkspaceView? Workspace { get; init; }
+}
 
 public sealed record BenchmarkModeItem(BenchmarkExecutionMode Mode, string Name)
 {
@@ -260,7 +263,7 @@ public static partial class BenchmarksPageFactory
             ("Status", nameof(BenchmarkRunRow.Status), .8),
             ("Scope", nameof(BenchmarkRunRow.Scope), 1.7),
             ("Progress", nameof(BenchmarkRunRow.Progress), .8),
-            ("Message", nameof(BenchmarkRunRow.Message), 1.8));
+            ("Name", nameof(BenchmarkRunRow.Name), 1.8));
         history.MinHeight = 190;
         history.SelectionMode = DataGridSelectionMode.Extended;
         PageSectionFactory.AddButtonColumn(
@@ -286,7 +289,6 @@ public static partial class BenchmarksPageFactory
             var availableWidth = Math.Max(0, viewportWidth - content.Margin.Left - content.Margin.Right);
             if (double.IsNaN(content.Width) || Math.Abs(content.Width - availableWidth) > 0.5)
                 content.Width = availableWidth;
-            resizeSelector(availableWidth);
         }
         void FitContentToViewport()
             => FitContentToWidth(root.ViewportWidth > 0 ? root.ViewportWidth : root.ActualWidth);
@@ -379,7 +381,7 @@ public static partial class BenchmarksPageFactory
         executionMode.SelectionChanged += (_, _) => UpdateModeUi();
         UpdateModeUi();
 
-        return new BenchmarksPageControls(root, model, profile, runtime, scopeProfiles,
+        var controls = new BenchmarksPageControls(root, model, profile, runtime, scopeProfiles,
             warmup, repeatEquivalent, name, preset, executionMode, pp, tg, compareContexts, contextSizes, pg, depths, repetitions, delay,
             concurrencies, readyTimeout, requestTimeout, requireSpeculative, cooldown,
             failurePolicy, threads, compareThreads, compareBatches, batches, compareMicroBatches, microBatches, compareGpuLayers, gpuLayers, cpuMoeLayers,
@@ -388,6 +390,7 @@ public static partial class BenchmarksPageFactory
             devices, loadModes, fitTargets, fitContexts, numaModes, priorities, cpuMasks, cpuStrict, pollValues,
             embeddings, noOpOffload, noHost, tensorOverrides, additionalArguments, summary, activeStatus, progress, history,
             historyPage, historyPrevious, historyNext, runButton, stopButton);
+        return controls with { Workspace = new BenchmarkWorkspaceView(controls, controller, content) };
     }
 
 }

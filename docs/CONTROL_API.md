@@ -301,6 +301,26 @@ Profile-serving runs snapshot and launch the exact saved profile. Direct
 under Manager process supervision and persist plans, checkpoints, results, and
 logs without persisting generated model text.
 
+Plans can set `serving.profileOverrides` to a dictionary of temporary profile
+field names and string values, such as `{"Threads":"8","TopP":"0.9"}`.
+Values are converted to the profile field's type and validated. Matrix lists
+take precedence; saved profiles are not edited. Runtime selection, address,
+port, metrics, and request-owned seed, temperature, and token limits retain
+their dedicated plan or Manager controls. Direct plans also accept
+`options.lazyModes` (`auto`, `on`, `off`) as a counted matrix dimension.
+
+Serving results distinguish `averageGenerationTokensPerSecond` (runtime decode
+timings) from `averageTokensPerSecond` (aggregate request throughput including
+prompt and HTTP time). Missing decode timings remain unavailable. CSV exposes
+the former as `avg_generation_ts`. Each result retains its own tested settings;
+different settings and runtimes are not averaged into the same chart entry.
+Direct runs require the expected number of valid rows to pass; incomplete
+output remains a failed, partial attempt even when the process exits zero.
+
+Resume never stops newly loaded sessions. Stop them separately first. If the
+saved profile configuration or runtime selection changed, clone the plan to
+start a new run instead of mixing configurations in the existing run.
+
 Inspect and control persisted runs with:
 
 ```powershell

@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "توکن/ثانیه",
   "EndpointInspection.ExpandDetails": "باز کردن جزئیات مدل",
   "EndpointInspection.CollapseDetails": "بستن جزئیات مدل",
   "EndpointInspection.PartialDetails": "برخی جزئیات در دسترس نیستند",
@@ -1046,5 +1047,17 @@
   "Runtimes.ClearDefault": "پاک کردن محیط اجرای پیش‌فرض",
   "Runtimes.DefaultHint": "محیط اجرای پیش‌فرض برای نمایه‌های جدید",
   "Runtimes.DefaultSelected": "{0} اکنون محیط اجرای پیش‌فرض برای نمایه‌های جدید است.",
-  "Runtimes.DefaultCleared": "محیط اجرای پیش‌فرض پاک شد."
+  "Runtimes.DefaultCleared": "محیط اجرای پیش‌فرض پاک شد.",
+  "Benchmarks.NewBenchmark": "بنچمارک جدید",
+  "Benchmarks.Results": "نتایج",
+  "Benchmarks.ProfileToTest": "پروفایل مورد آزمایش",
+  "Benchmarks.CompareSettings": "مقایسه تنظیمات",
+  "Benchmarks.Workload": "بار کاری",
+  "Benchmarks.ReviewRun": "بررسی و اجرا",
+  "Benchmarks.SelectedConfiguration": "پیکربندی انتخاب‌شده",
+  "Benchmarks.MeasurementDetails": "جزئیات اندازه‌گیری · JSON",
+  "Benchmarks.PreviewLaunches": "پیش‌نمایش اجراها",
+  "Benchmarks.TemporaryProfileSettings": "تنظیمات موقت پروفایل",
+  "Benchmarks.RuntimeOptions": "گزینه‌های این محیط اجرا",
+  "Benchmarks.ValidationDetails": "جزئیات اعتبارسنجی"
 }

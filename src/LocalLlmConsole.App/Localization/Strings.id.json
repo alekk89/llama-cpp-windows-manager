@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "token/detik",
   "EndpointInspection.ExpandDetails": "Perluas detail model",
   "EndpointInspection.CollapseDetails": "Ciutkan detail model",
   "EndpointInspection.PartialDetails": "Beberapa detail tidak tersedia",
@@ -1070,5 +1071,17 @@
   "Runtimes.ClearDefault": "Hapus runtime bawaan",
   "Runtimes.DefaultHint": "Runtime bawaan untuk profil baru",
   "Runtimes.DefaultSelected": "{0} sekarang menjadi runtime bawaan untuk profil baru.",
-  "Runtimes.DefaultCleared": "Runtime bawaan dihapus."
+  "Runtimes.DefaultCleared": "Runtime bawaan dihapus.",
+  "Benchmarks.NewBenchmark": "Benchmark baru",
+  "Benchmarks.Results": "Hasil",
+  "Benchmarks.ProfileToTest": "Profil yang diuji",
+  "Benchmarks.CompareSettings": "Bandingkan pengaturan",
+  "Benchmarks.Workload": "Beban kerja",
+  "Benchmarks.ReviewRun": "Tinjau dan jalankan",
+  "Benchmarks.SelectedConfiguration": "Konfigurasi yang dipilih",
+  "Benchmarks.MeasurementDetails": "Detail pengukuran · JSON",
+  "Benchmarks.PreviewLaunches": "Pratinjau peluncuran",
+  "Benchmarks.TemporaryProfileSettings": "Pengaturan profil sementara",
+  "Benchmarks.RuntimeOptions": "Opsi runtime ini",
+  "Benchmarks.ValidationDetails": "Detail validasi"
 }

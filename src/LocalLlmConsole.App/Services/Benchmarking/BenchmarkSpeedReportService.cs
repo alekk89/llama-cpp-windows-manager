@@ -27,7 +27,7 @@ public static class BenchmarkSpeedReportService
     {
         var tests = results
             .Where(row => !row.IsPartialAttempt)
-            .GroupBy(row => row.Result.WorkloadSignature, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(row => $"{row.WorkItemKey}|{row.Result.EnvironmentSignature}|{BenchmarkResultIdentity.StoredConfiguration(row.Result)}", StringComparer.OrdinalIgnoreCase)
             .Select(group => Average(group.Select(row => row.Result).ToArray()))
             .OrderBy(test => test.Sample.PromptTokens)
             .ThenBy(test => test.Sample.GenerationTokens)
@@ -82,8 +82,10 @@ public static class BenchmarkSpeedReportService
     {
         var isGeneration = test.Sample.ExecutionMode == BenchmarkExecutionMode.ProfileServing
                            || test.Sample.Classification == BenchmarkResultClassification.TokenGeneration;
-        return isGeneration && test.AverageTokensPerSecond > 0
-            ? Bar(test.Sample, test.AverageTokensPerSecond)
+        var rate = test.Sample.ExecutionMode == BenchmarkExecutionMode.ProfileServing
+            ? test.Sample.AverageGenerationTokensPerSecond : test.AverageTokensPerSecond;
+        return isGeneration && rate > 0
+            ? Bar(test.Sample, rate)
             : null;
     }
 
@@ -115,7 +117,11 @@ public static class BenchmarkSpeedReportService
     {
         var promptRates = rows.Select(row => row.AveragePromptTokensPerSecond).Where(rate => rate > 0).ToArray();
         return new AverageTest(
-            rows[0] with { GpuMemoryPeaks = BenchmarkGpuMemoryService.Merge(rows.SelectMany(row => row.GpuMemoryPeaks ?? [])) },
+            rows[0] with
+            {
+                GpuMemoryPeaks = BenchmarkGpuMemoryService.Merge(rows.SelectMany(row => row.GpuMemoryPeaks ?? [])),
+                AverageGenerationTokensPerSecond = rows.Average(row => row.AverageGenerationTokensPerSecond)
+            },
             rows.Average(row => row.AverageTokensPerSecond),
             promptRates.Length == 0 ? 0 : promptRates.Average());
     }

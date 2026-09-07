@@ -24,10 +24,11 @@ public sealed class BenchmarkProcessRunner
         IReadOnlyList<string> arguments,
         Func<string, Task> onResultLine,
         Action<string>? onDiagnostic,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int vulkanAllocationBlockSizeMiB = 0)
     {
         var marker = runtime.Mode == RuntimeMode.Wsl ? $"llwm-benchmark-{Guid.NewGuid():N}" : "";
-        var startInfo = BenchmarkRuntimeToolAdapter.CreateStartInfo(runtime, wslDistro, executable, arguments, marker);
+        var startInfo = BenchmarkRuntimeToolAdapter.CreateStartInfo(runtime, wslDistro, executable, arguments, marker, vulkanAllocationBlockSizeMiB);
         using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         using var jobObject = runtime.Mode == RuntimeMode.Native ? new ProcessJobObjectService() : null;
         var diagnostics = new StringBuilder();

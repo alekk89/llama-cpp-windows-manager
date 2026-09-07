@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "Token/s",
   "EndpointInspection.ExpandDetails": "Modelldetails aufklappen",
   "EndpointInspection.CollapseDetails": "Modelldetails zuklappen",
   "EndpointInspection.PartialDetails": "Einige Details sind nicht verfügbar",
@@ -1084,5 +1085,17 @@
   "Runtimes.ClearDefault": "Standard-Laufzeit zurücksetzen",
   "Runtimes.DefaultHint": "Standard-Laufzeit für neue Profile",
   "Runtimes.DefaultSelected": "{0} ist jetzt die Standard-Laufzeit für neue Profile.",
-  "Runtimes.DefaultCleared": "Standard-Laufzeit zurückgesetzt."
+  "Runtimes.DefaultCleared": "Standard-Laufzeit zurückgesetzt.",
+  "Benchmarks.NewBenchmark": "Neuer Benchmark",
+  "Benchmarks.Results": "Ergebnisse",
+  "Benchmarks.ProfileToTest": "Zu testendes Profil",
+  "Benchmarks.CompareSettings": "Einstellungen vergleichen",
+  "Benchmarks.Workload": "Testlast",
+  "Benchmarks.ReviewRun": "Prüfen und starten",
+  "Benchmarks.SelectedConfiguration": "Ausgewählte Konfiguration",
+  "Benchmarks.MeasurementDetails": "Messdetails · JSON",
+  "Benchmarks.PreviewLaunches": "Startvorschau",
+  "Benchmarks.TemporaryProfileSettings": "Temporäre Profileinstellungen",
+  "Benchmarks.RuntimeOptions": "Optionen dieser Laufzeit",
+  "Benchmarks.ValidationDetails": "Validierungsdetails"
 }

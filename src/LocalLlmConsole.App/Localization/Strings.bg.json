@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "токени/сек",
   "EndpointInspection.ExpandDetails": "Разгъни подробностите за модела",
   "EndpointInspection.CollapseDetails": "Свий подробностите за модела",
   "EndpointInspection.PartialDetails": "Някои подробности не са налични",
@@ -1126,5 +1127,17 @@
   "Runtimes.ClearDefault": "Изчистване на средата по подразбиране",
   "Runtimes.DefaultHint": "Среда по подразбиране за нови профили",
   "Runtimes.DefaultSelected": "{0} вече е средата по подразбиране за нови профили.",
-  "Runtimes.DefaultCleared": "Средата по подразбиране е изчистена."
+  "Runtimes.DefaultCleared": "Средата по подразбиране е изчистена.",
+  "Benchmarks.NewBenchmark": "Нов бенчмарк",
+  "Benchmarks.Results": "Резултати",
+  "Benchmarks.ProfileToTest": "Профил за тестване",
+  "Benchmarks.CompareSettings": "Сравняване на настройки",
+  "Benchmarks.Workload": "Натоварване",
+  "Benchmarks.ReviewRun": "Преглед и стартиране",
+  "Benchmarks.SelectedConfiguration": "Избрана конфигурация",
+  "Benchmarks.MeasurementDetails": "Подробности за измерването · JSON",
+  "Benchmarks.PreviewLaunches": "Преглед на стартиранията",
+  "Benchmarks.TemporaryProfileSettings": "Временни настройки на профила",
+  "Benchmarks.RuntimeOptions": "Опции на тази среда за изпълнение",
+  "Benchmarks.ValidationDetails": "Подробности за проверката"
 }

@@ -59,6 +59,7 @@ public sealed record BenchmarkOptionSet
     public IReadOnlyList<string> Devices { get; init; } = [];
     public IReadOnlyList<string> TensorSplits { get; init; } = [];
     public IReadOnlyList<string> LoadModes { get; init; } = [];
+    public IReadOnlyList<string> LazyModes { get; init; } = [];
     public IReadOnlyList<int> FitTargetsMiB { get; init; } = [];
     public IReadOnlyList<int> FitContexts { get; init; } = [];
     public IReadOnlyList<string> NumaModes { get; init; } = [];
@@ -75,6 +76,7 @@ public sealed record BenchmarkOptionSet
 
 public sealed record BenchmarkServingOptions
 {
+    public IReadOnlyDictionary<string, string> ProfileOverrides { get; init; } = new Dictionary<string, string>();
     public IReadOnlyList<int> ContextSizes { get; init; } = [];
     public IReadOnlyList<BenchmarkSpeculativeConfiguration> SpeculativeConfigurations { get; init; } = [];
     // Legacy independent dimensions. New plans should use SpeculativeConfigurations
@@ -147,7 +149,11 @@ public sealed record BenchmarkEffectiveOptions(
     IReadOnlyList<string> NoOpOffload,
     IReadOnlyList<string> NoHost,
     IReadOnlyList<string> TensorOverrides,
-    IReadOnlyList<string> AdditionalArguments);
+    IReadOnlyList<string> AdditionalArguments)
+{
+    public IReadOnlyList<string> LazyModes { get; init; } = [];
+    public int VulkanAllocationBlockSizeMiB { get; init; }
+}
 
 public sealed record BenchmarkWorkItem(
     string Key,
@@ -275,4 +281,8 @@ public sealed record BenchmarkParsedResult(
     IReadOnlyList<BenchmarkGpuMemoryPeak>? GpuMemoryPeaks = null,
     int GpuMemorySampleIntervalMilliseconds = 0,
     int VulkanAllocationBlockSizeMiB = 0,
-    string GpuMemoryMeasurementWindow = "");
+    string GpuMemoryMeasurementWindow = "",
+    double AverageGenerationTokensPerSecond = 0,
+    string ManagerModelName = "",
+    string ManagerRuntimeName = "",
+    string LazyMode = "");

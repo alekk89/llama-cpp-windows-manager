@@ -41,9 +41,9 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             var controls = LocalLlmConsole.BenchmarksPageFactory.Create(
                 new LocalLlmConsole.BenchmarksPageController(actions));
 
-            controls.Root.Measure(new Size(624, 504));
-            controls.Root.Arrange(new Rect(0, 0, 624, 504));
-            controls.Root.UpdateLayout();
+            controls.Workspace!.Root.Measure(new Size(624, 504));
+            controls.Workspace!.Root.Arrange(new Rect(0, 0, 624, 504));
+            controls.Workspace!.Root.UpdateLayout();
 
             Assert.Equal(ScrollBarVisibility.Auto, controls.Root.VerticalScrollBarVisibility);
             Assert.Equal(ScrollBarVisibility.Disabled, controls.Root.HorizontalScrollBarVisibility);
@@ -96,55 +96,17 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.True(double.IsNaN(controls.Model.Width));
             Assert.True(double.IsNaN(controls.Profile.Width));
             Assert.True(double.IsNaN(controls.Runtime.Width));
-            var addButtons = VisualDescendants<Button>(controls.Root).Where(button => Equals(button.Content, "Add")).ToArray();
-            var addProfileButton = Assert.Single(addButtons);
-            var clearButton = VisualDescendants<Button>(controls.Root).Single(button => Equals(button.Content, "Clear"));
-            Assert.Equal(0, Grid.GetRow(controls.Model));
-            Assert.Equal(1, Grid.GetRow(controls.Profile));
-            Assert.Equal(2, Grid.GetRow(controls.Runtime));
-            Assert.Equal(2, Grid.GetRow(addProfileButton));
-            Assert.Equal(Grid.GetRow(addProfileButton), Grid.GetRow(clearButton));
-            Assert.Equal(1, Grid.GetRowSpan(addProfileButton));
-            Assert.Equal(30, addProfileButton.MinHeight);
-            Assert.Equal(addProfileButton.MinHeight, clearButton.MinHeight);
-            Assert.Equal(controls.Runtime.MinHeight, addProfileButton.MinHeight);
-            Assert.Equal(5, controls.ScopeProfiles.Columns.Count);
-            Assert.Equal(36, Assert.IsType<LocalLlmConsole.ResponsiveActionDataGridColumn>(controls.ScopeProfiles.Columns[4]).MinWidth);
-            Assert.DoesNotContain(VisualDescendants<TextBlock>(controls.Root), block => block.Text.StartsWith("Benchmarks\n", StringComparison.Ordinal));
-            Assert.Contains(VisualDescendants<TextBlock>(controls.Root), block => block.Text == "1. Launch settings to test");
-            Assert.Contains(VisualDescendants<TextBlock>(controls.Root), block => block.Text == "2. Choose the request workload");
-            Assert.Contains(VisualDescendants<TextBlock>(controls.Root), block => block.Text == "3. Review and run");
-            Assert.DoesNotContain(VisualDescendants<TextBlock>(controls.Root), block => block.Text is "Plan" or "Active run");
-            var workloadDescription = VisualDescendants<TextBlock>(controls.Root).Single(block =>
-                block.Text.Contains("Presets provide a starting point", StringComparison.Ordinal));
-            Assert.Equal(TextWrapping.Wrap, workloadDescription.TextWrapping);
-            foreach (var label in new[] { "Run name", "Preset", "Benchmark type", "Prompt targets", "Generation targets" })
-            {
-                var workloadLabel = VisualDescendants<TextBlock>(controls.Root).Single(block => block.Text == label);
-                Assert.Equal(FontWeights.SemiBold, workloadLabel.FontWeight);
-                Assert.Equal(TextWrapping.Wrap, workloadLabel.TextWrapping);
-            }
-            Assert.Equal(HorizontalAlignment.Stretch, controls.Name.HorizontalAlignment);
-            Assert.Equal(HorizontalAlignment.Stretch, controls.Preset.HorizontalAlignment);
-            Assert.True(controls.CompareContextSizes.IsChecked);
-            Assert.Equal("65536", controls.ContextSizes.Text);
+            Assert.NotNull(controls.Workspace);
+            Assert.False(controls.CompareContextSizes.IsChecked);
+            Assert.Empty(controls.ContextSizes.Text);
+            var setupDepth = VisualDescendants<ComboBox>(controls.Root).Single(combo => AutomationProperties.GetName(combo) == "Setup depth");
+            setupDepth.SelectedIndex = 1;
+            controls.Workspace.Root.UpdateLayout();
             Assert.True(controls.ContextSizes.IsEnabled);
-            Assert.False(controls.CompareBatchSizes.IsChecked);
-            Assert.True(controls.BatchSizes.IsEnabled);
-            Assert.False(controls.CompareMicroBatchSizes.IsChecked);
-            Assert.True(controls.MicroBatchSizes.IsEnabled);
-            Assert.DoesNotContain(VisualDescendants<CheckBox>(controls.Root), checkBox =>
-                checkBox.Content?.ToString()?.StartsWith("Compare", StringComparison.Ordinal) == true);
-            Assert.Contains("saved context", controls.ContextSizes.ToolTip?.ToString(), StringComparison.OrdinalIgnoreCase);
-            var comparisonDescription = VisualDescendants<TextBlock>(controls.Root).Single(block =>
-                block.Text.Contains("Leave a row empty", StringComparison.Ordinal));
-            Assert.Equal(TextWrapping.Wrap, comparisonDescription.TextWrapping);
-            Assert.Contains("speculative type/head", comparisonDescription.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(5, controls.ScopeProfiles.Columns.Count);
             Assert.Contains("262144", controls.ContextSizes.Items.Cast<string>());
             Assert.Contains("32768", controls.BatchSizes.Items.Cast<string>());
             Assert.Contains("8192", controls.MicroBatchSizes.Items.Cast<string>());
-            Assert.DoesNotContain(VisualDescendants<TextBlock>(controls.Root), block =>
-                block.Text.Equals("Speculative type", StringComparison.OrdinalIgnoreCase));
 
             controls.GpuConfigurations.Mode.SelectedItem = controls.GpuConfigurations.Mode.Items.Cast<object>()
                 .Single(item => item.ToString()?.Contains("tensor", StringComparison.OrdinalIgnoreCase) == true);
@@ -181,97 +143,22 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
                 && configuration == new BenchmarkSpeculativeConfiguration("atomic-mtp", "auto")
                 && button.Content?.ToString()?.Contains("Atomic MTP · Automatic", StringComparison.Ordinal) == true);
 
-            controls.Root.Measure(new Size(820, 650));
-            controls.Root.Arrange(new Rect(0, 0, 820, 650));
-            controls.Root.UpdateLayout();
-            Assert.Equal(0, Grid.GetRow(controls.Model));
-            Assert.Equal(0, Grid.GetRow(controls.Profile));
-            Assert.Equal(1, Grid.GetRow(controls.Runtime));
-            Assert.Equal(1, Grid.GetRow(addProfileButton));
-            Assert.Equal(1, Grid.GetRow(clearButton));
-
-            controls.Root.Measure(new Size(1180, 700));
-            controls.Root.Arrange(new Rect(0, 0, 1180, 700));
-            controls.Root.UpdateLayout();
             var wideModelWidth = controls.Model.ActualWidth;
-            var wideProfileWidth = controls.Profile.ActualWidth;
-            Assert.True(double.IsNaN(controls.Model.Width));
-            Assert.True(double.IsNaN(controls.Profile.Width));
-            Assert.Equal(220, controls.Runtime.Width);
-            controls.Root.Measure(new Size(1480, 700));
-            controls.Root.Arrange(new Rect(0, 0, 1480, 700));
-            controls.Root.UpdateLayout();
+            controls.Workspace!.Root.Measure(new Size(1180, 700));
+            controls.Workspace.Root.Arrange(new Rect(0, 0, 1180, 700));
+            controls.Workspace.Root.UpdateLayout();
             Assert.True(controls.Model.ActualWidth > wideModelWidth);
-            Assert.True(controls.Profile.ActualWidth > wideProfileWidth);
-            Assert.Equal(controls.GpuConfigurations.Mode.ActualWidth,
-                controls.GpuConfigurations.Distribution.ActualWidth, 3);
-            Assert.Equal(controls.GpuConfigurations.Mode.ActualHeight,
-                controls.GpuConfigurations.Distribution.ActualHeight, 3);
-            Assert.Equal(controls.GpuConfigurations.Mode.TranslatePoint(new Point(), controls.Root).Y,
-                controls.GpuConfigurations.AddButton.TranslatePoint(new Point(), controls.Root).Y, 3);
-            Assert.Equal(controls.SpeculativeConfigurations.Type.ActualWidth,
-                controls.SpeculativeConfigurations.Head.ActualWidth, 3);
-            Assert.Equal(controls.SpeculativeConfigurations.Type.TranslatePoint(new Point(), controls.Root).Y,
-                controls.SpeculativeConfigurations.AddButton.TranslatePoint(new Point(), controls.Root).Y, 3);
-            Assert.True(double.IsNaN(controls.Model.Width));
-            Assert.True(double.IsNaN(controls.Profile.Width));
-            Assert.Equal(220, controls.Runtime.Width);
-            Assert.Equal(0, Grid.GetRow(controls.Profile));
-            Assert.Equal(0, Grid.GetRow(controls.Runtime));
-            Assert.Equal(0, Grid.GetRow(addProfileButton));
-            Assert.Equal(0, Grid.GetRow(clearButton));
-            controls.Root.Measure(new Size(1600, 800));
-            controls.Root.Arrange(new Rect(0, 0, 1600, 800));
-            controls.Root.UpdateLayout();
-            var benchmarkContent = Assert.IsAssignableFrom<FrameworkElement>(controls.Root.Content);
-            Assert.True(benchmarkContent.ActualWidth > 1180);
-            controls.Root.Measure(new Size(624, 504));
-            controls.Root.Arrange(new Rect(0, 0, 624, 504));
-            controls.Root.UpdateLayout();
-            Assert.Equal(0, Grid.GetRow(controls.Model));
-            Assert.Equal(1, Grid.GetRow(controls.Profile));
-            Assert.Equal(2, Grid.GetRow(controls.Runtime));
-            Assert.Equal(2, Grid.GetRow(addProfileButton));
-            Assert.True(benchmarkContent.ActualWidth <= controls.Root.ViewportWidth);
-            Assert.Contains("recommended", controls.ExecutionMode.SelectedItem?.ToString(), StringComparison.OrdinalIgnoreCase);
-            var directSettings = Assert.Single(
-                VisualDescendants<Expander>(controls.Root),
-                expander => Equals(expander.Header, "Direct llama-bench settings (optional)"));
-            Assert.Equal(Visibility.Collapsed, directSettings.Visibility);
+            Assert.True(double.IsNaN(controls.Runtime.Width));
+            Assert.True(controls.Runtime.ActualWidth > 220);
+            setupDepth.SelectedIndex = 2;
             controls.ExecutionMode.SelectedIndex = 1;
-            Assert.Equal(Visibility.Visible, directSettings.Visibility);
-            directSettings.IsExpanded = true;
-            controls.Root.UpdateLayout();
-            var directDescription = VisualDescendants<TextBlock>(directSettings).Single(block =>
-                block.Text.Contains("low-level llama-bench-only matrix", StringComparison.Ordinal));
-            Assert.Equal(TextWrapping.Wrap, directDescription.TextWrapping);
-            foreach (var label in new[] { "Context depths", "CPU MoE layers", "Main GPUs", "Devices", "Load modes" })
-            {
-                var directLabel = VisualDescendants<TextBlock>(directSettings).Single(block => block.Text == label);
-                Assert.Equal(FontWeights.SemiBold, directLabel.FontWeight);
-                Assert.Equal(TextWrapping.Wrap, directLabel.TextWrapping);
-            }
+            controls.Workspace.Root.UpdateLayout();
             Assert.True(controls.AdditionalArguments.IsEnabled);
             Assert.False(controls.CompareContextSizes.IsEnabled);
             Assert.False(controls.ContextSizes.IsEnabled);
             Assert.False(controls.RequireSpeculativeMetrics.IsEnabled);
-            var automationSettings = Assert.Single(
-                VisualDescendants<Expander>(controls.Root),
-                expander => Equals(expander.Header, "Automation and low-level options (optional)"));
-            automationSettings.IsExpanded = true;
-            controls.Root.UpdateLayout();
-            var automationDescription = VisualDescendants<TextBlock>(automationSettings).Single(block =>
-                block.Text.Contains("Control how expanded benchmark items", StringComparison.Ordinal));
-            Assert.Equal(TextWrapping.Wrap, automationDescription.TextWrapping);
-            foreach (var label in new[] { "Failure policy", "Cooldown between items", "Equivalent profiles", "Additional arguments" })
-            {
-                var automationLabel = VisualDescendants<TextBlock>(automationSettings).Single(block => block.Text == label);
-                Assert.Equal(FontWeights.SemiBold, automationLabel.FontWeight);
-                Assert.Equal(TextWrapping.Wrap, automationLabel.TextWrapping);
-            }
             Assert.True(controls.AdditionalArguments.MinHeight >= 100);
             controls.ExecutionMode.SelectedIndex = 0;
-            Assert.Equal(Visibility.Collapsed, directSettings.Visibility);
             Assert.Equal(
                 "2 context lengths × 3 batch sizes = 6 temporary launch configurations per profile.",
                 LocalLlmConsole.BenchmarksPageFactory.VariableCombinationSummary(true, "8192,16384", true, "512,1024,2048"));
@@ -287,17 +174,17 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.DoesNotContain(VisualDescendants<Button>(controls.CacheTypesK), button => Equals(button.Tag, "q8_0"));
             var removeQ8 = VisualDescendants<Button>(controls.Root).Single(button => Equals(button.Tag, "q8_0"));
             var removeQ4 = VisualDescendants<Button>(controls.Root).Single(button => Equals(button.Tag, "q4_0"));
-            Assert.Contains("K/V cache type", removeQ8.Content?.ToString(), StringComparison.Ordinal);
+            Assert.Contains("K/V cache", removeQ8.Content?.ToString(), StringComparison.Ordinal);
             Assert.Same(VisualTreeHelper.GetParent(removeQ8), VisualTreeHelper.GetParent(removeQ4));
             removeQ8.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal("q4_0", controls.CacheTypesK.Text);
             Assert.Contains("q8_0", controls.CacheTypesK.Items.Cast<string>());
 
-            Assert.Equal(new[] { "Short", "Medium", "Long", "Custom" }, controls.Preset.Items.Cast<string>());
+            Assert.Equal(new[] { "Quick check", "Standard", "Short", "Medium", "Long", "Custom" }, controls.Preset.Items.Cast<string>());
             Assert.Empty(controls.PromptSizes.Text);
             Assert.Empty(controls.GenerationSizes.Text);
-            Assert.Equal("8192/512, 16384/512, 32768/1024", controls.PromptGenerationPairs.Text);
-            Assert.Equal("65536", controls.ContextSizes.Text);
+            Assert.Equal("512/128", controls.PromptGenerationPairs.Text);
+            Assert.Empty(controls.ContextSizes.Text);
             Assert.Equal("1800", controls.RequestTimeoutSeconds.Text);
 
             controls.Preset.SelectedItem = "Short";
@@ -454,9 +341,9 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.Empty(rebuilt.Serving.ContextSizes);
             Assert.Empty(rebuilt.Options.BatchSizes);
 
-            var actionLabels = new[] { "Validate", "Start", "Stop" };
+            var actionLabels = new[] { "Start", "Validate", "Stop" };
             Assert.Equal(actionLabels,
-                VisualDescendants<Button>(controls.Root)
+                VisualDescendants<Button>(controls.Workspace!.Root)
                     .Where(button => actionLabels.Contains(button.Content?.ToString(), StringComparer.Ordinal))
                     .Select(button => button.Content?.ToString())
                     .ToArray());
@@ -472,10 +359,7 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.Equal("Delete", completedRun.RemoveAction);
             Assert.True(completedRun.CanRemove);
             Assert.False(runningRun.CanRemove);
-            var pager = Assert.IsType<StackPanel>(VisualTreeHelper.GetParent(controls.HistoryPrevious));
-            Assert.Equal(Orientation.Horizontal, pager.Orientation);
-            Assert.Equal(HorizontalAlignment.Right, pager.HorizontalAlignment);
-            Assert.Equal(1, Grid.GetColumn(pager));
+            var pager = Assert.IsType<WrapPanel>(VisualTreeHelper.GetParent(controls.HistoryPrevious));
             Assert.Same(pager, VisualTreeHelper.GetParent(controls.HistoryNext));
         });
     }

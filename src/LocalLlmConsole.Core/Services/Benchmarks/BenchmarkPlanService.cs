@@ -19,6 +19,9 @@ public sealed partial class BenchmarkPlanService
     {
         ArgumentNullException.ThrowIfNull(plan);
         var errors = ValidatePlan(plan).ToList();
+        if (errors.Count > 0) return new(false, errors, [], [], 0, 0, 0);
+        if (ServingVariantCount(plan) > MaximumWorkItems)
+            return new(false, [$"The plan exceeds the maximum of {MaximumWorkItems} launch configurations."], [], [], 0, 0, 0);
         var warnings = new List<string>();
         var selectedModels = SelectModels(plan, models, errors);
         var selectedProfiles = SelectProfiles(plan, selectedModels, profiles, errors);
@@ -67,6 +70,8 @@ public sealed partial class BenchmarkPlanService
                                 ExpectedResultRows: ResultRows(plan, options),
                                 ExecutionMode: plan.ExecutionMode,
                                 LaunchSettings: launchSettings));
+                            if (workItems.Count > MaximumWorkItems)
+                                return new(false, [$"The plan exceeds the maximum of {MaximumWorkItems} work items."], [], [], 0, 0, 0);
                         }
                     }
                 }
@@ -101,6 +106,8 @@ public sealed partial class BenchmarkPlanService
     public static IReadOnlyList<string> ValidatePlan(BenchmarkPlan plan)
     {
         var errors = new List<string>();
+        try { BenchmarkProfileOverrides.Apply(ModelLaunchSettings.FromAppSettings(AppSettings.CreateDefault("")), plan.Serving.ProfileOverrides); }
+        catch (ArgumentException error) { errors.Add(error.Message); }
         if (plan.SchemaVersion != BenchmarkPlan.CurrentSchemaVersion)
             errors.Add($"Unsupported benchmark plan schema version {plan.SchemaVersion}.");
         if (plan.Repetitions is < 1 or > 50) errors.Add("Repetitions must be between 1 and 50.");
@@ -162,7 +169,9 @@ public sealed partial class BenchmarkPlanService
             && (plan.Options.SplitModes.Count > 0 || plan.Options.TensorSplits.Count > 0))
             errors.Add("Paired GPU configurations cannot be combined with legacy split-mode or tensor-split lists.");
         ValidateAllowed(plan.Options.SplitModes, "Split mode", ["none", "layer", "row", "tensor"], errors);
-        ValidateAllowed(plan.Options.LoadModes, "Load mode", ["none", "mmap", "mlock", "mmap+mlock", "dio"], errors);
+        ValidateAllowed(plan.Options.LoadModes, "Load mode", ["auto", "none", "mmap", "mlock", "mmap+mlock", "dio"], errors);
+        ValidateAllowed(plan.Options.LazyModes, "Lazy mode", ["auto", "on", "off"], errors);
+        ValidateDimension(plan.Options.LazyModes, "lazy-mode", errors);
         ValidateAllowed(plan.Options.CacheTypesK, "K cache type", ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"], errors);
         ValidateAllowed(plan.Options.CacheTypesV, "V cache type", ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"], errors);
         ValidateAllowed(plan.Options.CacheTypesKv, "K/V cache type", ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"], errors);
@@ -283,7 +292,7 @@ public sealed partial class BenchmarkPlanService
             requested.GpuConfigurations.Count > 0
                 ? []
                 : requested.TensorSplits.Count > 0 ? requested.TensorSplits : NonBlank(profile.GpuSplit),
-            requested.LoadModes.Count > 0 ? Lower(requested.LoadModes) : LoadModes(profile.MmapMode),
+            requested.LoadModes.Count > 0 ? Lower(requested.LoadModes) : ProfileLoadModes(profile),
             requested.FitTargetsMiB,
             requested.FitContexts,
             Lower(requested.NumaModes),
@@ -294,8 +303,9 @@ public sealed partial class BenchmarkPlanService
             requested.Embeddings,
             requested.NoOpOffload,
             requested.NoHost,
-            requested.TensorOverrides,
-            requested.AdditionalArguments);
+            requested.TensorOverrides.Count > 0 ? requested.TensorOverrides : NonBlank(profile.TensorBufferOverrides),
+            requested.AdditionalArguments)
+        { LazyModes = requested.LazyModes, VulkanAllocationBlockSizeMiB = profile.VulkanAllocationBlockSizeMiB };
 
     private static int ResultRows(BenchmarkPlan plan, BenchmarkEffectiveOptions options)
     {
@@ -305,7 +315,7 @@ public sealed partial class BenchmarkPlanService
         var dimensions = new[]
         {
             Count(options.Threads), Count(options.BatchSizes), Count(options.MicroBatchSizes), Count(options.GpuLayers),
-            Count(options.CpuMoeLayers),
+            Count(options.CpuMoeLayers), Count(options.LazyModes),
             Count(options.FlashAttention), Count(options.CacheTypesK), Count(options.CacheTypesV), Count(options.KvOffload),
             Count(options.SplitModes), Count(options.MainGpus), Count(options.Devices), Count(options.TensorSplits), Count(options.LoadModes),
             Count(options.FitTargetsMiB), Count(options.FitContexts), Count(options.CpuMasks), Count(options.CpuStrict),
@@ -314,6 +324,14 @@ public sealed partial class BenchmarkPlanService
         var result = SaturatingMultiply(families, Math.Max(plan.Depths.Count, 1), MaximumResultRows + 1);
         foreach (var dimension in dimensions)
             result = SaturatingMultiply(result, dimension, MaximumResultRows + 1);
+        // Older plans may express lazy mode through the expert token list.
+        for (var index = 0; index < options.AdditionalArguments.Count; index++)
+        {
+            var parts = options.AdditionalArguments[index].Split('=', 2);
+            if (parts[0] is not ("--lazy-mode" or "-lzm")) continue;
+            var value = parts.Length == 2 ? parts[1] : options.AdditionalArguments.ElementAtOrDefault(index + 1) ?? "";
+            result = SaturatingMultiply(result, Math.Max(1, value.Split(',', StringSplitOptions.RemoveEmptyEntries).Length), MaximumResultRows + 1);
+        }
         return result;
     }
 
@@ -382,6 +400,10 @@ public sealed partial class BenchmarkPlanService
         "off" => ["none"],
         _ => []
     };
+    private static IReadOnlyList<string> ProfileLoadModes(ModelLaunchSettings profile)
+        => profile.MlockMode.Equals("on", StringComparison.OrdinalIgnoreCase)
+            ? [profile.MmapMode.Equals("off", StringComparison.OrdinalIgnoreCase) ? "mlock" : "mmap+mlock"]
+            : LoadModes(profile.MmapMode);
     private static int Count<T>(IReadOnlyList<T> values) => Math.Max(values.Count, 1);
     private static bool Same(string? left, string? right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     private static void ValidatePositive(IReadOnlyList<int> values, string name, bool allowZero, ICollection<string> errors)

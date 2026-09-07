@@ -16,6 +16,8 @@ public static class BenchmarksPagePlanService
     {
         ArgumentNullException.ThrowIfNull(page);
         ArgumentNullException.ThrowIfNull(plan);
+        page.OriginalPlan = plan;
+        page.SetRunPolicies(plan.StopActiveSessions, plan.PreventSystemSleep);
         if (page.Preset is not null) page.Preset.SelectedItem = "Custom";
         if (page.Name is not null) page.Name.Text = plan.Name;
         SelectMode(page.ExecutionMode, plan.ExecutionMode);
@@ -51,11 +53,7 @@ public static class BenchmarksPagePlanService
         Text(page.CpuMoeLayers, Join(plan.Options.CpuMoeLayers));
         Set(page.CompareFlashAttention, plan.Options.FlashAttention.Count > 0);
         PickerText(page.FlashAttention, Join(plan.Options.FlashAttention));
-        var cacheTypesKv = plan.Options.CacheTypesKv.Count > 0
-            ? plan.Options.CacheTypesKv
-            : plan.Options.CacheTypesK.SequenceEqual(plan.Options.CacheTypesV, StringComparer.OrdinalIgnoreCase)
-                ? plan.Options.CacheTypesK
-                : [];
+        var cacheTypesKv = plan.Options.CacheTypesKv;
         Set(page.CompareCacheTypesK, cacheTypesKv.Count > 0);
         PickerText(page.CacheTypesK, Join(cacheTypesKv));
         Set(page.CompareKvOffload, plan.Options.KvOffload.Count > 0);
@@ -85,14 +83,15 @@ public static class BenchmarksPagePlanService
         ComboText(page.NoHost, Join(plan.Options.NoHost));
         Text(page.TensorOverrides, Join(plan.Options.TensorOverrides));
         Text(page.AdditionalArguments, string.Join(Environment.NewLine, plan.Options.AdditionalArguments));
+        page.Workspace?.ShowImportedPlan(plan);
     }
 
     public static BenchmarkPlan Build(BenchmarksPageState page, string wslDistro)
     {
         ArgumentNullException.ThrowIfNull(page);
-        var scope = page.ScopeRows;
+        var scope = page.ScopeRows.Count > 0 ? page.ScopeRows : page.SelectedScopeRows;
         if (scope.Count == 0) throw new InvalidOperationException("Add at least one model profile to the benchmark scope.");
-        return new BenchmarkPlan
+        return page.OriginalPlan with
         {
             Name = page.Name?.Text.Trim() is { Length: > 0 } name ? name : "Benchmark run",
             ExecutionMode = page.ExecutionMode?.SelectedItem is BenchmarkModeItem mode ? mode.Mode : BenchmarkExecutionMode.ProfileServing,
@@ -117,7 +116,7 @@ public static class BenchmarksPagePlanService
             RepeatEquivalentProfiles = page.RepeatEquivalentProfiles?.IsChecked == true,
             StopActiveSessions = page.StopActiveSessions,
             PreventSystemSleep = page.PreventSystemSleep,
-            Serving = new BenchmarkServingOptions
+            Serving = page.OriginalPlan.Serving with
             {
                 ContextSizes = page.CompareContextSizes?.IsChecked == true
                     ? ParseIntegerList(page.ContextSizes?.Text, "context sizes", false)
@@ -126,15 +125,17 @@ public static class BenchmarksPagePlanService
                     ? page.SpeculativeConfigurations?.Values.ToArray() ?? []
                     : [],
                 SpeculativeTypes = [],
-                SpeculativeCompanionModes = [],
+                SpeculativeCompanionModes = page.CompareSpeculativeConfigurations?.IsChecked != true && page.OriginalPlan.Serving.SpeculativeTypes.Count == 0
+                    ? page.OriginalPlan.Serving.SpeculativeCompanionModes : [],
                 Concurrencies = ParseIntegerList(page.Concurrencies?.Text, "concurrencies", false),
                 ReadyTimeoutSeconds = ParseInteger(page.ReadyTimeoutSeconds?.Text, "ready timeout"),
                 RequestTimeoutSeconds = ParseInteger(page.RequestTimeoutSeconds?.Text, "request timeout"),
                 RequireSpeculativeMetrics = BooleanValue(page.RequireSpeculativeMetrics, true),
-                Seed = 42,
-                Temperature = 0
+                Seed = page.Workspace is { } workspace ? ParseInteger(workspace.Seed.Text, "seed") : page.OriginalPlan.Serving.Seed,
+                Temperature = page.Workspace is { } view ? ParseTemperature(view.Temperature.Text) : page.OriginalPlan.Serving.Temperature,
+                ProfileOverrides = page.Workspace?.ProfileEditor.Build() ?? page.OriginalPlan.Serving.ProfileOverrides
             },
-            Options = new BenchmarkOptionSet
+            Options = page.OriginalPlan.Options with
             {
                 Threads = page.CompareThreads?.IsChecked == true
                     ? ParseIntegerList(page.Threads?.Text, "threads", false)
@@ -150,6 +151,8 @@ public static class BenchmarksPagePlanService
                     : [],
                 CpuMoeLayers = ParseIntegerList(page.CpuMoeLayers?.Text, "CPU MoE layers", true),
                 FlashAttention = page.CompareFlashAttention?.IsChecked == true ? ParseStringList(PickerText(page.FlashAttention)) : [],
+                CacheTypesK = page.Workspace is { } cacheView ? ParseStringList(cacheView.CacheK.Text) : page.OriginalPlan.Options.CacheTypesK,
+                CacheTypesV = page.Workspace is { } cacheViewV ? ParseStringList(cacheViewV.CacheV.Text) : page.OriginalPlan.Options.CacheTypesV,
                 CacheTypesKv = page.CompareCacheTypesK?.IsChecked == true ? ParseStringList(PickerText(page.CacheTypesK)) : [],
                 KvOffload = page.CompareKvOffload?.IsChecked == true ? ParseStringList(PickerText(page.KvOffload)) : [],
                 GpuConfigurations = page.CompareGpuConfigurations?.IsChecked == true
@@ -158,8 +161,10 @@ public static class BenchmarksPagePlanService
                 SplitModes = [],
                 MainGpus = ParseIntegerList(page.MainGpus?.Text, "main GPUs", true),
                 Devices = ParseStringList(page.Devices?.Text),
-                TensorSplits = [],
+                TensorSplits = page.CompareGpuConfigurations?.IsChecked != true && page.OriginalPlan.Options.SplitModes.Count == 0
+                    ? page.OriginalPlan.Options.TensorSplits : [],
                 LoadModes = ParseStringList(ComboText(page.LoadModes)),
+                LazyModes = page.Workspace is { } lazyView ? ParseStringList(lazyView.LazyModes.Text) : page.OriginalPlan.Options.LazyModes,
                 FitTargetsMiB = ParseIntegerList(page.FitTargetsMiB?.Text, "fit targets", true),
                 FitContexts = ParseIntegerList(page.FitContexts?.Text, "fit contexts", true),
                 NumaModes = ParseStringList(ComboText(page.NumaModes)),
@@ -175,6 +180,10 @@ public static class BenchmarksPagePlanService
             }
         };
     }
+
+    private static double ParseTemperature(string value)
+        => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) && double.IsFinite(result)
+            ? result : throw new InvalidOperationException("Enter a valid temperature.");
 
     private static void SelectMode(ComboBox? combo, BenchmarkExecutionMode mode)
     {
@@ -227,8 +236,6 @@ public static class BenchmarksPagePlanService
         if (modes.Count == 0) return [];
         if (splits.Count == 0)
             return modes.Select(mode => new BenchmarkGpuConfiguration(mode)).ToArray();
-        if (modes.Count == splits.Count)
-            return modes.Select((mode, index) => Pair(mode, splits[index])).ToArray();
         if (modes.Count == 1)
             return splits.Select(split => Pair(modes[0], split)).ToArray();
         if (splits.Count == 1)
@@ -246,8 +253,6 @@ public static class BenchmarksPagePlanService
         if (types.Count == 0) return [];
         if (heads.Count == 0)
             return types.Select(type => new BenchmarkSpeculativeConfiguration(type)).ToArray();
-        if (types.Count == heads.Count)
-            return types.Select((type, index) => new BenchmarkSpeculativeConfiguration(type, heads[index])).ToArray();
         if (types.Count == 1)
             return heads.Select(head => new BenchmarkSpeculativeConfiguration(types[0], head)).ToArray();
         if (heads.Count == 1)

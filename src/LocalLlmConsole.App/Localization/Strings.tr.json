@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "token/sn",
   "EndpointInspection.ExpandDetails": "Model ayrıntılarını genişlet",
   "EndpointInspection.CollapseDetails": "Model ayrıntılarını daralt",
   "EndpointInspection.PartialDetails": "Bazı ayrıntılar kullanılamıyor",
@@ -1103,5 +1104,17 @@
   "Runtimes.ClearDefault": "Varsayılan çalışma zamanını kaldır",
   "Runtimes.DefaultHint": "Yeni profiller için varsayılan çalışma zamanı",
   "Runtimes.DefaultSelected": "{0} artık yeni profiller için varsayılan çalışma zamanı.",
-  "Runtimes.DefaultCleared": "Varsayılan çalışma zamanı kaldırıldı."
+  "Runtimes.DefaultCleared": "Varsayılan çalışma zamanı kaldırıldı.",
+  "Benchmarks.NewBenchmark": "Yeni kıyaslama",
+  "Benchmarks.Results": "Sonuçlar",
+  "Benchmarks.ProfileToTest": "Test edilecek profil",
+  "Benchmarks.CompareSettings": "Ayarları karşılaştır",
+  "Benchmarks.Workload": "İş yükü",
+  "Benchmarks.ReviewRun": "İncele ve çalıştır",
+  "Benchmarks.SelectedConfiguration": "Seçili yapılandırma",
+  "Benchmarks.MeasurementDetails": "Ölçüm ayrıntıları · JSON",
+  "Benchmarks.PreviewLaunches": "Başlatmaları önizle",
+  "Benchmarks.TemporaryProfileSettings": "Geçici profil ayarları",
+  "Benchmarks.RuntimeOptions": "Bu çalışma ortamının seçenekleri",
+  "Benchmarks.ValidationDetails": "Doğrulama ayrıntıları"
 }
