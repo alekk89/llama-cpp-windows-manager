@@ -112,11 +112,11 @@ public sealed partial class HelpCatalogService
             "endpoint-inspection",
             "overview",
             "Inspect an endpoint without generating text",
-            "Open a compact report for health, model metadata, defaults, capabilities, and slots.",
+            "Open a compact table of connection status, model IDs, size, context, and reported settings.",
             [
-                "Double-click a loaded-session or gateway row, or select its endpoint link. Report text is selectable, and the toolbar copies the endpoint, the safe report, or the API key separately.",
-                "Direct inspection reads /health, /v1/models, /props, and /slots.",
-                "Gateway inspection reads /health, /v1/models, and /running."
+                "Double-click a loaded-session or gateway row, or select its endpoint link. Report text is selectable. Inline actions copy the endpoint, the safe report, or the API key separately; the key action appears only when configured.",
+                "Direct inspection reads /health, /v1/models, /props, and /slots. The model table shows the exact advertised model ID to enter in a client or harness, on one line with a copy action, plus running context, size, and parameters. Expand a model row for its profile and training limit; optional settings appear only when reported.",
+                "Gateway inspection reads /health, /v1/models, and /running. Expand the unavailable-details notice for probe failures."
             ],
             [Action("Open Overview", "loaded-sessions")],
             ["health", "props", "slots", "endpoint report", "inspect", "copy", "api key"]),

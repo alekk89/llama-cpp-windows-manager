@@ -179,8 +179,11 @@ builds and must be described that way.
   count.
 - Double-click a running model row and click its direct endpoint link. Confirm
   both open the themed endpoint report populated from `/health`, `/v1/models`,
-  `/props`, and `/slots`, including context, output limit, reasoning/template
-  capability, sampling defaults, and current slot state without generating text.
+  `/props`, and `/slots`, including running context, training limit, size, reported output/reasoning/
+  sampling defaults, and an active/total slot summary without generating text.
+  Check the Runtimes-style framed tables at minimum width and with text scaling.
+  Expand/collapse model details to inspect the profile and training limit; absent optional
+  values should not leave placeholder rows.
   Confirm field text and table cells can be selected, **Copy endpoint** copies
   the direct `/v1` URL, **Copy report** includes the visible endpoint details but
   no API key, and **Copy API key** copies the credential used by that session.
@@ -189,11 +192,11 @@ builds and must be described that way.
   the exact ID/alias, including suffixes, without the display name or headers.
   Check multiple rows, long IDs, and a temporarily unavailable clipboard.
 - Inspect the gateway row and endpoint link. Confirm the report shows advertised
-  profile model IDs, running sessions, policy, and exposure, and explains that
-  context/reasoning/output defaults belong to each routed model. Confirm a runtime
-  without `/props` or `/slots` still shows available data plus a compact warning.
+  profile model IDs, running sessions, policy, and exposure. Context in advertised model details belongs to each
+  routed profile. Confirm a runtime
+  without `/props` or `/slots` still shows available data plus a collapsed, expandable warning.
   Confirm the gateway's dedicated API-key action copies the current model API
-  key from Settings.
+  key from Settings. With no configured key, hide the key-copy action.
 - Confirm Overview places Model, Launch profile, and Load on one row; Model and
   Launch profile grow and shrink with the available window width while keeping
   their left-side stars visible.

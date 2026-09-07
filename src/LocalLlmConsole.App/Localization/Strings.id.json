@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Perluas detail model",
+  "EndpointInspection.CollapseDetails": "Ciutkan detail model",
+  "EndpointInspection.PartialDetails": "Beberapa detail tidak tersedia",
+  "EndpointInspection.SlotSummary": "{0} aktif / {1} total",
+  "EndpointInspection.ModelId": "ID model",
+  "EndpointInspection.RunningDetails": "Status / Runtime / Titik akhir",
   "Launch.Field.VulkanAllocationBlockSize": "Ukuran blok alokasi Vulkan (MiB)",
   "Launch.RuntimeDefault": "Bawaan runtime",
   "Benchmark.Memory.Legacy": "Cuplikan memori GPU {0} MiB (seluruh perangkat; puncak tidak tersedia)",

@@ -1,9 +1,7 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using WpfApplication = System.Windows.Application;
 using WpfBorder = System.Windows.Controls.Border;
 using WpfBrush = System.Windows.Media.Brush;
@@ -33,9 +31,9 @@ public static partial class EndpointInspectionDialogFactory
         {
             Title = Loc.T("EndpointInspection.DialogTitle", report.Title),
             Width = 760,
-            Height = 560,
+            Height = 480,
             MinWidth = 620,
-            MinHeight = 400,
+            MinHeight = 320,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = System.Windows.Media.Brushes.Transparent,
             AllowsTransparency = true,
@@ -64,19 +62,23 @@ public static partial class EndpointInspectionDialogFactory
             report,
             apiKey,
             copy));
-        body.Children.Add(ConnectionCard(report, apiKey));
         body.Children.Add(ModelsCard(report, copy));
-        if (report.Defaults is not null)
-            body.Children.Add(DefaultsCard(report.Defaults));
-        if (report.Kind == EndpointInspectionKind.DirectModel)
-            body.Children.Add(SlotsCard(report.Slots));
-        else
-        {
-            body.Children.Add(GatewayCard(report));
+        var settings = SettingsFields(report);
+        if (settings.Count > 0)
+            body.Children.Add(Card(Loc.T(report.Kind == EndpointInspectionKind.Gateway
+                ? "EndpointInspection.ManagerRouting" : "EndpointInspection.ServerDefaults"), FieldsGrid(settings.ToArray())));
+        if (report.Kind == EndpointInspectionKind.Gateway && report.RunningModels.Count > 0)
             body.Children.Add(RunningModelsCard(report.RunningModels));
-        }
         if (report.UnavailableSources.Count > 0)
-            body.Children.Add(UnavailableCard(report.UnavailableSources));
+        {
+            body.Children.Add(new Expander
+            {
+                Header = Loc.T("EndpointInspection.PartialDetails"),
+                Foreground = ResourceBrush("Warning"),
+                Content = Muted(string.Join(Environment.NewLine, report.UnavailableSources)),
+                Margin = new Thickness(9, 4, 9, 4)
+            });
+        }
 
         var scroll = new ScrollViewer
         {
@@ -129,101 +131,21 @@ public static partial class EndpointInspectionDialogFactory
         return header;
     }
 
-    private static WpfBorder ConnectionCard(EndpointInspectionReport report, string apiKey)
-    {
-        var fields = FieldsGrid(
-            (Loc.T("EndpointInspection.Endpoint"), report.Endpoint),
-            (Loc.T("EndpointInspection.Protocol"), Loc.T("EndpointInspection.ProtocolValue")),
-            (Loc.T("EndpointInspection.Health"), report.Health),
-            (Loc.T("EndpointInspection.Authentication"), string.IsNullOrWhiteSpace(apiKey)
-                ? Loc.T("EndpointInspection.ApiKeyMissing")
-                : Loc.T("EndpointInspection.ApiKeyConfigured")),
-            (Loc.T("EndpointInspection.Inspected"), report.InspectedAt.ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture)),
-            (Loc.T("EndpointInspection.Sources"), report.Kind == EndpointInspectionKind.DirectModel
-                ? "/health · /v1/models · /props · /slots"
-                : "/health · /v1/models · /running"));
-        return Card(Loc.T("EndpointInspection.Connection"), fields);
-    }
-
-    private static WpfBorder DefaultsCard(EndpointInspectionDefaults defaults)
-    {
-        var capabilities = defaults.ChatCapabilities.Count == 0
-            ? Loc.T("EndpointInspection.NotReported")
-            : string.Join(", ", defaults.ChatCapabilities
-                .Where(pair => pair.Value)
-                .Select(pair => FriendlyCapability(pair.Key))
-                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
-        if (string.IsNullOrWhiteSpace(capabilities)) capabilities = Loc.T("EndpointInspection.NoCapabilitiesEnabled");
-        var fields = FieldsGrid(
-            (Loc.T("EndpointInspection.ModelFile"), Empty(defaults.ModelFile)),
-            (Loc.T("EndpointInspection.ContextSize"), defaults.ContextSize.HasValue ? Tokens(defaults.ContextSize.Value) : Loc.T("EndpointInspection.NotReported")),
-            (Loc.T("EndpointInspection.ParallelSlots"), Number(defaults.ParallelSlots)),
-            (Loc.T("EndpointInspection.DefaultMaxOutput"), OutputLimit(defaults.MaximumOutputTokens)),
-            (Loc.T("EndpointInspection.Reasoning"), Empty(defaults.Reasoning, Loc.T("EndpointInspection.NotReportedRequestControlled"))),
-            (Loc.T("EndpointInspection.ReasoningFormat"), Empty(defaults.ReasoningFormat, Loc.T("EndpointInspection.NotReportedRequestControlled"))),
-            (Loc.T("EndpointInspection.Vision"), defaults.Vision),
-            (Loc.T("EndpointInspection.Speculative"), Boolean(defaults.Speculative)),
-            (Loc.T("EndpointInspection.Temperature"), Number(defaults.Temperature)),
-            (Loc.T("EndpointInspection.TopK"), Number(defaults.TopK)),
-            (Loc.T("EndpointInspection.TopP"), Number(defaults.TopP)),
-            (Loc.T("EndpointInspection.MinP"), Number(defaults.MinP)),
-            (Loc.T("EndpointInspection.Sleeping"), Boolean(defaults.Sleeping)),
-            (Loc.T("EndpointInspection.Build"), Empty(defaults.Build)),
-            (Loc.T("EndpointInspection.ChatCapabilities"), capabilities));
-        return Card(Loc.T("EndpointInspection.ServerDefaults"), fields);
-    }
-
-    private static WpfBorder SlotsCard(IReadOnlyList<EndpointInspectionSlot> slots)
-    {
-        if (slots.Count == 0)
-            return Card(Loc.T("EndpointInspection.CurrentSlots"), Muted(Loc.T("EndpointInspection.NoSlotState")));
-        var rows = slots.Select(slot => new DisplayRow(
-            slot.Id?.ToString(CultureInfo.InvariantCulture) ?? "—",
-            SlotState(slot),
-            slot.ContextSize.HasValue ? Tokens(slot.ContextSize.Value) : "—",
-            SlotOutput(slot),
-            Boolean(slot.Speculative),
-            Sampling(slot)));
-        return Card(Loc.T("EndpointInspection.CurrentSlotsCount", slots.Count(slot => slot.IsProcessing), slots.Count), Table(
-            rows,
-            (Loc.T("EndpointInspection.Slot"), nameof(DisplayRow.C1), .42),
-            (Loc.T("Overview.SessionsCol.State"), nameof(DisplayRow.C2), .75),
-            (Loc.T("EndpointInspection.Context"), nameof(DisplayRow.C3), .8),
-            (Loc.T("EndpointInspection.MaxOutput"), nameof(DisplayRow.C4), .9),
-            (Loc.T("EndpointInspection.Speculative"), nameof(DisplayRow.C5), .7),
-            (Loc.T("EndpointInspection.Sampling"), nameof(DisplayRow.C6), 1.7)));
-    }
-
-    private static WpfBorder GatewayCard(EndpointInspectionReport report)
-        => Card(Loc.T("EndpointInspection.ManagerRouting"), FieldsGrid(
-            (Loc.T("EndpointInspection.Policy"), Empty(report.GatewayPolicy)),
-            (Loc.T("EndpointInspection.Exposure"), Empty(report.GatewayExposure)),
-            (Loc.T("EndpointInspection.ModelSelection"), Loc.T("EndpointInspection.ModelSelectionValue")),
-            (Loc.T("EndpointInspection.ModelDefaults"), Loc.T("EndpointInspection.ModelDefaultsValue"))));
-
     private static WpfBorder RunningModelsCard(IReadOnlyList<EndpointInspectionRunningModel> models)
     {
         if (models.Count == 0)
             return Card(Loc.T("EndpointInspection.LoadedThroughManager"), Muted(Loc.T("EndpointInspection.NoLoadedRuntime")));
         var rows = models.Select(model => new DisplayRow(
             Empty(model.Name, model.Id),
-            Empty(model.Status),
-            Empty(model.Runtime),
-            Empty(model.Endpoint),
-            model.StartedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "—"));
+            string.Join(" · ", new[] { model.Status, model.Runtime }.Where(value => !string.IsNullOrWhiteSpace(value)))
+                + Environment.NewLine + model.Endpoint, "", ""));
         return Card(Loc.T("EndpointInspection.LoadedThroughManagerCount", models.Count), Table(
             rows,
-            (Loc.T("Overview.SessionsCol.Model"), nameof(DisplayRow.C1), 1.15),
-            (Loc.T("Overview.SessionsCol.State"), nameof(DisplayRow.C2), .65),
-            (Loc.T("Overview.SessionsCol.Runtime"), nameof(DisplayRow.C3), 1.1),
-            (Loc.T("EndpointInspection.DirectEndpoint"), nameof(DisplayRow.C4), 1.45),
-            (Loc.T("EndpointInspection.Started"), nameof(DisplayRow.C5), .9)));
+            (Loc.T("Overview.SessionsCol.Model"), nameof(DisplayRow.C1), 1),
+            (Loc.T("EndpointInspection.RunningDetails"), nameof(DisplayRow.C2), 1.6)));
     }
 
-    private static WpfBorder UnavailableCard(IReadOnlyList<string> unavailable)
-        => Card(Loc.T("EndpointInspection.UnavailableDetails"), Muted(string.Join(Environment.NewLine, unavailable)));
-
-    private static Grid FieldsGrid(params (string Label, string Value)[] fields)
+    private static WpfBorder FieldsGrid(params (string Label, string Value)[] fields)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
@@ -235,31 +157,69 @@ public static partial class EndpointInspectionDialogFactory
         {
             var row = index / 2;
             if (grid.RowDefinitions.Count <= row)
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 33 });
+                var stripe = new WpfBorder
+                {
+                    Background = ResourceBrush(row % 2 == 0 ? "GridRowBack" : "GridRowAlt"),
+                    BorderBrush = ResourceBrush("PanelBorder"),
+                    BorderThickness = new Thickness(0, 0, 0, 1)
+                };
+                Grid.SetRow(stripe, row);
+                Grid.SetColumnSpan(stripe, 5);
+                grid.Children.Add(stripe);
+            }
             var column = index % 2 == 0 ? 0 : 3;
             var label = new TextBlock
             {
                 Text = fields[index].Label,
+                TextWrapping = TextWrapping.Wrap,
                 Foreground = ResourceBrush("TextMuted"),
-                Margin = new Thickness(0, 1, 8, 2),
-                VerticalAlignment = VerticalAlignment.Top
+                Margin = new Thickness(10, 6, 8, 6),
+                VerticalAlignment = VerticalAlignment.Center
             };
             Grid.SetRow(label, row);
             Grid.SetColumn(label, column);
             grid.Children.Add(label);
             var value = SelectableText(fields[index].Value, "TextMain");
+            value.Margin = new Thickness(0, 6, 10, 6);
+            value.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetRow(value, row);
             Grid.SetColumn(value, column + 1);
             grid.Children.Add(value);
         }
-        return grid;
+        return new WpfBorder
+        {
+            Background = ResourceBrush("SurfaceRaised"),
+            BorderBrush = ResourceBrush("PanelBorder"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Margin = new Thickness(0, 7, 0, 8),
+            Child = grid
+        };
     }
 
     private static DataGrid Table<T>(
         IEnumerable<T> rows,
         params (string Header, string Binding, double Width)[] columns)
     {
-        var grid = PageSectionFactory.GridFor(columns);
+        var grid = new DataGrid();
+        PageSectionFactory.PolishGrid(grid);
+        var textStyle = new Style(typeof(TextBlock), (Style)WpfApplication.Current.Resources["GridCellText"]);
+        textStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap));
+        textStyle.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.None));
+        textStyle.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(6, 5, 6, 5)));
+        foreach (var column in columns)
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = column.Header,
+                Binding = new System.Windows.Data.Binding(column.Binding),
+                Width = new DataGridLength(column.Width, DataGridLengthUnitType.Star),
+                MinWidth = 100,
+                ElementStyle = textStyle
+            });
+        grid.RowHeight = double.NaN;
+        grid.ColumnHeaderHeight = 36;
         grid.ItemsSource = new ObservableCollection<T>(rows);
         grid.IsReadOnly = true;
         grid.CanUserAddRows = false;
@@ -279,20 +239,19 @@ public static partial class EndpointInspectionDialogFactory
         panel.Children.Add(new TextBlock
         {
             Text = title,
-            FontSize = 13,
+            FontSize = 14.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = ResourceBrush("TextMain"),
-            Margin = new Thickness(0, 0, 0, 4)
+            Margin = new Thickness(1, 2, 0, 4)
         });
-        panel.Children.Add(content);
+        panel.Children.Add(content is DataGrid grid ? PageSectionFactory.GridFrame(grid) : content);
         return new WpfBorder
         {
-            Background = ResourceBrush("SurfaceRaised"),
+            Background = ResourceBrush("PanelBack"),
             BorderBrush = ResourceBrush("PanelBorder"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(9, 6, 9, 6),
-            Margin = new Thickness(0, 0, 0, 6),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(0, 4, 0, 4),
+            Margin = new Thickness(0),
             Child = panel
         };
     }

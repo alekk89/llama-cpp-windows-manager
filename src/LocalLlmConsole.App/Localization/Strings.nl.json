@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Modeldetails uitklappen",
+  "EndpointInspection.CollapseDetails": "Modeldetails inklappen",
+  "EndpointInspection.PartialDetails": "Sommige details zijn niet beschikbaar",
+  "EndpointInspection.SlotSummary": "{0} actief / {1} totaal",
+  "EndpointInspection.ModelId": "Model-ID",
+  "EndpointInspection.RunningDetails": "Status / Runtime / Eindpunt",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan-toewijzingsblokgrootte (MiB)",
   "Launch.RuntimeDefault": "Standaard van runtime",
   "Benchmark.Memory.Legacy": "Momentopname GPU-geheugen {0} MiB (gehele apparaat; piek niet beschikbaar)",

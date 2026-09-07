@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "मॉडल विवरण खोलें",
+  "EndpointInspection.CollapseDetails": "मॉडल विवरण समेटें",
+  "EndpointInspection.PartialDetails": "कुछ विवरण उपलब्ध नहीं हैं",
+  "EndpointInspection.SlotSummary": "{0} सक्रिय / कुल {1}",
+  "EndpointInspection.ModelId": "मॉडल आईडी",
+  "EndpointInspection.RunningDetails": "State / Runtime / समापन बिंदु",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan आवंटन ब्लॉक आकार (MiB)",
   "Launch.RuntimeDefault": "रनटाइम डिफ़ॉल्ट",
   "Benchmark.Memory.Legacy": "GPU मेमोरी का तात्कालिक माप {0} MiB (पूरा डिवाइस; अधिकतम उपलब्ध नहीं)",

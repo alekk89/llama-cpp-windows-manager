@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "モデルの詳細を展開",
+  "EndpointInspection.CollapseDetails": "モデルの詳細を折りたたむ",
+  "EndpointInspection.PartialDetails": "一部の詳細は取得できません",
+  "EndpointInspection.SlotSummary": "{0} アクティブ / 合計 {1}",
+  "EndpointInspection.ModelId": "モデル ID",
+  "EndpointInspection.RunningDetails": "状態 / ランタイム / エンドポイント",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan 割り当てブロックサイズ (MiB)",
   "Launch.RuntimeDefault": "ランタイムの既定値",
   "Benchmark.Memory.Legacy": "GPU メモリの瞬間値 {0} MiB（デバイス全体、ピーク値は取得不可）",

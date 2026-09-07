@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Modelldetails aufklappen",
+  "EndpointInspection.CollapseDetails": "Modelldetails zuklappen",
+  "EndpointInspection.PartialDetails": "Einige Details sind nicht verfügbar",
+  "EndpointInspection.SlotSummary": "{0} aktiv / {1} insgesamt",
+  "EndpointInspection.ModelId": "Modell-ID",
+  "EndpointInspection.RunningDetails": "Status / Laufzeitumgebung / Endpunkt",
   "Launch.Field.VulkanAllocationBlockSize": "Vulkan-Zuweisungsblockgröße (MiB)",
   "Launch.RuntimeDefault": "Standard der Laufzeit",
   "Benchmark.Memory.Legacy": "GPU-Speichermomentaufnahme {0} MiB (gesamtes Gerät; Spitzenwert nicht verfügbar)",

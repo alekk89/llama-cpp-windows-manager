@@ -1,4 +1,10 @@
 {
+  "EndpointInspection.ExpandDetails": "Mở rộng chi tiết mô hình",
+  "EndpointInspection.CollapseDetails": "Thu gọn chi tiết mô hình",
+  "EndpointInspection.PartialDetails": "Một số chi tiết không khả dụng",
+  "EndpointInspection.SlotSummary": "{0} đang hoạt động / tổng {1}",
+  "EndpointInspection.ModelId": "ID mô hình",
+  "EndpointInspection.RunningDetails": "Trạng thái / Runtime / Điểm cuối",
   "Launch.Field.VulkanAllocationBlockSize": "Kích thước khối cấp phát Vulkan (MiB)",
   "Launch.RuntimeDefault": "Mặc định của môi trường chạy",
   "Benchmark.Memory.Legacy": "Bộ nhớ GPU tại thời điểm đo: {0} MiB (toàn thiết bị; không có giá trị đỉnh)",

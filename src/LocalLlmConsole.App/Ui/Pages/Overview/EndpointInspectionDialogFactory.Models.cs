@@ -14,8 +14,11 @@ namespace LocalLlmConsole;
 
 public static partial class EndpointInspectionDialogFactory
 {
-    private sealed record ModelDisplayRow(string Id, string Name, string Profile, string Owner, string Context, string Parameters, string Size)
+    private sealed record ModelDisplayRow(string Id, string Name, string Context, string Size, string Parameters, string Details)
     {
+        public bool IsDetailsExpanded { get; set; }
+        public string DetailsAction => IsDetailsExpanded ? "▾" : "▸";
+        public bool HasDetails => NameVisibility == Visibility.Visible || !string.IsNullOrWhiteSpace(Details);
         public bool HasId => !string.IsNullOrWhiteSpace(Id);
         public string DisplayName => Name.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase) && (Name.Contains('\\') || Name.StartsWith('/'))
             ? RuntimeDirectAliasService.ShortModelId(Name) : Name;
@@ -33,28 +36,40 @@ public static partial class EndpointInspectionDialogFactory
 
         var rows = report.Models.Select(model =>
         {
-            var context = report.Kind == EndpointInspectionKind.Gateway ? model.ConfiguredContext : model.TrainingContext;
-            return new ModelDisplayRow(model.Id, model.Name, Empty(model.Profile), Empty(model.Owner),
+            var details = new List<string>();
+            void Add(string key, string value) => details.Add($"{Loc.T(key)}: {value}");
+            if (!string.IsNullOrWhiteSpace(model.Profile)) Add("EndpointInspection.Profile", model.Profile);
+            var context = report.Kind == EndpointInspectionKind.Gateway
+                ? model.ConfiguredContext
+                : report.Defaults?.ContextSize ?? model.ConfiguredContext;
+            // A model's training limit is not the context allocated by the running server.
+            if (report.Kind == EndpointInspectionKind.DirectModel && model.TrainingContext.HasValue)
+                Add("EndpointInspection.TrainingContext", Tokens(model.TrainingContext.Value));
+            return new ModelDisplayRow(model.Id, model.Name,
                 context.HasValue ? Tokens(context.Value) : "—",
+                model.SizeBytes.HasValue ? DisplayFormatService.Bytes(model.SizeBytes.Value) : "—",
                 model.ParameterCount.HasValue ? CompactCount(model.ParameterCount.Value) : "—",
-                model.SizeBytes.HasValue ? DisplayFormatService.Bytes(model.SizeBytes.Value) : "—");
+                string.Join(Environment.NewLine, details));
         });
         var grid = Table(rows,
-            (Loc.T("EndpointInspection.ModelIdName"), nameof(ModelDisplayRow.Id), 1.85),
-            (Loc.T("EndpointInspection.Profile"), nameof(ModelDisplayRow.Profile), .9),
-            (Loc.T("EndpointInspection.Owner"), nameof(ModelDisplayRow.Owner), .8),
-            (report.Kind == EndpointInspectionKind.Gateway
-                ? Loc.T("EndpointInspection.ContextSize")
-                : Loc.T("EndpointInspection.TrainingContext"), nameof(ModelDisplayRow.Context), .65),
-            (Loc.T("EndpointInspection.Parameters"), nameof(ModelDisplayRow.Parameters), .65),
-            (Loc.T("Models.Col.Size"), nameof(ModelDisplayRow.Size), .6));
-        // Size metadata to its headers so the copy action cannot compress labels.
+            (Loc.T("EndpointInspection.ModelId"), nameof(ModelDisplayRow.Id), 1.8),
+            (Loc.T("EndpointInspection.Context"), nameof(ModelDisplayRow.Context), 1),
+            (Loc.T("Models.Col.Size"), nameof(ModelDisplayRow.Size), .65),
+            (Loc.T("EndpointInspection.Parameters"), nameof(ModelDisplayRow.Parameters), .65));
+        grid.Columns[2].Visibility = report.Models.Any(model => model.SizeBytes.HasValue) ? Visibility.Visible : Visibility.Collapsed;
+        grid.Columns[3].Visibility = report.Models.Any(model => model.ParameterCount.HasValue) ? Visibility.Visible : Visibility.Collapsed;
         foreach (var column in grid.Columns.Skip(1))
         {
-            var header = new TextBlock { Text = column.Header?.ToString() ?? "", FontSize = grid.FontSize, FontWeight = FontWeights.SemiBold };
-            header.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
-            column.Width = new DataGridLength(header.DesiredSize.Width + 32);
+            var label = new TextBlock { Text = column.Header?.ToString(), FontSize = 11.5, FontWeight = FontWeights.SemiBold };
+            label.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+            column.MinWidth = label.DesiredSize.Width + 28;
         }
+        grid.MinRowHeight = 33;
+        grid.LoadingRow += (_, args) => args.Row.DetailsVisibility = args.Row.Item is ModelDisplayRow { IsDetailsExpanded: true }
+            ? Visibility.Visible : Visibility.Collapsed;
+        grid.RowDetailsVisibilityMode = DataGridRowDetailsVisibilityMode.Collapsed;
+        grid.AreRowDetailsFrozen = true;
+        grid.RowDetailsTemplate = ModelDetailsTemplate();
         var identityHeader = new TextBlock { Text = grid.Columns[0].Header?.ToString() ?? "", FontSize = grid.FontSize };
         identityHeader.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
         ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
@@ -70,7 +85,7 @@ public static partial class EndpointInspectionDialogFactory
             CellTemplate = ModelIdentityTemplate()
         };
 
-        var status = new TextBlock { Foreground = ResourceBrush("TextSoft"), FontSize = 11.5 };
+        var status = new TextBlock { Foreground = ResourceBrush("TextSoft"), FontSize = 11.5, Visibility = Visibility.Collapsed };
         AutomationProperties.SetAutomationId(status, "EndpointModelCopyStatus");
         AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
         var button = new FrameworkElementFactory(typeof(WpfButton));
@@ -78,8 +93,7 @@ public static partial class EndpointInspectionDialogFactory
         button.SetValue(FrameworkElement.ToolTipProperty, Loc.T("EndpointInspection.CopyModelId"));
         button.SetValue(AutomationProperties.AutomationIdProperty, "EndpointModelCopyIdButton");
         button.SetValue(AutomationProperties.NameProperty, Loc.T("EndpointInspection.CopyModelId"));
-        button.SetValue(Control.PaddingProperty, new Thickness(7, 1, 7, 1));
-        button.SetValue(FrameworkElement.MinHeightProperty, 27d);
+        InlineGlyphButtonVisual.ConfigureForDataGrid(button);
         button.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(ModelDisplayRow.HasId)));
         button.AddHandler(WpfButton.ClickEvent, new RoutedEventHandler((sender, _) =>
         {
@@ -88,20 +102,25 @@ public static partial class EndpointInspectionDialogFactory
             {
                 copyToClipboard(row.Id);
                 status.Text = Loc.T("EndpointInspection.Copied");
+                status.Visibility = Visibility.Visible;
             }
             catch
             {
                 status.Text = Loc.T("EndpointInspection.CopyFailed");
+                status.Visibility = Visibility.Visible;
             }
         }));
         grid.Columns.Add(new DataGridTemplateColumn
         {
-            Width = DataGridLength.Auto,
+            Width = new DataGridLength(40),
+            MinWidth = 40,
+            CellStyle = InlineGlyphButtonVisual.CenteredDataGridCellStyle(),
             CanUserSort = false,
             CellTemplate = new DataTemplate { VisualTree = button }
         });
+        grid.Columns.Add(ModelDetailsColumn());
         var content = new StackPanel();
-        content.Children.Add(grid);
+        content.Children.Add(PageSectionFactory.GridFrame(grid));
         content.Children.Add(status);
         return Card(report.Kind == EndpointInspectionKind.Gateway
             ? Loc.T("EndpointInspection.AdvertisedModelsCount", report.Models.Count)
@@ -110,15 +129,24 @@ public static partial class EndpointInspectionDialogFactory
 
     private static DataTemplate ModelIdentityTemplate()
     {
-        var panel = new FrameworkElementFactory(typeof(StackPanel));
         var id = ModelText(nameof(ModelDisplayRow.Id), "EndpointModelIdText");
         id.SetValue(FrameworkElement.FlowDirectionProperty, FlowDirection.LeftToRight);
-        panel.AppendChild(id);
+        id.SetValue(WpfTextBox.TextWrappingProperty, TextWrapping.NoWrap);
+        id.SetBinding(FrameworkElement.ToolTipProperty, new Binding(nameof(ModelDisplayRow.Id)));
+        id.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        return new DataTemplate { VisualTree = id };
+    }
+
+    private static DataTemplate ModelDetailsTemplate()
+    {
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+        panel.SetValue(FrameworkElement.MarginProperty, new Thickness(12, 4, 12, 8));
         var name = ModelText(nameof(ModelDisplayRow.DisplayName), "EndpointModelNameText");
         name.SetBinding(FrameworkElement.ToolTipProperty, new Binding(nameof(ModelDisplayRow.Name)));
         name.SetBinding(UIElement.VisibilityProperty, new Binding(nameof(ModelDisplayRow.NameVisibility)));
         name.SetResourceReference(Control.ForegroundProperty, "TextSoft");
         panel.AppendChild(name);
+        panel.AppendChild(ModelText(nameof(ModelDisplayRow.Details), "EndpointModelDetailsText"));
         return new DataTemplate { VisualTree = panel };
     }
 
