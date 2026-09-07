@@ -361,7 +361,10 @@ builds and must be described that way.
 - Confirm Settings includes a **UI** category with **Show/Hide** choices for
   Model Status, Live Runtime Log, and the Models Hugging Face section.
   Confirm each choice applies automatically, hidden rows leave no blank
-  splitter/space, and choices persist after restart. Confirm hiding Model Status
+  splitter/space, and choices persist after restart. Check Hugging Face, Live
+  Runtime Log, and raw metrics after navigating away and back with a previously
+  resized splitter; saved sizes must not reopen hidden rows or collapse visible
+  sections. Confirm hiding Model Status
   collapses the complete dashboard section without changing its saved cards and
   leaves the model/profile controls and loaded-session table visible. Confirm Hardware, Slots, Tokens, Speculative tokens, and
   KV cache are customized from the Overview dashboard rather than duplicated as

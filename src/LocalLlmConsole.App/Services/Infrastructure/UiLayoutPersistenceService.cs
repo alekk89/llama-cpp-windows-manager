@@ -466,7 +466,11 @@ public sealed class UiLayoutPersistenceService
 
     private static void ApplySplitter(GridSplitter splitter, SplitterLayout layout)
     {
-        if (splitter.ResizeDirection != layout.Direction
+        // Visibility preferences own collapsed sections. A saved zero-sized side
+        // represents a hidden section, not a split to restore when it is shown again.
+        if (splitter.Visibility != Visibility.Visible
+            || layout.First.Value <= 0 || layout.Second.Value <= 0
+            || splitter.ResizeDirection != layout.Direction
             || VisualTreeTraversal.FindAncestor<Grid>(splitter) is not { } grid)
             return;
         if (layout.Direction == GridResizeDirection.Columns)
