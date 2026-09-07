@@ -17,7 +17,7 @@ public sealed partial class BenchmarkApplicationService
         var errors = preview.Errors.ToList();
         var warnings = preview.Warnings.ToList();
         var modelsById = (await modelsTask).ToDictionary(model => model.Id, StringComparer.OrdinalIgnoreCase);
-        foreach (var item in preview.WorkItems.GroupBy(item => item.RuntimeId, StringComparer.OrdinalIgnoreCase).Select(group => group.First()))
+        foreach (var item in preview.WorkItems)
         {
             var runtime = (await runtimesTask).First(runtime => runtime.Id.Equals(item.RuntimeId, StringComparison.OrdinalIgnoreCase));
             if (item.ExecutionMode == BenchmarkExecutionMode.ProfileServing)
@@ -26,6 +26,20 @@ public sealed partial class BenchmarkApplicationService
                     errors.Add($"{item.ProfileNames.FirstOrDefault()}: the launch-profile snapshot is missing.");
                 else if (plan.Serving.Concurrencies.DefaultIfEmpty(1).Max() > Math.Max(item.LaunchSettings.ParallelSlots, 1))
                     errors.Add($"{item.ProfileNames.FirstOrDefault()}: maximum benchmark concurrency {plan.Serving.Concurrencies.Max()} exceeds the profile's {item.LaunchSettings.ParallelSlots} parallel slot(s). Save a profile with enough slots so the benchmark measures the requested configuration without changing it.");
+                if (item.LaunchSettings is { } launch)
+                {
+                    try
+                    {
+                        RuntimeLaunchOptionPolicy.ValidateCustomArguments(CustomLaunchParameterParser.Parse(launch.CustomParameters));
+                        var settings = launch.ApplyTo(AppSettings.CreateDefault("")) with
+                        { Port = 8080, Host = "127.0.0.1", WslDistro = item.WslDistro, RequireApiKeyAuth = false, ModelApiKey = "" };
+                        var request = RuntimeLaunchRequestFactory.Create(settings, new(runtime.Mode, runtime.Backend,
+                            runtime.ExecutablePath, item.ModelPath, "127.0.0.1", false,
+                            VisionProjectorPath: launch.VisionProjectorPath, DraftModelPath: launch.SpecDraftModelPath, MtpHeadPath: launch.MtpHeadPath));
+                        errors.AddRange(LlamaCppLaunchValidator.Validate(request).Errors.Select(error => $"{item.ProfileNames.FirstOrDefault()}: {error}"));
+                    }
+                    catch (InvalidOperationException error) { errors.Add(error.Message); }
+                }
                 continue;
             }
             var capability = await _capabilities.ProbeAsync(runtime, item.WslDistro, cancellationToken);
@@ -57,7 +71,7 @@ public sealed partial class BenchmarkApplicationService
         foreach (var item in preview.WorkItems.Where(item => item.ExecutionMode == BenchmarkExecutionMode.ProfileServing))
             if (item.LaunchSettings is not null && modelsById.TryGetValue(item.ModelId, out var model))
                 ValidateServingSpeculativeCompanion(item, model, errors);
-        return preview with { IsValid = errors.Count == 0, Errors = errors.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), Warnings = warnings };
+        return preview with { IsValid = errors.Count == 0, Errors = errors.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(), Warnings = warnings.Distinct().ToArray() };
     }
 
     private static void ValidateServingSpeculativeCompanion(
@@ -127,7 +141,7 @@ public sealed partial class BenchmarkApplicationService
     {
         if (capability.AvailableDevices.Count == 0) return;
         var available = capability.AvailableDevices.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var device in requested.SelectMany(value => value.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+        foreach (var device in requested.SelectMany(value => value.Split([',', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
             if (!device.Equals("none", StringComparison.OrdinalIgnoreCase) && !available.Contains(device))
                 errors.Add($"{runtime.Name}: device '{device}' was not reported by llama-bench --list-devices.");
     }

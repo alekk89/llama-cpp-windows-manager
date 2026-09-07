@@ -14,12 +14,18 @@ public static class BenchmarksPageWorkflowService
         var preview = await benchmarks.ValidateAsync(plan);
         if (page?.Summary is null) return preview;
         if (page.RunButton is not null) page.RunButton.IsEnabled = !page.IsRunActive;
-        page.Summary.Text = preview.IsValid
+        var details = preview.IsValid
             ? $"{preview.WorkItems.Count} work item(s) · {preview.ExpectedResultRows} result row(s) · {preview.TimedRepetitions} timed repetition(s). "
               + (preview.DeduplicatedWorkItems > 0 ? $"Collapsed {preview.DeduplicatedWorkItems} equivalent profile item(s)." : "Ready to run.")
               + (preview.Warnings.Count > 0 ? $"{Environment.NewLine}{string.Join(Environment.NewLine, preview.Warnings)}" : "")
               + CommandPreview(plan, preview)
             : string.Join(Environment.NewLine, preview.Errors);
+        page.Workspace?.SetValidationDetails(details);
+        page.Workspace?.ShowPreview(preview);
+        page.Summary.Text = preview.IsValid ? (preview.Warnings.Count > 0 ? "Ready · review validation details for runtime notes." : "Ready to run.")
+            : string.Join(Environment.NewLine, preview.Errors.Take(2));
+        page.Summary.ToolTip = details;
+        if (page.RunButton is not null) page.RunButton.IsEnabled = preview.IsValid && !page.IsRunActive;
         return preview;
     }
 

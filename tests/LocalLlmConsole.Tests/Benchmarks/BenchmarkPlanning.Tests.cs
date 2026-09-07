@@ -114,7 +114,7 @@ public sealed class BenchmarkPlanningTests
     public void SpeedReportSeparatesPromptAndGenerationScalesAndAveragesRepetitions()
     {
         const string promptJson = """{"build_commit":"a","build_number":1,"cpu_info":"CPU","gpu_info":"GPU","backends":"CUDA","devices":"CUDA0","model_filename":"m.gguf","model_type":"m","model_size":1,"model_n_params":2,"n_prompt":512,"n_gen":0,"n_depth":0,"n_batch":2048,"n_ubatch":512,"n_threads":8,"n_gpu_layers":-1,"n_cpu_moe":0,"type_k":"f16","type_v":"f16","split_mode":"layer","main_gpu":0,"no_kv_offload":false,"flash_attn":"on","tensor_split":"","load_mode":"mmap","avg_ns":100,"stddev_ns":2,"avg_ts":500.0,"stddev_ts":1.0,"test_time":"now"}""";
-        const string servingJson = """{"n_prompt":16384,"n_gen":512,"n_ctx":32768,"n_batch":2048,"avg_ts":70.0,"stddev_ts":1.2,"execution_mode":"profile_serving","profile_id":"default","profile_name":"Default","speculative_type":"none","concurrency":1,"request_count":5,"avg_prompt_ts":900.0,"avg_latency_ms":2200.0}""";
+        const string servingJson = """{"n_prompt":16384,"n_gen":512,"n_ctx":32768,"n_batch":2048,"avg_ts":70.0,"avg_generation_ts":90.0,"stddev_ts":1.2,"execution_mode":"profile_serving","profile_id":"default","profile_name":"Default","speculative_type":"none","concurrency":1,"request_count":5,"avg_prompt_ts":900.0,"avg_latency_ms":2200.0}""";
         Assert.True(BenchmarkResultService.TryParse(promptJson, "model", "direct", RuntimeMode.Native, RuntimeBackend.Cuda, out var prompt, out var promptError), promptError);
         Assert.True(BenchmarkResultService.TryParse(servingJson, "model", "profile", RuntimeMode.Native, RuntimeBackend.Cuda, out var serving, out var servingError), servingError);
         var now = DateTimeOffset.UtcNow;
@@ -124,7 +124,7 @@ public sealed class BenchmarkPlanningTests
             new StoredBenchmarkResult(1, "run", "direct", 1, 1, false, prompt!, now),
             new StoredBenchmarkResult(2, "run", "serving", 1, 1, false, serving!, now),
             new StoredBenchmarkResult(3, "run", "serving", 1, 2, false,
-                serving! with { AverageTokensPerSecond = 80, AveragePromptTokensPerSecond = 1100 }, now),
+                serving! with { AverageTokensPerSecond = 80, AveragePromptTokensPerSecond = 1100, AverageGenerationTokensPerSecond = 110 }, now),
             new StoredBenchmarkResult(4, "run", "partial", 1, 3, true,
                 serving! with { AverageTokensPerSecond = 9999, AveragePromptTokensPerSecond = 9999 }, now)
         ]);
@@ -135,7 +135,7 @@ public sealed class BenchmarkPlanningTests
         Assert.Contains(promptSection.Bars, bar => bar.TokensPerSecond == 1000);
         var generationSection = Assert.Single(sections, section => section.Kind == BenchmarkSpeedReportKind.Generation);
         var servingBar = Assert.Single(generationSection.Bars);
-        Assert.Equal(75, servingBar.TokensPerSecond);
+        Assert.Equal(100, servingBar.TokensPerSecond);
         Assert.Equal("No speculative decoding", servingBar.ConfigurationLabel);
         Assert.DoesNotContain(sections.SelectMany(section => section.Bars), bar => bar.TokensPerSecond == 9999);
     }
@@ -143,7 +143,7 @@ public sealed class BenchmarkPlanningTests
     [Fact]
     public void SpeedReportMakesSpeculativeConfigurationsProminent()
     {
-        const string servingJson = """{"n_prompt":8192,"n_gen":512,"n_ctx":65536,"n_batch":8162,"avg_ts":38.0,"execution_mode":"profile_serving","profile_id":"default","profile_name":"Default","speculative_type":"draft-dflash","concurrency":1,"request_count":5,"avg_prompt_ts":1200.0,"avg_latency_ms":20000.0}""";
+        const string servingJson = """{"n_prompt":8192,"n_gen":512,"n_ctx":65536,"n_batch":8162,"avg_ts":38.0,"avg_generation_ts":48.0,"execution_mode":"profile_serving","profile_id":"default","profile_name":"Default","speculative_type":"draft-dflash","concurrency":1,"request_count":5,"avg_prompt_ts":1200.0,"avg_latency_ms":20000.0}""";
         Assert.True(BenchmarkResultService.TryParse(servingJson, "model", "profile", RuntimeMode.Native, RuntimeBackend.Cuda, out var dflash, out var error), error);
         var mtp = dflash! with
         {

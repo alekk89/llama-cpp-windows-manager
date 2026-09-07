@@ -205,8 +205,10 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
         Assert.Contains("Synthetic persistence failure", failure.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task UnattendedRunPersistsRowsOwnsComputeAndRejectsSecondRun()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnattendedRunPersistsRowsOwnsComputeAndRejectsSecondRun(bool incompleteOutput)
     {
         var root = CreateTempRoot();
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -246,7 +248,7 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
             GenerationSizes = [128],
             Repetitions = 1,
             PreventSystemSleep = false,
-            Options = new BenchmarkOptionSet { AdditionalArguments = ["--fake-delay-ms", "300"] }
+            Options = new BenchmarkOptionSet { AdditionalArguments = ["--fake-delay-ms", "300"], Threads = incompleteOutput ? [4, 8] : [] }
         };
 
         var started = await service.StartAsync(plan, confirmed: true, cancellationToken);
@@ -257,6 +259,17 @@ public sealed class BenchmarkPersistenceAndExecutionTests : ManagerRegressionTes
         Assert.Contains("already active", secondError.Message, StringComparison.OrdinalIgnoreCase);
 
         var completed = await WaitForTerminalAsync(service, started.Job.Id, cancellationToken);
+        if (incompleteOutput)
+        {
+            Assert.Equal(JobStatus.Failed, completed.Job.Status);
+            var checkpoint = Assert.Single(completed.Payload.Checkpoints);
+            Assert.Equal(BenchmarkWorkItemStatus.Failed, checkpoint.Status);
+            Assert.Contains("expected 4", checkpoint.Error, StringComparison.Ordinal);
+            Assert.Equal(2, completed.PersistedResultRows);
+            Assert.Empty(await store.ListBenchmarkResultsAsync(started.Job.Id, includePartialAttempts: false, cancellationToken: cancellationToken));
+            Assert.False(sessions.HasBenchmarkLease);
+            return;
+        }
         Assert.True(completed.Job.Status == JobStatus.Completed, completed.Payload.Message);
         Assert.Equal(BenchmarkRunOutcome.Success, completed.Payload.Outcome);
         Assert.Equal(2, completed.PersistedResultRows);

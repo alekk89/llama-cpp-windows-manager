@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "jetons/s",
   "EndpointInspection.ExpandDetails": "Développer les détails du modèle",
   "EndpointInspection.CollapseDetails": "Réduire les détails du modèle",
   "EndpointInspection.PartialDetails": "Certains détails sont indisponibles",
@@ -1067,5 +1068,17 @@
   "Runtimes.ClearDefault": "Effacer l’environnement par défaut",
   "Runtimes.DefaultHint": "Environnement par défaut pour les nouveaux profils",
   "Runtimes.DefaultSelected": "{0} est désormais l’environnement par défaut pour les nouveaux profils.",
-  "Runtimes.DefaultCleared": "Environnement par défaut effacé."
+  "Runtimes.DefaultCleared": "Environnement par défaut effacé.",
+  "Benchmarks.NewBenchmark": "Nouveau benchmark",
+  "Benchmarks.Results": "Résultats",
+  "Benchmarks.ProfileToTest": "Profil à tester",
+  "Benchmarks.CompareSettings": "Comparer les paramètres",
+  "Benchmarks.Workload": "Charge de travail",
+  "Benchmarks.ReviewRun": "Vérifier et lancer",
+  "Benchmarks.SelectedConfiguration": "Configuration sélectionnée",
+  "Benchmarks.MeasurementDetails": "Détails de la mesure · JSON",
+  "Benchmarks.PreviewLaunches": "Aperçu des lancements",
+  "Benchmarks.TemporaryProfileSettings": "Paramètres temporaires du profil",
+  "Benchmarks.RuntimeOptions": "Options de cet environnement d’exécution",
+  "Benchmarks.ValidationDetails": "Détails de validation"
 }

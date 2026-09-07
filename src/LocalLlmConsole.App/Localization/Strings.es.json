@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "tokens/segundo",
   "EndpointInspection.ExpandDetails": "Expandir detalles del modelo",
   "EndpointInspection.CollapseDetails": "Contraer detalles del modelo",
   "EndpointInspection.PartialDetails": "Algunos detalles no están disponibles",
@@ -1046,5 +1047,17 @@
   "Runtimes.ClearDefault": "Quitar el entorno predeterminado",
   "Runtimes.DefaultHint": "Entorno predeterminado para perfiles nuevos",
   "Runtimes.DefaultSelected": "{0} es ahora el entorno predeterminado para perfiles nuevos.",
-  "Runtimes.DefaultCleared": "Se quitó el entorno predeterminado."
+  "Runtimes.DefaultCleared": "Se quitó el entorno predeterminado.",
+  "Benchmarks.NewBenchmark": "Nuevo benchmark",
+  "Benchmarks.Results": "Resultados",
+  "Benchmarks.ProfileToTest": "Perfil que se probará",
+  "Benchmarks.CompareSettings": "Comparar ajustes",
+  "Benchmarks.Workload": "Carga de trabajo",
+  "Benchmarks.ReviewRun": "Revisar y ejecutar",
+  "Benchmarks.SelectedConfiguration": "Configuración seleccionada",
+  "Benchmarks.MeasurementDetails": "Detalles de la medición · JSON",
+  "Benchmarks.PreviewLaunches": "Vista previa de ejecuciones",
+  "Benchmarks.TemporaryProfileSettings": "Ajustes temporales del perfil",
+  "Benchmarks.RuntimeOptions": "Opciones de este entorno de ejecución",
+  "Benchmarks.ValidationDetails": "Detalles de validación"
 }

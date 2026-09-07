@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "tokens/segundo",
   "EndpointInspection.ExpandDetails": "Expandir detalhes do modelo",
   "EndpointInspection.CollapseDetails": "Recolher detalhes do modelo",
   "EndpointInspection.PartialDetails": "Alguns detalhes não estão disponíveis",
@@ -1070,5 +1071,17 @@
   "Runtimes.ClearDefault": "Remover runtime padrão",
   "Runtimes.DefaultHint": "Runtime padrão para novos perfis",
   "Runtimes.DefaultSelected": "{0} agora é o runtime padrão para novos perfis.",
-  "Runtimes.DefaultCleared": "Runtime padrão removido."
+  "Runtimes.DefaultCleared": "Runtime padrão removido.",
+  "Benchmarks.NewBenchmark": "Novo benchmark",
+  "Benchmarks.Results": "Resultados",
+  "Benchmarks.ProfileToTest": "Perfil a testar",
+  "Benchmarks.CompareSettings": "Comparar configurações",
+  "Benchmarks.Workload": "Carga de trabalho",
+  "Benchmarks.ReviewRun": "Revisar e executar",
+  "Benchmarks.SelectedConfiguration": "Configuração selecionada",
+  "Benchmarks.MeasurementDetails": "Detalhes da medição · JSON",
+  "Benchmarks.PreviewLaunches": "Prévia das execuções",
+  "Benchmarks.TemporaryProfileSettings": "Configurações temporárias do perfil",
+  "Benchmarks.RuntimeOptions": "Opções deste ambiente de execução",
+  "Benchmarks.ValidationDetails": "Detalhes da validação"
 }

@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "tokenů/s",
   "EndpointInspection.ExpandDetails": "Rozbalit podrobnosti modelu",
   "EndpointInspection.CollapseDetails": "Sbalit podrobnosti modelu",
   "EndpointInspection.PartialDetails": "Některé podrobnosti nejsou dostupné",
@@ -1056,5 +1057,17 @@
   "Runtimes.ClearDefault": "Zrušit výchozí běhové prostředí",
   "Runtimes.DefaultHint": "Výchozí běhové prostředí pro nové profily",
   "Runtimes.DefaultSelected": "{0} je nyní výchozí běhové prostředí pro nové profily.",
-  "Runtimes.DefaultCleared": "Výchozí běhové prostředí bylo zrušeno."
+  "Runtimes.DefaultCleared": "Výchozí běhové prostředí bylo zrušeno.",
+  "Benchmarks.NewBenchmark": "Nový benchmark",
+  "Benchmarks.Results": "Výsledky",
+  "Benchmarks.ProfileToTest": "Testovaný profil",
+  "Benchmarks.CompareSettings": "Porovnání nastavení",
+  "Benchmarks.Workload": "Zátěž",
+  "Benchmarks.ReviewRun": "Kontrola a spuštění",
+  "Benchmarks.SelectedConfiguration": "Vybraná konfigurace",
+  "Benchmarks.MeasurementDetails": "Podrobnosti měření · JSON",
+  "Benchmarks.PreviewLaunches": "Náhled spuštění",
+  "Benchmarks.TemporaryProfileSettings": "Dočasná nastavení profilu",
+  "Benchmarks.RuntimeOptions": "Možnosti tohoto běhového prostředí",
+  "Benchmarks.ValidationDetails": "Podrobnosti ověření"
 }

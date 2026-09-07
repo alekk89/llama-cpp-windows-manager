@@ -14,11 +14,14 @@ public static class BenchmarksPagePresentationService
             run.Job.Status.ToString(),
             $"{run.Payload.WorkItems.Count} item(s)",
             $"{run.Payload.CompletedWorkItems + run.Payload.FailedWorkItems}/{run.Payload.WorkItems.Count}",
-            run.Payload.Message)).ToArray());
+            run.Payload.Message)
+        { Name = run.Payload.Plan.Name }).ToArray());
         if (page.HistoryPage is not null) page.HistoryPage.Text = $"Page {(page.HistoryOffset / page.HistoryPageSize) + 1}";
         if (page.HistoryPrevious is not null) page.HistoryPrevious.IsEnabled = page.HistoryOffset > 0;
         if (page.HistoryNext is not null) page.HistoryNext.IsEnabled = runs.Count == page.HistoryPageSize;
         var active = runs.FirstOrDefault(run => run.Job.Status is JobStatus.Queued or JobStatus.Running or JobStatus.Paused);
+        if (page.ActiveStatus is not null) page.ActiveStatus.Visibility = active is null ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+        if (page.Progress is not null) page.Progress.Visibility = active is null ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
         page.IsRunActive = active is not null;
         page.ActiveRunId = active?.Job.Id ?? "";
         if (page.RunButton is not null) page.RunButton.IsEnabled = active is null;
@@ -36,6 +39,7 @@ public static class BenchmarksPagePresentationService
     public static void ApplyProgress(BenchmarksPageState page, BenchmarkRunSnapshot run)
     {
         if (page.ActiveStatus is null || page.Progress is null) return;
+        page.ActiveStatus.Visibility = page.Progress.Visibility = System.Windows.Visibility.Visible;
         page.IsRunActive = run.Job.Status is JobStatus.Queued or JobStatus.Running or JobStatus.Paused;
         page.ActiveRunId = page.IsRunActive ? run.Job.Id : "";
         if (page.RunButton is not null) page.RunButton.IsEnabled = !page.IsRunActive;

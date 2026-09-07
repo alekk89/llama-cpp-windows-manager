@@ -58,7 +58,7 @@ public sealed partial class BenchmarkPlanService
             var splitCount = split.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
             foreach (var deviceSelection in devices.Where(value => !string.IsNullOrWhiteSpace(value)))
             {
-                var deviceCount = deviceSelection.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+                var deviceCount = deviceSelection.Split([',', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
                 if (deviceCount != splitCount)
                     errors.Add($"{profileName}: GPU split '{split}' has {splitCount} entries, but the inherited device selection '{deviceSelection}' has {deviceCount} devices.");
             }

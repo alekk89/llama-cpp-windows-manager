@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "tokens/seconde",
   "EndpointInspection.ExpandDetails": "Modeldetails uitklappen",
   "EndpointInspection.CollapseDetails": "Modeldetails inklappen",
   "EndpointInspection.PartialDetails": "Sommige details zijn niet beschikbaar",
@@ -1076,5 +1077,17 @@
   "Runtimes.ClearDefault": "Standaardruntime wissen",
   "Runtimes.DefaultHint": "Standaardruntime voor nieuwe profielen",
   "Runtimes.DefaultSelected": "{0} is nu de standaardruntime voor nieuwe profielen.",
-  "Runtimes.DefaultCleared": "Standaardruntime gewist."
+  "Runtimes.DefaultCleared": "Standaardruntime gewist.",
+  "Benchmarks.NewBenchmark": "Nieuwe benchmark",
+  "Benchmarks.Results": "Resultaten",
+  "Benchmarks.ProfileToTest": "Te testen profiel",
+  "Benchmarks.CompareSettings": "Instellingen vergelijken",
+  "Benchmarks.Workload": "Werklast",
+  "Benchmarks.ReviewRun": "Controleren en starten",
+  "Benchmarks.SelectedConfiguration": "Geselecteerde configuratie",
+  "Benchmarks.MeasurementDetails": "Meetgegevens · JSON",
+  "Benchmarks.PreviewLaunches": "Voorbeeld van starts",
+  "Benchmarks.TemporaryProfileSettings": "Tijdelijke profielinstellingen",
+  "Benchmarks.RuntimeOptions": "Opties van deze runtime",
+  "Benchmarks.ValidationDetails": "Validatiedetails"
 }

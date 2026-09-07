@@ -49,9 +49,10 @@ public static class BenchmarkCommandBuilder
         AddValues(args, "--no-kv-offload", item.Options.KvOffload.Select(value => value.Equals("off", StringComparison.OrdinalIgnoreCase) ? "1" : "0").ToArray());
         AddValues(args, "--split-mode", item.Options.SplitModes);
         AddValues(args, "--main-gpu", item.Options.MainGpus);
-        AddValues(args, "--device", item.Options.Devices);
-        AddValues(args, "--tensor-split", item.Options.TensorSplits);
+        AddValues(args, "--device", item.Options.Devices.Select(DeviceGroup).ToArray());
+        AddValues(args, "--tensor-split", item.Options.TensorSplits.Select(DeviceGroup).ToArray());
         AddValues(args, "--load-mode", item.Options.LoadModes);
+        AddValues(args, "--lazy-mode", item.Options.LazyModes);
         AddValues(args, "--fit-target", item.Options.FitTargetsMiB);
         AddValues(args, "--fit-ctx", item.Options.FitContexts);
         AddValues(args, "--numa", item.Options.NumaModes);
@@ -85,14 +86,26 @@ public static class BenchmarkCommandBuilder
             $"ngl={Join(options.GpuLayers)}", $"fa={Join(options.FlashAttention)}", $"ctk={Join(options.CacheTypesK)}",
             $"ctv={Join(options.CacheTypesV)}", $"kvo={Join(options.KvOffload)}", $"sm={Join(options.SplitModes)}",
             $"mg={Join(options.MainGpus)}", $"dev={Join(options.Devices)}", $"ts={Join(options.TensorSplits)}",
-            $"lm={Join(options.LoadModes)}", $"fit={Join(options.FitTargetsMiB)}", $"fitc={Join(options.FitContexts)}",
+            $"lm={Join(options.LoadModes)}", $"lazy={Join(options.LazyModes)}", $"fit={Join(options.FitTargetsMiB)}", $"fitc={Join(options.FitContexts)}",
             $"numa={Join(options.NumaModes)}", $"prio={Join(options.Priorities)}", $"mask={Join(options.CpuMasks)}",
             $"strict={Join(options.CpuStrict)}", $"poll={Join(options.PollValues)}", $"embd={Join(options.Embeddings)}",
             $"nopo={Join(options.NoOpOffload)}", $"nohost={Join(options.NoHost)}", $"ot={Join(options.TensorOverrides)}",
-            $"ncmoe={Join(options.CpuMoeLayers)}", $"extra={Join(options.AdditionalArguments)}"
+            $"ncmoe={Join(options.CpuMoeLayers)}", $"extra={Join(options.AdditionalArguments)}", $"vulkan-block={options.VulkanAllocationBlockSizeMiB}"
         };
         return BenchmarkPlanService.StableHash(string.Join('|', parts));
     }
+
+    // The emitted JSON row identifies matrix values. Only options absent from
+    // that row belong here; including the whole plan merges different cases and
+    // prevents matching cases across plans with different repetition counts.
+    public static string ResultSignature(BenchmarkEffectiveOptions options)
+        => BenchmarkPlanService.StableHash($"{Join(options.NumaModes)}|{Join(options.Priorities)}|{Join(options.AdditionalArguments)}|{options.VulkanAllocationBlockSizeMiB}");
+
+    private static string DeviceGroup(string value) => value.Replace(',', '/');
+
+    public static bool CanOfferAdditionalOption(string name)
+        => !Aliases.ContainsKey(name) && !AppOwnedOptions.Contains(name) && !ForbiddenOptions.Contains(name)
+            && name is not ("--help" or "--version" or "--list-devices");
 
     public static void ValidateAdditionalArguments(IReadOnlyList<string> arguments)
     {
@@ -129,7 +142,7 @@ public static class BenchmarkCommandBuilder
         ["--batch-size", "-b"], ["--ubatch-size", "-ub"], ["--cache-type-k", "-ctk"],
         ["--cache-type-v", "-ctv"], ["--threads", "-t"], ["--cpu-mask", "-C"],
         ["--n-gpu-layers", "-ngl"], ["--n-cpu-moe", "-ncmoe"], ["--split-mode", "-sm"],
-        ["--load-mode", "-lm"], ["--main-gpu", "-mg"], ["--no-kv-offload", "-nkvo"],
+        ["--load-mode", "-lm"], ["--lazy-mode", "-lzm"], ["--main-gpu", "-mg"], ["--no-kv-offload", "-nkvo"],
         ["--flash-attn", "-fa"], ["--device", "-dev"], ["--tensor-split", "-ts"],
         ["--fit-target", "-fitt"], ["--fit-ctx", "-fitc"], ["--rpc", "-rpc"],
         ["--embeddings", "-embd"], ["--override-tensor", "-ot"], ["--no-op-offload", "-nopo"]

@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "токенов/с",
   "EndpointInspection.ExpandDetails": "Развернуть сведения о модели",
   "EndpointInspection.CollapseDetails": "Свернуть сведения о модели",
   "EndpointInspection.PartialDetails": "Некоторые сведения недоступны",
@@ -1099,5 +1100,17 @@
   "Runtimes.ClearDefault": "Сбросить среду по умолчанию",
   "Runtimes.DefaultHint": "Среда выполнения по умолчанию для новых профилей",
   "Runtimes.DefaultSelected": "{0} теперь используется по умолчанию для новых профилей.",
-  "Runtimes.DefaultCleared": "Среда выполнения по умолчанию сброшена."
+  "Runtimes.DefaultCleared": "Среда выполнения по умолчанию сброшена.",
+  "Benchmarks.NewBenchmark": "Новый бенчмарк",
+  "Benchmarks.Results": "Результаты",
+  "Benchmarks.ProfileToTest": "Профиль для тестирования",
+  "Benchmarks.CompareSettings": "Сравнить настройки",
+  "Benchmarks.Workload": "Нагрузка",
+  "Benchmarks.ReviewRun": "Проверить и запустить",
+  "Benchmarks.SelectedConfiguration": "Выбранная конфигурация",
+  "Benchmarks.MeasurementDetails": "Подробности измерения · JSON",
+  "Benchmarks.PreviewLaunches": "Предпросмотр запусков",
+  "Benchmarks.TemporaryProfileSettings": "Временные настройки профиля",
+  "Benchmarks.RuntimeOptions": "Параметры этой среды выполнения",
+  "Benchmarks.ValidationDetails": "Подробности проверки"
 }

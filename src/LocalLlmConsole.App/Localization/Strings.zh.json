@@ -1,4 +1,5 @@
 {
+  "Benchmarks.TokensPerSecondUnit": "词元/秒",
   "EndpointInspection.ExpandDetails": "展开模型详情",
   "EndpointInspection.CollapseDetails": "折叠模型详情",
   "EndpointInspection.PartialDetails": "部分详情不可用",
@@ -1096,5 +1097,17 @@
   "Runtimes.ClearDefault": "清除默认运行时",
   "Runtimes.DefaultHint": "新配置的默认运行时",
   "Runtimes.DefaultSelected": "{0} 现已设为新配置的默认运行时。",
-  "Runtimes.DefaultCleared": "已清除默认运行时。"
+  "Runtimes.DefaultCleared": "已清除默认运行时。",
+  "Benchmarks.NewBenchmark": "新建基准测试",
+  "Benchmarks.Results": "结果",
+  "Benchmarks.ProfileToTest": "待测试配置",
+  "Benchmarks.CompareSettings": "比较设置",
+  "Benchmarks.Workload": "工作负载",
+  "Benchmarks.ReviewRun": "检查并运行",
+  "Benchmarks.SelectedConfiguration": "所选配置",
+  "Benchmarks.MeasurementDetails": "测量详情 · JSON",
+  "Benchmarks.PreviewLaunches": "预览启动项",
+  "Benchmarks.TemporaryProfileSettings": "临时配置设置",
+  "Benchmarks.RuntimeOptions": "此运行时提供的选项",
+  "Benchmarks.ValidationDetails": "验证详情"
 }
