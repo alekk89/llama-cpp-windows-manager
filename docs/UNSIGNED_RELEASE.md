@@ -18,15 +18,15 @@ manual GitHub publication. Keep `TRUSTED_RELEASE_ENABLED` unset. Do not pass
    does not enable the disabled trusted workflow.
 5. Download the workflow artifact into an ignored workspace. From the clean
    checkout of the tagged commit, run `scripts/publish-unsigned-release.ps1`
-   with `-Tag v2.7.0 -AssetDirectory <downloaded-assets>` to create and verify a
+   with `-Tag v2.8.0 -AssetDirectory <downloaded-assets>` to create and verify a
    draft. After the release gates pass, rerun with `-Publish`. The script checks
    hashes, source commit and asset order before publication. Do not replace
    assets of an existing release; fix errors in a new version.
 
-For v2.7.0, the release assets are exactly:
+For v2.8.0, the release assets are exactly:
 
-- `Setup-LlamaCppWindowsManager-2.7.0-win-x64.exe`
-- `Setup-LlamaCppWindowsManager-2.7.0-win-x64.exe.sha256`
+- `Setup-LlamaCppWindowsManager-2.8.0-win-x64.exe`
+- `Setup-LlamaCppWindowsManager-2.8.0-win-x64.exe.sha256`
 - `LlamaCppWindowsManager.exe`
 - `LlamaCppWindowsManager.exe.sha256`
 
@@ -48,7 +48,7 @@ To reproduce preparation on a disposable Windows machine:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-release-gate.ps1 -RequireCleanTree -IncludePublish -IncludeInstaller -ReleaseChannel stable
-pwsh -NoProfile -File .\scripts\test-previous-version-upgrade.ps1 -CandidateInstallerPath .\dist\installer\LlamaCppWindowsManager-Setup-2.7.0-win-x64.exe
+pwsh -NoProfile -File .\scripts\test-previous-version-upgrade.ps1 -CandidateInstallerPath .\dist\installer\LlamaCppWindowsManager-Setup-2.8.0-win-x64.exe
 pwsh -NoProfile -File .\scripts\test-portable-update.ps1 -CandidateExePath .\dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\stage-unsigned-release.ps1
 ```
@@ -57,8 +57,8 @@ The installer tests refuse to modify an existing production installer identity.
 Use a disposable runner for those tests. Build-only preparation on a workstation
 does not establish that the installer lifecycle gate passed.
 
-The v2.5 and v2.6 updaters require signatures: users must install unsigned v2.7 manually
-once, retaining their data folder. Unsigned v2.7 supports subsequent official
+The v2.5 and v2.6 updaters require signatures: users must install unsigned v2.8 manually
+once, retaining their data folder. Unsigned builds from v2.7 onward support subsequent official
 HTTPS EXE updates with size and checksum verification. Signed builds retain
 mandatory signature and publisher checks. See
 [UPDATES_AND_RELEASE_VERIFICATION.md](UPDATES_AND_RELEASE_VERIFICATION.md).
