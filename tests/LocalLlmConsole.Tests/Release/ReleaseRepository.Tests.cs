@@ -48,9 +48,9 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         var notices = File.ReadAllText(FindRepositoryFile("THIRD-PARTY-NOTICES.md"));
         var apache = File.ReadAllText(FindRepositoryFile("licenses", "Apache-2.0.txt"));
 
-        Assert.Contains("Microsoft.Data.Sqlite\" Version=\"10.0.11\"", project, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.Data.Sqlite\" Version=\"10.0.12\"", project, StringComparison.Ordinal);
         Assert.Contains("SQLitePCLRaw.bundle_e_sqlite3\" Version=\"3.0.5\"", project, StringComparison.Ordinal);
-        Assert.Contains("Microsoft.Data.Sqlite 10.0.11", notices, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.Data.Sqlite 10.0.12", notices, StringComparison.Ordinal);
         Assert.Contains("SQLitePCLRaw.bundle_e_sqlite3", notices, StringComparison.Ordinal);
         Assert.Contains("3.0.5", notices, StringComparison.Ordinal);
         Assert.Contains("SQLite 3.53.4", notices, StringComparison.Ordinal);
