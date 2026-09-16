@@ -6,6 +6,15 @@ namespace LocalLlmConsole;
 
 public static class SelectorFavoriteBinding
 {
+    public static SettingsPageControls ConfigureSettings(
+        SettingsPageControls controls,
+        Func<StateStore?> stateStore,
+        Action<string>? reportError = null)
+    {
+        Configure(controls.StartupProfiles.ProfileCombo, stateStore, SelectorFavoriteKind.LaunchProfile, reportError);
+        return controls;
+    }
+
     public static OverviewPageControls ConfigureOverview(
         OverviewPageControls controls,
         Func<StateStore?> stateStore,

@@ -25,13 +25,13 @@ public partial class MainWindow
         var definitions = _coreServices.App.SettingsPageDefinitions.BuildRows(_settings, knownCacheSize);
         _viewModel.Settings.ReplaceRows(definitions);
 
-        var page = SettingsPageFactory.Create(new SettingsPageRequest(
+        var page = SelectorFavoriteBinding.ConfigureSettings(SettingsPageFactory.Create(new SettingsPageRequest(
             _viewModel.Settings.Rows,
             _settings.ThemeMode,
             _pageControllers.Settings.Build(),
             StartupLaunchProfileSettingsSnapshot.Empty,
             new(profileId => AppServices.StartupLaunchProfiles.SetLoadOnStartupAsync(profileId, loadOnStartup: true), profileId => AppServices.StartupLaunchProfiles.SetLoadOnStartupAsync(profileId, loadOnStartup: false),
-                AppServices.StartupLaunchProfiles.GetSettingsSnapshotAsync, RunEventAsync)));
+                AppServices.StartupLaunchProfiles.GetSettingsSnapshotAsync, RunEventAsync))), () => _stateStore, SetStatus);
         _settingsPage.Apply(
             page,
             _viewModel.Settings.Rows,

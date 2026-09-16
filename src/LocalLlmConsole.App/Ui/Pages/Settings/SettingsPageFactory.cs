@@ -206,6 +206,7 @@ public static class SettingsPageFactory
         {
             DisplayMemberPath = nameof(StartupLaunchProfileChoice.DisplayName),
             SearchTextSelector = item => (item as StartupLaunchProfileChoice)?.DisplayName ?? "",
+            FavoriteKeySelector = item => (item as StartupLaunchProfileChoice)?.ProfileId ?? "",
             Height = 28,
             MinHeight = 28,
             Margin = new Thickness(0),
