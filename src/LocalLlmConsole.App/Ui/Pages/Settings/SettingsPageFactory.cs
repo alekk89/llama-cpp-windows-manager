@@ -281,6 +281,8 @@ public static class SettingsPageFactory
         button.SetValue(FrameworkElement.ToolTipProperty, Loc.T("Models.Profile.RemoveTitle"));
         button.SetValue(AutomationProperties.NameProperty, Loc.T("Models.ActionBtn.Remove"));
         button.SetBinding(FrameworkElement.TagProperty, new WpfBinding("."));
+        button.SetValue(FrameworkElement.StyleProperty, (Style)WpfApplication.Current.Resources[typeof(WpfButton)]);
+        button.SetValue(VisualRole.ButtonRoleProperty, VisualRole.Danger);
         PageSectionFactory.ConfigureGridActionButton(button);
         button.AddHandler(WpfButton.ClickEvent, new RoutedEventHandler(async (sender, _) =>
         {

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 using LocalLlmConsole.ViewModels;
@@ -43,6 +44,9 @@ public abstract partial class WpfUiTestBase
             new RuntimeLaunchOptionDefinition("--no-log-colors", ["--no-log-colors"], "", "disable colored runtime logs", RuntimeLaunchOptionValueKind.Switch, [])
         ]);
         panelState.ApplyControlState(controlPlan);
+        panel.Root.Measure(new Size(900, 1200));
+        panel.Root.Arrange(new Rect(0, 0, 900, 1200));
+        panel.Root.UpdateLayout();
 
         Assert.Equal(28, panel.LaunchSettingsSearchBox.Height);
         var launchSettingsToolbar = Assert.IsType<Grid>(panel.FitToAvailableVramButton.Parent);
@@ -57,6 +61,20 @@ public abstract partial class WpfUiTestBase
         Assert.IsType<LocalLlmConsole.SearchableComboBox>(panel.RuntimeCombo);
         Assert.False(panel.RuntimeCombo.IsEditable);
         Assert.True(panel.RuntimeCombo.StaysOpenOnEdit);
+        var cacheTypeKCombo = panel.FormControls.CacheTypeKCombo!;
+        cacheTypeKCombo.ApplyTemplate();
+        var cacheSelection = Assert.Single(VisualDescendants<ContentPresenter>(cacheTypeKCombo),
+            presenter => presenter.Name == "SelectionPresenter");
+        Assert.Same(Application.Current.Resources["TextMain"], TextElement.GetForeground(cacheSelection));
+        var draftCacheTypeKCombo = panel.FormControls.SpecDraftCacheTypeKCombo!;
+        Assert.False(draftCacheTypeKCombo.IsEnabled);
+        draftCacheTypeKCombo.ApplyTemplate();
+        var draftCacheSelection = Assert.Single(VisualDescendants<ContentPresenter>(draftCacheTypeKCombo),
+            presenter => presenter.Name == "SelectionPresenter");
+        Assert.Equal(1, draftCacheTypeKCombo.Opacity);
+        Assert.Same(Application.Current.Resources["DisabledControlBack"], draftCacheTypeKCombo.Background);
+        Assert.Same(Application.Current.Resources["DisabledControlBorder"], draftCacheTypeKCombo.BorderBrush);
+        Assert.Same(Application.Current.Resources["DisabledControlForeground"], TextElement.GetForeground(draftCacheSelection));
         Assert.NotNull(panel.FormControls.HostBox);
         Assert.Equal("127.0.0.1", panel.FormControls.HostBox.Text);
         panel.FormControls.HostBox.Text = "10.10.10.21";

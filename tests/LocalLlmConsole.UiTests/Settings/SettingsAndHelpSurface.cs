@@ -356,6 +356,8 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             var remove = Assert.Single(
                 VisualDescendants<Button>(controls.StartupProfiles.SelectedGrid),
                 button => AutomationProperties.GetName(button) == LocalLlmConsole.Localization.Loc.T("Models.ActionBtn.Remove"));
+            Assert.Same(Application.Current.Resources[typeof(Button)], remove.Style);
+            Assert.Equal(LocalLlmConsole.VisualRole.Danger, LocalLlmConsole.VisualRole.GetButtonRole(remove));
             remove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal([selected.ProfileId], removed);
         });
