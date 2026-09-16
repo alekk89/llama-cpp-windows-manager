@@ -107,14 +107,17 @@
                   </ControlTemplate>
                 </ToggleButton.Template>
                 <Grid Background="{TemplateBinding Background}">
-                  <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                  <ContentPresenter x:Name="SelectionPresenter"
+                                    Content="{TemplateBinding SelectionBoxItem}"
                                     ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                     ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                     Margin="8,4,24,4"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
+                                    TextElement.Foreground="{TemplateBinding Foreground}"
                                     RecognizesAccessKey="True"/>
-                  <Path Data="M 0 0 L 4 4 L 8 0 Z"
+                  <Path x:Name="DropDownArrow"
+                        Data="M 0 0 L 4 4 L 8 0 Z"
                         Fill="{DynamicResource TextSoft}"
                         Width="8"
                         Height="4"
@@ -143,7 +146,11 @@
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Opacity" Value="0.52"/>
+                <Setter Property="Background" Value="{DynamicResource DisabledControlBack}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource DisabledControlBorder}"/>
+                <Setter TargetName="SelectionPresenter" Property="TextElement.Foreground" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter TargetName="DropDownArrow" Property="Fill" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter Property="Opacity" Value="1"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
