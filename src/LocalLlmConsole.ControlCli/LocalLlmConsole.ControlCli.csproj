@@ -13,7 +13,7 @@
     <InformationalVersion>v2.8.0</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="LocalLlmConsole.Tests" />

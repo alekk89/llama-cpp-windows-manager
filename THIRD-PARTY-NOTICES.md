@@ -6,7 +6,7 @@ The release includes the .NET runtime license and notices under
 
 The application directly or transitively includes these NuGet packages:
 
-- Microsoft.Data.Sqlite 10.0.11 and Microsoft.Data.Sqlite.Core 10.0.11 — MIT,
+- Microsoft.Data.Sqlite 10.0.12 and Microsoft.Data.Sqlite.Core 10.0.12 — MIT,
   copyright Microsoft Corporation.
 - SQLitePCLRaw.bundle_e_sqlite3, SQLitePCLRaw.config.e_sqlite3,
   SQLitePCLRaw.core, and SQLitePCLRaw.provider.e_sqlite3 3.0.5 — Apache-2.0,
