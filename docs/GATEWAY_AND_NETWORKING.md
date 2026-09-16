@@ -12,6 +12,16 @@ ID or alias, without the display name, headers, or other row fields. The ID and
 display name can also be selected independently. This works for both gateway
 and direct endpoint reports.
 
+When gateway LAN exposure is enabled, its endpoint report lists the loopback
+and LAN `/v1` URLs separately. The health result is a loopback probe from the
+Manager; it does not prove that another device can reach the LAN URL. The same
+report shows whether the Manager's named Windows Firewall rule is installed for
+the current port. **Allow LAN through Windows Firewall** is an explicit,
+administrator-approved action that creates an inbound TCP rule limited to
+`LocalSubnet` on Private and Domain networks. **Remove firewall rule** removes
+only that named Manager rule. The Manager never changes the firewall merely by
+enabling LAN exposure or opening the report.
+
 **Settings > Network > Auto-load models** controls just-in-time loading through
 the gateway. It defaults to **Yes**, including after upgrading older settings.
 Set it to **No** to keep the shared endpoint available for manually loaded
@@ -93,6 +103,9 @@ The gateway checks the client's peer address when enforcing local-only access;
 a leftover wildcard Windows URL reservation or a spoofed Host header does not
 authorize a remote client. A newly selected port may require a one-time Windows
 permission. After permission is granted, startup retries with a fresh listener.
+That URL reservation permission and the Windows Firewall rule are separate;
+both may be required for LAN access. API-key authentication remains required
+regardless of either permission.
 
 The Manager control API is independent: always loopback-only with its own
 protected token. Do not expose its discovery file. Host, Origin, request-size,

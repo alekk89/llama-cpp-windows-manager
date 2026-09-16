@@ -100,7 +100,7 @@ public sealed partial class AppServiceFactory
         var modelRuntimeStartFollowup = CreateModelRuntimeStartFollowupService();
         var modelRuntimeStartFollowupApplication = CreateModelRuntimeStartFollowupApplicationService();
         var runtimeEndpointProbe = CreateRuntimeEndpointProbeService(request.RuntimeProbeClient);
-        var endpointInspection = CreateEndpointInspectionService(request.RuntimeProbeClient);
+        var endpointInspection = CreateEndpointInspectionService(request.RuntimeProbeClient, request.ProcessRunner);
         var runtimeMetricPoller = CreateRuntimeMetricPollerService(request.MetricsClient);
         var runtimeTelemetryApplication = CreateRuntimeTelemetryApplicationService(runtimeMetricPoller);
         var runtimeDashboardSelection = CreateRuntimeDashboardSelectionService();

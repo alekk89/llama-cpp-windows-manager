@@ -36,7 +36,21 @@ internal static class EndpointInspectionCopyBarFactory
         var copyEndpoint = CopyButton("EndpointCopyEndpointButton", Loc.T("EndpointInspection.CopyEndpoint"),
             report.Endpoint, Loc.T("EndpointInspection.Copied"), status, copyToClipboard);
         copyEndpoint.IsEnabled = !string.IsNullOrWhiteSpace(report.Endpoint);
-        AddRow(Loc.T("EndpointInspection.Endpoint"), report.Endpoint, copyEndpoint, leftToRight: true);
+        AddRow(Loc.T(report.Kind == EndpointInspectionKind.Gateway
+            ? "EndpointInspection.LocalEndpoint"
+            : "EndpointInspection.Endpoint"), report.Endpoint, copyEndpoint, leftToRight: true);
+        if (report.GatewayNetwork is { LanEnabled: true } network)
+        {
+            var copyLanEndpoint = CopyButton(
+                "EndpointCopyLanEndpointButton",
+                Loc.T("EndpointInspection.CopyLanEndpoint"),
+                network.LanEndpoint,
+                Loc.T("EndpointInspection.Copied"),
+                status,
+                copyToClipboard);
+            copyLanEndpoint.IsEnabled = !string.IsNullOrWhiteSpace(network.LanEndpoint);
+            AddRow(Loc.T("EndpointInspection.LanEndpoint"), network.LanEndpoint, copyLanEndpoint, leftToRight: true);
+        }
         var configured = !string.IsNullOrWhiteSpace(apiKey);
         var copyKey = CopyButton("EndpointCopyApiKeyButton", Loc.T("EndpointInspection.CopyApiKey"),
             apiKey, Loc.T("EndpointInspection.Copied"), status, copyToClipboard);
@@ -53,8 +67,9 @@ internal static class EndpointInspectionCopyBarFactory
         health.ToolTip = Loc.T("EndpointInspection.Inspected") + ": " + report.InspectedAt.ToLocalTime().ToString("g");
         // Reachability alone does not prove readiness (e.g. a loading server).
         health.Foreground = ResourceBrush(report.IsReachable ? "TextMain" : "Danger");
+        var statusRow = table.RowDefinitions.Count;
         table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Grid.SetRow(status, 3);
+        Grid.SetRow(status, statusRow);
         Grid.SetColumnSpan(status, 3);
         table.Children.Add(status);
         return new Border

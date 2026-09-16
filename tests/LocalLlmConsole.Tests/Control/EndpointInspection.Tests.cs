@@ -80,13 +80,14 @@ public sealed class EndpointInspectionTests : ManagerRegressionTestBase
         var settings = AppSettings.CreateDefault(CreateTempRoot()) with
         {
             AutoLoadGatewayPort = 28082,
+            ModelAccessMode = "gateway",
             ModelApiKey = new string('g', 40)
         };
 
         var report = await new EndpointInspectionService(http).InspectGatewayAsync(
             settings,
             "Prefer keeping loaded models",
-            "Local only",
+            "Gateway LAN",
             TestContext.Current.CancellationToken);
 
         Assert.Equal(EndpointInspectionKind.Gateway, report.Kind);
@@ -99,6 +100,13 @@ public sealed class EndpointInspectionTests : ManagerRegressionTestBase
         Assert.Null(report.Defaults);
         Assert.Empty(report.Slots);
         Assert.Equal("Prefer keeping loaded models", report.GatewayPolicy);
+        Assert.NotNull(report.GatewayNetwork);
+        Assert.True(report.GatewayNetwork.LanEnabled);
+        Assert.Equal("http://127.0.0.1:28082/v1", report.GatewayNetwork.LocalEndpoint);
+        Assert.EndsWith(":28082/v1", report.GatewayNetwork.LanEndpoint, StringComparison.Ordinal);
+        Assert.Equal("http://+:28082/", report.GatewayNetwork.ListenerPrefix);
+        Assert.Equal("unavailable", report.GatewayNetwork.FirewallStatus);
+        Assert.Equal("not_tested", report.GatewayNetwork.LanVerification);
         Assert.All(requests, request => Assert.Equal(settings.ModelApiKey, request.Headers.Authorization?.Parameter));
     }
 
@@ -137,7 +145,17 @@ public sealed class EndpointInspectionTests : ManagerRegressionTestBase
             [new EndpointInspectionRunningModel("qwen", "Qwen", "Running", "CUDA", "http://127.0.0.1:8089/v1", DateTimeOffset.UtcNow)],
             "Prefer keeping loaded models",
             "Local only",
-            ["/running: HTTP 404"]);
+            ["/running: HTTP 404"])
+        {
+            GatewayNetwork = new EndpointInspectionGatewayNetwork(
+                true,
+                "http://127.0.0.1:8082/v1",
+                "http://192.168.1.20:8082/v1",
+                "http://+:8082/",
+                "missing",
+                "",
+                "not_tested")
+        };
 
         var text = EndpointInspectionReportFormatter.Format(report, apiKeyConfigured: true);
 
@@ -146,6 +164,9 @@ public sealed class EndpointInspectionTests : ManagerRegressionTestBase
         Assert.Contains(Loc.T("EndpointInspection.ContextSize"), text, StringComparison.Ordinal);
         Assert.DoesNotContain(Loc.T("EndpointInspection.TrainingContext"), text, StringComparison.Ordinal);
         Assert.Contains("http://127.0.0.1:8089/v1", text, StringComparison.Ordinal);
+        Assert.Contains("http://192.168.1.20:8082/v1", text, StringComparison.Ordinal);
+        Assert.Contains(Loc.T("EndpointInspection.FirewallMissing"), text, StringComparison.Ordinal);
+        Assert.Contains(Loc.T("EndpointInspection.LanNotTested"), text, StringComparison.Ordinal);
         Assert.Contains("/running: HTTP 404", text, StringComparison.Ordinal);
         Assert.Contains(Loc.T("EndpointInspection.ApiKeyConfigured"), text, StringComparison.Ordinal);
         Assert.DoesNotContain(apiKey, text, StringComparison.Ordinal);

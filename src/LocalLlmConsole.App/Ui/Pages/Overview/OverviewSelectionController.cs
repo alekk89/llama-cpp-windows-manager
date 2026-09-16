@@ -151,6 +151,7 @@ public sealed class OverviewSelectionController
     {
         ArgumentNullException.ThrowIfNull(row);
         EndpointInspectionReport report;
+        EndpointInspectionGatewayActions? gatewayActions = null;
         string apiKey;
         var settings = _actions.Settings();
         if (row.Kind == OverviewEndpointKind.Gateway)
@@ -160,6 +161,10 @@ public sealed class OverviewSelectionController
                 settings,
                 AppPreferenceService.GatewayPolicyLabel(settings),
                 AppPreferenceService.ModelAccessModeLabel(settings.ModelAccessMode));
+            var port = settings.AutoLoadGatewayPort;
+            gatewayActions = new EndpointInspectionGatewayActions(
+                () => _runtime.EndpointInspection.InstallGatewayFirewallRuleAsync(port),
+                () => _runtime.EndpointInspection.RemoveGatewayFirewallRuleAsync(port));
         }
         else
         {
@@ -177,7 +182,12 @@ public sealed class OverviewSelectionController
             report = await _runtime.EndpointInspection.InspectDirectAsync(session);
         }
 
-        EndpointInspectionDialogFactory.Show(_actions.Owner, report, apiKey, _actions.CopyToClipboard);
+        EndpointInspectionDialogFactory.Show(
+            _actions.Owner,
+            report,
+            apiKey,
+            _actions.CopyToClipboard,
+            gatewayActions);
     }
 
     public async Task UnloadSessionAsync(string sessionId)
