@@ -11,18 +11,28 @@ using WpfWindow = System.Windows.Window;
 
 namespace LocalLlmConsole;
 
+public sealed record EndpointInspectionGatewayActions(
+    Func<Task<GatewayFirewallRuleOperationResult>> InstallFirewallRuleAsync,
+    Func<Task<GatewayFirewallRuleOperationResult>> RemoveFirewallRuleAsync);
+
 public static partial class EndpointInspectionDialogFactory
 {
     private sealed record DisplayRow(string C1, string C2, string C3, string C4, string C5 = "", string C6 = "");
 
-    public static void Show(WpfWindow owner, EndpointInspectionReport report, string apiKey, Action<string> copyToClipboard)
-        => Create(owner, report, apiKey, copyToClipboard).ShowDialog();
+    public static void Show(
+        WpfWindow owner,
+        EndpointInspectionReport report,
+        string apiKey,
+        Action<string> copyToClipboard,
+        EndpointInspectionGatewayActions? gatewayActions = null)
+        => Create(owner, report, apiKey, copyToClipboard, gatewayActions).ShowDialog();
 
     public static WpfWindow Create(
         WpfWindow owner,
         EndpointInspectionReport report,
         string apiKey = "",
-        Action<string>? copyToClipboard = null)
+        Action<string>? copyToClipboard = null,
+        EndpointInspectionGatewayActions? gatewayActions = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(report);
@@ -67,6 +77,8 @@ public static partial class EndpointInspectionDialogFactory
         if (settings.Count > 0)
             body.Children.Add(Card(Loc.T(report.Kind == EndpointInspectionKind.Gateway
                 ? "EndpointInspection.ManagerRouting" : "EndpointInspection.ServerDefaults"), FieldsGrid(settings.ToArray())));
+        if (report.GatewayNetwork is { LanEnabled: true } gatewayNetwork)
+            body.Children.Add(GatewayNetworkCard(gatewayNetwork, gatewayActions));
         if (report.Kind == EndpointInspectionKind.Gateway && report.RunningModels.Count > 0)
             body.Children.Add(RunningModelsCard(report.RunningModels));
         if (report.UnavailableSources.Count > 0)

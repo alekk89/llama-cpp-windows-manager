@@ -163,6 +163,13 @@ builds and must be described that way.
 - Confirm model serving defaults to local-only `127.0.0.1`.
 - Confirm Settings LAN exposure maps Local only to loopback, Gateway LAN only to the router listener, Direct models LAN only to runtime hosts, and Gateway + direct LAN to both serving surfaces.
 - Confirm Settings LAN exposure changes only model-serving endpoints, not the app-local control service.
+- With gateway LAN exposure enabled, confirm endpoint inspection labels and
+  copies separate local and LAN URLs, identifies its health result as not tested
+  from another device, and reports the Manager firewall rule state. Confirm the
+  install action requires Windows administrator approval and creates only an
+  inbound TCP rule for the current port, `LocalSubnet`, and Private/Domain
+  profiles. Confirm the remove action deletes that named rule and neither
+  enabling LAN exposure nor opening the report changes the firewall.
 - Set a profile Host IP to a LAN address with Local only or Gateway LAN only:
   confirm the preview explains the loopback listener, the loaded endpoint uses
   loopback, and readiness/metrics succeed. Enable Direct models LAN only and

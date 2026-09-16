@@ -12,7 +12,9 @@ public static class EndpointInspectionReportFormatter
         Line(output, report.Kind == EndpointInspectionKind.Gateway
             ? Loc.T("EndpointInspection.GatewayReport")
             : Loc.T("EndpointInspection.DirectReport"));
-        Field(output, Loc.T("EndpointInspection.Endpoint"), report.Endpoint);
+        Field(output, Loc.T(report.Kind == EndpointInspectionKind.Gateway
+            ? "EndpointInspection.LocalEndpoint"
+            : "EndpointInspection.Endpoint"), report.Endpoint);
         Field(output, Loc.T("EndpointInspection.Protocol"), Loc.T("EndpointInspection.ProtocolValue"));
         Field(output, Loc.T("EndpointInspection.Authentication"), apiKeyConfigured
             ? Loc.T("EndpointInspection.ApiKeyConfigured")
@@ -76,6 +78,13 @@ public static class EndpointInspectionReportFormatter
             Section(output, Loc.T("EndpointInspection.ManagerRouting"));
             Field(output, Loc.T("EndpointInspection.Policy"), report.GatewayPolicy);
             Field(output, Loc.T("EndpointInspection.Exposure"), report.GatewayExposure);
+            if (report.GatewayNetwork is { LanEnabled: true } network)
+            {
+                Field(output, Loc.T("EndpointInspection.LanEndpoint"), network.LanEndpoint);
+                Field(output, Loc.T("EndpointInspection.ListenerPrefix"), network.ListenerPrefix);
+                Field(output, Loc.T("EndpointInspection.WindowsFirewall"), FirewallStatus(network.FirewallStatus));
+                Field(output, Loc.T("EndpointInspection.LanVerification"), LanVerification(network.LanVerification));
+            }
             Section(output, Loc.T("EndpointInspection.LoadedThroughManager"));
             if (report.RunningModels.Count == 0)
                 Line(output, Loc.T("EndpointInspection.NoLoadedRuntime"));
@@ -113,6 +122,20 @@ public static class EndpointInspectionReportFormatter
 
     private static string Empty(string value)
         => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    internal static string FirewallStatus(string status)
+        => Loc.T(status switch
+        {
+            "installed" => "EndpointInspection.FirewallInstalled",
+            "different_port" => "EndpointInspection.FirewallDifferentPort",
+            "unavailable" => "EndpointInspection.FirewallUnavailable",
+            _ => "EndpointInspection.FirewallMissing"
+        });
+
+    internal static string LanVerification(string status)
+        => Loc.T(status == "not_tested"
+            ? "EndpointInspection.LanNotTested"
+            : "EndpointInspection.NotApplicable");
 
     private static void Line(StringBuilder output, string value)
         => output.AppendLine(value);

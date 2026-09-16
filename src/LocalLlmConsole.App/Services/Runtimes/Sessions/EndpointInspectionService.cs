@@ -59,6 +59,15 @@ public sealed record EndpointInspectionRunningModel(
     string Endpoint,
     DateTimeOffset? StartedAt);
 
+public sealed record EndpointInspectionGatewayNetwork(
+    bool LanEnabled,
+    string LocalEndpoint,
+    string LanEndpoint,
+    string ListenerPrefix,
+    string FirewallStatus,
+    string FirewallDetail,
+    string LanVerification);
+
 public sealed record EndpointInspectionReport(
     EndpointInspectionKind Kind,
     string Title,
@@ -74,6 +83,8 @@ public sealed record EndpointInspectionReport(
     IReadOnlyList<string> UnavailableSources)
 {
     public bool IsReachable => !Health.StartsWith("Unavailable", StringComparison.OrdinalIgnoreCase);
+
+    public EndpointInspectionGatewayNetwork? GatewayNetwork { get; init; }
 }
 
 public sealed class EndpointInspectionService
@@ -84,10 +95,14 @@ public sealed class EndpointInspectionService
     }
 
     private readonly HttpClient _http;
+    private readonly GatewayFirewallRuleService? _gatewayFirewall;
 
-    public EndpointInspectionService(HttpClient http)
+    public EndpointInspectionService(
+        HttpClient http,
+        GatewayFirewallRuleService? gatewayFirewall = null)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
+        _gatewayFirewall = gatewayFirewall;
     }
 
     public Task<EndpointInspectionReport> InspectDirectAsync(
@@ -105,14 +120,14 @@ public sealed class EndpointInspectionService
             cancellationToken);
     }
 
-    public Task<EndpointInspectionReport> InspectGatewayAsync(
+    public async Task<EndpointInspectionReport> InspectGatewayAsync(
         AppSettings settings,
         string policy,
         string exposure,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return InspectAsync(
+        var report = await InspectAsync(
             EndpointInspectionKind.Gateway,
             "Shared gateway",
             RuntimeEndpointService.LocalGatewayServerBaseUrl(settings),
@@ -120,7 +135,49 @@ public sealed class EndpointInspectionService
             policy,
             exposure,
             cancellationToken);
+        var lanEnabled = ModelAccessPolicy.GatewayAllowsLanAccess(settings.ModelAccessMode);
+        var firewall = !lanEnabled
+            ? new GatewayFirewallRuleState(GatewayFirewallRuleStatus.Missing, settings.AutoLoadGatewayPort)
+            : _gatewayFirewall is null
+                ? new GatewayFirewallRuleState(
+                    GatewayFirewallRuleStatus.Unavailable,
+                    settings.AutoLoadGatewayPort,
+                    "Windows Firewall inspection is not available in this host.")
+                : await _gatewayFirewall.InspectAsync(settings.AutoLoadGatewayPort, cancellationToken);
+        return report with
+        {
+            GatewayNetwork = new EndpointInspectionGatewayNetwork(
+                lanEnabled,
+                RuntimeEndpointService.LocalGatewayOpenAiBaseUrl(settings),
+                lanEnabled ? $"{RuntimeEndpointService.LanGatewayServerBaseUrl(settings)}/v1" : "",
+                GatewayUrlReservationService.ListenerPrefixForPort(settings.AutoLoadGatewayPort, lanEnabled),
+                lanEnabled ? firewall.StatusCode : "not_applicable",
+                firewall.Detail,
+                lanEnabled ? "not_tested" : "not_applicable")
+        };
     }
+
+    public Task<GatewayFirewallRuleOperationResult> InstallGatewayFirewallRuleAsync(
+        int port,
+        CancellationToken cancellationToken = default)
+        => _gatewayFirewall?.InstallAsync(port, cancellationToken)
+           ?? Task.FromResult(UnavailableFirewallOperation(port));
+
+    public Task<GatewayFirewallRuleOperationResult> RemoveGatewayFirewallRuleAsync(
+        int port,
+        CancellationToken cancellationToken = default)
+        => _gatewayFirewall?.RemoveAsync(port, cancellationToken)
+           ?? Task.FromResult(UnavailableFirewallOperation(port));
+
+    private static GatewayFirewallRuleOperationResult UnavailableFirewallOperation(int port)
+        => new(
+            Success: false,
+            Cancelled: false,
+            State: new GatewayFirewallRuleState(
+                GatewayFirewallRuleStatus.Unavailable,
+                port,
+                "Windows Firewall management is not available in this host."),
+            Error: "Windows Firewall management is not available in this host.");
 
     private async Task<EndpointInspectionReport> InspectAsync(
         EndpointInspectionKind kind,

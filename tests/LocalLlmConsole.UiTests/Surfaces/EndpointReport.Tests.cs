@@ -88,6 +88,76 @@ public sealed class WpfEndpointReportTests : WpfUiTestBase
             finally { dialog.Close(); owner.Close(); }
         });
 
+    [Fact]
+    public async Task GatewayReportCopiesLanEndpointAndOffersReversibleFirewallAction()
+        => await RunStaAsync(() =>
+        {
+            var owner = new Window();
+            var copied = new List<string>();
+            var installCalls = 0;
+            var removeCalls = 0;
+            var report = new EndpointInspectionReport(
+                EndpointInspectionKind.Gateway,
+                "Shared gateway",
+                "http://127.0.0.1:8080/v1",
+                "Healthy",
+                DateTimeOffset.UtcNow,
+                [], null, [], [], "Keep loaded", "Gateway LAN", [])
+            {
+                GatewayNetwork = new EndpointInspectionGatewayNetwork(
+                    true,
+                    "http://127.0.0.1:8080/v1",
+                    "http://192.168.1.20:8080/v1",
+                    "http://+:8080/",
+                    "missing",
+                    "",
+                    "not_tested")
+            };
+            var actions = new EndpointInspectionGatewayActions(
+                () =>
+                {
+                    installCalls++;
+                    return Task.FromResult(new GatewayFirewallRuleOperationResult(
+                        true, false, new GatewayFirewallRuleState(GatewayFirewallRuleStatus.Installed, 8080)));
+                },
+                () =>
+                {
+                    removeCalls++;
+                    return Task.FromResult(new GatewayFirewallRuleOperationResult(
+                        true, false, new GatewayFirewallRuleState(GatewayFirewallRuleStatus.Missing, 8080)));
+                });
+            var dialog = EndpointInspectionDialogFactory.Create(owner, report, copyToClipboard: copied.Add, gatewayActions: actions);
+            try
+            {
+                var content = Layout(dialog, 760);
+                var lanCopy = Assert.Single(VisualDescendants<Button>(content), button =>
+                    AutomationProperties.GetAutomationId(button) == "EndpointCopyLanEndpointButton");
+                lanCopy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal("http://192.168.1.20:8080/v1", Assert.Single(copied));
+
+                var status = Assert.Single(VisualDescendants<TextBlock>(content), text =>
+                    AutomationProperties.GetAutomationId(text) == "EndpointFirewallStatus");
+                var install = Assert.Single(VisualDescendants<Button>(content), button =>
+                    AutomationProperties.GetAutomationId(button) == "EndpointInstallFirewallButton");
+                var remove = Assert.Single(VisualDescendants<Button>(content), button =>
+                    AutomationProperties.GetAutomationId(button) == "EndpointRemoveFirewallButton");
+                Assert.Equal(Visibility.Visible, install.Visibility);
+                Assert.Equal(Visibility.Collapsed, remove.Visibility);
+                install.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(1, installCalls);
+                Assert.Equal(Loc.T("EndpointInspection.FirewallInstalled"), status.Text);
+                Assert.Equal(Visibility.Collapsed, install.Visibility);
+                Assert.Equal(Visibility.Visible, remove.Visibility);
+
+                remove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(1, removeCalls);
+                Assert.Equal(Loc.T("EndpointInspection.FirewallMissing"), status.Text);
+                Assert.Equal(Visibility.Visible, install.Visibility);
+                Assert.Equal(Visibility.Collapsed, remove.Visibility);
+            }
+            finally { dialog.Close(); owner.Close(); }
+        });
+
     private static FrameworkElement Layout(Window dialog, double width)
     {
         var content = Assert.IsAssignableFrom<FrameworkElement>(dialog.Content);
