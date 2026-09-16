@@ -57,6 +57,7 @@ public sealed class StartupLaunchProfileApplicationService
     public async Task<StartupLaunchProfileSettingsSnapshot> GetSettingsSnapshotAsync()
     {
         var selectedIds = await _stateStore.ListStartupLaunchProfileIdsAsync();
+        var favoriteIds = await _stateStore.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.LaunchProfile);
         var models = (await _stateStore.ListModelsAsync())
             .ToDictionary(model => model.Id, StringComparer.OrdinalIgnoreCase);
         var profiles = await _stateStore.ListNamedModelLaunchProfilesAsync();
@@ -71,7 +72,8 @@ public sealed class StartupLaunchProfileApplicationService
         var selectedSet = selectedIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var available = choicesById.Values
             .Where(choice => !selectedSet.Contains(choice.ProfileId))
-            .OrderBy(choice => choice.ModelName, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(choice => favoriteIds.Contains(choice.ProfileId))
+            .ThenBy(choice => choice.ModelName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(choice => choice.ProfileName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(choice => choice.ProfileId, StringComparer.OrdinalIgnoreCase)
             .ToArray();

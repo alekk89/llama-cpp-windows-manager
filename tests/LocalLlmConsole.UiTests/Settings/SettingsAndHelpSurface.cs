@@ -317,16 +317,18 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             var removed = new List<string>();
             var viewModel = new SettingsPageViewModel();
             viewModel.ReplaceRows(new SettingsPageDefinitionService().BuildRows(settings));
-            var controls = LocalLlmConsole.SettingsPageFactory.Create(new LocalLlmConsole.SettingsPageRequest(
-                viewModel.Rows,
-                settings.ThemeMode,
-                new LocalLlmConsole.SettingsPageActions((_, _) => { }, (_, _) => { }, (_, _) => { }, (_, _) => { }, () => { }),
-                new StartupLaunchProfileSettingsSnapshot([first, second], [selected]),
-                new LocalLlmConsole.StartupLaunchProfileSettingsActions(
-                    profileId => { added.Add(profileId); return Task.CompletedTask; },
-                    profileId => { removed.Add(profileId); return Task.CompletedTask; },
-                    () => Task.FromResult(new StartupLaunchProfileSettingsSnapshot([first, second], [selected])),
-                    action => action())));
+            var controls = LocalLlmConsole.SelectorFavoriteBinding.ConfigureSettings(
+                LocalLlmConsole.SettingsPageFactory.Create(new LocalLlmConsole.SettingsPageRequest(
+                    viewModel.Rows,
+                    settings.ThemeMode,
+                    new LocalLlmConsole.SettingsPageActions((_, _) => { }, (_, _) => { }, (_, _) => { }, (_, _) => { }, () => { }),
+                    new StartupLaunchProfileSettingsSnapshot([first, second], [selected]),
+                    new LocalLlmConsole.StartupLaunchProfileSettingsActions(
+                        profileId => { added.Add(profileId); return Task.CompletedTask; },
+                        profileId => { removed.Add(profileId); return Task.CompletedTask; },
+                        () => Task.FromResult(new StartupLaunchProfileSettingsSnapshot([first, second], [selected])),
+                        action => action()))),
+                () => null);
             controls.Root.Measure(new Size(900, 900));
             controls.Root.Arrange(new Rect(0, 0, 900, 900));
             controls.Root.UpdateLayout();
@@ -334,6 +336,9 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             Assert.Equal(2, controls.StartupProfiles.ProfileCombo.Items.Count);
             var startupProfileCombo = Assert.IsType<LocalLlmConsole.SearchableComboBox>(controls.StartupProfiles.ProfileCombo);
             Assert.Contains("Long context", startupProfileCombo.SearchTextSelector(second));
+            Assert.Equal(second.ProfileId, startupProfileCombo.FavoriteKeySelector(second));
+            Assert.NotNull(startupProfileCombo.LoadFavoriteKeysAsync);
+            Assert.NotNull(startupProfileCombo.ToggleFavoriteAsync);
             Assert.Equal(28, startupProfileCombo.ActualHeight);
             Assert.Equal(startupProfileCombo.ActualHeight, controls.StartupProfiles.AddButton.ActualHeight);
             Assert.Equal(new Thickness(0), startupProfileCombo.Margin);

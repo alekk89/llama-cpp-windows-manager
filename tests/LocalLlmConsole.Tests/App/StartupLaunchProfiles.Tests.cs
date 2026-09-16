@@ -21,6 +21,11 @@ public sealed class StartupLaunchProfilesTests : ManagerRegressionTestBase
         await store.UpsertModelAsync(model);
         await store.SaveNamedModelLaunchProfileAsync(first);
         await store.SaveNamedModelLaunchProfileAsync(second);
+        await store.SetLaunchProfileFavoriteAsync(second.Id, true);
+
+        var application = new StartupLaunchProfileApplicationService(store);
+        var initialSnapshot = await application.GetSettingsSnapshotAsync();
+        Assert.Equal([second.Id, first.Id], initialSnapshot.Available.Select(choice => choice.ProfileId));
 
         await store.SetStartupLaunchProfileAsync(second.Id, true);
         await store.SetStartupLaunchProfileAsync(first.Id, true);
@@ -30,7 +35,6 @@ public sealed class StartupLaunchProfilesTests : ManagerRegressionTestBase
         await store.SetStartupLaunchProfileAsync(second.Id, false);
         Assert.Equal([first.Id], await store.ListStartupLaunchProfileIdsAsync());
 
-        var application = new StartupLaunchProfileApplicationService(store);
         Assert.True(await application.ToggleLoadOnStartupAsync(second.Id));
         Assert.Contains(second.Id, await application.ConfiguredProfileIdsAsync());
         Assert.False(await application.ToggleLoadOnStartupAsync(second.Id));

@@ -306,14 +306,15 @@ until typing pauses before entering the shared save debounce. Invalid input stay
 visible for correction and does not replace the last valid persisted value.
 
 **Load profiles on startup** lists saved model/profile pairs. Search or choose a
-pair from the dropdown and select **Add**; repeat for every profile that should
-start with the Manager. The same choice is available from the Saved Launch
-Profiles context menu. Remove a row to stop loading that profile automatically. Startup
-recovers still-running managed sessions first, leaves matching profiles alone,
-and then starts the remaining selections independently. One failure does not
-prevent later selections from being attempted. Every selected profile still
-needs a valid runtime and a unique direct API port, and normal memory admission
-rules still apply.
+pair from the dropdown and select **Add**; favorite profiles are starred and
+listed first. Repeat for every profile that should start with the Manager. The
+same choice is available from the Saved Launch Profiles context menu. Remove a
+row to stop loading that profile automatically. Startup recovers still-running
+managed sessions first, leaves matching profiles alone, and then starts the
+remaining selections independently. One failure does not prevent later
+selections from being attempted. Every selected profile still needs a valid
+runtime and a unique direct API port, and normal memory admission rules still
+apply.
 
 Model-serving API-key authentication is enabled by default and is separate from
 the Manager's control credential. Authentication may be disabled only with

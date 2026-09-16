@@ -468,8 +468,9 @@ builds and must be described that way.
   chrome, and layout transforms remain unchanged and repeated changes do not
   compound.
 - In **Settings → Load profiles on startup**, type into the dropdown search,
-  add at least two saved model/profile pairs, and confirm the dropdown and Add
-  button match the compact height of the surrounding settings controls. Remove
+  confirm favorite profiles are starred and listed first, add at least two saved
+  model/profile pairs, and confirm the dropdown and Add button match the compact
+  height of the surrounding settings controls. Remove
   one row, then toggle another with **Load on startup** from Saved Launch
   Profiles. Restart and confirm only the remaining selections load, a failed
   selection does not prevent later selections, and deleting a saved profile
