@@ -89,37 +89,19 @@ jobs:
           if ($null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $expectedThumbprint) {
             throw 'The returned artifact does not use the approved SignPath test certificate.'
           }
-
-          # This self-signed certificate is trusted only temporarily on this runner.
-          # Requiring Valid after trust checks integrity, rather than accepting NotTrusted.
-          $rootPath = "Cert:\CurrentUser\Root\$expectedThumbprint"
-          $alreadyTrusted = Test-Path -LiteralPath $rootPath
-          $certificatePath = Join-Path $env:RUNNER_TEMP 'llwm-signpath-test.cer'
-          try {
-            if (-not $alreadyTrusted) {
-              Export-Certificate -Cert $signature.SignerCertificate -FilePath $certificatePath | Out-Null
-              Import-Certificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
-            }
-            $verified = Get-AuthenticodeSignature -FilePath $exe
-            if ($verified.Status -ne 'Valid') {
-              throw "Test signature verification failed: $($verified.Status) $($verified.StatusMessage)"
-            }
-            if ($null -eq $verified.TimeStamperCertificate) { throw 'The returned signature has no timestamp.' }
-
-            # Prove that a modified executable is rejected by the same verifier.
-            $tamperedPath = Join-Path $env:RUNNER_TEMP 'llwm-signpath-tampered.exe'
-            $bytes = [IO.File]::ReadAllBytes($exe)
-            $bytes[0x40] = $bytes[0x40] -bxor 1
-            [IO.File]::WriteAllBytes($tamperedPath, $bytes)
-            if ((Get-AuthenticodeSignature -FilePath $tamperedPath).Status -ne 'HashMismatch') {
-              throw 'Signature verification did not reject a modified executable with HashMismatch.'
-            }
+          if ($signature.Status -ne 'NotTrusted') {
+            throw "Unexpected test signature status: $($signature.Status) $($signature.StatusMessage)"
           }
-          finally {
-            if (-not $alreadyTrusted -and (Test-Path -LiteralPath $rootPath)) {
-              Remove-Item -LiteralPath $rootPath -Force
-            }
-            if (Test-Path -LiteralPath $certificatePath) { Remove-Item -LiteralPath $certificatePath -Force }
+          if ($null -eq $signature.TimeStamperCertificate) { throw 'The returned signature has no timestamp.' }
+
+          # The pinned self-signed test certificate intentionally remains untrusted.
+          # Prove signature integrity by requiring Windows to reject a modified copy.
+          $tamperedPath = Join-Path $env:RUNNER_TEMP 'llwm-signpath-tampered.exe'
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          $bytes[0x40] = $bytes[0x40] -bxor 1
+          [IO.File]::WriteAllBytes($tamperedPath, $bytes)
+          if ((Get-AuthenticodeSignature -FilePath $tamperedPath).Status -ne 'HashMismatch') {
+            throw 'Signature verification did not reject a modified executable with HashMismatch.'
           }
 
           $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
