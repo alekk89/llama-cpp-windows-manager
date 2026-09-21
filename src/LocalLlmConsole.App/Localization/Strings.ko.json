@@ -251,6 +251,8 @@
   "Models.Import.Role.SpeculativeAssistant": "추론 보조 모델",
   "Models.Import.Role.Ambiguous": "모호함",
   "Models.Import.Role.Invalid": "유효하지 않음",
+  "Models.Reattach.Action": "파일 찾기…",
+  "Models.Reattach.ToolTip": "이동된 GGUF 파일을 선택하고 이 모델의 실행 프로필을 유지합니다.",
   "Models.ScanDiagnostics.Title": "모델 검색 진단",
   "Models.ScanDiagnostics.Message": "일부 GGUF 파일은 검토가 필요하여 자동으로 등록되지 않았습니다.\n\n{0}\n\n유효하지만 모호한 파일을 명시적으로 등록하려면 모델 파일 추가…를 사용하세요.",
   "Models.ScanDiagnostics.MoreFiles": "…외 {0}개 파일.",

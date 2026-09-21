@@ -254,6 +254,8 @@
   "Models.Import.Role.SpeculativeAssistant": "спекулятивный помощник",
   "Models.Import.Role.Ambiguous": "неоднозначный",
   "Models.Import.Role.Invalid": "недопустимый",
+  "Models.Reattach.Action": "Найти файл…",
+  "Models.Reattach.ToolTip": "Выберите перемещённый файл GGUF и сохраните профили запуска этой модели.",
   "Models.ScanDiagnostics.Title": "Диагностика сканирования моделей",
   "Models.ScanDiagnostics.Message": "Некоторые файлы GGUF требуют проверки и не были зарегистрированы автоматически.\n\n{0}\n\nИспользуйте «Добавить файл модели…», чтобы явно зарегистрировать допустимый неоднозначный файл.",
   "Models.ScanDiagnostics.MoreFiles": "…и ещё {0} файл(ов).",

@@ -49,6 +49,7 @@ internal static partial class ControlCliRequestFactory
             "get" => Get($"/api/v1/models/{Segment(ModelArg(args, 2))}"),
             "scan" => Post("/api/v1/models/scan"),
             "import" => ModelImportRequest(args),
+            "reattach" => ModelReattachRequest(args),
             "companions" or "heads" => Get($"/api/v1/models/{Segment(ModelArg(args, 2))}/companions"),
             "load" => LoadRequest("load", args, 2),
             "restart" => LoadRequest("restart", args, 2),
@@ -56,6 +57,16 @@ internal static partial class ControlCliRequestFactory
             "delete" => Delete($"/api/v1/models/{Segment(ModelArg(args, 2))}?confirm={args.Has("confirm").ToString().ToLowerInvariant()}"),
             _ => throw new InvalidOperationException($"Unknown model action '{action}'.")
         };
+
+    private static ControlRequest ModelReattachRequest(Arguments args)
+        => Post(
+            $"/api/v1/models/{Segment(ModelArg(args, 2))}/reattach",
+            new JsonObject
+            {
+                ["file"] = Required(args, "file"),
+                ["confirmRole"] = args.Has("confirm-role"),
+                ["confirmIdentityMismatch"] = args.Has("confirm-mismatch")
+            });
 
     private static ControlRequest ModelImportRequest(Arguments args)
     {

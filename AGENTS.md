@@ -71,6 +71,11 @@ Use `profiles list --model <model>` for saved variants. When `self` is
 ambiguous, retry with `--endpoint`, `--model`, `--session`, `--port`, or process
 hints; never guess from the UI selection.
 
+When a registered GGUF has moved and is shown as missing, preserve its stable
+model and profile IDs with `llwmctl models reattach <model> --file <path.gguf>`.
+Review identity warnings before using `--confirm-mismatch`. The command rejects
+loaded source or duplicate registrations; unload them explicitly first.
+
 ## Load, restart, and unload models
 
 Prefer a saved profile and wait for endpoint readiness:

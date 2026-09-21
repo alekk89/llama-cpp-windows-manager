@@ -6,6 +6,7 @@ public sealed record ModelsPageRowActionControllerActions(
     Func<object, ModelRecord?> ModelFromRowButton,
     Func<object, ModelGridRow?> ModelRowFromButton,
     Func<ModelFolderApplicationActions> ModelFolderActions,
+    Func<ModelGridRow, Task> ReattachModelRowAsync,
     Func<ModelGridRow, Task> DeleteModelRowAsync,
     Func<HuggingFaceFile, Task> StartHuggingFaceDownloadAsync,
     Func<HuggingFaceModelCardApplicationActions> ModelCardActions,
@@ -27,8 +28,17 @@ public sealed class ModelsPageRowActionController
         _actions = actions;
     }
 
-    public void OpenModelFolderRow_Click(object sender, RoutedEventArgs e)
-        => _modelFolders.Open(_actions.ModelFromRowButton(sender), _actions.ModelFolderActions());
+    public async void OpenModelFolderRow_Click(object sender, RoutedEventArgs e)
+    {
+        var row = _actions.ModelRowFromButton(sender);
+        if (row is { IsMissing: true })
+        {
+            await _actions.RunEventAsync(() => _actions.ReattachModelRowAsync(row));
+            return;
+        }
+
+        _modelFolders.Open(row?.Model ?? _actions.ModelFromRowButton(sender), _actions.ModelFolderActions());
+    }
 
     public async void DeleteModelRow_Click(object sender, RoutedEventArgs e)
     {

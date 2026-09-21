@@ -41,7 +41,7 @@ public partial class MainWindow
             new ModelsPageRowActionControllerActions(
                 ModelFromRowButton,
                 ModelRowFromButton,
-                ModelFolderActions,
+                ModelFolderActions, row => ModelReattachUiAction.RunAsync(row, this, _settings.ModelsRoot, _coreServices.Models.ModelReattachApplication, _coreServices.App.FileSystemDialogs, _coreServices.App.Dialogs, () => ModelServices.Catalog, IsModelActive, RunAsync, RefreshModelsAsync, RefreshOverviewAsync, SetStatus),
                 DeleteModelRowAsync,
                 StartHuggingFaceDownloadAsync,
                 HuggingFaceModelCardActions,

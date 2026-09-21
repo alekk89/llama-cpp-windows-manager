@@ -11,7 +11,7 @@ public static class ControlRouteCatalog
         new("self", "GET /api/v1/self"),
         new("models",
             "GET /api/v1/models", "POST /api/v1/models/scan", "POST /api/v1/models/import",
-            "GET /api/v1/models/{model}/companions", "POST /api/v1/models/{model}/load",
+            "GET /api/v1/models/{model}/companions", "POST /api/v1/models/{model}/reattach", "POST /api/v1/models/{model}/load",
             "POST /api/v1/models/{model}/restart", "POST /api/v1/models/{model}/unload",
             "DELETE /api/v1/models/{model}?confirm=true", "GET /api/v1/models/{model}/profiles",
             "POST /api/v1/models/{model}/profiles", "PUT /api/v1/models/{model}/profiles/{profile}",

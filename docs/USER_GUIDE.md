@@ -116,6 +116,7 @@ Models owns GGUF inventory and launch profiles. Use it to:
 - select the models folder and scan it;
 - download from Hugging Face when that section is enabled in Settings;
 - register one valid GGUF from any folder with **Add model file…**;
+- locate a relocated GGUF from its **Missing** model row without recreating profiles;
 - review metadata, size, missing-file state, and discovered companions;
 - configure launch settings and save named profiles;
 - create groups and assign profiles;
@@ -139,7 +140,12 @@ requires explicit confirmation before it can be treated as a main model;
 unreadable or invalid GGUFs are rejected.
 
 Removing a GGUF from disk does not erase its registration or profiles. A later
-scan marks it **Missing** so it can be restored or explicitly removed. Deleting
+scan marks it **Missing** so it can be restored, located at its new path, or
+explicitly removed. Choose **Locate file…** on the missing row and select the
+relocated GGUF. The Manager keeps the model and profile IDs, including group,
+favorite, and startup-profile selections. If that path was already imported,
+the duplicate registration is consolidated after active-session and GGUF
+identity checks pass. Deleting
 an imported external model removes its registration by default. Deleting an
 app-owned downloaded model may remove its managed directory after confirmation.
 

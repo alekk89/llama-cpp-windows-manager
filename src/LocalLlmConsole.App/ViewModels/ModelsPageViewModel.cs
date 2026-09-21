@@ -29,6 +29,7 @@ public sealed class ModelsPageViewModel
         {
             var sizeLabel = modelSizeLabels?.GetValueOrDefault(model.Id) ?? "";
             var isMissing = string.Equals(sizeLabel, "Missing", StringComparison.OrdinalIgnoreCase);
+            var isActive = isModelActive(model);
             Rows.Add(new ModelGridRow
             {
                 Name = model.Name,
@@ -36,10 +37,14 @@ public sealed class ModelsPageViewModel
                 Size = sizeLabel,
                 CanLoad = !isMissing,
                 IsMissing = isMissing,
-                OpenFolderAction = Loc.T("Common.OpenButton"),
-                CanDelete = !isModelActive(model),
+                OpenFolderAction = isMissing ? Loc.T("Models.Reattach.Action") : Loc.T("Common.OpenButton"),
+                OpenFolderToolTip = isMissing
+                    ? Loc.T("Models.Reattach.ToolTip")
+                    : "Open the folder containing this model file.",
+                CanOpenFolder = !isMissing || !isActive,
+                CanDelete = !isActive,
                 IsFavorite = favoriteModelIds?.Contains(model.Id) == true,
-                DeleteToolTip = isModelActive(model)
+                DeleteToolTip = isActive
                     ? "Unload this model before deleting it from disk."
                     : "Delete this model file and remove it from the catalog.",
                 Model = model

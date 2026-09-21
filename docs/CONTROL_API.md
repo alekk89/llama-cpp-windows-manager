@@ -89,10 +89,17 @@ Other lifecycle commands:
 llwmctl unload <model>
 llwmctl models scan
 llwmctl models import --folder D:\ExternalModels\ModelFolder
+llwmctl models reattach <missing-model> --file D:\RelocatedModels\model.gguf
 llwmctl models delete <model> --confirm
 ```
 
 App-owned deletion removes the Manager-owned model directory. Imported/external models are unregistered without deleting the external model folder.
+`models reattach` requires the registered model file to be missing, keeps the
+existing model and launch-profile IDs, and consolidates a duplicate registration
+for the selected path. It rejects loaded source or duplicate registrations.
+Use `--confirm-role` for a valid GGUF that is not classified as a main model and
+`--confirm-mismatch` only after reviewing reported differences from the stored
+GGUF identity.
 
 ## Model groups, retention, and eviction priority
 
@@ -468,6 +475,7 @@ The complete live route and settings list is returned by `GET /api/v1/capabiliti
 - `GET /api/v1/sessions/{session}/inspect|metrics|logs`
 - `GET /api/v1/gateway/inspect`
 - `POST /api/v1/models/{model}/load|restart|unload`
+- `POST /api/v1/models/{model}/reattach`
 - `GET|POST /api/v1/models/{model}/profiles`
 - `PUT|DELETE /api/v1/models/{model}/profiles/{profile}`
 - `GET /api/v1/models/{model}/companions`

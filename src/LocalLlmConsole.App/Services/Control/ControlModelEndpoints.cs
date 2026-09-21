@@ -101,6 +101,37 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
             });
         }
 
+        if (segments.Length == 5 && segments[4].Equals("reattach", StringComparison.OrdinalIgnoreCase) && method == "POST")
+        {
+            var file = RequiredString(request.Body, "file");
+            var inspection = await _deps.ModelCatalog.InspectReattachFileAsync(model, file, cancellationToken);
+            var active = inspection.DuplicateModels.Prepend(model).FirstOrDefault(candidate =>
+                _deps.Sessions.SessionForModel(candidate.Id) is { IsRunning: true });
+            if (active is not null)
+                throw new InvalidOperationException($"Unload '{active.Name}' before reattaching or consolidating its model registration.");
+
+            var result = await _deps.ModelCatalog.ReattachFileAsync(
+                model,
+                inspection,
+                request.Body?["confirmRole"]?.GetValue<bool>() ?? false,
+                request.Body?["confirmIdentityMismatch"]?.GetValue<bool>() ?? false);
+            await _deps.Actions.RefreshAsync(cancellationToken);
+            return Ok(new
+            {
+                ok = true,
+                previousPath = model.ModelPath,
+                removedDuplicateRecords = result.RemovedDuplicateRecords,
+                movedLaunchProfiles = result.MovedLaunchProfiles,
+                identityWarnings = result.IdentityWarnings,
+                classification = ClassificationView(result.Classification),
+                model = ModelView(
+                    result.Model,
+                    await _deps.LaunchProfiles.ListNamedAsync(result.Model),
+                    await _modelGroups.SnapshotAsync(),
+                    _deps.Actions.GetSettings().AutoUnloadIdleMinutes)
+            });
+        }
+
         if (segments.Length == 5 && segments[4].Equals("group", StringComparison.OrdinalIgnoreCase))
         {
             var defaultProfile = (await _deps.LaunchProfiles.ListNamedAsync(model)).FirstOrDefault(profile => profile.IsDefault)

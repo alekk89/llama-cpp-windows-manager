@@ -99,6 +99,9 @@ public sealed partial class AppServiceFactory
     public ModelImportApplicationService CreateModelImportApplicationService()
         => new();
 
+    public ModelReattachApplicationService CreateModelReattachApplicationService()
+        => new();
+
     public ModelDeletionApplicationService CreateModelDeletionApplicationService()
         => new();
 
