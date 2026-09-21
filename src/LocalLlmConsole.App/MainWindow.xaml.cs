@@ -65,7 +65,8 @@ public partial class MainWindow : Window
                 OpenBenchmarkPlan: OpenBenchmarkPlan,
                 ShowModels: ShowModels,
                 OpenLog: OpenLogPath,
-                SetStatus: SetStatus));
+                SetStatus: SetStatus,
+                StateStore: () => _stateStore));
         _overviewSelection = new OverviewSelectionController(
             _viewModel,
             _overviewPage,

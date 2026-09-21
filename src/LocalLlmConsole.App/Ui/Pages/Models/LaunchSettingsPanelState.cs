@@ -26,6 +26,8 @@ public sealed class LaunchSettingsPanelState
 
     public List<FrameworkElement> AdvancedLaunchSections { get; } = [];
 
+    public IReadOnlyList<RuntimeChoice> RuntimeChoices { get; private set; } = [];
+
     private WpfButton? SaveModelLaunchSettingsButton { get; set; }
     private WpfButton? FitToAvailableVramButton { get; set; }
 
@@ -62,6 +64,7 @@ public sealed class LaunchSettingsPanelState
         SaveAsNewModelNameBox = controls.SaveAsNewModelNameBox;
         SaveAsNewModelButton = controls.SaveAsNewModelButton;
         FormControls = controls.FormControls;
+        RuntimeChoices = controls.RuntimeChoices;
     }
 
     public void SetSaveForModelState(string content, bool enabled, bool visible)

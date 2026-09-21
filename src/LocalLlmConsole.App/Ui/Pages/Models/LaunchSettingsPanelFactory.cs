@@ -25,6 +25,7 @@ public sealed record LaunchSettingsPanelRequest(
     Func<Task> ChooseDraftModelAsync,
     Func<Task> ChooseMtpHeadAsync,
     Action SaveAsNewNameChanged,
+    Func<Task> CopyProfileToAnotherModelAsync,
     Func<string, string?> ChooseAdditionalFile,
     Func<string, string?> ChooseAdditionalDirectory);
 
@@ -44,6 +45,7 @@ public sealed class LaunchSettingsPanelControls
     public required HashSet<string> AdvancedLaunchSettingLabels { get; init; }
     public required List<LaunchSettingsSectionElements> LaunchSettingSections { get; init; }
     public required List<FrameworkElement> AdvancedLaunchSections { get; init; }
+    public required IReadOnlyList<RuntimeChoice> RuntimeChoices { get; init; }
 }
 
 public sealed record LaunchSettingsSectionElements(
@@ -116,7 +118,8 @@ public static partial class LaunchSettingsPanelFactory
             LaunchSettingElements = launchSettingElements,
             AdvancedLaunchSettingLabels = advancedLaunchSettingLabels,
             LaunchSettingSections = launchSettingSections,
-            AdvancedLaunchSections = advancedLaunchSections
+            AdvancedLaunchSections = advancedLaunchSections,
+            RuntimeChoices = request.RuntimeChoices.ToList()
         };
     }
 }

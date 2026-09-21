@@ -137,6 +137,38 @@ public partial class MainWindow
             ModelRuntimeLoadActions(() => _settings, profile.Id, profile.Name));
     }
 
+    private async Task CopyLaunchProfileToAnotherModelAsync(ModelRecord model, NamedModelLaunchProfile profile)
+    {
+        var result = ModelLaunchProfileCopyDialogFactory.Show(
+            this,
+            model,
+            profile,
+            await ModelServices.Catalog.ListAsync(),
+            _viewModel.LaunchSettings.RuntimeChoices,
+            () => AppServices.StateStore);
+        if (!result.Accepted || result.TargetModel is null)
+            return;
+
+        await ModelServices.LaunchProfileCopy.CopySelectedAsync(
+            model,
+            result.TargetModel,
+            profile,
+            result.Name,
+            _settings,
+            new ModelLaunchProfileCopySelectedActions(
+                RunResponsiveAsync,
+                () => RenderSelectedModelLaunchSettingsAsync(),
+                () => _settings,
+                SelectedLaunchRuntimeId,
+                request => ModelServices.LaunchVariants.CopyProfileAsync(request),
+                new ModelLaunchProfileCopyActions(
+                    RefreshModelsAsync,
+                    SelectLaunchProfileAfterRefresh,
+                    () => RenderSelectedModelLaunchSettingsAsync(),
+                    RefreshOverviewModelSelectorAsync,
+                    SetStatus)));
+    }
+
     private async void BeginNewLaunchProfile()
         => await RunEventAsync(_launchSettingsController.BeginNewProfileAsync);
 

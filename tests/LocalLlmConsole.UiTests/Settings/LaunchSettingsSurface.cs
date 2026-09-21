@@ -34,6 +34,7 @@ public abstract partial class WpfUiTestBase
             ChooseDraftModelAsync: () => Task.CompletedTask,
             ChooseMtpHeadAsync: () => Task.CompletedTask,
             SaveAsNewNameChanged: () => { },
+            CopyProfileToAnotherModelAsync: () => Task.CompletedTask,
             ChooseAdditionalFile: _ => null,
             ChooseAdditionalDirectory: _ => null));
         panelState.Apply(panel);

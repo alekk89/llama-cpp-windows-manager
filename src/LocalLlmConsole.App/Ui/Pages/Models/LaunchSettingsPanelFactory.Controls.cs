@@ -125,6 +125,7 @@ public static partial class LaunchSettingsPanelFactory
             request.ResetDefaults();
             return Task.CompletedTask;
         }));
+        actions.Children.Add(Button(Loc.T("Launch.CopyProfileToAnotherModelButton"), request.CopyProfileToAnotherModelAsync));
         return actions;
     }
 

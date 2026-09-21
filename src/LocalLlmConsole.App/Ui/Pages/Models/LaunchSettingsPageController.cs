@@ -26,7 +26,8 @@ public sealed record LaunchSettingsPageControllerActions(
     Action<BenchmarkPlan> OpenBenchmarkPlan,
     Action ShowModels,
     Action<string> OpenLog,
-    Action<string> SetStatus);
+    Action<string> SetStatus,
+    Func<StateStore?> StateStore);
 
 public sealed class LaunchSettingsPageController
 {
@@ -145,6 +146,62 @@ public sealed class LaunchSettingsPageController
                 _actions.SelectedRuntimeId,
                 request => _actions.ModelServices().LaunchVariants.SaveAsNewAsync(request),
                 new ModelLaunchVariantSaveActions(
+                    _actions.RefreshModelsAsync,
+                    _actions.SelectProfileAfterRefresh,
+                    () => RenderSelectedAsync(),
+                    _actions.RefreshOverviewModelsAsync,
+                    _actions.SetStatus)));
+    }
+
+    public async Task CopyProfileToAnotherModelAsync()
+    {
+        var sourceModel = _actions.SelectedModel();
+        if (sourceModel is null)
+        {
+            _actions.SetStatus(Loc.T("Models.Profile.SelectOrCreate"));
+            return;
+        }
+
+        var profileId = _actions.SelectedProfileId();
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            _actions.SetStatus(Loc.T("Models.Profile.SelectOrCreate"));
+            return;
+        }
+
+        var sourceProfile = await _actions.ModelServices().LaunchProfiles.GetNamedAsync(profileId);
+        if (sourceProfile is null)
+        {
+            _actions.SetStatus(Loc.T("Models.Profile.SelectOrCreate"));
+            return;
+        }
+
+        var result = ModelLaunchProfileCopyDialogFactory.Show(
+            System.Windows.Application.Current.MainWindow,
+            sourceModel,
+            sourceProfile,
+            await _actions.ModelServices().Catalog.ListAsync(),
+            _panel.RuntimeChoices,
+            _actions.StateStore);
+        if (!result.Accepted || result.TargetModel is null)
+        {
+            _actions.SetStatus(Loc.T("Launch.CopyProfileToAnotherModel.Title"));
+            return;
+        }
+
+        await _actions.ModelServices().LaunchProfileCopy.CopySelectedAsync(
+            sourceModel,
+            result.TargetModel,
+            sourceProfile,
+            result.Name,
+            _actions.Settings(),
+            new ModelLaunchProfileCopySelectedActions(
+                _actions.RunBusyAsync,
+                () => RenderSelectedAsync(),
+                _actions.Settings,
+                _actions.SelectedRuntimeId,
+                request => _actions.ModelServices().LaunchVariants.CopyProfileAsync(request),
+                new ModelLaunchProfileCopyActions(
                     _actions.RefreshModelsAsync,
                     _actions.SelectProfileAfterRefresh,
                     () => RenderSelectedAsync(),
