@@ -2,10 +2,12 @@
 
 Last reviewed: 2026-08-25
 
-The project has applied for the SignPath Foundation open-source code-signing
-programme. Until the application is accepted and the protected workflow has
-completed successfully, release artifacts must continue to be described as
-unsigned.
+The project has been provisioned in the SignPath Foundation open-source
+code-signing programme with a test certificate. The production certificate is
+pending technical setup and origin verification. Until it is activated and the
+protected release workflow has completed successfully, public release artifacts
+must continue to be described as unsigned. The separate
+[onboarding workflow](SIGNPATH.md) produces explicitly labelled test artifacts.
 
 Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 

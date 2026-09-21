@@ -47,9 +47,11 @@ private key is available to the job.
 ## Free Options
 
 - **Free and publicly useful for qualifying OSS:** apply to SignPath Foundation
-  for open-source code signing. The application is pending; if accepted, adapt
-  the protected workflow to SignPath's returned-artifact flow and enforce the
-  repository [code-signing policy](CODE_SIGNING_POLICY.md).
+  for open-source code signing. The account and test certificate are provisioned;
+  the production certificate is awaiting technical setup and origin verification.
+  Follow [SignPath onboarding](SIGNPATH.md), then adapt the protected workflow to
+  SignPath's returned-artifact flow and enforce the repository
+  [code-signing policy](CODE_SIGNING_POLICY.md).
 - **Free but not publicly trusted:** self-signed certificates are useful for
   local testing and enterprise environments where the certificate is deployed to
   trusted stores. They do not remove SmartScreen or public trust warnings for
