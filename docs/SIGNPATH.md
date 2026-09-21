@@ -25,13 +25,13 @@ configuration. The current v3 connector requires the SignPath GitHub App to be
 installed for this repository; an API token alone is insufficient. See the
 [SignPath GitHub integration documentation](https://docs.signpath.io/trusted-build-systems/github).
 
-The workflow pins the signer certificate, temporarily trusts that exact
-self-signed certificate only on the disposable hosted runner, requires a valid
-Authenticode signature and timestamp, and checks that modifying the executable
-produces a hash mismatch. It removes the temporary trust in a `finally` block.
-The test artifacts are clearly labelled, expire after 14 days, and are never
-published as GitHub release assets. Do not install the test certificate on users'
-machines or describe these artifacts as publicly trusted.
+The workflow pins the signer certificate, requires the expected `NotTrusted`
+status for that self-signed certificate and a timestamp, and checks that
+modifying the executable produces a hash mismatch. It does not add the test
+certificate to any trusted root store. The test artifacts are clearly labelled,
+expire after 14 days, and are never published as GitHub release assets. Do not
+install the test certificate on users' machines or describe these artifacts as
+publicly trusted.
 
 ## Credentials and execution
 
