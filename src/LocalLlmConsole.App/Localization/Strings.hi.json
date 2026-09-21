@@ -192,6 +192,8 @@
   "Models.Import.Role.SpeculativeAssistant": "अनुमान सहायक",
   "Models.Import.Role.Ambiguous": "अस्पष्ट",
   "Models.Import.Role.Invalid": "अमान्य",
+  "Models.Reattach.Action": "फ़ाइल खोजें…",
+  "Models.Reattach.ToolTip": "स्थानांतरित GGUF फ़ाइल चुनें और इस मॉडल की लॉन्च प्रोफ़ाइल सुरक्षित रखें।",
   "Models.ScanDiagnostics.Title": "मॉडल स्कैन निदान",
   "Models.ScanDiagnostics.Message": "कुछ GGUF फ़ाइलों की समीक्षा आवश्यक है और वे अपने आप पंजीकृत नहीं हुईं।\n\n{0}\n\nकिसी वैध अस्पष्ट फ़ाइल को स्पष्ट रूप से पंजीकृत करने के लिए मॉडल फ़ाइल जोड़ें… का उपयोग करें।",
   "Models.ScanDiagnostics.MoreFiles": "…और {0} फ़ाइलें।",

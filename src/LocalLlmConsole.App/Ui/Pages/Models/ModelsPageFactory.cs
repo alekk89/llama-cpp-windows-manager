@@ -245,7 +245,9 @@ public static class ModelsPageFactory
                 row => row.IsFavorite,
                 row => row.LaunchProfile is null,
                 row => actions.ToggleModelFavoriteAsync(row.Model)),
-            new(_ => Loc.T("Models.ActionBtn.OpenFolder"),
+            new(row => ((ModelGridRow)row).IsMissing
+                    ? Loc.T("Models.Reattach.Action")
+                    : Loc.T("Models.ActionBtn.OpenFolder"),
                 row => row is ModelGridRow { CanOpenFolder: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(actions.OpenModelFolderRowClick, row)),
             new(_ => Loc.T("Launch.SaveAsNewButton"),

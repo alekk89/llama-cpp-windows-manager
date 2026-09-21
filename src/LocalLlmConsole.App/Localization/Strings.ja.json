@@ -201,6 +201,8 @@
   "Models.Import.Role.SpeculativeAssistant": "投機的アシスタント",
   "Models.Import.Role.Ambiguous": "不明確",
   "Models.Import.Role.Invalid": "無効",
+  "Models.Reattach.Action": "ファイルを指定…",
+  "Models.Reattach.ToolTip": "移動した GGUF ファイルを選択し、このモデルの起動プロファイルを保持します。",
   "Models.ScanDiagnostics.Title": "モデルスキャン診断",
   "Models.ScanDiagnostics.Message": "確認が必要な GGUF ファイルがあり、自動登録されませんでした。\n\n{0}\n\n有効で不明確なファイルを明示的に登録するには、［モデルファイルを追加…］を使用してください。",
   "Models.ScanDiagnostics.MoreFiles": "…ほか {0} ファイル。",

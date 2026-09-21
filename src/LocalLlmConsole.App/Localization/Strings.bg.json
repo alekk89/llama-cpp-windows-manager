@@ -281,6 +281,8 @@
   "Models.Import.Role.SpeculativeAssistant": "спекулативен помощник",
   "Models.Import.Role.Ambiguous": "нееднозначен",
   "Models.Import.Role.Invalid": "невалиден",
+  "Models.Reattach.Action": "Намиране на файл…",
+  "Models.Reattach.ToolTip": "Изберете преместения GGUF файл и запазете профилите за стартиране на този модел.",
   "Models.ScanDiagnostics.Title": "Диагностика на сканирането на модели",
   "Models.ScanDiagnostics.Message": "Някои GGUF файлове изискват преглед и не бяха регистрирани автоматично.\n\n{0}\n\nИзползвайте „Добавяне на файл с модел…“, за да регистрирате изрично валиден нееднозначен файл.",
   "Models.ScanDiagnostics.MoreFiles": "…и още {0} файл(а).",

@@ -192,6 +192,8 @@
   "Models.Import.Role.SpeculativeAssistant": "مساعد تخميني",
   "Models.Import.Role.Ambiguous": "ملتبس",
   "Models.Import.Role.Invalid": "غير صالح",
+  "Models.Reattach.Action": "تحديد موقع الملف…",
+  "Models.Reattach.ToolTip": "اختر ملف GGUF الذي تم نقله واحتفظ بملفات تعريف تشغيل هذا النموذج.",
   "Models.ScanDiagnostics.Title": "تشخيص فحص النماذج",
   "Models.ScanDiagnostics.Message": "تحتاج بعض ملفات GGUF إلى المراجعة ولم تُسجّل تلقائياً.\n\n{0}\n\nاستخدم «إضافة ملف نموذج…» لتسجيل ملف صالح ملتبس بشكل صريح.",
   "Models.ScanDiagnostics.MoreFiles": "…و{0} ملف إضافي.",

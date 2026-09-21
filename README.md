@@ -27,6 +27,7 @@ endpoints on native Windows or Ubuntu/WSL.
 * Installs or registers Windows and WSL `llama.cpp` runtimes.
 * Downloads, imports, scans, and organizes GGUF models.
 * Saves multiple launch profiles for each model.
+* Reattaches relocated GGUF files without losing saved profiles or group assignments.
 * Searches and favourites models, saved profiles, and runtimes consistently,
   including quick profile control from the themed tray menu.
 * Runs and supervises several model servers on separate ports.

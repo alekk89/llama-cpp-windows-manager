@@ -263,6 +263,8 @@
   "Models.Import.Role.SpeculativeAssistant": "asystent spekulatywny",
   "Models.Import.Role.Ambiguous": "niejednoznaczny",
   "Models.Import.Role.Invalid": "nieprawidłowy",
+  "Models.Reattach.Action": "Znajdź plik…",
+  "Models.Reattach.ToolTip": "Wybierz przeniesiony plik GGUF i zachowaj profile uruchamiania tego modelu.",
   "Models.ScanDiagnostics.Title": "Diagnostyka skanowania modeli",
   "Models.ScanDiagnostics.Message": "Niektóre pliki GGUF wymagają przeglądu i nie zostały automatycznie zarejestrowane.\n\n{0}\n\nUżyj opcji Dodaj plik modelu…, aby jawnie zarejestrować prawidłowy niejednoznaczny plik.",
   "Models.ScanDiagnostics.MoreFiles": "…oraz jeszcze {0} plik(ów).",

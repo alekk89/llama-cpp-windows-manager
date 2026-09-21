@@ -133,6 +133,7 @@ public sealed partial class AppServiceFactory
         var modelRuntimeUnloadApplication = CreateModelRuntimeUnloadApplicationService(modelRuntimeCommands);
         var modelFolderApplication = CreateModelFolderApplicationService();
         var modelImportApplication = CreateModelImportApplicationService();
+        var modelReattachApplication = CreateModelReattachApplicationService();
         var modelDeletionApplication = CreateModelDeletionApplicationService();
         var modelGatewayHostFactory = CreateModelGatewayHostFactoryService();
         var modelGatewayLifecycleApplication = CreateModelGatewayLifecycleApplicationService();
@@ -262,6 +263,7 @@ public sealed partial class AppServiceFactory
                 launchRuntimeSelection,
                 modelFolderApplication,
                 modelImportApplication,
+                modelReattachApplication,
                 modelDeletionApplication,
                 modelGatewayHostFactory,
                 modelGatewayLifecycleApplication,

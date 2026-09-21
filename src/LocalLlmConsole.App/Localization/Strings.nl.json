@@ -233,6 +233,8 @@
   "Models.Import.Role.SpeculativeAssistant": "speculatieve assistent",
   "Models.Import.Role.Ambiguous": "dubbelzinnig",
   "Models.Import.Role.Invalid": "ongeldig",
+  "Models.Reattach.Action": "Bestand zoeken…",
+  "Models.Reattach.ToolTip": "Selecteer het verplaatste GGUF-bestand en behoud de startprofielen van dit model.",
   "Models.ScanDiagnostics.Title": "Diagnose van modelscan",
   "Models.ScanDiagnostics.Message": "Sommige GGUF-bestanden moeten worden beoordeeld en zijn niet automatisch geregistreerd.\n\n{0}\n\nGebruik Modelbestand toevoegen… om een geldig dubbelzinnig bestand expliciet te registreren.",
   "Models.ScanDiagnostics.MoreFiles": "…en nog {0} bestand(en).",

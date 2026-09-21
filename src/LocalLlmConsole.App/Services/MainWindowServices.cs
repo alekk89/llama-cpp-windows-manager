@@ -138,6 +138,7 @@ public sealed record MainWindowCoreModelServices(
     LaunchRuntimeSelectionService LaunchRuntimeSelection,
     ModelFolderApplicationService ModelFolderApplication,
     ModelImportApplicationService ModelImportApplication,
+    ModelReattachApplicationService ModelReattachApplication,
     ModelDeletionApplicationService ModelDeletionApplication,
     ModelGatewayHostFactoryService ModelGatewayHostFactory,
     ModelGatewayLifecycleApplicationService ModelGatewayLifecycleApplication,

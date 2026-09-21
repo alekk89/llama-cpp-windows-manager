@@ -549,21 +549,22 @@ Current:
 1. Choose a models folder, scan it on demand, or explicitly select one GGUF file anywhere on disk.
 2. Classify readable GGUFs from role metadata first (`MainModel`, `VisionProjector`, `SpeculativeAssistant`, or `Ambiguous`), use narrow filename conventions only as a fallback or conflict signal, and return per-file scan diagnostics instead of silently relying on broad name exclusions.
 3. Auto-register main-model GGUFs in SQLite. An explicit file import rejects invalid GGUFs, asks for confirmation before treating a companion or ambiguous file as a main model, and persists that confirmation so later scans do not discard the registration.
-4. Pick a prebuilt or custom built llama.cpp runtime and launch settings.
-5. Load/restart/unload explicitly; more than one launch profile can stay loaded at the same time, including profiles backed by the same GGUF, when each profile has a unique saved port and hardware capacity allows it.
-6. Search Hugging Face from the Models page, paste a Hugging Face repo or GGUF file URL directly, review compatibility signals, open the selected repo's model card, and download/install the selected GGUF plus a discoverable verified mmproj/projector companion as a background job.
-7. Delete registration or app-owned model directory according to ownership flags.
-8. Generate compact model manifests from readable GGUF metadata while preserving imported/download metadata.
-9. Bound downloads by their expected size while streaming, then verify expected
+4. Reattach a missing registration to a relocated GGUF while retaining its stable model ID and profile relationships. The operation validates the GGUF role and stored identity, blocks active source or duplicate registrations, and transactionally consolidates a registration that already owns the selected path.
+5. Pick a prebuilt or custom built llama.cpp runtime and launch settings.
+6. Load/restart/unload explicitly; more than one launch profile can stay loaded at the same time, including profiles backed by the same GGUF, when each profile has a unique saved port and hardware capacity allows it.
+7. Search Hugging Face from the Models page, paste a Hugging Face repo or GGUF file URL directly, review compatibility signals, open the selected repo's model card, and download/install the selected GGUF plus a discoverable verified mmproj/projector companion as a background job.
+8. Delete registration or app-owned model directory according to ownership flags.
+9. Generate compact model manifests from readable GGUF metadata while preserving imported/download metadata.
+10. Bound downloads by their expected size while streaming, then verify expected
    byte counts or SHA-256 before registering downloaded GGUF files.
    The worker also persists failures from filesystem preparation before transfer
    begins, so a stopped worker cannot silently leave a queued job. If persistence
    itself fails, trace both errors and release the active-download registration.
-10. Validate local vision/projector pairing by surfacing missing mmproj files in capability summaries, invalidating cached capabilities when a projector is added or removed, carrying auto-detected, embedded/model-bundled, or explicit per-model Vision head choices, carrying a separate MTP head path for compatible `--mtp-head` runtimes, and carrying per-model dynamic-resolution image token allowances through to `llama-server`.
-11. Save named launch variants per model so users can keep multiple runtime/port/context/vision profiles without duplicating model registration.
-12. Keep model serving local-only unless Settings explicitly enables LAN exposure. Local-only mode may explicitly disable model API-key authentication, which clears the active key while retaining a protected backup for re-enabling it. LAN exposure can be scoped to the auto-load gateway, direct model ports, or both, and always requires a strong key. These settings affect only model-serving endpoints, not the independently authenticated app-local control API.
-13. Show model loading progress in Overview with separate model-name and loading-time rows, and retain the completed load duration after readiness is reached so users can see how long startup took.
-14. Treat UI visibility as presentation state only. Collapsing cards, logs, raw
+11. Validate local vision/projector pairing by surfacing missing mmproj files in capability summaries, invalidating cached capabilities when a projector is added or removed, carrying auto-detected, embedded/model-bundled, or explicit per-model Vision head choices, carrying a separate MTP head path for compatible `--mtp-head` runtimes, and carrying per-model dynamic-resolution image token allowances through to `llama-server`.
+12. Save named launch variants per model so users can keep multiple runtime/port/context/vision profiles without duplicating model registration.
+13. Keep model serving local-only unless Settings explicitly enables LAN exposure. Local-only mode may explicitly disable model API-key authentication, which clears the active key while retaining a protected backup for re-enabling it. LAN exposure can be scoped to the auto-load gateway, direct model ports, or both, and always requires a strong key. These settings affect only model-serving endpoints, not the independently authenticated app-local control API.
+14. Show model loading progress in Overview with separate model-name and loading-time rows, and retain the completed load duration after readiness is reached so users can see how long startup took.
+15. Treat UI visibility as presentation state only. Collapsing cards, logs, raw
     metrics, or Hugging Face controls must never disable collection, downloads,
     or model serving. Absent keys use the documented per-surface defaults.
 
