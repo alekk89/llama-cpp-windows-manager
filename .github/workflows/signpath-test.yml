@@ -1,0 +1,139 @@
+name: SignPath test signing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: signpath-test
+  cancel-in-progress: false
+
+jobs:
+  test-signing:
+    name: Build and verify SignPath test signature
+    if: github.repository == 'alekk89/llama-cpp-windows-manager' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    environment: signpath-test
+
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check signing configuration
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN)) {
+            throw 'Add SIGNPATH_API_TOKEN to the protected signpath-test environment.'
+          }
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Build the real control CLI
+        shell: pwsh
+        run: |
+          $project = 'src/LocalLlmConsole.ControlCli/LocalLlmConsole.ControlCli.csproj'
+          dotnet restore $project -r win-x64 --locked-mode -p:PublishAot=true -p:SelfContained=true -p:NuGetLockFilePath=packages.publish.lock.json
+          if ($LASTEXITCODE -ne 0) { throw 'Locked CLI restore failed.' }
+          dotnet publish $project --no-restore -c Release -r win-x64 --self-contained true -p:PublishAot=true -p:NuGetLockFilePath=packages.publish.lock.json -o dist/signpath-test/unsigned
+          if ($LASTEXITCODE -ne 0) { throw 'CLI publish failed.' }
+          $exe = 'dist/signpath-test/unsigned/llwmctl.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'CLI executable is missing.' }
+          if ((Get-AuthenticodeSignature -FilePath $exe).Status -ne 'NotSigned') {
+            throw 'Expected a newly built unsigned CLI.'
+          }
+
+      # The existing SignPath "initial" configuration expects a raw PE file.
+      - name: Upload unsigned executable for origin verification
+        id: unsigned
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          path: dist/signpath-test/unsigned/llwmctl.exe
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Submit to SignPath test signing
+        id: signpath
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: 4834e5f4-7a05-47a1-8aa7-abae116a9135
+          project-slug: llama-cpp-windows-manager
+          signing-policy-slug: test-signing
+          artifact-configuration-slug: initial
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signpath-test/signed
+          skip-decompress: true
+
+      - name: Verify pinned test certificate and signature integrity
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
+            throw 'Test certificate verification is restricted to a disposable GitHub-hosted runner.'
+          }
+          $exe = Join-Path $PWD 'dist/signpath-test/signed/llwmctl.exe'
+          $expectedThumbprint = '38044475DB3D73116E9394D9E52D7323A449DF1D'
+          $signature = Get-AuthenticodeSignature -FilePath $exe
+          if ($null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $expectedThumbprint) {
+            throw 'The returned artifact does not use the approved SignPath test certificate.'
+          }
+          $statusName = [string]$signature.Status
+          if ($statusName -notin @('NotTrusted', 'UnknownError')) {
+            throw "Unexpected test signature status: $($signature.Status) $($signature.StatusMessage)"
+          }
+          if ($statusName -eq 'UnknownError' -and $signature.StatusMessage -notmatch 'root certificate which is not trusted') {
+            throw "Unexpected test signature error: $($signature.StatusMessage)"
+          }
+          if ($null -eq $signature.TimeStamperCertificate) { throw 'The returned signature has no timestamp.' }
+
+          # The pinned self-signed test certificate intentionally remains untrusted.
+          # Prove signature integrity by requiring Windows to reject a modified copy.
+          $tamperedPath = Join-Path $env:RUNNER_TEMP 'llwm-signpath-tampered.exe'
+          $bytes = [IO.File]::ReadAllBytes($exe)
+          $bytes[0x40] = $bytes[0x40] -bxor 1
+          [IO.File]::WriteAllBytes($tamperedPath, $bytes)
+          if ((Get-AuthenticodeSignature -FilePath $tamperedPath).Status -ne 'HashMismatch') {
+            throw 'Signature verification did not reject a modified executable with HashMismatch.'
+          }
+
+          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  llwmctl.exe" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
+          'TEST SIGNATURE ONLY. This certificate is self-signed and is not publicly trusted. Do not distribute this artifact as a production release.' |
+            Set-Content -LiteralPath (Join-Path (Split-Path -Parent $exe) 'TEST-ONLY.txt') -Encoding utf8
+
+      - name: Record onboarding evidence
+        if: always() && steps.signpath.outputs.signing-request-id != ''
+        shell: pwsh
+        env:
+          SIGNING_REQUEST_ID: ${{ steps.signpath.outputs.signing-request-id }}
+          SIGNING_REQUEST_URL: ${{ steps.signpath.outputs.signing-request-web-url }}
+        run: |
+          @"
+          ## SignPath onboarding test
+          - Commit: $env:GITHUB_SHA
+          - Policy: test-signing
+          - Artifact configuration: initial (raw PE)
+          - Signing request: [$env:SIGNING_REQUEST_ID]($env:SIGNING_REQUEST_URL)
+          - Check the verification step result and inspect GitHub origin in SignPath before requesting certificate issuance.
+          - These artifacts are test-signed only and are not a production release.
+          "@ >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload verified test artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: signpath-TEST-ONLY-${{ github.run_id }}
+          path: dist/signpath-test/signed/
+          if-no-files-found: error
+          retention-days: 14
