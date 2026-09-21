@@ -89,8 +89,12 @@ jobs:
           if ($null -eq $signature.SignerCertificate -or $signature.SignerCertificate.Thumbprint -ne $expectedThumbprint) {
             throw 'The returned artifact does not use the approved SignPath test certificate.'
           }
-          if ($signature.Status -ne 'NotTrusted') {
+          $statusName = [string]$signature.Status
+          if ($statusName -notin @('NotTrusted', 'UnknownError')) {
             throw "Unexpected test signature status: $($signature.Status) $($signature.StatusMessage)"
+          }
+          if ($statusName -eq 'UnknownError' -and $signature.StatusMessage -notmatch 'root certificate which is not trusted') {
+            throw "Unexpected test signature error: $($signature.StatusMessage)"
           }
           if ($null -eq $signature.TimeStamperCertificate) { throw 'The returned signature has no timestamp.' }
 
