@@ -206,6 +206,8 @@
   "Models.Import.Role.SpeculativeAssistant": "spekulativní asistent",
   "Models.Import.Role.Ambiguous": "nejednoznačný",
   "Models.Import.Role.Invalid": "neplatný",
+  "Models.Reattach.Action": "Vyhledat soubor…",
+  "Models.Reattach.ToolTip": "Vyberte přesunutý soubor GGUF a zachovejte spouštěcí profily tohoto modelu.",
   "Models.ScanDiagnostics.Title": "Diagnostika kontroly modelů",
   "Models.ScanDiagnostics.Message": "Některé soubory GGUF vyžadují kontrolu a nebyly automaticky zaregistrovány.\n\n{0}\n\nPomocí možnosti Přidat soubor modelu… výslovně zaregistrujte platný nejednoznačný soubor.",
   "Models.ScanDiagnostics.MoreFiles": "…a dalších {0} souborů.",

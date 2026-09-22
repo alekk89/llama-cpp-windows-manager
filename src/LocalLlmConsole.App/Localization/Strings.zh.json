@@ -251,6 +251,8 @@
   "Models.Import.Role.SpeculativeAssistant": "推测助手",
   "Models.Import.Role.Ambiguous": "不明确",
   "Models.Import.Role.Invalid": "无效",
+  "Models.Reattach.Action": "定位文件…",
+  "Models.Reattach.ToolTip": "选择已移动的 GGUF 文件，并保留此模型的启动配置。",
   "Models.ScanDiagnostics.Title": "模型扫描诊断",
   "Models.ScanDiagnostics.Message": "某些 GGUF 文件需要检查，因此未自动注册。\n\n{0}\n\n使用“添加模型文件…”可明确注册有效但角色不明确的文件。",
   "Models.ScanDiagnostics.MoreFiles": "…以及另外 {0} 个文件。",

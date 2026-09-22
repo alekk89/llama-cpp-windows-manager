@@ -225,6 +225,8 @@
   "Models.Import.Role.SpeculativeAssistant": "assistente especulativo",
   "Models.Import.Role.Ambiguous": "ambíguo",
   "Models.Import.Role.Invalid": "inválido",
+  "Models.Reattach.Action": "Localizar arquivo…",
+  "Models.Reattach.ToolTip": "Selecione o arquivo GGUF realocado e mantenha os perfis de inicialização deste modelo.",
   "Models.ScanDiagnostics.Title": "Diagnóstico da verificação de modelos",
   "Models.ScanDiagnostics.Message": "Alguns arquivos GGUF precisam de revisão e não foram registrados automaticamente.\n\n{0}\n\nUse Adicionar arquivo de modelo… para registrar explicitamente um arquivo ambíguo válido.",
   "Models.ScanDiagnostics.MoreFiles": "…e mais {0} arquivo(s).",

@@ -260,6 +260,8 @@
   "Models.Import.Role.SpeculativeAssistant": "spekulativ assistent",
   "Models.Import.Role.Ambiguous": "tvetydig",
   "Models.Import.Role.Invalid": "ogiltig",
+  "Models.Reattach.Action": "Leta upp fil…",
+  "Models.Reattach.ToolTip": "Välj den flyttade GGUF-filen och behåll modellens startprofiler.",
   "Models.ScanDiagnostics.Title": "Diagnostik för modellgenomsökning",
   "Models.ScanDiagnostics.Message": "Vissa GGUF-filer behöver granskas och registrerades inte automatiskt.\n\n{0}\n\nAnvänd Lägg till modellfil… för att uttryckligen registrera en giltig tvetydig fil.",
   "Models.ScanDiagnostics.MoreFiles": "…och ytterligare {0} fil(er).",

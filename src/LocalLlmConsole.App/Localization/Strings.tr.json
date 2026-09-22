@@ -257,6 +257,8 @@
   "Models.Import.Role.SpeculativeAssistant": "spekülatif yardımcı",
   "Models.Import.Role.Ambiguous": "belirsiz",
   "Models.Import.Role.Invalid": "geçersiz",
+  "Models.Reattach.Action": "Dosyayı bul…",
+  "Models.Reattach.ToolTip": "Taşınan GGUF dosyasını seçin ve bu modelin başlatma profillerini koruyun.",
   "Models.ScanDiagnostics.Title": "Model tarama tanılaması",
   "Models.ScanDiagnostics.Message": "Bazı GGUF dosyalarının incelenmesi gerekiyor ve bunlar otomatik olarak kaydedilmedi.\n\n{0}\n\nGeçerli ancak belirsiz bir dosyayı açıkça kaydetmek için Model dosyası ekle… seçeneğini kullanın.",
   "Models.ScanDiagnostics.MoreFiles": "…ve {0} dosya daha.",

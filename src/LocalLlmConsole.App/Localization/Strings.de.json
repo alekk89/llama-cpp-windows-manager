@@ -234,6 +234,8 @@
   "Models.Import.Role.SpeculativeAssistant": "spekulativer Assistent",
   "Models.Import.Role.Ambiguous": "mehrdeutig",
   "Models.Import.Role.Invalid": "ungültig",
+  "Models.Reattach.Action": "Datei suchen…",
+  "Models.Reattach.ToolTip": "Wählen Sie die verschobene GGUF-Datei aus und behalten Sie die Startprofile dieses Modells.",
   "Models.ScanDiagnostics.Title": "Diagnose des Modellscans",
   "Models.ScanDiagnostics.Message": "Einige GGUF-Dateien müssen geprüft werden und wurden nicht automatisch registriert.\n\n{0}\n\nVerwenden Sie „Modelldatei hinzufügen…“, um eine gültige mehrdeutige Datei ausdrücklich zu registrieren.",
   "Models.ScanDiagnostics.MoreFiles": "…und {0} weitere Datei(en).",

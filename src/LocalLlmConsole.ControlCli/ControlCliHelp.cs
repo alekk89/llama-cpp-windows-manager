@@ -7,8 +7,9 @@ llwmctl - control llama.cpp Windows Manager
 
 Core:
   llwmctl status | capabilities | self [--endpoint URL|--model ID|--session ID]
-  llwmctl models list|get|scan|import|companions|delete
+  llwmctl models list|get|scan|import|reattach|companions|delete
   llwmctl models import --file PATH [--confirm-role] | --folder PATH
+  llwmctl models reattach MODEL --file PATH [--confirm-role] [--confirm-mismatch]
   llwmctl load|restart|unload MODEL [--profile NAME] [--runtime ID] [--set name=value] [--wait]
   llwmctl profiles list|create|update|delete --model MODEL [--id ID] [--name NAME] [--set name=value]
   llwmctl groups list|get|create|update|delete [GROUP] [--name NAME] [--retention inherit|pinned|idle-timeout] [--idle-minutes N] [--priority low|normal|high]

@@ -113,6 +113,28 @@ public sealed class ReleaseGateIntegrationTests : ManagerRegressionTestBase
             new JsonObject { ["file"] = importedModelPath }));
         Assert.Equal(200, importResponse.StatusCode);
         Assert.Contains("\"source\":\"file\"", JsonSerializer.Serialize(importResponse.Body), StringComparison.Ordinal);
+        var missingApiModel = new ModelRecord(
+            "api-missing-model",
+            "API Missing Model",
+            Path.Combine(root, "moved-from", "model.gguf"),
+            OwnershipKind.External,
+            "{}",
+            DateTimeOffset.UtcNow);
+        await store.UpsertModelAsync(missingApiModel);
+        var missingApiProfile = await profiles.EnsureDefaultAsync(missingApiModel, settings);
+        var relocatedApiPath = Path.Combine(root, "moved-to", "model.gguf");
+        Directory.CreateDirectory(Path.GetDirectoryName(relocatedApiPath)!);
+        WriteMinimalGguf(relocatedApiPath, "qwen35");
+        var reattachResponse = await api.HandleAsync(Request(
+            "POST",
+            "/api/v1/models/api-missing-model/reattach",
+            new JsonObject { ["file"] = relocatedApiPath }));
+        Assert.Equal(200, reattachResponse.StatusCode);
+        var reattachJson = JsonSerializer.SerializeToNode(reattachResponse.Body)!.AsObject();
+        Assert.Equal(missingApiModel.ModelPath, reattachJson["previousPath"]!.GetValue<string>());
+        Assert.Equal(missingApiModel.Id, reattachJson["model"]!["id"]!.GetValue<string>());
+        Assert.Equal(Path.GetFullPath(relocatedApiPath), reattachJson["model"]!["modelPath"]!.GetValue<string>());
+        Assert.Equal(missingApiProfile.Id, Assert.Single(await store.ListNamedModelLaunchProfilesAsync(missingApiModel.Id)).Id);
         Assert.Equal(400, (await api.HandleAsync(Request("POST", "/api/v1/runtimes/register", new JsonObject { ["folder"] = Path.Combine(root, "missing-runtime") }))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/api/v1/sessions/missing"))).StatusCode);
         Assert.Equal(404, (await api.HandleAsync(Request("GET", "/api/v1/logs/missing.log"))).StatusCode);

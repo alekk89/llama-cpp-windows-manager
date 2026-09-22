@@ -201,6 +201,8 @@
   "Models.Import.Role.SpeculativeAssistant": "دستیار حدسی",
   "Models.Import.Role.Ambiguous": "مبهم",
   "Models.Import.Role.Invalid": "نامعتبر",
+  "Models.Reattach.Action": "یافتن فایل…",
+  "Models.Reattach.ToolTip": "فایل GGUF جابه‌جا‌شده را انتخاب کنید و پروفایل‌های راه‌اندازی این مدل را حفظ کنید.",
   "Models.ScanDiagnostics.Title": "عیب‌یابی پویش مدل‌ها",
   "Models.ScanDiagnostics.Message": "برخی فایل‌های GGUF نیاز به بررسی دارند و به‌طور خودکار ثبت نشدند.\n\n{0}\n\nبرای ثبت صریح یک فایل مبهم معتبر، از «افزودن فایل مدل…» استفاده کنید.",
   "Models.ScanDiagnostics.MoreFiles": "…و {0} فایل دیگر.",
