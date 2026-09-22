@@ -69,3 +69,5 @@ TestResults/
 /benchmark-qwen-flash-speed.json
 __pycache__/
 *.py[cod]
+.idea
+.kilo
