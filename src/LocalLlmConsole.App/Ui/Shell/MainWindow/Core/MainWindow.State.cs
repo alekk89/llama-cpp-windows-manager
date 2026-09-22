@@ -35,6 +35,7 @@ public partial class MainWindow
     private readonly RuntimeCatalogSessionState _runtimeCatalogState;
     private readonly LaunchSettingsPanelState _launchSettingsPanel;
     private readonly LaunchSettingsPageController _launchSettingsController;
+    private readonly ModelLaunchProfileCopyController _copyProfileController;
     private readonly ModelsPageState _modelsPage;
     private readonly OverviewPageState _overviewPage;
     private readonly OverviewSelectionController _overviewSelection;

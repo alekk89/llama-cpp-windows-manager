@@ -2,14 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
-using Forms = System.Windows.Forms;
-using WpfApplication = System.Windows.Application;
-using WpfBinding = System.Windows.Data.Binding;
-using WpfButton = System.Windows.Controls.Button;
-using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
-using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public partial class MainWindow
@@ -135,38 +127,6 @@ public partial class MainWindow
                 AppReady: true,
                 SelectedProfileLoaded: selectedProfileLoaded),
             ModelRuntimeLoadActions(() => _settings, profile.Id, profile.Name));
-    }
-
-    private async Task CopyLaunchProfileToAnotherModelAsync(ModelRecord model, NamedModelLaunchProfile profile)
-    {
-        var result = ModelLaunchProfileCopyDialogFactory.Show(
-            this,
-            model,
-            profile,
-            await ModelServices.Catalog.ListAsync(),
-            _viewModel.LaunchSettings.RuntimeChoices,
-            () => AppServices.StateStore);
-        if (!result.Accepted || result.TargetModel is null)
-            return;
-
-        await ModelServices.LaunchProfileCopy.CopySelectedAsync(
-            model,
-            result.TargetModel,
-            profile,
-            result.Name,
-            _settings,
-            new ModelLaunchProfileCopySelectedActions(
-                RunResponsiveAsync,
-                () => RenderSelectedModelLaunchSettingsAsync(),
-                () => _settings,
-                SelectedLaunchRuntimeId,
-                request => ModelServices.LaunchVariants.CopyProfileAsync(request),
-                new ModelLaunchProfileCopyActions(
-                    RefreshModelsAsync,
-                    SelectLaunchProfileAfterRefresh,
-                    () => RenderSelectedModelLaunchSettingsAsync(),
-                    RefreshOverviewModelSelectorAsync,
-                    SetStatus)));
     }
 
     private async void BeginNewLaunchProfile()

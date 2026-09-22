@@ -61,7 +61,7 @@ public partial class MainWindow
                 ToggleTrayProfileFavoriteAsync,
                 async (_, profile) => { await AppServices.StartupLaunchProfiles.ToggleLoadOnStartupAsync(profile.Id); await RefreshModelsAsync(); },
                 LoadLaunchProfileAsync,
-                CopyLaunchProfileToAnotherModelAsync,
+                _copyProfileController.CopyToAnotherModelAsync,
                 BeginNewLaunchProfile,
                 SelectModelGridRow,
                 modelRows,

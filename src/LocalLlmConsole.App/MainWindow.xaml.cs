@@ -85,6 +85,19 @@ public partial class MainWindow : Window
                 SetStatus,
                 this,
                 _coreServices.App.Clipboard.SetText));
+        _copyProfileController = new ModelLaunchProfileCopyController(new ModelLaunchProfileCopyControllerActions(
+            Owner: this,
+            ModelServices: () => ModelServices,
+            RuntimeChoices: () => _viewModel.LaunchSettings.RuntimeChoices,
+            StateStore: () => AppServices.StateStore,
+            Settings: () => _settings,
+            SelectedLaunchRuntimeId: SelectedLaunchRuntimeId,
+            RenderSelectedModelLaunchSettingsAsync: () => RenderSelectedModelLaunchSettingsAsync(),
+            RefreshModelsAsync: RefreshModelsAsync,
+            SelectLaunchProfileAfterRefresh: SelectLaunchProfileAfterRefresh,
+            RefreshOverviewModelSelectorAsync: RefreshOverviewModelSelectorAsync,
+            SetStatus: SetStatus,
+            RunBusyAsync: RunResponsiveAsync));
         _pageControllers = CreatePageControllers();
     }
 
