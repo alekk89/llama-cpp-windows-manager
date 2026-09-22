@@ -32,6 +32,7 @@ public sealed partial class AppServiceFactory
         var launchProfiles = CreateModelLaunchProfileService(stateStore, request.Sessions);
         var trayProfiles = CreateTrayProfileMenuApplicationService(stateStore, request.Sessions);
         var launchVariants = CreateModelLaunchVariantWorkflowService(launchProfiles);
+        var launchProfileCopy = CreateModelLaunchProfileCopyApplicationService();
         var modelLaunchSettingsWorkflow = CreateModelLaunchSettingsWorkflowService(launchProfiles);
         var gatewayRouteCatalog = CreateModelGatewayRouteCatalogApplicationService(stateStore);
         var gatewayModelLoadWorkflow = CreateGatewayModelLoadWorkflowService(stateStore, launchProfiles, core.Runtime.RuntimeSessions);
@@ -114,6 +115,7 @@ public sealed partial class AppServiceFactory
                 launchProfiles,
                 trayProfiles,
                 launchVariants,
+                launchProfileCopy,
                 modelLaunchSettingsWorkflow),
             new MainWindowLoadedGatewayServices(
                 gatewayRouteCatalog,

@@ -32,6 +32,7 @@ public partial class MainWindow
             ChooseDraftModelPathAsync,
             ChooseMtpHeadPathAsync,
             UpdateLaunchSaveButtonState,
+            () => _launchSettingsController.CopyProfileToAnotherModelAsync(),
             initialPath => _coreServices.App.FileSystemDialogs.PickOpenFile(new OpenFilePickerRequest(
                 "Choose launch option file",
                 "All files (*.*)|*.*",

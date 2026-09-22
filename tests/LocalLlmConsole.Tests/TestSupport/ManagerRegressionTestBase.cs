@@ -1,3 +1,4 @@
+using System.Globalization;
 using LocalLlmConsole.Localization;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
@@ -12,7 +13,12 @@ public abstract partial class ManagerRegressionTestBase : IDisposable
     private readonly TestWorkspace _workspace = new();
 
     protected ManagerRegressionTestBase()
-        => Loc.LoadLanguage("en");
+    {
+        var usCulture = new CultureInfo("en-US");
+        Loc.LoadLanguage("en");
+        System.Threading.Thread.CurrentThread.CurrentCulture = usCulture;
+        System.Threading.Thread.CurrentThread.CurrentUICulture = usCulture;
+    }
 
     protected static readonly Lazy<string> RepositoryRoot = new(FindRepositoryRoot);
 

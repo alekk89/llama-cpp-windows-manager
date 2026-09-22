@@ -27,6 +27,9 @@ public sealed class ModelLaunchProfileService
     public Task<IReadOnlyList<NamedModelLaunchProfile>> ListNamedAsync(ModelRecord model)
         => _stateStore.ListNamedModelLaunchProfilesAsync(model.Id);
 
+    public Task<NamedModelLaunchProfile?> GetNamedAsync(string profileId)
+        => _stateStore.GetNamedModelLaunchProfileAsync(profileId);
+
     public Task SaveNamedAsync(NamedModelLaunchProfile profile)
     {
         _ = RuntimeVulkanEnvironment.Value(RuntimeBackend.Vulkan, profile.Settings.VulkanAllocationBlockSizeMiB);

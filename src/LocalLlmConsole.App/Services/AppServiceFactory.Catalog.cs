@@ -28,6 +28,9 @@ public sealed partial class AppServiceFactory
         ModelLaunchProfileService launchProfiles)
         => new(launchProfiles);
 
+    public ModelLaunchProfileCopyApplicationService CreateModelLaunchProfileCopyApplicationService()
+        => new();
+
     public ModelLaunchSettingsWorkflowService CreateModelLaunchSettingsWorkflowService(
         ModelLaunchProfileService launchProfiles)
         => new(launchProfiles);

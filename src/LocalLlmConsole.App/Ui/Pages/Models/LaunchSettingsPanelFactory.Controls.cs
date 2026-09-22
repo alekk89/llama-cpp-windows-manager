@@ -44,7 +44,6 @@ public static partial class LaunchSettingsPanelFactory
         runtimeGrid.Children.Add(launchPortBox);
         return runtimeGrid;
     }
-
     private static WpfComboBox RuntimeCombo(LaunchSettingsPanelRequest request)
     {
         var combo = CrispCompactControl(new SearchableComboBox
@@ -125,6 +124,7 @@ public static partial class LaunchSettingsPanelFactory
             request.ResetDefaults();
             return Task.CompletedTask;
         }));
+        actions.Children.Add(Button(Loc.T("Launch.CopyProfileToAnotherModelButton"), request.CopyProfileToAnotherModelAsync));
         return actions;
     }
 

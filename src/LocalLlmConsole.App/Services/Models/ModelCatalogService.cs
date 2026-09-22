@@ -7,6 +7,8 @@ public sealed partial class ModelCatalogService
 
     public ModelCatalogService(StateStore store) => _store = store;
 
+    public Task<IReadOnlyList<ModelRecord>> ListAsync() => _store.ListModelsAsync();
+
     public async Task<int> ScanAsync(string modelsRoot)
         => (await ScanDetailedAsync(modelsRoot)).RegisteredCount;
 

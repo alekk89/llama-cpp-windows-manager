@@ -21,6 +21,7 @@ public sealed record ModelsPageActions(
     Func<ModelRecord, NamedModelLaunchProfile, Task> ToggleTrayProfileFavoriteAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> ToggleStartupLaunchProfileAsync,
     Func<ModelRecord, NamedModelLaunchProfile, Task> LoadLaunchProfileAsync,
+    Func<ModelRecord, NamedModelLaunchProfile, Task> CopyLaunchProfileToAnotherModelAsync,
     Action BeginNewLaunchProfile,
     Action<DataGrid, DataGrid?> SelectModelGridRow,
     RoutedEventHandler OpenModelFolderRowClick,
@@ -269,6 +270,10 @@ public static class ModelsPageFactory
                 ToolTip: row => ((ModelGridRow)row).IsMissing
                     ? Loc.T("Overview.MissingModelLoadTooltip")
                     : Loc.T("Tooltip.Load")),
+            new(_ => Loc.T("Launch.CopyProfileToAnotherModelButton"),
+                row => row is ModelGridRow { LaunchProfile: not null },
+                row => CopyProfileAsync(actions, (ModelGridRow)row),
+                ToolTip: _ => Loc.T("Tooltip.CopyProfileToAnotherModel")),
             SelectorFavoriteContextAction.Create<ModelGridRow>(
                 row => row.IsFavorite,
                 row => row.LaunchProfile is not null,
@@ -301,6 +306,9 @@ public static class ModelsPageFactory
 
     private static Task LoadProfileAsync(ModelsPageActions actions, ModelGridRow row)
         => actions.LoadLaunchProfileAsync(row.Model, row.LaunchProfile!);
+
+    private static Task CopyProfileAsync(ModelsPageActions actions, ModelGridRow row)
+        => actions.CopyLaunchProfileToAnotherModelAsync(row.Model, row.LaunchProfile!);
 
     private static Task AssignGroupAsync(ModelsPageActions actions, ModelGridRow row)
         => actions.AssignLaunchProfileGroupAsync(row.Model, row.LaunchProfile!);

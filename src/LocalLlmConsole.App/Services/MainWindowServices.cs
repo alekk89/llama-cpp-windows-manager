@@ -196,6 +196,7 @@ public sealed record MainWindowLoadedModelServices(
     ModelLaunchProfileService LaunchProfiles,
     TrayProfileMenuApplicationService TrayProfiles,
     ModelLaunchVariantWorkflowService LaunchVariants,
+    ModelLaunchProfileCopyApplicationService LaunchProfileCopy,
     ModelLaunchSettingsWorkflowService ModelLaunchSettingsWorkflow);
 
 public sealed record MainWindowLoadedGatewayServices(
