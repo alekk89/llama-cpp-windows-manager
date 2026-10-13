@@ -350,3 +350,14 @@ source change.
   application executable.
 - See [docs/CONTROL_API.md](docs/CONTROL_API.md) for request contracts and route
   details.
+
+## Profile export and import
+
+Use `llwmctl profiles export --model <model> [--id <profile>] --file profiles.jsonc`
+for one model's saved profiles. Run `profiles import --model <target> --file
+profiles.jsonc --runtime <local-runtime> --dry-run` and inspect all mappings and
+warnings before `--apply`. Import defaults to Keep both; `--conflict
+keep-both|replace|skip` controls name conflicts. Imports are atomic and do not
+load, unload or restart sessions. Use the UI preview to resolve ambiguous local
+companion paths or per-profile settings. JSONC comments are accepted; persistent
+annotations use `annotations.notes` and `annotations.settingNotes`.

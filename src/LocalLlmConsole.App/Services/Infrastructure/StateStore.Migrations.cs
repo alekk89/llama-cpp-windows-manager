@@ -261,6 +261,9 @@ CREATE TABLE IF NOT EXISTS default_runtime (
   runtime_id TEXT NOT NULL,
   FOREIGN KEY(runtime_id) REFERENCES runtimes(id) ON DELETE CASCADE
 );
+"""),
+        new(16, "profile-transfer-annotations", """
+ALTER TABLE model_launch_profiles ADD COLUMN annotations_json TEXT NULL;
 """)
     ];
 

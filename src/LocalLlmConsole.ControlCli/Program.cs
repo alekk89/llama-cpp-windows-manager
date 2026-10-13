@@ -40,6 +40,7 @@ internal static class Program
                 return waited.ExitCode;
             }
 
+            if (response.IsSuccessStatusCode) ControlCliProfileTransferOutput.SaveExportFile(text, command);
             ControlCliOutput.WriteResponse(text, command.Has("compact"));
             return response.IsSuccessStatusCode ? 0 : Math.Clamp((int)response.StatusCode, 1, 255);
         }

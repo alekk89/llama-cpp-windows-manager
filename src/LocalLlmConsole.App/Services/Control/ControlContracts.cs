@@ -67,7 +67,8 @@ public sealed record LocalControlDependencies(
     ModelGroupService? ModelGroups = null,
     EndpointInspectionService? EndpointInspection = null,
     LifetimeMetricsApplicationService? LifetimeMetrics = null,
-    Func<BenchmarkApplicationService>? Benchmarks = null);
+    Func<BenchmarkApplicationService>? Benchmarks = null,
+    ProfileTransferWorkflowService? ProfileTransfers = null);
 
 public sealed record LocalControlDiscoveryDocument(
     int Version,

@@ -508,3 +508,38 @@ Settings patches that only change presentation, or repeat the effective gateway
 configuration, preserve the listener and active requests. Start-with-Windows
 registration changes only when that preference changes; disabling it never
 removes another executable’s registration.
+
+## Portable profile bundles
+
+```powershell
+llwmctl profiles export --model <model> --id <profile> --file profiles.jsonc
+# Omit --id to export all saved profiles for that one model.
+llwmctl profiles import --model <target> --file profiles.jsonc --runtime <local-runtime> --dry-run
+llwmctl profiles import --model <target> --file profiles.jsonc --runtime <local-runtime> --apply
+```
+
+Imports preview by default, including local mappings, warnings, errors and final
+names/ports. `--conflict keep-both|replace|skip` applies to all imported names and
+defaults to `keep-both`. `--apply` saves the validated batch atomically; it never
+loads or stops a model. `--dry-run` takes precedence over `--apply`.
+Use the UI preview to browse companion files or edit individual settings/mappings.
+
+`GET /api/v1/models/{model}/profiles/export?profile=<id>` returns `bundle` and
+its formatted `text`. Omit `profile` to export all profiles for that model.
+`POST /api/v1/models/{model}/profiles/import` accepts `text` (JSONC string),
+`dryRun` (defaults to true), and optional `choices`. Each choice has a zero-based
+`index`, numeric `action` (0 Keep both, 1 Replace, 2 Skip), optional `name`, local
+`runtimeId`, and a partial `settings` override object. The runtime belongs in
+`runtimeId`, not the settings override. Unknown, null or invalid settings fail
+validation. File paths in local overrides must exist; portable references are
+compatible companion filenames only. Apply revalidates under the lifecycle gate.
+
+Schema 1 is one model hint (`name`, `fileName`, `architecture`) plus `profiles`.
+Each profile has `name`, `settings`, optional `runtime` hints (`name`, `backend`,
+`mode`), `gpuNames`, and `annotations` (`notes`, `settingNotes` mapping field names
+to text). Settings use camelCase launch field names, excluding runtimeId. JSONC
+comments and trailing commas are accepted. Comments themselves are not retained;
+annotations persist through saves and re-export. Files are limited to 4 MiB and
+100 profiles. Bundles exclude model binaries, credentials, startup/favourite/group
+preferences and general app settings. Blank host continues to inherit the app's
+default; explicit hosts remain subject to the app's LAN policy.

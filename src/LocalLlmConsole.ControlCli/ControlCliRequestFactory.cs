@@ -94,6 +94,8 @@ internal static partial class ControlCliRequestFactory
         return action switch
         {
             "list" => Get($"/api/v1/models/{model}/profiles"),
+            "export" => Get($"/api/v1/models/{model}/profiles/export" + (args.Value("id") is { } id ? $"?profile={Uri.EscapeDataString(id)}" : "")),
+            "import" => ProfileImportRequest(model, args),
             "create" => Post($"/api/v1/models/{model}/profiles", ProfileBody(args, requireName: true)),
             "update" => Put($"/api/v1/models/{model}/profiles/{Segment(Required(args, "id"))}", ProfileBody(args, requireName: false)),
             "delete" => Delete($"/api/v1/models/{model}/profiles/{Segment(Required(args, "id"))}"),

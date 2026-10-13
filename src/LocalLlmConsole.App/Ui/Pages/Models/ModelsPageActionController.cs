@@ -19,7 +19,8 @@ public sealed record ModelsPageActionControllerActions(
     ModelsPageRowActionController RowActions,
     Func<Task> SearchHuggingFaceAsync,
     Func<Task> ShowDownloadHistoryAsync,
-    Action<DataGrid> ConfigureModelGridColumnSizing);
+    Action<DataGrid> ConfigureModelGridColumnSizing,
+    ProfileTransferUiActions? ProfileTransfer = null);
 
 public sealed class ModelsPageActionController
 {
@@ -49,5 +50,6 @@ public sealed class ModelsPageActionController
             _actions.RowActions.DeleteModelRow_Click,
             _actions.SearchHuggingFaceAsync,
             _actions.ShowDownloadHistoryAsync,
-            _actions.ConfigureModelGridColumnSizing);
+            _actions.ConfigureModelGridColumnSizing,
+            _actions.ProfileTransfer);
 }

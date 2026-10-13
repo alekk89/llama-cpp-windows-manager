@@ -648,3 +648,26 @@ files.
   does not own a real UI adaptation, decision, state, or boundary.
 - Prefer behavior tests and module-boundary guard tests over brittle tests that
   assert exact source text in specific files.
+
+## Portable launch-profile transfer
+
+Core's `ProfileBundleCodec` owns the versioned JSONC contract, portable setting
+projection and pure validation. `ProfileTransferWorkflowService` resolves local
+runtime and companion references, reserves batch ports, plans name conflicts,
+and revalidates the reviewed plan before applying. UI file, clipboard and
+model-to-model copy use this workflow; control API imports use it too.
+The apply stage holds the session lifecycle gate and checks the catalog revision
+inside the serialized database write. `StateStore.ApplyProfileImportAsync`
+commits the selected profiles in one transaction. Replacements update the same
+row ID, preserving default, startup, favourite and group references. New rows get
+fresh IDs. Profile annotations are nullable, additive metadata; ordinary settings
+saves preserve existing annotations when none are supplied.
+
+The bundle contains one model hint and up to 100 profiles, with a 4 MiB limit.
+Runtime hints replace machine IDs; companion filenames replace absolute paths.
+Destination resolution stays within existing exact-folder compatibility discovery
+unless the user supplies an explicit local path. Ambiguous/missing companions
+block import until resolved or explicitly cleared. Unverified GPU layouts reset
+device-specific selections with a visible warning. LAN policy, app credentials,
+model files and UI-owned preferences are outside the contract. No transfer loads,
+stops or restarts model sessions.

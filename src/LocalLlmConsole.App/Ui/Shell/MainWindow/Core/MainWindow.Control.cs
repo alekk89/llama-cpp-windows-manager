@@ -29,7 +29,7 @@ public partial class MainWindow
             ModelServices.ModelGroups,
             _coreServices.Runtime.EndpointInspection,
             AppServices.LifetimeMetricsApplication,
-            () => AppServices.Benchmarks.Value));
+            () => AppServices.Benchmarks.Value, ModelServices.ProfileTransfers));
         _controlApi = api;
         return _serviceFactory.CreateLocalAppService(
             stateStore,

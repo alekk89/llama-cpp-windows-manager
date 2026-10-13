@@ -89,6 +89,7 @@ public sealed class WpfModelsSurfaceTests : WpfUiTestBase
             var startupToggleProfileId = "";
             var modelFavoriteId = "";
             var profileFavoriteId = "";
+            var copiedProfileId = "";
             var modelPage = LocalLlmConsole.ModelsPageFactory.Create(new LocalLlmConsole.ModelsPageRequest(
                 viewModel,
                 settings.ModelsRoot,
@@ -110,7 +111,10 @@ public sealed class WpfModelsSurfaceTests : WpfUiTestBase
                     (_, _) => { },
                     () => Task.CompletedTask,
                     () => Task.CompletedTask,
-                    _ => { })));
+                    _ => { },
+                    new LocalLlmConsole.ProfileTransferUiActions(
+                        (_, profileId, _) => { copiedProfileId = profileId; return Task.CompletedTask; },
+                        (_, _) => Task.CompletedTask, (_, _) => Task.CompletedTask))));
             modelPage.Root.Measure(new Size(1024, 680));
             modelPage.Root.Arrange(new Rect(0, 0, 1024, 680));
             modelPage.Root.UpdateLayout();
@@ -173,8 +177,10 @@ public sealed class WpfModelsSurfaceTests : WpfUiTestBase
             Assert.Equal(48, Assert.IsType<LocalLlmConsole.FlexibleActionDataGridColumn>(modelPage.ModelsGrid.Columns[4]).MinWidth);
             Assert.Equal(36, Assert.IsType<LocalLlmConsole.ResponsiveActionDataGridColumn>(modelPage.ModelsGrid.Columns[^1]).MinWidth);
             Assert.Equal(36, Assert.IsType<LocalLlmConsole.ResponsiveActionDataGridColumn>(modelPage.ModelVariantsGrid.Columns[^1]).MinWidth);
-            AssertContextMenu(modelPage.ModelsGrid, viewModel.Models.Rows[0], "Remove from favorites", "Open Folder", "Save New Profile", "Delete");
-            AssertContextMenu(modelPage.ModelVariantsGrid, favoriteProfileRow, "Load", "Remove from favorites", "Load on startup", "Change group…", "Remove from group", "Remove");
+            AssertContextMenu(modelPage.ModelsGrid, viewModel.Models.Rows[0], "Remove from favorites", "Open Folder", "Save New Profile", "Export all profiles…", "Import profiles…", "Paste profiles", "Delete");
+            AssertContextMenu(modelPage.ModelVariantsGrid, favoriteProfileRow, "Load", "Remove from favorites", "Load on startup", "Change group…", "Remove from group", "Export profile…", "Copy profile", "Copy to another model…", "Import profiles…", "Paste profiles", "Remove");
+            modelPage.ModelVariantsGrid.ContextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Copy profile")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Equal(favoriteProfileRow.LaunchProfile!.Id, copiedProfileId);
             Assert.Equal(Visibility.Collapsed, modelPage.ModelsSearch.Input.Visibility);
             Assert.Equal(Visibility.Collapsed, modelPage.LaunchProfilesSearch.Input.Visibility);
             modelPage.ModelsGrid.SelectedItem = viewModel.Models.Rows[0];
