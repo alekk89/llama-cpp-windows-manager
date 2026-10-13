@@ -48,9 +48,9 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         var notices = File.ReadAllText(FindRepositoryFile("THIRD-PARTY-NOTICES.md"));
         var apache = File.ReadAllText(FindRepositoryFile("licenses", "Apache-2.0.txt"));
 
-        Assert.Contains("Microsoft.Data.Sqlite\" Version=\"10.0.12\"", project, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.Data.Sqlite\" Version=\"10.0.13\"", project, StringComparison.Ordinal);
         Assert.Contains("SQLitePCLRaw.bundle_e_sqlite3\" Version=\"3.0.5\"", project, StringComparison.Ordinal);
-        Assert.Contains("Microsoft.Data.Sqlite 10.0.12", notices, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.Data.Sqlite 10.0.13", notices, StringComparison.Ordinal);
         Assert.Contains("SQLitePCLRaw.bundle_e_sqlite3", notices, StringComparison.Ordinal);
         Assert.Contains("3.0.5", notices, StringComparison.Ordinal);
         Assert.Contains("SQLite 3.53.4", notices, StringComparison.Ordinal);
@@ -140,7 +140,7 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         Assert.True(File.Exists(FindRepositoryFile(".github", "workflows", "codeql.yml")));
         Assert.True(File.Exists(FindRepositoryFile(".github", "workflows", "dependency-review.yml")));
         Assert.True(File.Exists(FindRepositoryFile(".github", "dependabot.yml")));
-        Assert.Contains("\"version\": \"10.0.400\"", globalJson, StringComparison.Ordinal);
+        Assert.Contains("\"version\": \"10.0.402\"", globalJson, StringComparison.Ordinal);
         Assert.Contains("\"runner\": \"Microsoft.Testing.Platform\"", globalJson, StringComparison.Ordinal);
         Assert.Contains("TreatWarningsAsErrors", File.ReadAllText(FindRepositoryFile("Directory.Build.props")), StringComparison.Ordinal);
         Assert.Contains("root = true", editorConfig, StringComparison.Ordinal);
