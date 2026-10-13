@@ -543,3 +543,7 @@ annotations persist through saves and re-export. Files are limited to 4 MiB and
 100 profiles. Bundles exclude model binaries, credentials, startup/favourite/group
 preferences and general app settings. Blank host continues to inherit the app's
 default; explicit hosts remain subject to the app's LAN policy.
+
+In the Models UI, Ctrl+C on a selected saved profile copies the same bundle.
+Ctrl+V on a destination model or profile opens the common preview. Shortcuts
+inside text fields retain ordinary text editing behavior.

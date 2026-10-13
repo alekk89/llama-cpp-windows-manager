@@ -230,6 +230,7 @@
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="CheckColumn" Width="0"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition x:Name="SubmenuColumn" Width="0"/>
                   </Grid.ColumnDefinitions>
                   <TextBlock x:Name="CheckGlyph"
@@ -246,12 +247,19 @@
                                     VerticalAlignment="Center"
                                     RecognizesAccessKey="True"/>
                   <TextBlock x:Name="SubmenuGlyph"
-                             Grid.Column="2"
+                             Grid.Column="3"
                              Text="›"
                              FontSize="14"
                              HorizontalAlignment="Right"
                              VerticalAlignment="Center"
                              Visibility="Collapsed"/>
+                  <TextBlock x:Name="GestureLabel"
+                             Grid.Column="2"
+                             Text="{TemplateBinding InputGestureText}"
+                             Foreground="{DynamicResource TextMuted}"
+                             Margin="16,0,0,0"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Center"/>
                 </Grid>
               </Border>
               <Popup x:Name="PART_Popup"
@@ -276,6 +284,9 @@
               </Popup>
             </Grid>
             <ControlTemplate.Triggers>
+              <Trigger Property="InputGestureText" Value="">
+                <Setter TargetName="GestureLabel" Property="Visibility" Value="Collapsed"/>
+              </Trigger>
               <Trigger Property="IsCheckable" Value="True">
                 <Setter TargetName="CheckColumn" Property="Width" Value="20"/>
               </Trigger>

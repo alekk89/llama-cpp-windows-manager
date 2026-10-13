@@ -180,6 +180,9 @@ public sealed class WpfModelsSurfaceTests : WpfUiTestBase
             AssertContextMenu(modelPage.ModelsGrid, viewModel.Models.Rows[0], "Remove from favorites", "Open Folder", "Save New Profile", "Export all profiles…", "Import profiles…", "Paste profiles", "Delete");
             AssertContextMenu(modelPage.ModelVariantsGrid, favoriteProfileRow, "Load", "Remove from favorites", "Load on startup", "Change group…", "Remove from group", "Export profile…", "Copy profile", "Copy to another model…", "Import profiles…", "Paste profiles", "Remove");
             modelPage.ModelVariantsGrid.ContextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Copy profile")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert.Equal("Ctrl+C", modelPage.ModelVariantsGrid.ContextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Copy profile")).InputGestureText);
+            Assert.Contains(VisualDescendants<TextBlock>(modelPage.ModelVariantsGrid.ContextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Copy profile"))), text => text.Text == "Ctrl+C");
+            Assert.Equal("Ctrl+V", modelPage.ModelVariantsGrid.ContextMenu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Paste profiles")).InputGestureText);
             Assert.Equal(favoriteProfileRow.LaunchProfile!.Id, copiedProfileId);
             Assert.Equal(Visibility.Collapsed, modelPage.ModelsSearch.Input.Visibility);
             Assert.Equal(Visibility.Collapsed, modelPage.LaunchProfilesSearch.Input.Visibility);

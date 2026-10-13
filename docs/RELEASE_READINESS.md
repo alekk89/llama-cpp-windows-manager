@@ -853,3 +853,7 @@ changes, port conflicts, persistent notes and changed catalog state after previe
 Confirm that import saves selected profiles atomically and leaves sessions alone.
 Run the full release gate with publish; test a separate development workspace
 without replacing production data. Local packages remain unsigned.
+
+Profile transfer UI checks include Ctrl+C/Ctrl+V between model/profile lists,
+text editing and repeated-key handling, and import previews at 850×760 (English,
+100%) and 680×560 (German, 125%) with long scrollable warnings.

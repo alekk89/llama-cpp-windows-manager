@@ -15,7 +15,7 @@ public static class ProfileImportDialog
     {
         var window = Window(owner, Loc.T("Profiles.Transfer.CopyTitle"), 520, 230);
         var panel = Panel();
-        var combo = new WpfComboBox { ItemsSource = models, DisplayMemberPath = nameof(ModelRecord.Name), SelectedIndex = models.Count > 0 ? 0 : -1, Margin = new Thickness(0, 12, 0, 12) };
+        var combo = new WpfComboBox { ItemsSource = models, ItemTemplate = LabelTemplate(nameof(ModelRecord.Name)), SelectedIndex = models.Count > 0 ? 0 : -1, Margin = new Thickness(0, 12, 0, 12) };
         panel.Children.Add(Text(Loc.T("Profiles.Transfer.TargetPrompt")));
         panel.Children.Add(combo);
         panel.Children.Add(Button(Loc.T("Common.Continue"), () => window.DialogResult = combo.SelectedItem is ModelRecord));
@@ -28,20 +28,35 @@ public static class ProfileImportDialog
         Func<IReadOnlyList<ProfileImportChoice>, Task<ProfileImportPreview>> previewAsync)
     {
         var window = Window(owner, Loc.T("Profiles.Transfer.TargetTitle", model.Name), 850, 760);
-        var root = Panel();
+        var root = new Grid { Margin = new Thickness(16) };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.Children.Add(Text(Loc.T("Profiles.Transfer.PreviewPrompt")));
-        var tabs = new System.Windows.Controls.TabControl { Margin = new Thickness(0, 10, 0, 8), Height = 480 };
+        root.SetResourceReference(System.Windows.Controls.Panel.BackgroundProperty, "AppBack");
         var editors = new List<Editor>();
         foreach (var row in initial.Rows)
         {
             var editor = new Editor(row.Index, bundle.Profiles[row.Index], row, runtimes);
             editors.Add(editor);
-            tabs.Items.Add(new TabItem { Header = bundle.Profiles[row.Index].Name, Content = new ScrollViewer { Content = editor.Panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
         }
-        root.Children.Add(tabs);
+        var editorView = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MinHeight = 80 };
+        var profilePicker = new WpfComboBox
+        {
+            ItemsSource = editors,
+            ItemTemplate = LabelTemplate(nameof(Editor.Title)),
+            SelectedIndex = editors.Count > 0 ? 0 : -1,
+            Margin = new Thickness(0, 10, 0, 8)
+        };
+        profilePicker.SelectionChanged += (_, _) => editorView.Content = (profilePicker.SelectedItem as Editor)?.Panel;
+        editorView.Content = editors.FirstOrDefault()?.Panel;
+        Grid.SetRow(profilePicker, 1); root.Children.Add(profilePicker);
+        Grid.SetRow(editorView, 2); root.Children.Add(editorView);
         var summary = Text(Describe(initial));
-        summary.MaxHeight = 95;
-        root.Children.Add(new ScrollViewer { Content = summary, MaxHeight = 100, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        var summaryScroller = new ScrollViewer { Content = summary, MaxHeight = 100, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Grid.SetRow(summaryScroller, 3); root.Children.Add(summaryScroller);
         ProfileImportDialogResult? result = null;
         ProfileImportDialogResult? reviewed = null;
         var apply = Button(Loc.T("Profiles.Transfer.Apply"), () => { result = reviewed; window.DialogResult = true; });
@@ -65,7 +80,7 @@ public static class ProfileImportDialog
         foreach (var editor in editors) editor.Changed += () => { apply.IsEnabled = false; reviewed = null; };
         var buttons = new WrapPanel();
         buttons.Children.Add(review); buttons.Children.Add(apply); buttons.Children.Add(Button(Loc.T("Common.Cancel"), () => window.DialogResult = false));
-        root.Children.Add(buttons);
+        Grid.SetRow(buttons, 4); root.Children.Add(buttons);
         window.Content = root;
         return window.ShowDialog() == true ? result : null;
     }
@@ -82,21 +97,23 @@ public static class ProfileImportDialog
         private readonly WpfComboBox _conflict;
         private readonly WpfComboBox _runtime;
         private readonly WpfTextBox _settings;
+        public string Title { get; }
         public StackPanel Panel { get; } = ProfileImportDialog.Panel();
         public event Action? Changed;
 
         public Editor(int index, PortableLaunchProfile source, ProfileImportRow row, IReadOnlyList<RuntimeRecord> runtimes)
         {
             _index = index;
+            Title = source.Name;
             _name = Box(source.Name);
             _conflict = new WpfComboBox
             {
                 ItemsSource = Enum.GetValues<ProfileConflictAction>().Select(action => new ConflictItem(action, ConflictLabel(action))).ToArray(),
-                DisplayMemberPath = nameof(ConflictItem.Label),
+                ItemTemplate = LabelTemplate(nameof(ConflictItem.Label)),
                 SelectedValuePath = nameof(ConflictItem.Action),
                 SelectedValue = ProfileConflictAction.KeepBoth
             };
-            _runtime = new WpfComboBox { ItemsSource = runtimes.Where(RuntimeAvailabilityService.IsAvailable).ToArray(), DisplayMemberPath = nameof(RuntimeRecord.Name), SelectedItem = runtimes.FirstOrDefault(runtime => runtime.Id == row.Settings.RuntimeId) };
+            _runtime = new WpfComboBox { ItemsSource = runtimes.Where(RuntimeAvailabilityService.IsAvailable).ToArray(), ItemTemplate = LabelTemplate(nameof(RuntimeRecord.Name)), SelectedItem = runtimes.FirstOrDefault(runtime => runtime.Id == row.Settings.RuntimeId) };
             var node = ProfileBundleCodec.SettingsNode(row.Settings); node.Remove("runtimeId");
             _settings = Box(node.ToJsonString(ProfileBundleCodec.JsonOptions));
             _settings.AcceptsReturn = true; _settings.AcceptsTab = true; _settings.Height = 280;
@@ -149,7 +166,20 @@ public static class ProfileImportDialog
     };
 
     private static Window Window(Window owner, string title, double width, double height)
-        => new() { Owner = owner, Title = title, Width = width, Height = height, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize };
+    {
+        var window = new Window { Owner = owner, Title = title, Width = width, Height = height, MinWidth = Math.Min(width, 520), MinHeight = Math.Min(height, 440), WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize };
+        window.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "AppBack");
+        window.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextMain");
+        return window;
+    }
+
+    private static DataTemplate LabelTemplate(string property)
+    {
+        var label = new FrameworkElementFactory(typeof(TextBlock));
+        label.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(property));
+        label.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        return new DataTemplate { VisualTree = label };
+    }
     private static StackPanel Panel() => new() { Margin = new Thickness(16) };
     private static TextBlock Text(string value) => new() { Text = value, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4) };
     private static WpfTextBox Box(string value) => new() { Text = value, Margin = new Thickness(0, 4, 0, 8) };

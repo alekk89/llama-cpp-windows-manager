@@ -9,6 +9,41 @@ namespace LocalLlmConsole.UiTests;
 public sealed class ProfileImportDialogTests : WpfUiTestBase
 {
     [Fact]
+    public async Task LargeBundleUsesAProfilePickerAndPreservesEditsAcrossSelections()
+    {
+        await RunStaAsync(() =>
+        {
+            var owner = new Window { Width = 200, Height = 100, ShowInTaskbar = false }; owner.Show();
+            var settings = ModelLaunchSettings.FromAppSettings(AppSettings.CreateDefault(TestWorkspace));
+            var model = new ModelRecord("target", "Target", "target.gguf", OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+            var profiles = Enumerable.Range(0, 100).Select(index => new PortableLaunchProfile($"Profile {index}", ProfileBundleCodec.PortableSettings(settings))).ToArray();
+            var bundle = new ProfileBundle(1, new("Source", "source.gguf"), profiles);
+            var preview = new ProfileImportPreview(1, model.Id, profiles.Select((profile, index) => new ProfileImportRow(index, profile.Name, null, settings, null, [], [])).ToArray());
+            IReadOnlyList<ProfileImportChoice>? reviewed = null;
+            Exception? failure = null;
+            owner.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var dialog = Application.Current.Windows.OfType<Window>().Single(window => window.Owner == owner);
+                try
+                {
+                    dialog.UpdateLayout();
+                    var picker = VisualDescendants<ComboBox>(dialog).Single(combo => combo.Items.Count == 100);
+                    picker.SelectedIndex = 99; dialog.UpdateLayout();
+                    VisualDescendants<TextBox>(dialog).Single(box => box.Text == "Profile 99").Text = "Renamed last";
+                    picker.SelectedIndex = 0; picker.SelectedIndex = 99; dialog.UpdateLayout();
+                    Assert.Contains(VisualDescendants<TextBox>(dialog), box => box.Text == "Renamed last");
+                    VisualDescendants<Button>(dialog).Single(button => Equals(button.Content, "Review changes")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                }
+                catch (Exception ex) { failure = ex; }
+                finally { dialog.Close(); }
+            }), DispatcherPriority.ApplicationIdle);
+            LocalLlmConsole.ProfileImportDialog.Show(owner, model, bundle, preview, [], choices => { reviewed = choices; return Task.FromResult(preview); });
+            owner.Close(); if (failure is not null) throw failure;
+            Assert.NotNull(reviewed); Assert.Equal(100, reviewed.Count); Assert.Equal("Renamed last", reviewed[99].Name);
+        });
+    }
+
+    [Fact]
     public async Task ImportRequiresReviewAndEditingInvalidatesTheReviewedPlan()
     {
         await RunStaAsync(() =>

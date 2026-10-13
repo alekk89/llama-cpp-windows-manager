@@ -139,6 +139,8 @@ public static class ModelsPageFactory
         PageSectionFactory.AddButtonColumn(modelVariantsGrid, Loc.T("Models.ActionBtn.Remove"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .68, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         modelVariantsGrid.ItemsSource = request.ViewModel.Models.VariantRows;
         AttachLaunchProfileContextMenu(modelVariantsGrid, request.Actions);
+        if (request.Actions.ProfileTransfer is { } clipboardActions)
+            new ProfileTransferKeyboardController(modelsGrid, modelVariantsGrid, clipboardActions).Attach();
         var modelsSearch = DataGridSearch.Create(modelsGrid,
             item => item is ModelGridRow row ? $"{row.Name} {row.Quant} {row.Size}" : "",
             Loc.T("Models.SearchModels"));
@@ -276,7 +278,7 @@ public static class ModelsPageFactory
             new(_ => Loc.T("Profiles.Transfer.Import"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
                 row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, false)),
             new(_ => Loc.T("Profiles.Transfer.Paste"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
-                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, true)),
+                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, true), InputGestureText: "Ctrl+V"),
             new(_ => Loc.T("Models.ActionBtn.Delete"),
                 row => row is ModelGridRow { CanDelete: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(actions.DeleteModelRowClick, row),
@@ -314,13 +316,13 @@ public static class ModelsPageFactory
             new(_ => Loc.T("Profiles.Transfer.Export"), row => row is ModelGridRow { LaunchProfile: not null } && actions.ProfileTransfer is not null,
                 row => actions.ProfileTransfer!.Export(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!.Id, false)),
             new(_ => Loc.T("Profiles.Transfer.Copy"), row => row is ModelGridRow { LaunchProfile: not null } && actions.ProfileTransfer is not null,
-                row => actions.ProfileTransfer!.Export(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!.Id, true)),
+                row => actions.ProfileTransfer!.Export(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!.Id, true), InputGestureText: "Ctrl+C"),
             new(_ => Loc.T("Profiles.Transfer.CopyTo"), row => row is ModelGridRow { LaunchProfile: not null } && actions.ProfileTransfer is not null,
                 row => actions.ProfileTransfer!.CopyToModel(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!)),
             new(_ => Loc.T("Profiles.Transfer.Import"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
                 row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, false)),
             new(_ => Loc.T("Profiles.Transfer.Paste"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
-                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, true)),
+                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, true), InputGestureText: "Ctrl+V"),
             new(_ => Loc.T("Models.ActionBtn.Remove"),
                 row => row is ModelGridRow { CanDelete: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(actions.DeleteModelRowClick, row),

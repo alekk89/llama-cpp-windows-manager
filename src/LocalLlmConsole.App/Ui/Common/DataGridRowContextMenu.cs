@@ -11,7 +11,8 @@ public sealed record DataGridRowContextAction(
     Func<object, Task> ExecuteAsync,
     bool SeparatorBefore = false,
     Func<object, bool>? IsVisible = null,
-    Func<object, string>? ToolTip = null);
+    Func<object, string>? ToolTip = null,
+    string InputGestureText = "");
 
 public static class DataGridRowContextMenu
 {
@@ -31,7 +32,7 @@ public static class DataGridRowContextMenu
                 menu.Items.Add(separator);
             }
 
-            var item = new MenuItem();
+            var item = new MenuItem { InputGestureText = action.InputGestureText };
             item.Click += async (_, _) =>
             {
                 if (grid.SelectedItem is { } row && action.CanExecute(row))
