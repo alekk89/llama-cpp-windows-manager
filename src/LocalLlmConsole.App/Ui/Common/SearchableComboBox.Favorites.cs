@@ -16,7 +16,7 @@ public sealed partial class SearchableComboBox
     private void DecorateFavoriteContainer(WpfComboBoxItem container)
     {
         container.ApplyTemplate();
-        if (container.Template.FindName("ItemChrome", container) is not System.Windows.Controls.Border chrome)
+        if (container.Template?.FindName("ItemChrome", container) is not System.Windows.Controls.Border chrome)
             return;
 
         WpfButton favoriteButton;
