@@ -21,7 +21,7 @@ internal static partial class ControlCliRequestFactory
         var count = document["profiles"]?.AsArray().Count ?? 0;
         var choices = new JsonArray();
         for (var index = 0; index < count; index++)
-            choices.Add(new JsonObject { ["index"] = index, ["action"] = conflict, ["runtimeId"] = args.Value("runtime") });
+            choices.Add((JsonNode)new JsonObject { ["index"] = index, ["action"] = conflict, ["runtimeId"] = args.Value("runtime") });
         return Post($"/api/v1/models/{model}/profiles/import", new JsonObject
         {
             ["text"] = text,
