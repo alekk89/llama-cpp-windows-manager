@@ -83,6 +83,8 @@ public static class ModelsPageFactory
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(.95, GridUnitType.Star), MinWidth = 380 });
 
         var (modelLists, modelsGrid, modelVariantsGrid, modelsSearch, launchProfilesSearch) = ModelLists(request);
+        if (request.Actions.ProfileTransfer is { } clipboardActions)
+            new ProfileTransferKeyboardController(modelsGrid, modelVariantsGrid, clipboardActions).Attach(root);
         body.Children.Add(modelLists);
         body.Children.Add(PageSectionFactory.VerticalGridSplitter(1));
         Grid.SetColumn(request.LaunchSettingsPanel, 2);
@@ -139,8 +141,6 @@ public static class ModelsPageFactory
         PageSectionFactory.AddButtonColumn(modelVariantsGrid, Loc.T("Models.ActionBtn.Remove"), nameof(ModelGridRow.DeleteAction), nameof(ModelGridRow.CanDelete), request.Actions.DeleteModelRowClick, .68, tooltipBinding: nameof(ModelGridRow.DeleteToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         modelVariantsGrid.ItemsSource = request.ViewModel.Models.VariantRows;
         AttachLaunchProfileContextMenu(modelVariantsGrid, request.Actions);
-        if (request.Actions.ProfileTransfer is { } clipboardActions)
-            new ProfileTransferKeyboardController(modelsGrid, modelVariantsGrid, clipboardActions).Attach();
         var modelsSearch = DataGridSearch.Create(modelsGrid,
             item => item is ModelGridRow row ? $"{row.Name} {row.Quant} {row.Size}" : "",
             Loc.T("Models.SearchModels"));

@@ -18,21 +18,46 @@ public sealed class ProfileTransferKeyboardController
         _models = models; _profiles = profiles; _actions = actions;
     }
 
-    public void Attach()
+    public void Attach(FrameworkElement page)
     {
-        _models.PreviewKeyDown += async (_, args) => await HandleAsync(args.Key, Keyboard.Modifiers,
-            args.OriginalSource, false, () => args.Handled = true);
-        _profiles.PreviewKeyDown += async (_, args) => await HandleAsync(args.Key, Keyboard.Modifiers,
-            args.OriginalSource, true, () => args.Handled = true);
+        var bindings = new[] { Binding(ApplicationCommands.Copy, Key.C), Binding(ApplicationCommands.Paste, Key.V) };
+        foreach (var binding in bindings) page.CommandBindings.Add(binding);
+        Window? window = null;
+        page.Loaded += (_, _) =>
+        {
+            window = Window.GetWindow(page);
+            if (window is null) return;
+            foreach (var binding in bindings) window.CommandBindings.Add(binding);
+        };
+        page.Unloaded += (_, _) =>
+        {
+            if (window is null) return;
+            foreach (var binding in bindings) window.CommandBindings.Remove(binding);
+            window = null;
+        };
+    }
+
+    private CommandBinding Binding(RoutedCommand command, Key key)
+    {
+        var binding = new CommandBinding(command);
+        void CanExecute(object sender, CanExecuteRoutedEventArgs args)
+        {
+            if (SelectedRow(key, args.OriginalSource, IsWithin(args.OriginalSource, _profiles)) is null) return;
+            args.CanExecute = true; args.Handled = true;
+        }
+        binding.PreviewCanExecute += CanExecute;
+        binding.CanExecute += CanExecute;
+        binding.PreviewExecuted += async (_, args) => await HandleAsync(key, ModifierKeys.Control,
+            args.OriginalSource, IsWithin(args.OriginalSource, _profiles), () => args.Handled = true);
+        return binding;
     }
 
     public async Task<bool> HandleAsync(Key key, ModifierKeys modifiers, object? originalSource,
         bool fromProfiles, Action markHandled)
     {
-        if (modifiers != ModifierKeys.Control || key is not (Key.C or Key.V) || IsEditingText(originalSource)) return false;
-        var row = (fromProfiles ? _profiles.SelectedItem : _models.SelectedItem) as ModelGridRow;
-        if (key == Key.V) row ??= (fromProfiles ? _models.SelectedItem : _profiles.SelectedItem) as ModelGridRow;
-        if (row is null || key == Key.C && (!fromProfiles || row.LaunchProfile is null)) return false;
+        if (modifiers != ModifierKeys.Control || key is not (Key.C or Key.V)) return false;
+        var row = SelectedRow(key, originalSource, fromProfiles);
+        if (row is null) return false;
         // Consume before awaiting so DataGrid's built-in cell copy cannot replace the profile bundle.
         markHandled();
         if (_busy) return true;
@@ -46,13 +71,30 @@ public sealed class ProfileTransferKeyboardController
         return true;
     }
 
+    private ModelGridRow? SelectedRow(Key key, object? source, bool fromProfiles)
+    {
+        if (IsEditingText(source)) return null;
+        if (key == Key.C) return fromProfiles && _profiles.SelectedItem is ModelGridRow { LaunchProfile: not null } profile ? profile : null;
+        // Model selection remains authoritative when the profile list is empty or rebuilding.
+        return _models.SelectedItem as ModelGridRow ?? _profiles.SelectedItem as ModelGridRow;
+    }
+
+    private static bool IsWithin(object? source, DependencyObject ancestor)
+    {
+        for (var node = source as DependencyObject; node is not null; node = Parent(node))
+            if (ReferenceEquals(node, ancestor)) return true;
+        return false;
+    }
+
+    private static DependencyObject? Parent(DependencyObject node)
+        => node is FrameworkContentElement content ? content.Parent
+            : node is Visual ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
+
     private static bool IsEditingText(object? source)
     {
-        for (var node = source as DependencyObject; node is not null;)
+        for (var node = source as DependencyObject; node is not null; node = Parent(node))
         {
             if (node is System.Windows.Controls.Primitives.TextBoxBase or PasswordBox || node is System.Windows.Controls.ComboBox { IsEditable: true }) return true;
-            node = node is FrameworkContentElement content ? content.Parent
-                : node is Visual ? VisualTreeHelper.GetParent(node) : LogicalTreeHelper.GetParent(node);
         }
         return false;
     }
