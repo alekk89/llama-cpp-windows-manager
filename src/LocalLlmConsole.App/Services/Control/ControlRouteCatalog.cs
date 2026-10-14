@@ -16,6 +16,8 @@ public static class ControlRouteCatalog
             "DELETE /api/v1/models/{model}?confirm=true", "GET /api/v1/models/{model}/profiles",
             "POST /api/v1/models/{model}/profiles", "PUT /api/v1/models/{model}/profiles/{profile}",
             "DELETE /api/v1/models/{model}/profiles/{profile}",
+            "GET /api/v1/models/{model}/profiles/export?profile=...",
+            "POST /api/v1/models/{model}/profiles/import",
             "GET|PUT|DELETE /api/v1/models/{model}/profiles/{profile}/group"),
         new("model-groups",
             "GET|POST /api/v1/model-groups", "GET|PATCH|DELETE /api/v1/model-groups/{group}"),

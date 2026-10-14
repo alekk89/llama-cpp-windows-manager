@@ -66,7 +66,7 @@ public partial class MainWindow
                 modelRows,
                 SearchHuggingFaceAsync,
                 async () => await ShowDownloadHistoryAsync(),
-                SetModelGridColumnSizing));
+                SetModelGridColumnSizing, new ProfileTransferUiController(this, () => ModelServices.ProfileTransfers, () => AppServices.StateStore, () => _settings, RefreshModelsAsync, SetStatus, RunAsync).Actions));
 
     private LogsPageActionController CreateLogsPageActionController()
         => new(

@@ -842,3 +842,18 @@ the window must cancel pending layout restoration and detach layout observers.
 Run a native benchmark fixture whose parent exits while a descendant inherits
 its output pipe. Verify the owned descendant stops promptly, output draining
 remains cancellable after parent exit, and no child is left behind.
+
+## Profile transfer candidate (#79)
+
+The candidate adds a nullable profile-annotations column through migration 16;
+existing profile settings and IDs remain compatible. Verify one/all exports,
+clipboard round trips and copy to another model through the common preview.
+Exercise Keep both/Replace/Skip, unavailable runtime/companion mappings, GPU
+changes, port conflicts, persistent notes and changed catalog state after preview.
+Confirm that import saves selected profiles atomically and leaves sessions alone.
+Run the full release gate with publish; test a separate development workspace
+without replacing production data. Local packages remain unsigned.
+
+Profile transfer UI checks include Ctrl+C/Ctrl+V between model/profile lists,
+text editing and repeated-key handling, and import previews at 850×760 (English,
+100%) and 680×560 (German, 125%) with long scrollable warnings.

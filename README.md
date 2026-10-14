@@ -28,6 +28,7 @@ endpoints on native Windows or Ubuntu/WSL.
 * Downloads, imports, scans, and organizes GGUF models.
 * Saves multiple launch profiles for each model.
 * Reattaches relocated GGUF files without losing saved profiles or group assignments.
+* Transfers launch profiles as readable JSONC bundles, through files, clipboard, or copy to another model, with a shared import preview and Ctrl+C/Ctrl+V between models.
 * Searches and favourites models, saved profiles, and runtimes consistently,
   including quick profile control from the themed tray menu.
 * Runs and supervises several model servers on separate ports.

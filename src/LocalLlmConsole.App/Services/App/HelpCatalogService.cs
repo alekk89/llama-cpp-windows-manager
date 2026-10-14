@@ -170,6 +170,8 @@ public sealed partial class HelpCatalogService
             "Profiles save launch variants; groups apply retention policy to selected profiles.",
             [
                 "Keep separate profiles for low memory, long context, vision, or different runtimes; use the shared star or Add to favorites action to keep frequent models and profiles first throughout the app and tray, and toggle Load on startup from a saved profile row.",
+                "Right-click a saved profile to Export profile, Copy profile, or Copy to another model. Ctrl+C copies the selected saved profile; Ctrl+V on the destination model or profile opens the shared preview. Text fields keep normal copy and paste behavior. The model menu exports all of its profiles. Import profiles and Paste profiles open the same preview from the model menu or profiles panel.",
+                "Review local runtime, companion, GPU and port mappings before importing. Keep both is the default; Replace preserves the existing profile ID and references. Imports save profiles together and never load or restart a model. JSONC supports comments; use annotations.notes and annotations.settingNotes for notes that survive re-export.",
                 "A group can pin sessions, inherit the global idle timeout, or use its own idle timeout.",
                 "Group priority controls automatic idle-eviction order, not inference scheduling.",
                 "A group load validates runtimes, unique ports, and aggregate VRAM before starting independent profile sessions."

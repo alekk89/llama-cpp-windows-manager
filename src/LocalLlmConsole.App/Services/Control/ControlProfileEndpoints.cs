@@ -14,6 +14,25 @@ internal sealed class ControlProfileEndpoints : ControlEndpointHandler
         ModelRecord model,
         CancellationToken cancellationToken)
     {
+        if (segments.Length == 6 && segments[5].Equals("export", StringComparison.OrdinalIgnoreCase) && method == "GET")
+        {
+            var workflow = _deps.ProfileTransfers ?? new ProfileTransferWorkflowService(_deps.StateStore, _deps.Sessions);
+            var profileId = request.Query.TryGetValue("profile", out var value) ? value : null;
+            var bundle = await workflow.ExportAsync(model, profileId);
+            return Ok(new { ok = true, bundle, text = ProfileBundleCodec.Write(bundle) });
+        }
+        if (segments.Length == 6 && segments[5].Equals("import", StringComparison.OrdinalIgnoreCase) && method == "POST")
+        {
+            var write = Body<ProfileTransferControlRequest>(request.Body);
+            var bundle = ProfileBundleCodec.Read(write.Text);
+            var workflow = _deps.ProfileTransfers ?? new ProfileTransferWorkflowService(_deps.StateStore, _deps.Sessions);
+            var choices = write.Choices ?? [];
+            var preview = await workflow.PreviewAsync(model, bundle, _deps.Actions.GetSettings(), choices);
+            if (write.DryRun) return Ok(new { ok = true, dryRun = true, preview });
+            var profiles = await workflow.ApplyAsync(model, bundle, _deps.Actions.GetSettings(), choices, preview);
+            await _deps.Actions.RefreshAsync(cancellationToken);
+            return Ok(new { ok = true, preview, profiles });
+        }
         if (segments.Length == 5 && method == "GET")
         {
             var snapshot = await _modelGroups.SnapshotAsync();
@@ -117,3 +136,5 @@ internal sealed class ControlProfileEndpoints : ControlEndpointHandler
     }
 
 }
+
+internal sealed record ProfileTransferControlRequest(string Text, bool DryRun = true, IReadOnlyList<ProfileImportChoice>? Choices = null);

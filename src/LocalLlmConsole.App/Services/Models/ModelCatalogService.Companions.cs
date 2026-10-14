@@ -165,6 +165,16 @@ public sealed partial class ModelCatalogService
         return SpeculativeCompanionKind.Unknown;
     }
 
+    public static bool IsCompatibleCompanion(string modelPath, string companionPath, string speculativeType, bool vision = false)
+    {
+        if (!File.Exists(companionPath)) return false;
+        if (vision) return LooksLikeVisionProjectorName(Path.GetFileName(companionPath))
+            && LooksCompatibleWithMainModel(Path.GetFileName(modelPath), Path.GetFileName(companionPath));
+        var kind = ClassifySpeculativeCompanion(companionPath);
+        return kind != SpeculativeCompanionKind.Unknown && MatchesSpeculativeType(kind, speculativeType)
+            && LooksCompatibleWithMainModel(Path.GetFileName(modelPath), Path.GetFileName(companionPath), kind != SpeculativeCompanionKind.DraftModel);
+    }
+
     private static bool MatchesSpeculativeType(SpeculativeCompanionKind kind, string speculativeType)
         => speculativeType switch
         {

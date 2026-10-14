@@ -6,7 +6,8 @@ public sealed record NamedModelLaunchProfile(
     string Name,
     ModelLaunchSettings Settings,
     DateTimeOffset UpdatedAt,
-    bool IsDefault = false);
+    bool IsDefault = false,
+    ProfileAnnotations? Annotations = null);
 
 public sealed record ModelLaunchSettings(
     int ContextSize,

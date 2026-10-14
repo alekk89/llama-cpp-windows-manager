@@ -169,8 +169,8 @@ VALUES ($id, $model_id, 'Default', $settings_json, $updated_at, 1);
             var profiles = new List<NamedModelLaunchProfile>();
             await using var command = _connection.CreateCommand();
             command.CommandText = string.IsNullOrWhiteSpace(modelId)
-                ? "SELECT id, model_id, name, settings_json, updated_at, is_default FROM model_launch_profiles ORDER BY is_default DESC, name;"
-                : "SELECT id, model_id, name, settings_json, updated_at, is_default FROM model_launch_profiles WHERE model_id = $model_id ORDER BY is_default DESC, name;";
+                ? "SELECT id, model_id, name, settings_json, updated_at, is_default, annotations_json FROM model_launch_profiles ORDER BY is_default DESC, name;"
+                : "SELECT id, model_id, name, settings_json, updated_at, is_default, annotations_json FROM model_launch_profiles WHERE model_id = $model_id ORDER BY is_default DESC, name;";
             if (!string.IsNullOrWhiteSpace(modelId))
                 command.Parameters.AddWithValue("$model_id", modelId);
             await using var reader = await command.ExecuteReaderAsync();
@@ -186,7 +186,8 @@ VALUES ($id, $model_id, 'Default', $settings_json, $updated_at, 1);
                         reader.GetString(2),
                         settings,
                         DateValue(reader.GetString(4)),
-                        reader.GetInt32(5) != 0));
+                        reader.GetInt32(5) != 0,
+                        reader.IsDBNull(6) ? null : JsonSerializer.Deserialize<ProfileAnnotations>(reader.GetString(6))));
                 }
                 catch
                 {
@@ -206,24 +207,7 @@ VALUES ($id, $model_id, 'Default', $settings_json, $updated_at, 1);
         await WithConnectionAsync(async () =>
         {
             InvalidateCatalog();
-            await using var command = _connection.CreateCommand();
-            command.CommandText = """
-INSERT INTO model_launch_profiles (id, model_id, name, settings_json, updated_at, is_default)
-VALUES ($id, $model_id, $name, $settings_json, $updated_at, $is_default)
-ON CONFLICT(id) DO UPDATE SET
-  model_id = excluded.model_id,
-  name = excluded.name,
-  settings_json = excluded.settings_json,
-  updated_at = excluded.updated_at,
-  is_default = excluded.is_default;
-""";
-            command.Parameters.AddWithValue("$id", profile.Id);
-            command.Parameters.AddWithValue("$model_id", profile.ModelId);
-            command.Parameters.AddWithValue("$name", profile.Name.Trim());
-            command.Parameters.AddWithValue("$settings_json", JsonSerializer.Serialize(profile.Settings));
-            command.Parameters.AddWithValue("$updated_at", profile.UpdatedAt.ToString("O"));
-            command.Parameters.AddWithValue("$is_default", profile.IsDefault ? 1 : 0);
-            await command.ExecuteNonQueryAsync();
+            await WriteLaunchProfileUnlockedAsync(profile, null);
         });
     }
 

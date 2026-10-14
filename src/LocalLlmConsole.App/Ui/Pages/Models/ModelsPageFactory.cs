@@ -27,7 +27,8 @@ public sealed record ModelsPageActions(
     RoutedEventHandler DeleteModelRowClick,
     Func<Task> SearchHuggingFaceAsync,
     Func<Task> ShowDownloadHistoryAsync,
-    Action<DataGrid> ConfigureModelGridColumnSizing);
+    Action<DataGrid> ConfigureModelGridColumnSizing,
+    ProfileTransferUiActions? ProfileTransfer = null);
 
 public sealed record ModelsPageRequest(
     MainWindowViewModel ViewModel,
@@ -82,6 +83,8 @@ public static class ModelsPageFactory
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(.95, GridUnitType.Star), MinWidth = 380 });
 
         var (modelLists, modelsGrid, modelVariantsGrid, modelsSearch, launchProfilesSearch) = ModelLists(request);
+        if (request.Actions.ProfileTransfer is { } clipboardActions)
+            new ProfileTransferKeyboardController(modelsGrid, modelVariantsGrid, clipboardActions).Attach(root);
         body.Children.Add(modelLists);
         body.Children.Add(PageSectionFactory.VerticalGridSplitter(1));
         Grid.SetColumn(request.LaunchSettingsPanel, 2);
@@ -150,7 +153,24 @@ public static class ModelsPageFactory
 
         modelLists.Children.Add(PageSectionFactory.GridSection(Loc.T("Models.ModelFilesTitle"), modelsGrid, Loc.T("Models.ModelFilesDescription"), modelsSearch.Root));
         modelLists.Children.Add(PageSectionFactory.HorizontalGridSplitter(1));
-        var variantsSection = PageSectionFactory.GridSection(Loc.T("Models.SavedVariantsTitle"), modelVariantsGrid, Loc.T("Models.SavedVariantsDescription"), launchProfilesSearch.Root);
+        var profileTools = new StackPanel();
+        profileTools.Children.Add(launchProfilesSearch.Root);
+        if (request.Actions.ProfileTransfer is { } transfer)
+        {
+            var tools = new WrapPanel();
+            foreach (var (label, paste) in new[] { (Loc.T("Profiles.Transfer.Import"), false), (Loc.T("Profiles.Transfer.Paste"), true) })
+            {
+                var button = new WpfButton { Content = label, Margin = new Thickness(0, 3, 6, 3) };
+                button.Click += async (_, _) =>
+                {
+                    var row = modelsGrid.SelectedItem as ModelGridRow ?? modelVariantsGrid.SelectedItem as ModelGridRow;
+                    if (row is not null) await transfer.Import(row.Model, paste);
+                };
+                tools.Children.Add(button);
+            }
+            profileTools.Children.Add(tools);
+        }
+        var variantsSection = PageSectionFactory.GridSection(Loc.T("Models.SavedVariantsTitle"), modelVariantsGrid, Loc.T("Models.SavedVariantsDescription"), profileTools);
         Grid.SetRow(variantsSection, 2);
         modelLists.Children.Add(variantsSection);
         return (modelLists, modelsGrid, modelVariantsGrid, modelsSearch, launchProfilesSearch);
@@ -253,6 +273,12 @@ public static class ModelsPageFactory
             new(_ => Loc.T("Launch.SaveAsNewButton"),
                 row => row is ModelGridRow { IsMissing: false },
                 _ => BeginNewLaunchProfileAsync(actions)),
+            new(_ => Loc.T("Profiles.Transfer.ExportAll"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Export(((ModelGridRow)row).Model, null, false)),
+            new(_ => Loc.T("Profiles.Transfer.Import"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, false)),
+            new(_ => Loc.T("Profiles.Transfer.Paste"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, true), InputGestureText: "Ctrl+V"),
             new(_ => Loc.T("Models.ActionBtn.Delete"),
                 row => row is ModelGridRow { CanDelete: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(actions.DeleteModelRowClick, row),
@@ -287,6 +313,16 @@ public static class ModelsPageFactory
                 row => row is ModelGridRow { LaunchProfile: not null, CanAssignGroup: false },
                 row => RemoveGroupAsync(actions, (ModelGridRow)row),
                 IsVisible: row => row is ModelGridRow { CanAssignGroup: false }),
+            new(_ => Loc.T("Profiles.Transfer.Export"), row => row is ModelGridRow { LaunchProfile: not null } && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Export(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!.Id, false)),
+            new(_ => Loc.T("Profiles.Transfer.Copy"), row => row is ModelGridRow { LaunchProfile: not null } && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Export(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!.Id, true), InputGestureText: "Ctrl+C"),
+            new(_ => Loc.T("Profiles.Transfer.CopyTo"), row => row is ModelGridRow { LaunchProfile: not null } && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.CopyToModel(((ModelGridRow)row).Model, ((ModelGridRow)row).LaunchProfile!)),
+            new(_ => Loc.T("Profiles.Transfer.Import"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, false)),
+            new(_ => Loc.T("Profiles.Transfer.Paste"), row => row is ModelGridRow && actions.ProfileTransfer is not null,
+                row => actions.ProfileTransfer!.Import(((ModelGridRow)row).Model, true), InputGestureText: "Ctrl+V"),
             new(_ => Loc.T("Models.ActionBtn.Remove"),
                 row => row is ModelGridRow { CanDelete: true },
                 row => DataGridRowContextMenu.RaiseRowActionAsync(actions.DeleteModelRowClick, row),

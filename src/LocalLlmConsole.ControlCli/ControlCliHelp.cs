@@ -12,6 +12,9 @@ Core:
   llwmctl models reattach MODEL --file PATH [--confirm-role] [--confirm-mismatch]
   llwmctl load|restart|unload MODEL [--profile NAME] [--runtime ID] [--set name=value] [--wait]
   llwmctl profiles list|create|update|delete --model MODEL [--id ID] [--name NAME] [--set name=value]
+  llwmctl profiles export --model MODEL [--id PROFILE] --file profiles.jsonc
+  llwmctl profiles import --model MODEL --file profiles.jsonc [--runtime ID] [--conflict keep-both|replace|skip] [--apply]
+    Import previews by default. Review mappings/warnings, then use --apply to save; no models are loaded.
   llwmctl groups list|get|create|update|delete [GROUP] [--name NAME] [--retention inherit|pinned|idle-timeout] [--idle-minutes N] [--priority low|normal|high]
   llwmctl groups assign MODEL PROFILE --group GROUP | groups unassign MODEL PROFILE
   llwmctl sessions list|get|logs|metrics|inspect [SESSION]

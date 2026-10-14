@@ -149,7 +149,7 @@ public sealed partial class LocalControlApi
             {
                 "self-identification", "model-catalog", "model-scan", "model-import", "model-delete", "launch-profile-groups",
                 "model-load", "model-restart", "model-unload", "session-status", "endpoint-inspection", "live-metrics",
-                "runtime-and-app-logs", "profile-crud", "one-shot-setting-overrides", "vision-heads",
+                "runtime-and-app-logs", "profile-crud", "profile-transfer", "one-shot-setting-overrides", "vision-heads",
                 "draft-and-mtp-heads", "app-settings", "runtime-scan", "runtime-register",
                 "huggingface-search", "huggingface-download", "download-pause-resume-cancel", "jobs",
                 "llama-bench", "benchmark-automation", "benchmark-history", "benchmark-agent-contract", "benchmark-comparison", "benchmark-delete",
@@ -166,6 +166,16 @@ public sealed partial class LocalControlApi
                 priorityMeaning = "Automatic idle eviction order only; active inference request scheduling is unchanged."
             },
             modelLaunchSettings = ControlEndpointHandler.SettingsSchema<ModelLaunchSettings>(),
+            profileTransfer = new
+            {
+                schemaVersion = ProfileBundleCodec.SchemaVersion,
+                maximumBytes = ProfileBundleCodec.MaximumBytes,
+                conflictActions = new { keepBoth = 0, replace = 1, skip = 2 },
+                defaultAction = "keepBoth",
+                importRequest = new { text = "JSON or JSONC bundle", dryRun = true, choices = "Optional per-profile index, action, name, runtimeId and local settings overrides" },
+                exportScope = "One or all saved profiles for exactly one model; runtime hints and companion filenames only",
+                loadsModels = false
+            },
             appSettings = ControlEndpointHandler.SettingsSchema<AppSettings>(),
             benchmarks = ControlBenchmarkContract.CapabilitySummary,
             selfIdentificationHints = new[] { "sessionId", "model", "endpoint", "port", "processId" }

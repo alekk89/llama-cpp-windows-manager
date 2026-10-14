@@ -114,6 +114,8 @@ public sealed partial class AppServiceFactory
                 launchProfiles,
                 trayProfiles,
                 launchVariants,
+                new ProfileTransferWorkflowService(stateStore, request.Sessions, async () =>
+                    (await core.Ui.RuntimeGpuSummaryApplication.SnapshotAsync(null, DateTimeOffset.UtcNow)).Gpus.Select(gpu => gpu.Name).ToArray()),
                 modelLaunchSettingsWorkflow),
             new MainWindowLoadedGatewayServices(
                 gatewayRouteCatalog,
