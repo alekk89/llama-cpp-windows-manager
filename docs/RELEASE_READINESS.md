@@ -1,15 +1,16 @@
 # Release Readiness Checklist
 
-Last updated: 2026-09-08
+Last updated: 2026-10-14
 
-The v2.8 release is explicitly unsigned and ships the installer and portable EXE
+The v2.9 release is explicitly unsigned and ships the installer and portable EXE
 with SHA-256 companions. See [UNSIGNED_RELEASE.md](UNSIGNED_RELEASE.md).
 
 Release scope and final validation are tracked in
-[release issue #68](https://github.com/alekk89/llama-cpp-windows-manager/issues/68).
-The candidate collects the completed benchmark, endpoint report, gateway,
-telemetry, draft-token accuracy, and hidden-section layout changes. The app,
-CLI, window labels, and installer all use version 2.8.0.
+[release issue #105](https://github.com/alekk89/llama-cpp-windows-manager/issues/105).
+The candidate includes every merged change since v2.8.0: profile transfers,
+GGUF reattach, startup favourites, dark-theme and gateway fixes, update
+verification, and dependency updates. The app, CLI, window labels, and installer
+all use version 2.9.0.
 
 Before publication, the exact merged commit must pass required PR checks and
 the clean Windows unsigned preparation workflow, including installer lifecycle,
@@ -18,8 +19,8 @@ embed that exact source commit. Record the successful runs and artifact review
 in the release issue; the dated checks below remain historical evidence.
 
 Live GPU benchmark execution, spoken Narrator, and Windows high-contrast
-presentation are not established by this release preparation. Existing saved
-data formats are unchanged by the release metadata update.
+presentation are not established by this release preparation. The database adds
+optional profile annotations while preserving existing profiles and settings.
 
 ## Automated Gate
 
@@ -79,7 +80,7 @@ builds and must be described that way.
   gateway and control loads retain their explicit policies.
 
 - Publish the standalone `dist\LlamaCppWindowsManager-win-x64\LlamaCppWindowsManager.exe` from a clean checkout; do not publish a portable ZIP.
-- Build `dist\installer\LlamaCppWindowsManager-Setup-2.8.0-win-x64.exe` from the published app with Inno Setup 6.
+- Build `dist\installer\LlamaCppWindowsManager-Setup-2.9.0-win-x64.exe` from the published app with Inno Setup 6.
 - Confirm the publish folder contains no `.pdb` files.
 - Confirm the portable EXE and installer each have a matching `.sha256` companion file. For signed builds, generate the companion file after signing.
 - Confirm signed installer builds fail before compilation if `-SkipPublish`
@@ -604,8 +605,8 @@ builds and must be described that way.
 - Confirm manual Check For Updates shows a no-update popup when current, or an install confirmation when a newer release exists.
 - Confirm the release includes the installer and standalone EXE, each with a
   matching SHA-256 companion, and no portable ZIP. Checksum failures prevent staging.
-- Install unsigned v2.8 manually from v2.5 or v2.6; their existing updaters require signatures.
-- Confirm unsigned v2.8 can check and stage a subsequent checksum-verified unsigned release.
+- Install unsigned v2.9 manually from v2.5 or v2.6; their existing updaters require signatures.
+- Confirm unsigned v2.9 can check and stage a subsequent checksum-verified unsigned release.
 - Confirm a signed installed app refuses an unsigned or differently signed staged update.
 - Confirm a completed staged update restarts `LlamaCppWindowsManager.exe` and shows the GitHub release notes.
 - Confirm a non-critical staging-cleanup failure after successful replacement is
@@ -762,7 +763,7 @@ either marker already exists, which prevents a temporary test from replacing a
 real installation's uninstall registration or shortcut.
 
 1. Start from a clean Windows VM.
-2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.8.0-win-x64.exe`.
+2. Install `dist\installer\LlamaCppWindowsManager-Setup-2.9.0-win-x64.exe`.
 3. Confirm the installer prefers `D:\LlamaCppWindowsManager` when `D:` exists and allows choosing a different folder before install.
 4. Confirm the launch-after-install option opens the app.
 5. Confirm first launch creates `data\models`, `data\runtimes`, `data\cache`, `data\state`, and `data\logs` beside the exe when the install folder is writable.

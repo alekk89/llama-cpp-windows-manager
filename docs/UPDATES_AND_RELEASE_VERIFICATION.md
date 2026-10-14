@@ -2,7 +2,7 @@
 
 ## Unsigned community releases
 
-Version 2.8 is an unsigned community release. Download the installer or standalone
+Version 2.9 is an unsigned community release. Download the installer or standalone
 `LlamaCppWindowsManager.exe` and its matching `.sha256` companion from
 [GitHub Releases](https://github.com/alekk89/llama-cpp-windows-manager/releases).
 The portable ZIP is no longer published. The EXE restores its bundled CLI,
@@ -18,7 +18,7 @@ if ($actual -ne $expected) { throw "Checksum mismatch" }
 Checksums detect mismatched downloads; they are not publisher signatures.
 Windows may display an unknown-publisher or SmartScreen prompt.
 
-The v2.5 and v2.6 updaters require signatures, so install unsigned v2.8 manually once.
+The v2.5 and v2.6 updaters require signatures, so install an unsigned release manually once.
 Exit the Manager, then run the installer over the existing installation or
 replace the portable EXE in its existing folder. Keep the `data` folder.
 
