@@ -123,7 +123,15 @@ SDK would change that version and fail locked restore or silently change the
 self-contained runtime pack. Install the pinned SDK (the scripts also accept a
 sibling `..\.dotnet-sdk-10` or `LLAMA_CPP_WINDOWS_MANAGER_DOTNET`). To adopt a
 newer SDK, update `global.json`, the matching runtime-versioned package
-references, and every lock file with `--force-evaluate` in the same change.
+references, and every lock file in the same change. The solution restore does
+not regenerate the self-contained publish locks; refresh them with the same
+arguments that `scripts/publish-app.ps1` uses:
+
+```powershell
+dotnet restore LocalLlmConsole.sln --force-evaluate
+dotnet restore src/LocalLlmConsole.ControlCli -r win-x64 --force-evaluate -p:PublishAot=true -p:SelfContained=true -p:NuGetLockFilePath=packages.publish.lock.json
+dotnet restore src/LocalLlmConsole.App -r win-x64 --force-evaluate -p:PublishSingleFile=true -p:SelfContained=true
+```
 
 To include packaging on a machine with publish/installer prerequisites, run:
 
