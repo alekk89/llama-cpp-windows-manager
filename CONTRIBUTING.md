@@ -8,8 +8,9 @@ Search existing issues, keep a change focused, and explain the user problem it
 solves. Security reports belong in the private process described in
 [SECURITY.md](SECURITY.md).
 
-Development requires Windows 10 or 11 x64, PowerShell 5+, and the .NET 10 SDK
-selected by `global.json`. Read [AGENTS.md](AGENTS.md),
+Development requires Windows 10 or 11 x64, PowerShell 5+, and the exact .NET 10
+SDK version pinned by `global.json` (roll-forward is disabled so locked AOT
+publish stays deterministic). Read [AGENTS.md](AGENTS.md),
 [Development](docs/DEVELOPMENT.md), and [Architecture](docs/ARCHITECTURE.md)
 before changing runtime, control API, persistence, packaging, or release code.
 
