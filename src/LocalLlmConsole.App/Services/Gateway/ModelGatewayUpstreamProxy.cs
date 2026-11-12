@@ -53,12 +53,15 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         using var request = BuildUpstreamRequest(context.Request, upstream, body, session.LaunchSettings);
         var started = Stopwatch.StartNew();
         var priorElapsed = elapsedBeforeUpstream ?? TimeSpan.Zero;
+        // Cancelled when a client write fails so the upstream generation is
+        // abandoned instead of running to completion for a closed connection.
+        using var clientCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
-            using var headerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var headerCancellation = CancellationTokenSource.CreateLinkedTokenSource(clientCancellation.Token);
             headerCancellation.CancelAfter(_responseHeaderTimeout);
             using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, headerCancellation.Token);
-            var observation = await CopyResponseAsync(context, response, started, cancellationToken);
+            var observation = await CopyResponseAsync(context, response, started, clientCancellation);
             _performance?.Observe(response.IsSuccessStatusCode, priorElapsed + started.Elapsed,
                 observation.TimeToFirstData is { } first ? priorElapsed + first : null,
                 observation.ResponseTokensPerSecond);
@@ -98,8 +101,9 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         HttpListenerContext context,
         HttpResponseMessage response,
         Stopwatch started,
-        CancellationToken cancellationToken)
+        CancellationTokenSource clientCancellation)
     {
+        var cancellationToken = clientCancellation.Token;
         context.Response.StatusCode = (int)response.StatusCode;
         foreach (var header in response.Headers)
         {
@@ -125,9 +129,16 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var observedOutput = new GatewayObservedResponseStream(context.Response.OutputStream, started);
+        var observedOutput = new GatewayObservedResponseStream(context.Response.OutputStream, started, clientCancellation);
         await stream.CopyToAsync(observedOutput, cancellationToken);
-        context.Response.Close();
+        try
+        {
+            context.Response.Close();
+        }
+        catch (Exception ex) when (ModelGatewayClientDisconnectedException.IsClientStreamFailure(ex))
+        {
+            throw new ModelGatewayClientDisconnectedException(ex);
+        }
         var completionTokens = observedOutput.Complete();
         var throughput = GatewayResponseThroughputPolicy.Calculate(
             completionTokens,
@@ -137,7 +148,12 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         return new(observedOutput.TimeToFirstData, throughput);
     }
 
-    private sealed class GatewayObservedResponseStream(Stream inner, Stopwatch started) : Stream
+    // Client write failures cancel the upstream request and surface as a client
+    // disconnect, distinct from upstream read failures during the same copy.
+    private sealed class GatewayObservedResponseStream(
+        Stream inner,
+        Stopwatch started,
+        CancellationTokenSource clientCancellation) : Stream
     {
         private readonly GatewayCompletionTokenObserver _tokens = new();
 
@@ -146,27 +162,35 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         public double? Complete() => _tokens.Complete();
 
         public override void Write(byte[] buffer, int offset, int count)
-        {
-            Observe(buffer.AsSpan(offset, count));
-            inner.Write(buffer, offset, count);
-        }
+            => Write(buffer.AsSpan(offset, count));
 
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             Observe(buffer);
-            inner.Write(buffer);
+            try
+            {
+                inner.Write(buffer);
+            }
+            catch (Exception ex) when (ModelGatewayClientDisconnectedException.IsClientStreamFailure(ex))
+            {
+                throw Disconnected(ex);
+            }
         }
 
-        public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            Observe(buffer.AsSpan(offset, count));
-            await inner.WriteAsync(buffer.AsMemory(offset, count), cancellationToken);
-        }
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             Observe(buffer.Span);
-            return inner.WriteAsync(buffer, cancellationToken);
+            try
+            {
+                await inner.WriteAsync(buffer, cancellationToken);
+            }
+            catch (Exception ex) when (ModelGatewayClientDisconnectedException.IsClientStreamFailure(ex))
+            {
+                throw Disconnected(ex);
+            }
         }
 
         private void Observe(ReadOnlySpan<byte> buffer)
@@ -176,8 +200,42 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
             _tokens.Observe(buffer);
         }
 
-        public override void Flush() => inner.Flush();
-        public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+        private ModelGatewayClientDisconnectedException Disconnected(Exception ex)
+        {
+            try
+            {
+                clientCancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The request already completed; there is no upstream work left to cancel.
+            }
+            return new ModelGatewayClientDisconnectedException(ex);
+        }
+
+        public override void Flush()
+        {
+            try
+            {
+                inner.Flush();
+            }
+            catch (Exception ex) when (ModelGatewayClientDisconnectedException.IsClientStreamFailure(ex))
+            {
+                throw Disconnected(ex);
+            }
+        }
+
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await inner.FlushAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ModelGatewayClientDisconnectedException.IsClientStreamFailure(ex))
+            {
+                throw Disconnected(ex);
+            }
+        }
         public override bool CanRead => false;
         public override bool CanSeek => false;
         public override bool CanWrite => true;

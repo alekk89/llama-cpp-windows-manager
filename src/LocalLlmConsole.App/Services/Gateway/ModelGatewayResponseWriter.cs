@@ -22,6 +22,15 @@ public static class ModelGatewayResponseWriter
         }
     }
 
+    public static void TryAbort(HttpListenerResponse response)
+    {
+        try { response.Abort(); }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Could not abort model gateway response: {ex.Message}");
+        }
+    }
+
     public static object ModelsResponse(IReadOnlyList<ModelGatewayModelRoute> models)
         => new
         {

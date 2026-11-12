@@ -136,3 +136,11 @@ session while a gateway request on it is active, and a request that arrives
 while an idle session is stopping waits and reloads it. Requests sent directly
 to a model's own endpoint are not tracked by the gateway; explicit unloads and
 restarts still stop sessions immediately.
+
+When a client disconnects, the gateway cancels the upstream llama-server
+request, releases the request's model slot, and logs a client disconnect rather
+than a gateway error. Windows `HttpListener` reports a disconnect only when the
+gateway next reads from or writes to that client. A streamed response is
+therefore stopped at its next chunk, but a disconnect during a model load or
+while a non-streaming response is still being generated is detected only when
+the response is ready to send.
