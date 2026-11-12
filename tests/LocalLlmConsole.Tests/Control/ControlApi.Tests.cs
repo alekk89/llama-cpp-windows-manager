@@ -236,8 +236,7 @@ public sealed class ControlApiTests : ManagerRegressionTestBase
         var result = await RunGuardedCliRequestAsync(
             ["load", "self-model", "--restart"],
             _ => "{\"ok\":true,\"identified\":true,\"session\":{\"modelId\":\"self-model\",\"runtimeId\":\"runtime\",\"mode\":\"Native\"}}",
-            _ => "{\"ok\":true,\"model\":{\"id\":\"self-model\"}}",
-            expectedRequestCount: 2);
+            _ => "{\"ok\":true,\"model\":{\"id\":\"self-model\"}}");
 
         Assert.Equal(1, result.ExitCode);
         Assert.Equal(["GET /api/v1/self", "GET /api/v1/models/self-model"], result.Requests);
@@ -249,8 +248,7 @@ public sealed class ControlApiTests : ManagerRegressionTestBase
         var result = await RunGuardedCliRequestAsync(
             ["request", "POST", "/api/v1/operations/app%2Eshutdown", "--body", "{\"confirm\":true}"],
             _ => "{\"ok\":true,\"identified\":true,\"session\":{\"modelId\":\"self-model\",\"runtimeId\":\"runtime\",\"mode\":\"Native\"}}",
-            _ => "{\"ok\":true}",
-            expectedRequestCount: 1);
+            _ => "{\"ok\":true}");
 
         Assert.Equal(1, result.ExitCode);
         Assert.Equal(["GET /api/v1/self"], result.Requests);
@@ -262,8 +260,7 @@ public sealed class ControlApiTests : ManagerRegressionTestBase
         var result = await RunGuardedCliRequestAsync(
             ["unload", "other-model"],
             _ => "{\"ok\":true,\"identified\":false,\"confidence\":\"ambiguous\",\"candidates\":[{\"modelId\":\"first\"},{\"modelId\":\"second\"}]}",
-            _ => "{\"ok\":true}",
-            expectedRequestCount: 1);
+            _ => "{\"ok\":true}");
 
         Assert.Equal(1, result.ExitCode);
         Assert.Equal(["GET /api/v1/self"], result.Requests);
@@ -275,8 +272,7 @@ public sealed class ControlApiTests : ManagerRegressionTestBase
         var result = await RunGuardedCliRequestAsync(
             ["unload", "candidate-model"],
             _ => "{\"ok\":true,\"identified\":true,\"confidence\":\"inferred-single-running-session\",\"session\":{\"modelId\":\"candidate-model\"}}",
-            _ => "{\"ok\":true}",
-            expectedRequestCount: 1);
+            _ => "{\"ok\":true}");
 
         Assert.Equal(1, result.ExitCode);
         Assert.Equal(["GET /api/v1/self"], result.Requests);
@@ -288,80 +284,17 @@ public sealed class ControlApiTests : ManagerRegressionTestBase
         var result = await RunGuardedCliRequestAsync(
             ["unload", "stopped-model"],
             _ => "{\"ok\":true,\"identified\":false,\"confidence\":\"ambiguous\",\"candidates\":[]}",
-            _ => "{\"ok\":true}",
-            expectedRequestCount: 2);
+            _ => "{\"ok\":true}");
 
         Assert.Equal(0, result.ExitCode);
         Assert.Equal(["GET /api/v1/self", "POST /api/v1/models/stopped-model/unload"], result.Requests);
     }
 
-    private static async Task<(int ExitCode, IReadOnlyList<string> Requests)> RunGuardedCliRequestAsync(
+    private static Task<(int ExitCode, IReadOnlyList<string> Requests)> RunGuardedCliRequestAsync(
         string[] command,
         Func<string, string> selfResponse,
-        Func<string, string> otherResponse,
-        int expectedRequestCount)
-    {
-        var root = CreateTempRoot();
-        var connectionPath = Path.Combine(root, "control.json");
-        var port = FreeTcpPort();
-        File.WriteAllText(connectionPath, JsonSerializer.Serialize(new
-        {
-            version = 1,
-            processId = Environment.ProcessId,
-            baseUrl = $"http://127.0.0.1:{port}",
-            protectedToken = "test-token",
-            workspaceRoot = root,
-            startedAt = DateTimeOffset.UtcNow
-        }));
-
-        using var listener = new HttpListener();
-        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
-        listener.Start();
-        var received = new List<string>();
-        var server = Task.Run(async () =>
-        {
-            try
-            {
-                while (listener.IsListening && received.Count < expectedRequestCount)
-                {
-                    var context = await listener.GetContextAsync();
-                    var path = context.Request.Url?.AbsolutePath ?? "";
-                    received.Add($"{context.Request.HttpMethod} {path}");
-                    var json = path == "/api/v1/self" ? selfResponse(path) : otherResponse(path);
-                    var bytes = Encoding.UTF8.GetBytes(json);
-                    context.Response.StatusCode = 200;
-                    context.Response.ContentType = "application/json";
-                    context.Response.ContentLength64 = bytes.Length;
-                    await context.Response.OutputStream.WriteAsync(bytes);
-                    context.Response.Close();
-                }
-            }
-            catch (HttpListenerException) when (!listener.IsListening)
-            {
-            }
-        }, TestContext.Current.CancellationToken);
-
-        try
-        {
-            var args = command.Concat(["--connection", connectionPath, "--compact"]).ToArray();
-            var exitCode = await LocalLlmConsole.ControlCli.Program.Main(args);
-            return (exitCode, received);
-        }
-        finally
-        {
-            listener.Stop();
-            await server.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        }
-
-        static int FreeTcpPort()
-        {
-            var tcp = new TcpListener(IPAddress.Loopback, 0);
-            tcp.Start();
-            var port = ((IPEndPoint)tcp.LocalEndpoint).Port;
-            tcp.Stop();
-            return port;
-        }
-    }
+        Func<string, string> otherResponse)
+        => RunControlCliAsync(command, path => path == "/api/v1/self" ? selfResponse(path) : otherResponse(path));
 
     [Fact]
     public void CompanionDiscoveryReturnsAllEligibleVisionAndDraftHeads()

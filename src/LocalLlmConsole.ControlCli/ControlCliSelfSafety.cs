@@ -10,35 +10,31 @@ internal static class ControlCliSelfSafety
         if (args.Has("allow-self-stop")) return;
         var group = args.Positionals.ElementAtOrDefault(0)?.ToLowerInvariant() ?? "";
         var action = args.Positionals.ElementAtOrDefault(1)?.ToLowerInvariant() ?? "";
-        var requestSegments = RequestSegments(request.Path);
-        var rawOperation = group == "request"
-            && request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase)
-            && requestSegments.Length == 4
-            && requestSegments[0].Equals("api", StringComparison.OrdinalIgnoreCase)
-            && requestSegments[1].Equals("v1", StringComparison.OrdinalIgnoreCase)
-            && requestSegments[2].Equals("operations", StringComparison.OrdinalIgnoreCase)
-                ? requestSegments[3].ToLowerInvariant()
-                : "";
+        var requestSegments = ControlCliRequestPath.Segments(request.Path);
+        var rawOperation = RawRoute(group, request, requestSegments, "operations") ?? "";
         var operation = rawOperation.Length > 0
             ? rawOperation
             : group is "operations" or "operation" or "ops" && action is "run" or "execute"
             ? args.Positionals.ElementAtOrDefault(2)?.ToLowerInvariant() ?? ""
             : "";
-        var operationSetting = new Func<string, string?>(name =>
-            request.Body?[name]?.ToString() ?? SettingArg(args, name));
-        var operationMayStopSelf = operation is "app.shutdown" or "updates.install" or "runtime.delete"
-            || operation == "wsl.setup" && (operationSetting("action")?.StartsWith("Delete", StringComparison.OrdinalIgnoreCase) ?? false);
-        var benchmarkMayStopSelf = group is "benchmarks" or "benchmark"
-            && action is "run" or "start"
-            && request.Body?["plan"]?["stopActiveSessions"]?.GetValue<bool>() == true
-            && !args.Has("dry-run");
-        if (operationMayStopSelf && (request.Body?["dryRun"]?.GetValue<bool>() ?? args.Has("dry-run"))) return;
+        var operationSettings = new Func<string, IEnumerable<string>>(name =>
+            ControlCliJsonFields.Strings(request.Body, name).Concat(SettingArg(args, name) is { } value ? [value] : []));
+        var operationMayStopSelf = operation is "app.shutdown" or "updates.install" or "runtime.delete" or "gateway.stop" or "gateway.restart"
+            || operation == "wsl.setup" && operationSettings("action").Any(value => value.StartsWith("Delete", StringComparison.OrdinalIgnoreCase));
+        var dryRun = request.Body is null ? args.Has("dry-run") : ControlCliJsonFields.DryRun(request.Body);
+        var benchmarkRun = group is "benchmarks" or "benchmark" && action is "run" or "start"
+            || RawRoute(group, request, requestSegments, "benchmarks") == "run";
+        var benchmarkMayStopSelf = benchmarkRun
+            && ControlCliJsonFields.AnyNestedTrue(request.Body, "plan", "stopActiveSessions")
+            && !dryRun;
+        if (operationMayStopSelf && dryRun) return;
 
         var rawModelAction = group == "request" ? RawModelAction(request, requestSegments) : null;
-        var unloadOthers = args.Has("unload-others") || (request.Body?["unloadOthers"]?.GetValue<bool>() ?? false);
+        var restartFlag = ControlCliJsonFields.AnyTrue(request.Body, "restart");
+        var unloadOthers = args.Has("unload-others") || ControlCliJsonFields.AnyTrue(request.Body, "unloadOthers");
         var rawStopsTarget = rawModelAction?.Action is "restart" or "unload" or "delete"
-            || rawModelAction?.Action == "load" && (request.Body?["restart"]?.GetValue<bool>() ?? false);
-        var namedLoadRestarts = group == "load" && (request.Body?["restart"]?.GetValue<bool>() ?? false);
+            || rawModelAction?.Action == "load" && restartFlag;
+        var namedLoadRestarts = group == "load" && restartFlag;
         var destructive = group is "restart" or "unload"
             || group is "models" or "model" && action is "restart" or "unload" or "delete"
             || namedLoadRestarts
@@ -77,9 +73,13 @@ internal static class ControlCliSelfSafety
             var targetsOperationSelf = operation switch
             {
                 "app.shutdown" or "updates.install" => true,
-                "runtime.delete" => StringProperty(selfSession, "runtimeId").Equals(
-                    operationSetting("runtime"), StringComparison.OrdinalIgnoreCase),
+                "runtime.delete" => operationSettings("runtime").Any(runtime =>
+                    StringProperty(selfSession, "runtimeId").Equals(runtime, StringComparison.OrdinalIgnoreCase)),
                 "wsl.setup" => StringProperty(selfSession, "mode").Equals("Wsl", StringComparison.OrdinalIgnoreCase),
+                // Stopping or restarting the gateway aborts every in-flight gateway request. Only a
+                // session proven to be reached directly (endpoint or port hint) is outside it.
+                "gateway.stop" or "gateway.restart" => !StringProperty(root, "matchedBy").Equals("endpoint", StringComparison.OrdinalIgnoreCase)
+                    && !StringProperty(root, "matchedBy").Equals("port", StringComparison.OrdinalIgnoreCase),
                 _ => false
             };
             if (targetsOperationSelf)
@@ -130,14 +130,15 @@ internal static class ControlCliSelfSafety
         return null;
     }
 
-    private static string[] RequestSegments(string path)
-    {
-        var question = path.IndexOf('?');
-        var route = question >= 0 ? path[..question] : path;
-        return route.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries)
-            .Select(Uri.UnescapeDataString)
-            .ToArray();
-    }
+    private static string? RawRoute(string group, ControlRequest request, string[] segments, string resource)
+        => group == "request"
+            && request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase)
+            && segments.Length == 4
+            && segments[0].Equals("api", StringComparison.OrdinalIgnoreCase)
+            && segments[1].Equals("v1", StringComparison.OrdinalIgnoreCase)
+            && segments[2].Equals(resource, StringComparison.OrdinalIgnoreCase)
+                ? segments[3].ToLowerInvariant()
+                : null;
 
     private static async Task<string> ResolveModelIdAsync(HttpClient http, string identifier)
     {

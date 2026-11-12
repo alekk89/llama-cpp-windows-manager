@@ -45,7 +45,7 @@ The CLI automatically forwards `LLWM_SESSION_ID`, `LLWM_MODEL_ID`, `LLWM_ENDPOIN
 
 An agent should identify itself before unloading, restarting, or using `--unload-others`. Stopping its own model may terminate the response that initiated the command.
 
-For destructive lifecycle commands, `llwmctl` performs this identity check automatically. It refuses to stop the identified current model unless `--allow-self-stop` is supplied. Agents should add that override only after an explicit user request and warning.
+For destructive lifecycle commands, `llwmctl` performs this identity check automatically. It refuses to stop the identified current model, or to stop or restart the gateway while the current session may be served through it, unless `--allow-self-stop` is supplied. Agents should add that override only after an explicit user request and warning.
 
 ## Model lifecycle
 
@@ -473,7 +473,7 @@ check resolves the newest compatible release and exact platform/backend asset;
 feed ordering is not an installed-version contract. Installation remains a
 confirmed operation and fails closed when the selected asset cannot be verified.
 
-Operations marked `requiresConfirmation` reject execution without `confirm=true`. Every operation accepts `dryRun=true`; dry-run validates the action and target and returns its planned consequence without mutation. Machine setup launches can open elevated or interactive terminals and report `Started`, not installation completion.
+Operations marked `requiresConfirmation` reject execution without `confirm=true`. `gateway.stop` and `gateway.restart` require confirmation because they abort every in-flight gateway request. `llwmctl` also treats them as able to stop the current agent session unless `self` proves that session is reached directly through its own endpoint or port; otherwise they need `--allow-self-stop`. Every operation accepts `dryRun=true`; dry-run validates the action and target and returns its planned consequence without mutation. Machine setup launches can open elevated or interactive terminals and report `Started`, not installation completion.
 
 ## HTTP route summary
 
@@ -511,7 +511,7 @@ llwmctl request GET /api/v1/capabilities
 llwmctl request POST /api/v1/models/MODEL/load --body '{"waitForReady":true}'
 ```
 
-Raw requests sent through `llwmctl request` still enforce the CLI's current-session protection for model unload/restart/delete, `unloadOthers`, and operations that can stop the active runtime or Manager. `--allow-self-stop` is required for the same explicitly authorized cases as the named commands; CLI raw mode is not a safety bypass.
+Raw requests sent through `llwmctl request` still enforce the CLI's current-session protection for model unload/restart/delete, `unloadOthers`, benchmark plans that stop active sessions, and operations that can stop the active runtime, gateway, or Manager. `--allow-self-stop` is required for the same explicitly authorized cases as the named commands; CLI raw mode is not a safety bypass. Body fields are matched case-insensitively, as the Manager binds them, and a request counts as a dry run only when every spelling of `dryRun` is `true`. Raw paths must be canonical: `.`, `..`, and backslash segments, including percent-encoded forms, and fragments are rejected before anything is sent.
 
 Settings patches that only change presentation, or repeat the effective gateway
 configuration, preserve the listener and active requests. Start-with-Windows

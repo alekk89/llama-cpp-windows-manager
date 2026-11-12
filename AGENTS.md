@@ -102,7 +102,10 @@ Before any restart or unload, identify the current model with `self`. Never
 stop the session serving the current operation unless the user explicitly asks
 for that consequence and accepts that the response may terminate. Only then may
 `--allow-self-stop` be used. Do not use `--unload-others` while identity is
-unknown.
+unknown. `gateway.stop` and `gateway.restart` abort every in-flight gateway
+request, including an agent's own; they require `--confirm`, and also
+`--allow-self-stop` unless `self` matched the current session by its direct
+endpoint or port.
 
 ## Companions and launch profiles
 

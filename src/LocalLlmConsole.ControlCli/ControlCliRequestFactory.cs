@@ -256,6 +256,7 @@ internal static partial class ControlCliRequestFactory
     {
         var method = Identifier(args, 1).ToUpperInvariant();
         var path = Identifier(args, 2);
+        _ = ControlCliRequestPath.Segments(path);
         JsonObject? body = null;
         if (args.Value("body-file") is { Length: > 0 } file)
             body = JsonNode.Parse(File.ReadAllText(file)) as JsonObject ?? throw new InvalidOperationException("Body file must contain a JSON object.");
