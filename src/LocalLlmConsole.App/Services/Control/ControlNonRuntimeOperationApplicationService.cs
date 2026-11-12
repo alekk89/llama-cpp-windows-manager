@@ -80,7 +80,10 @@ public sealed class ControlNonRuntimeOperationApplicationService
         var settings = _actions.Settings();
         var plan = await _dependencies.Cache.PlanAsync(settings, _dependencies.HuggingFace.ActiveDownloadCount > 0, cancellationToken);
         var ready = string.Equals(plan.Status.ToString(), "Ready", StringComparison.Ordinal);
-        if (!clear || dryRun || !ready) return new { plan, wouldClear = clear && ready };
+        if (!clear || dryRun || plan.Status == CacheClearPlanStatus.Empty) return new { plan, wouldClear = clear && ready };
+        if (!ready)
+            return ControlOperationFailure.FromOutcome("cache.clear", plan.Status.ToString(), plan.Message,
+                new { plan, wouldClear = false });
         await _dependencies.Cache.ClearAsync(settings, cancellationToken);
         _actions.SetStatus($"Cleared cache ({plan.DisplaySize}) through the control API.");
         return new { cleared = true, plan.SizeBytes };
@@ -101,10 +104,15 @@ public sealed class ControlNonRuntimeOperationApplicationService
                 throw new InvalidOperationException("Log identifiers must be file names, not paths.");
             plan = _dependencies.Logs.BuildSingleDeletionCommand(Path.Combine(_dependencies.LogWorkflow.LogRoot, name), sessions);
         }
-        if (dryRun || !plan.CanDelete) return new { plan.CanDelete, plan.StatusMessage, plan.ConfirmationMessage };
+        var operation = all ? "logs.delete-all" : "logs.delete";
+        if (dryRun) return new { plan.CanDelete, plan.StatusMessage, plan.ConfirmationMessage };
+        if (!plan.CanDelete)
+            return ControlOperationFailure.FromOutcome(operation, nameof(LogPageDeleteApplicationOutcome.Blocked), plan.StatusMessage,
+                new { plan.CanDelete, plan.StatusMessage, plan.ConfirmationMessage });
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = await _dependencies.Logs.DeleteAsync(plan, new LogPageDeleteApplicationActions(
-            _ => true, _actions.RunBusyAsync, () => { }, () => Task.CompletedTask, _actions.SetStatus), cancellationToken);
-        return new { outcome = outcome.ToString() };
+            _ => true, _actions.RunBusyAsync, () => { }, () => Task.CompletedTask, status.Set), cancellationToken);
+        return Outcome(operation, outcome, outcome == LogPageDeleteApplicationOutcome.Deleted, status.Last, new { outcome = outcome.ToString() });
     }
 
     private async Task<object> LifetimeAsync(string action, string modelId, bool dryRun, CancellationToken cancellationToken)
@@ -133,10 +141,12 @@ public sealed class ControlNonRuntimeOperationApplicationService
         var job = (await _dependencies.Downloads.ListJobsAsync()).FirstOrDefault(candidate => candidate.Id.Equals(jobId, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"Download job '{jobId}' was not found.");
         if (dryRun) return new { job.Id, job.Kind, status = job.Status.ToString(), wouldDelete = true };
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = await _dependencies.Downloads.DeleteAsync(job, _actions.Settings(), new DownloadHistoryDeleteApplicationActions(
             _ => true,
-            new DownloadHistoryCommandApplicationActions(_actions.RunBusyAsync, () => Task.CompletedTask, _actions.SetStatus, _ => { })), cancellationToken);
-        return new { outcome = outcome.ToString(), job = job.Id };
+            new DownloadHistoryCommandApplicationActions(_actions.RunBusyAsync, () => Task.CompletedTask, status.Set, _ => { })), cancellationToken);
+        return Outcome("downloads.delete", outcome, outcome == DownloadHistoryApplicationOutcome.Applied, status.Last,
+            new { outcome = outcome.ToString(), job = job.Id });
     }
 
     private object WindowsSetup(string actionName, bool dryRun, bool confirm)
@@ -145,8 +155,10 @@ public sealed class ControlNonRuntimeOperationApplicationService
             throw new InvalidOperationException($"Unknown Windows setup action '{actionName}'. Use CPU, CUDA, Vulkan, or SYCL.");
         var plan = _dependencies.WindowsSetupWorkflow.Plan(action);
         if (dryRun) return new { plan.Action, plan.Title, plan.ConfirmationMessage, plan.Elevated };
-        var outcome = _dependencies.WindowsSetupApplication.Run(action, new WindowsToolSetupApplicationActions(_ => confirm, _actions.SetStatus));
-        return new { outcome = outcome.ToString(), plan.StartedStatus };
+        var status = new ControlOperationStatus(_actions.SetStatus);
+        var outcome = _dependencies.WindowsSetupApplication.Run(action, new WindowsToolSetupApplicationActions(_ => confirm, status.Set));
+        return Outcome("windows.setup", outcome, outcome == ToolSetupApplicationOutcome.Started, status.Last,
+            new { outcome = outcome.ToString(), plan.StartedStatus });
     }
 
     private async Task<object> WindowsStatusAsync(CancellationToken cancellationToken)
@@ -174,9 +186,11 @@ public sealed class ControlNonRuntimeOperationApplicationService
             throw new InvalidOperationException("This WSL action requires distro=<Ubuntu name>.");
         var plan = _dependencies.WslSetupWorkflow.Plan(action, selectedDistro, "llama.cpp Windows Manager");
         if (dryRun) return new { plan.Action, launchKind = plan.LaunchKind.ToString(), plan.Title, plan.ConfirmationMessage, plan.IsWarning, plan.Elevated, distro = selectedDistro };
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = _dependencies.WslSetupApplication.Run(
-            action, selectedDistro, "llama.cpp Windows Manager", new WslToolSetupApplicationActions(_ => confirm, _actions.SetStatus));
-        return new { outcome = outcome.ToString(), plan.StartedStatus };
+            action, selectedDistro, "llama.cpp Windows Manager", new WslToolSetupApplicationActions(_ => confirm, status.Set));
+        return Outcome("wsl.setup", outcome, outcome == ToolSetupApplicationOutcome.Started, status.Last,
+            new { outcome = outcome.ToString(), plan.StartedStatus });
     }
 
     private async Task<object> UpdateCheckAsync(CancellationToken cancellationToken)
@@ -200,4 +214,8 @@ public sealed class ControlNonRuntimeOperationApplicationService
     }
 
     private static string String(JsonObject body, string name) => body[name]?.ToString()?.Trim() ?? "";
+
+    private static object Outcome<TOutcome>(string operation, TOutcome outcome, bool succeeded, string reason, object result)
+        where TOutcome : struct, Enum
+        => succeeded ? result : ControlOperationFailure.FromOutcome(operation, outcome.ToString(), reason, result);
 }

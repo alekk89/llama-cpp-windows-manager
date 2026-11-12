@@ -39,7 +39,9 @@ public sealed class ControlMaintenanceTests : ManagerRegressionTestBase
         await fixture.Jobs.UpdateAsync(job, JobStatus.Running, "{}", TestContext.Current.CancellationToken);
 
         var result = await fixture.ExecuteAsync("cache.clear");
-        Assert.False(result["wouldClear"]!.GetValue<bool>());
+        Assert.Equal(nameof(CacheClearPlanStatus.Busy), result["Outcome"]!.GetValue<string>());
+        Assert.StartsWith("Operation 'cache.clear' did not complete", result["Error"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.False(result["Result"]!["wouldClear"]!.GetValue<bool>());
         Assert.Equal("active", File.ReadAllText(cached));
     }
 
@@ -57,7 +59,8 @@ public sealed class ControlMaintenanceTests : ManagerRegressionTestBase
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.ExecuteAsync("logs.delete", new JsonObject { ["file"] = "../keep.txt" }));
         var blocked = await fixture.ExecuteAsync("logs.delete", new JsonObject { ["file"] = "active.log" });
-        Assert.False(blocked["CanDelete"]!.GetValue<bool>());
+        Assert.Equal("Blocked", blocked["Outcome"]!.GetValue<string>());
+        Assert.False(blocked["Result"]!["CanDelete"]!.GetValue<bool>());
         await fixture.ExecuteAsync("logs.delete-all", dryRun: true);
         Assert.True(File.Exists(inactive));
         await fixture.ExecuteAsync("logs.delete-all");
@@ -96,7 +99,9 @@ public sealed class ControlMaintenanceTests : ManagerRegressionTestBase
         await using var fixture = await Fixture.CreateAsync(CreateTempRoot());
         var body = new JsonObject { ["action"] = action };
         await fixture.ExecuteAsync(operation, body, dryRun: true);
-        await fixture.ExecuteAsync(operation, body, confirm: false);
+        var declined = await fixture.ExecuteAsync(operation, body, confirm: false);
+        Assert.Equal("Cancelled", declined["Outcome"]!.GetValue<string>());
+        Assert.Equal("Cancelled", declined["Result"]!["outcome"]!.GetValue<string>());
         Assert.Empty(fixture.Launched);
         var result = await fixture.ExecuteAsync(operation, body, confirm: true);
         Assert.Single(fixture.Launched);

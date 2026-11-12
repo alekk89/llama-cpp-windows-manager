@@ -473,6 +473,8 @@ check resolves the newest compatible release and exact platform/backend asset;
 feed ordering is not an installed-version contract. Installation remains a
 confirmed operation and fails closed when the selected asset cannot be verified.
 
+An operation whose action was refused, cancelled, or not applied (for example a blocked runtime, package, source, or build deletion; a log that is still in use; a busy cache; a declined setup; or a gateway restart that leaves the gateway stopped) returns HTTP 409 with `ok: false`, `outcome`, and `error` describing the reason. The usual `result` payload is still included, and `llwmctl` exits nonzero. Successful outcomes, including informational ones such as a build with no update, keep HTTP 200 and `ok: true`.
+
 Operations marked `requiresConfirmation` reject execution without `confirm=true`. `gateway.stop` and `gateway.restart` require confirmation because they abort every in-flight gateway request. `llwmctl` also treats them as able to stop the current agent session unless `self` proves that session is reached directly through its own endpoint or port; otherwise they need `--allow-self-stop`. Every operation accepts `dryRun=true`; dry-run validates the action and target and returns its planned consequence without mutation. Machine setup launches can open elevated or interactive terminals and report `Started`, not installation completion.
 
 ## HTTP route summary

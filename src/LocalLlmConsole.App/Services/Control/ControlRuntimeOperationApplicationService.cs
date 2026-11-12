@@ -122,11 +122,13 @@ public sealed class ControlRuntimeOperationApplicationService
             ?? throw new KeyNotFoundException($"Runtime '{identifier}' was not found.");
         if (dryRun) return new { runtime, wouldDelete = true };
 
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = await _dependencies.DeletionApplication.DeleteRuntimeAsync(
             runtime,
             _actions.Settings(),
-            DeletionActions());
-        return new { outcome = outcome.ToString(), runtime = runtime.Id };
+            DeletionActions(status));
+        return Outcome("runtime.delete", outcome, outcome == RuntimeBuildDeletionApplicationOutcome.Deleted, status,
+            new { outcome = outcome.ToString(), runtime = runtime.Id });
     }
 
     private async Task<object> RunPackageAsync(string action, string identifier, bool dryRun)
@@ -135,14 +137,16 @@ public sealed class ControlRuntimeOperationApplicationService
         if (dryRun) return new { action, preset, wouldExecute = true };
 
         var settings = _actions.Settings();
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = action switch
         {
-            "install" => await _dependencies.PackageApplication.InstallAsync(preset, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), PackageActions()),
-            "check" => await _dependencies.PackageApplication.CheckUpdateAsync(preset, null, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), PackageActions()),
-            "delete" => await _dependencies.PackageApplication.DeleteBuildsAsync(preset, settings, _dependencies.CatalogState, PackageActions()),
+            "install" => await _dependencies.PackageApplication.InstallAsync(preset, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), PackageActions(status)),
+            "check" => await _dependencies.PackageApplication.CheckUpdateAsync(preset, null, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), PackageActions(status)),
+            "delete" => await _dependencies.PackageApplication.DeleteBuildsAsync(preset, settings, _dependencies.CatalogState, PackageActions(status)),
             _ => throw new InvalidOperationException($"Unknown runtime package action '{action}'.")
         };
-        return new { outcome = outcome.ToString(), preset = preset.Id };
+        return Outcome($"runtime-package.{action}", outcome, outcome == RuntimePackageApplicationOutcome.Applied, status,
+            new { outcome = outcome.ToString(), preset = preset.Id });
     }
 
     private async Task<object> RunSourceAsync(string action, string identifier, bool dryRun)
@@ -151,21 +155,25 @@ public sealed class ControlRuntimeOperationApplicationService
         if (dryRun) return new { action, preset, wouldExecute = true };
 
         var settings = _actions.Settings();
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = action == "download"
-            ? await _dependencies.SourceApplication.DownloadAsync(preset, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), SourceActions())
-            : await _dependencies.SourceApplication.CheckUpdateAsync(preset, null, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), SourceActions());
-        return new { outcome = outcome.ToString(), preset = preset.Id };
+            ? await _dependencies.SourceApplication.DownloadAsync(preset, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), SourceActions(status))
+            : await _dependencies.SourceApplication.CheckUpdateAsync(preset, null, settings, _dependencies.CatalogState, _actions.MaxLogBytes(), SourceActions(status));
+        return Outcome($"runtime-source.{action}", outcome, outcome != RuntimeSourceApplicationOutcome.Blocked, status,
+            new { outcome = outcome.ToString(), preset = preset.Id });
     }
 
     private async Task<object> DeleteSourceAsync(string identifier, bool dryRun)
     {
         var source = ResolveSource(identifier);
         if (dryRun) return new { source, wouldDelete = true };
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = await _dependencies.DeletionApplication.DeleteSourceAsync(
             source,
             _actions.Settings(),
-            DeletionActions());
-        return new { outcome = outcome.ToString(), source = source.SourceDir };
+            DeletionActions(status));
+        return Outcome("runtime-source.delete", outcome, outcome == RuntimeBuildDeletionApplicationOutcome.Deleted, status,
+            new { outcome = outcome.ToString(), source = source.SourceDir });
     }
 
     private async Task<object> BuildAsync(string identifier, bool update, string sourceIdentifier, bool dryRun)
@@ -174,21 +182,25 @@ public sealed class ControlRuntimeOperationApplicationService
         var source = string.IsNullOrWhiteSpace(sourceIdentifier) ? null : ResolveSource(sourceIdentifier);
         if (dryRun) return new { preset, source, update, wouldBuild = true };
 
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = await _dependencies.BuildApplication.BuildAsync(
             new RuntimeBuildApplicationRequest(preset, _actions.Settings(), update, source, _actions.MaxLogBytes()),
-            BuildActions());
-        return new { outcome = outcome.ToString(), preset = preset.Id, update };
+            BuildActions(status));
+        return Outcome("runtime-build.start", outcome, outcome != RuntimeBuildApplicationOutcome.Cancelled, status,
+            new { outcome = outcome.ToString(), preset = preset.Id, update });
     }
 
     private async Task<object> DeleteBuildAsync(string identifier, bool dryRun)
     {
         var preset = ResolveBuild(identifier);
         if (dryRun) return new { preset, wouldDelete = true };
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = await _dependencies.DeletionApplication.DeletePresetBuildsAsync(
             preset,
             _actions.Settings(),
-            DeletionActions());
-        return new { outcome = outcome.ToString(), preset = preset.Id };
+            DeletionActions(status));
+        return Outcome("runtime-build.delete", outcome, outcome == RuntimeBuildDeletionApplicationOutcome.Deleted, status,
+            new { outcome = outcome.ToString(), preset = preset.Id });
     }
 
     private async Task<object> RunJobAsync(string action, string jobId, bool dryRun)
@@ -201,14 +213,16 @@ public sealed class ControlRuntimeOperationApplicationService
         if (dryRun) return new { action, job.Id, job.Kind, status = job.Status.ToString(), wouldExecute = true };
 
         var settings = _actions.Settings();
+        var status = new ControlOperationStatus(_actions.SetStatus);
         var outcome = action switch
         {
-            "cancel" => await _dependencies.BuildJobApplication.CancelAsync(job, settings, _actions.MaxLogBytes(), BuildJobActions()),
-            "retry" => await _dependencies.BuildJobApplication.RetryAsync(job, BuildJobActions()),
-            "clear" => await _dependencies.BuildJobApplication.ClearAsync(job, BuildJobActions()),
+            "cancel" => await _dependencies.BuildJobApplication.CancelAsync(job, settings, _actions.MaxLogBytes(), BuildJobActions(status)),
+            "retry" => await _dependencies.BuildJobApplication.RetryAsync(job, BuildJobActions(status)),
+            "clear" => await _dependencies.BuildJobApplication.ClearAsync(job, BuildJobActions(status)),
             _ => throw new InvalidOperationException($"Unknown runtime job action '{action}'.")
         };
-        return new { outcome = outcome.ToString(), job = job.Id };
+        return Outcome($"runtime-job.{action}", outcome, outcome == RuntimeBuildJobApplicationOutcome.Applied, status,
+            new { outcome = outcome.ToString(), job = job.Id });
     }
 
     private RuntimePackagePreset ResolvePackage(string identifier)
@@ -238,41 +252,41 @@ public sealed class ControlRuntimeOperationApplicationService
                ?? throw new KeyNotFoundException($"Runtime source '{identifier}' was not found.");
     }
 
-    private RuntimePackageApplicationActions PackageActions()
+    private RuntimePackageApplicationActions PackageActions(ControlOperationStatus status)
         => new(
             _actions.RunBusyAsync,
             NoOpAsync,
             NoOpAsync,
             NoOpAsync,
             () => { },
-            _actions.SetStatus,
-            (_, message) => _actions.SetStatus(message),
+            status.Set,
+            (_, message) => status.Set(message),
             _ => true,
             _ => true);
 
-    private RuntimeSourceApplicationActions SourceActions()
+    private RuntimeSourceApplicationActions SourceActions(ControlOperationStatus status)
         => new(
             _actions.RunBusyAsync,
             NoOpAsync,
             NoOpAsync,
             NoOpAsync,
             () => { },
-            _actions.SetStatus,
-            (_, message) => _actions.SetStatus(message));
+            status.Set,
+            (_, message) => status.Set(message));
 
-    private RuntimeBuildApplicationActions BuildActions()
+    private RuntimeBuildApplicationActions BuildActions(ControlOperationStatus status)
         => new(
             _actions.RunBusyAsync,
             NoOpAsync,
             NoOpAsync,
-            _actions.SetStatus,
-            (_, message) => _actions.SetStatus(message),
+            status.Set,
+            (_, message) => status.Set(message),
             _actions.SetProgressStatusAsync);
 
-    private RuntimeBuildDeletionApplicationActions DeletionActions()
-        => new(_ => true, _actions.RunBusyAsync, NoOpAsync, NoOpAsync, _actions.SetStatus);
+    private RuntimeBuildDeletionApplicationActions DeletionActions(ControlOperationStatus status)
+        => new(_ => true, _actions.RunBusyAsync, NoOpAsync, NoOpAsync, status.Set);
 
-    private RuntimeBuildJobApplicationActions BuildJobActions()
+    private RuntimeBuildJobApplicationActions BuildJobActions(ControlOperationStatus status)
         => new(
             _ => true,
             _actions.RunBusyAsync,
@@ -283,10 +297,19 @@ public sealed class ControlRuntimeOperationApplicationService
                     retry.Update,
                     retry.Source,
                     _actions.MaxLogBytes()),
-                BuildActions()),
-            _actions.SetStatus);
+                BuildActions(status)),
+            status.Set);
 
     private static Task NoOpAsync() => Task.CompletedTask;
+
+    private static object Outcome<TOutcome>(
+        string operation,
+        TOutcome outcome,
+        bool succeeded,
+        ControlOperationStatus status,
+        object result)
+        where TOutcome : struct, Enum
+        => succeeded ? result : ControlOperationFailure.FromOutcome(operation, outcome.ToString(), status.Last, result);
 
     private static string Required(JsonObject body, string name)
     {
