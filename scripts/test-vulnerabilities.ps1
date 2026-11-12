@@ -92,6 +92,8 @@ function Count-Properties($node, [string] $propertyName) {
   return $count
 }
 
+. (Join-Path $PSScriptRoot "package-audit-policy.ps1")
+
 $appDir = Split-Path -Parent $PSScriptRoot
 $projects = @(
   (Join-Path $appDir "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj"),
@@ -117,6 +119,28 @@ if ($info -match "No SDKs were found") {
 $totalVulnerabilities = 0
 $totalOutdated = 0
 $totalDeprecated = 0
+
+# Self-contained publish restores add SDK-implied runtime and AOT compiler packs
+# that the ordinary restore graph does not contain. Audit those graphs as well,
+# using the same locked restore arguments as scripts/publish-app.ps1.
+$publishRestores = @(
+  @{ Project = (Join-Path $appDir "src\LocalLlmConsole.ControlCli\LocalLlmConsole.ControlCli.csproj"); Arguments = @("-p:PublishAot=true", "-p:SelfContained=true", "-p:NuGetLockFilePath=packages.publish.lock.json") },
+  @{ Project = (Join-Path $appDir "src\LocalLlmConsole.App\LocalLlmConsole.App.csproj"); Arguments = @("-p:PublishSingleFile=true", "-p:SelfContained=true") }
+)
+# `dotnet list package` does not report those implicit packs, so rely on
+# NuGet's restore-time audit and promote every advisory severity to an error.
+foreach ($publishRestore in $publishRestores) {
+  $project = $publishRestore.Project
+  & $dotnet restore $project -r win-x64 --locked-mode --force-evaluate @($publishRestore.Arguments) `
+    "-p:NuGetAudit=true" "-p:NuGetAuditMode=all" "-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904"
+  if ($LASTEXITCODE -ne 0) {
+    $totalVulnerabilities++
+    Write-Host "Locked publish restore or its vulnerability audit failed for $project" -ForegroundColor Red
+  } else {
+    Write-Host "No vulnerable packages found in the publish graph of $project" -ForegroundColor Green
+  }
+}
+
 foreach ($project in $projects) {
   if (-not (Test-Path -LiteralPath $project)) {
     throw "Project not found: $project"
@@ -146,11 +170,14 @@ foreach ($project in $projects) {
   if ($LASTEXITCODE -ne 0) {
     throw "dotnet outdated package audit failed for $project."
   }
-  $outdatedCount = Count-Properties ($outdatedText | ConvertFrom-Json) "latestVersion"
+  $outdatedPackages = Get-OutdatedPackages ($outdatedText | ConvertFrom-Json)
+  $outdatedCount = $outdatedPackages.Count
   $totalOutdated += $outdatedCount
   if ($outdatedCount -gt 0) {
     Write-Host "Outdated direct packages found in $project" -ForegroundColor Red
-    $outdatedText | Write-Host
+    foreach ($package in $outdatedPackages) {
+      Write-Host "  $($package.id) $($package.resolvedVersion) -> $($package.latestVersion)"
+    }
   }
 
   $deprecatedText = & $dotnet list $project package --deprecated --include-transitive --format json
