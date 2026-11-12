@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "version": "2.8.0",
+  "tag": "v2.8.0",
+  "publishedAtUtc": "2026-09-08T11:12:27Z",
+  "installer": {
+    "name": "Setup-LlamaCppWindowsManager-2.8.0-win-x64.exe",
+    "url": "https://github.com/alekk89/llama-cpp-windows-manager/releases/download/v2.8.0/Setup-LlamaCppWindowsManager-2.8.0-win-x64.exe",
+    "size": 78168661,
+    "sha256": "5ff27d1f3014649a40b4907ae12fd4feb560f660475547322f11cb0f3b5f8b12"
+  },
+  "portableExecutable": {
+    "name": "LlamaCppWindowsManager.exe",
+    "url": "https://github.com/alekk89/llama-cpp-windows-manager/releases/download/v2.8.0/LlamaCppWindowsManager.exe",
+    "size": 81565429,
+    "sha256": "aefbff4251ffd556d42ad28e3c4d2d9c7a8e6e38f6d0ce09143e5f8c7125a253"
+  }
+}

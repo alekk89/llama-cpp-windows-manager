@@ -4,7 +4,7 @@ param(
   [string] $SignaturePath = "",
   [string] $ManifestPublicKeySpki = "",
   [string] $ExpectedPublisher = "",
-  [string] $BaselinePath = "tests/release-baselines/v2.6.0.json",
+  [string] $BaselinePath = "tests/release-baselines/v2.8.0.json",
   [switch] $RequireSigned
 )
 
@@ -58,17 +58,31 @@ if ($RequireSigned -or $ManifestPath -or $SignaturePath) {
 $baseline = Get-Content -LiteralPath $BaselineFile -Raw | ConvertFrom-Json
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ("llwm-portable-update-" + [Guid]::NewGuid().ToString("N"))
 $rootPrefix = [IO.Path]::GetFullPath($testRoot).TrimEnd('\') + '\'
-$oldArchive = Join-Path $testRoot $baseline.portableArchive.name
+# Releases up to v2.6.0 published a portable ZIP; later releases publish only the
+# standalone EXE, which restores its embedded llwmctl.exe sidecar on bootstrap.
+$oldPortableExe = $null -ne $baseline.PSObject.Properties["portableExecutable"]
+$oldPortable = if ($oldPortableExe) { $baseline.portableExecutable } else { $baseline.portableArchive }
+if ($null -eq $oldPortable) { throw "Release baseline defines neither portableExecutable nor portableArchive." }
+if ($oldPortableExe -and $oldPortable.name -ne "LlamaCppWindowsManager.exe") { throw "Baseline portable executable must be LlamaCppWindowsManager.exe." }
+$oldDownload = Join-Path $testRoot $oldPortable.name
 $oldRoot = Join-Path $testRoot "old"
 $candidateRoot = Join-Path $testRoot "candidate"
 try {
   New-Item -ItemType Directory -Path $testRoot, $oldRoot, $candidateRoot -Force | Out-Null
-  Invoke-WebRequest -Uri $baseline.portableArchive.url -OutFile $oldArchive -UseBasicParsing
-  if ((Get-Item -LiteralPath $oldArchive).Length -ne [long]$baseline.portableArchive.size) { throw "Pinned old portable size mismatch." }
-  if ((Get-FileHash -LiteralPath $oldArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $baseline.portableArchive.sha256) {
+  Invoke-WebRequest -Uri $oldPortable.url -OutFile $oldDownload -UseBasicParsing
+  if ((Get-Item -LiteralPath $oldDownload).Length -ne [long]$oldPortable.size) { throw "Pinned old portable size mismatch." }
+  if ((Get-FileHash -LiteralPath $oldDownload -Algorithm SHA256).Hash.ToLowerInvariant() -ne $oldPortable.sha256) {
     throw "Pinned old portable hash mismatch."
   }
-  Expand-Archive -LiteralPath $oldArchive -DestinationPath $oldRoot
+  if ($oldPortableExe) {
+    $oldExe = Join-Path $oldRoot $oldPortable.name
+    Move-Item -LiteralPath $oldDownload -Destination $oldExe
+    $oldBootstrap = Start-Process -FilePath $oldExe -ArgumentList "--bootstrap-agent-sidecars-only" -WindowStyle Hidden -Wait -PassThru
+    if ($oldBootstrap.ExitCode -ne 0) { throw "Pinned old portable EXE sidecar bootstrap failed." }
+  }
+  else {
+    Expand-Archive -LiteralPath $oldDownload -DestinationPath $oldRoot
+  }
   $candidateBootstrapExe = Join-Path $candidateRoot "LlamaCppWindowsManager.exe"
   Copy-Item -LiteralPath $CandidateExe -Destination $candidateBootstrapExe
   $bootstrap = Start-Process -FilePath $candidateBootstrapExe -ArgumentList "--bootstrap-agent-sidecars-only" -WindowStyle Hidden -Wait -PassThru
