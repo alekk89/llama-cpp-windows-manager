@@ -227,6 +227,7 @@
   "Models.Import.Role.Invalid": "tidak valid",
   "Models.Reattach.Action": "Temukan file…",
   "Models.Reattach.ToolTip": "Pilih file GGUF yang dipindahkan dan pertahankan profil peluncuran model ini.",
+  "Models.Reattach.RenamedProfilesStatus": "Mempertahankan {0} profil peluncuran yang bentrok dengan nama baru: {1}.",
   "Models.Reattach.PickerTitle": "Temukan GGUF untuk {0}",
   "Models.Reattach.Busy": "Menyambungkan kembali file model...",
   "Models.Reattach.CompletedStatus": "Berhasil menyambungkan kembali {0} dan mempertahankan profil peluncurannya.",

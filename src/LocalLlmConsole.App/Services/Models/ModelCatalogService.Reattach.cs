@@ -14,7 +14,8 @@ public sealed record ModelReattachResult(
     GgufFileClassification Classification,
     int RemovedDuplicateRecords,
     int MovedLaunchProfiles,
-    IReadOnlyList<string> IdentityWarnings);
+    IReadOnlyList<string> IdentityWarnings,
+    IReadOnlyList<ModelReattachRenamedProfile> RenamedLaunchProfiles);
 
 public sealed partial class ModelCatalogService
 {
@@ -35,14 +36,23 @@ public sealed partial class ModelCatalogService
         if (File.Exists(current.ModelPath))
             throw new InvalidOperationException($"{current.Name} is not missing. Reattach is available only when its registered GGUF cannot be found.");
 
-        var duplicates = registered
-            .Where(candidate => candidate.Ownership != OwnershipKind.RegistryOnly
-                && !candidate.Id.Equals(current.Id, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(NormalizePath(candidate.ModelPath), fullPath, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var duplicates = ReattachDuplicates(registered, current.Id, fullPath);
         var warnings = await IdentityWarningsAsync(current, fullPath, cancellationToken);
         return new ModelReattachInspection(fullPath, classification, warnings, duplicates);
     }
+
+    public async Task<IReadOnlyList<ModelRecord>> ListReattachDuplicatesAsync(ModelRecord model, string fullPath)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return ReattachDuplicates(await _store.ListModelsAsync(), model.Id, Path.GetFullPath(fullPath));
+    }
+
+    private static ModelRecord[] ReattachDuplicates(IEnumerable<ModelRecord> registered, string modelId, string fullPath)
+        => registered
+            .Where(candidate => candidate.Ownership != OwnershipKind.RegistryOnly
+                && !candidate.Id.Equals(modelId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NormalizePath(candidate.ModelPath), fullPath, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
 
     public async Task<ModelReattachResult> ReattachFileAsync(
         ModelRecord model,
@@ -119,7 +129,8 @@ public sealed partial class ModelCatalogService
             inspection.Classification,
             persisted.RemovedDuplicateRecords,
             persisted.MovedLaunchProfiles,
-            inspection.IdentityWarnings);
+            inspection.IdentityWarnings,
+            persisted.RenamedLaunchProfiles);
     }
 
     private static async Task<IReadOnlyList<string>> IdentityWarningsAsync(

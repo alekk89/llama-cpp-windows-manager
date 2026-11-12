@@ -213,6 +213,7 @@
   "Models.Import.Role.Invalid": "non valide",
   "Models.Reattach.Action": "Localiser le fichier…",
   "Models.Reattach.ToolTip": "Sélectionnez le fichier GGUF déplacé et conservez les profils de lancement de ce modèle.",
+  "Models.Reattach.RenamedProfilesStatus": "{0} profil(s) de lancement en conflit conservé(s) sous de nouveaux noms : {1}.",
   "Models.ScanDiagnostics.Title": "Diagnostic de l’analyse des modèles",
   "Models.ScanDiagnostics.Message": "Certains fichiers GGUF nécessitent une vérification et n’ont pas été enregistrés automatiquement.\n\n{0}\n\nUtilisez Ajouter un fichier modèle… pour enregistrer explicitement un fichier ambigu valide.",
   "Models.ScanDiagnostics.MoreFiles": "…et {0} autre(s) fichier(s).",

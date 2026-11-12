@@ -12,6 +12,7 @@ public static class ModelReattachUiAction
         FileSystemDialogService fileDialogs,
         DialogService dialogs,
         Func<ModelCatalogService> catalog,
+        LoadedModelSessionManager sessions,
         Func<ModelRecord, bool> isModelActive,
         Func<string, Func<Task>, Task> runBusyAsync,
         Func<Task> refreshModelsAsync,
@@ -27,7 +28,8 @@ public static class ModelReattachUiAction
                 confirmation => dialogs.Confirm(owner, confirmation.Message, confirmation.Title, MessageBoxImage.Warning),
                 isModelActive,
                 (model, path) => catalog().InspectReattachFileAsync(model, path),
-                (model, inspection, confirmRole, confirmIdentityMismatch) => catalog().ReattachFileAsync(model, inspection, confirmRole, confirmIdentityMismatch),
+                (model, inspection, confirmRole, confirmIdentityMismatch) => new ModelReattachWorkflowService(catalog(), sessions)
+                    .ReattachAsync(model, inspection, confirmRole, confirmIdentityMismatch),
                 runBusyAsync,
                 refreshModelsAsync,
                 refreshOverviewAsync,

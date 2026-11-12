@@ -253,6 +253,7 @@
   "Models.Import.Role.Invalid": "无效",
   "Models.Reattach.Action": "定位文件…",
   "Models.Reattach.ToolTip": "选择已移动的 GGUF 文件，并保留此模型的启动配置。",
+  "Models.Reattach.RenamedProfilesStatus": "已使用新名称保留 {0} 个冲突的启动配置文件：{1}。",
   "Models.ScanDiagnostics.Title": "模型扫描诊断",
   "Models.ScanDiagnostics.Message": "某些 GGUF 文件需要检查，因此未自动注册。\n\n{0}\n\n使用“添加模型文件…”可明确注册有效但角色不明确的文件。",
   "Models.ScanDiagnostics.MoreFiles": "…以及另外 {0} 个文件。",

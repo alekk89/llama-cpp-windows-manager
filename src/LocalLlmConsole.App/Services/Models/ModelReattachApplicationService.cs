@@ -65,15 +65,37 @@ public sealed class ModelReattachApplicationService
         var completed = false;
         await actions.RunBusyAsync(Loc.T("Models.Reattach.Busy"), async () =>
         {
-            var result = await actions.ReattachAsync(model, inspection, confirmRole, confirmIdentityMismatch);
+            ModelReattachResult result;
+            try
+            {
+                // The final loaded-state check runs again inside the lifecycle gate after the dialogs.
+                result = await actions.ReattachAsync(model, inspection, confirmRole, confirmIdentityMismatch);
+            }
+            catch (ModelReattachBlockedException blocked)
+            {
+                actions.SetStatus(blocked.IsSource
+                    ? Loc.T("Models.Reattach.LoadedStatus", blocked.BlockingModel.Name)
+                    : Loc.T("Models.Reattach.TargetLoadedStatus"));
+                return;
+            }
+
             await actions.RefreshModelsAsync();
             await actions.RefreshOverviewAsync();
-            actions.SetStatus(result.RemovedDuplicateRecords > 0
-                ? Loc.T("Models.Reattach.CompletedMergedStatus", result.Model.Name, result.RemovedDuplicateRecords)
-                : Loc.T("Models.Reattach.CompletedStatus", result.Model.Name));
+            actions.SetStatus(BuildCompletedStatus(result));
             completed = true;
         });
         return completed ? ModelReattachApplicationOutcome.Reattached : ModelReattachApplicationOutcome.Blocked;
+    }
+
+    public static string BuildCompletedStatus(ModelReattachResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var status = result.RemovedDuplicateRecords > 0
+            ? Loc.T("Models.Reattach.CompletedMergedStatus", result.Model.Name, result.RemovedDuplicateRecords)
+            : Loc.T("Models.Reattach.CompletedStatus", result.Model.Name);
+        if (result.RenamedLaunchProfiles.Count == 0) return status;
+        var renamed = string.Join(", ", result.RenamedLaunchProfiles.Select(profile => $"'{profile.PreviousName}' → '{profile.Name}'"));
+        return $"{status} {Loc.T("Models.Reattach.RenamedProfilesStatus", result.RenamedLaunchProfiles.Count, renamed)}";
     }
 
     public static OpenFilePickerRequest BuildPickerRequest(ModelRecord model, string modelsRoot)

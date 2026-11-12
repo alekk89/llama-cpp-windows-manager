@@ -213,6 +213,7 @@
   "Models.Import.Role.Invalid": "non valido",
   "Models.Reattach.Action": "Individua file…",
   "Models.Reattach.ToolTip": "Seleziona il file GGUF spostato e conserva i profili di avvio di questo modello.",
+  "Models.Reattach.RenamedProfilesStatus": "Mantenuti {0} profili di avvio in conflitto con nuovi nomi: {1}.",
   "Models.Reattach.PickerTitle": "Individua il GGUF per {0}",
   "Models.Reattach.Busy": "Ricollegamento del file del modello...",
   "Models.Reattach.CompletedStatus": "{0} è stato ricollegato mantenendo i profili di avvio.",

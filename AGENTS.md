@@ -74,7 +74,10 @@ hints; never guess from the UI selection.
 When a registered GGUF has moved and is shown as missing, preserve its stable
 model and profile IDs with `llwmctl models reattach <model> --file <path.gguf>`.
 Review identity warnings before using `--confirm-mismatch`. The command rejects
-loaded source or duplicate registrations; unload them explicitly first.
+loaded source or duplicate registrations; unload them explicitly first. The
+final loaded-state check runs inside the session lifecycle gate. Duplicate
+profiles whose names conflict, and a second default, are kept under a
+`<name> (relocated)` name and listed in `renamedLaunchProfiles`.
 
 ## Load, restart, and unload models
 

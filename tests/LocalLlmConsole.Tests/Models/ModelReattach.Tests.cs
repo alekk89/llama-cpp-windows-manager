@@ -50,7 +50,9 @@ public sealed class ModelReattachTests : ManagerRegressionTestBase
         Assert.Equal(Path.GetFullPath(newPath), result.Model.ModelPath);
         Assert.Equal(OwnershipKind.External, result.Model.Ownership);
         Assert.Equal(1, result.RemovedDuplicateRecords);
-        Assert.Equal(1, result.MovedLaunchProfiles);
+        Assert.Equal(2, result.MovedLaunchProfiles);
+        var renamed = Assert.Single(result.RenamedLaunchProfiles);
+        Assert.Equal(new ModelReattachRenamedProfile(duplicateDefault.Id, "Default", "Default (relocated)", WasDefault: true), renamed);
         Assert.Empty(result.IdentityWarnings);
         var persisted = Assert.Single(await store.ListModelsAsync());
         Assert.Equal(oldModel.Id, persisted.Id);
@@ -58,11 +60,11 @@ public sealed class ModelReattachTests : ManagerRegressionTestBase
         Assert.Equal("reattached-file", JsonNode.Parse(persisted.MetadataJson)?["registrationSource"]?.ToString());
 
         var profiles = await store.ListNamedModelLaunchProfilesAsync(oldModel.Id);
-        Assert.Equal(["Benchmark", "Coding", "Default"], profiles.Select(profile => profile.Name).Order().ToArray());
+        Assert.Equal(["Benchmark", "Coding", "Default", "Default (relocated)"], profiles.Select(profile => profile.Name).Order().ToArray());
         Assert.Contains(profiles, profile => profile.Id == defaultProfile.Id && profile.IsDefault);
         Assert.Contains(profiles, profile => profile.Id == codingProfile.Id);
         Assert.Contains(profiles, profile => profile.Id == benchmarkProfile.Id && !profile.IsDefault);
-        Assert.DoesNotContain(profiles, profile => profile.Id == duplicateDefault.Id);
+        Assert.Contains(profiles, profile => profile.Id == duplicateDefault.Id && !profile.IsDefault && profile.Settings.Port == 8092);
         Assert.Equal(group.Id, (await store.GetModelGroupSnapshotAsync()).GroupForProfile(codingProfile.Id)?.Id);
         Assert.Contains(codingProfile.Id, await store.ListStartupLaunchProfileIdsAsync());
         Assert.Contains(codingProfile.Id, await store.ListFavoriteLaunchProfileIdsAsync());
@@ -128,7 +130,7 @@ public sealed class ModelReattachTests : ManagerRegressionTestBase
                 {
                     Assert.Same(inspection, inspected);
                     reattachConfirmedMismatch = confirmMismatch;
-                    return Task.FromResult(new ModelReattachResult(model with { ModelPath = newPath }, classification, 0, 0, inspection.IdentityWarnings));
+                    return Task.FromResult(new ModelReattachResult(model with { ModelPath = newPath }, classification, 0, 0, inspection.IdentityWarnings, []));
                 },
                 async (_, action) => await action(),
                 () => { refreshes.Add("models"); return Task.CompletedTask; },

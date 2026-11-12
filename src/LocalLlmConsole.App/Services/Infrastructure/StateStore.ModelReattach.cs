@@ -1,8 +1,15 @@
 namespace LocalLlmConsole.Services;
 
+public sealed record ModelReattachRenamedProfile(
+    string Id,
+    string PreviousName,
+    string Name,
+    bool WasDefault);
+
 public sealed record ModelReattachPersistenceResult(
     int RemovedDuplicateRecords,
-    int MovedLaunchProfiles);
+    int MovedLaunchProfiles,
+    IReadOnlyList<ModelReattachRenamedProfile> RenamedLaunchProfiles);
 
 public sealed partial class StateStore
 {
@@ -26,6 +33,7 @@ public sealed partial class StateStore
                 var hasDefault = canonicalProfiles.Any(profile => profile.IsDefault);
                 var movedProfiles = 0;
                 var removedDuplicates = 0;
+                var renamedProfiles = new List<ModelReattachRenamedProfile>();
 
                 foreach (var duplicateId in duplicateModelIds
                              .Where(id => !string.IsNullOrWhiteSpace(id)
@@ -34,18 +42,30 @@ public sealed partial class StateStore
                 {
                     foreach (var profile in await ReadProfilesAsync(duplicateId, transaction))
                     {
-                        if (profileNames.Contains(profile.Name) || profile.IsDefault && hasDefault)
-                            continue;
+                        // Conflicting profiles are kept under a distinct name; IDs, and therefore group,
+                        // favorite, and startup references, move with them.
+                        var keepDefault = profile.IsDefault && !hasDefault;
+                        var name = profileNames.Contains(profile.Name) || profile.IsDefault && !keepDefault
+                            ? RelocatedProfileName(profile.Name, profileNames)
+                            : profile.Name;
 
                         await using var moveProfile = _connection.CreateCommand();
                         moveProfile.Transaction = transaction;
-                        moveProfile.CommandText = "UPDATE model_launch_profiles SET model_id = $model_id, updated_at = $updated_at WHERE id = $id;";
+                        moveProfile.CommandText = """
+UPDATE model_launch_profiles
+SET model_id = $model_id, name = $name, is_default = $is_default, updated_at = $updated_at
+WHERE id = $id;
+""";
                         moveProfile.Parameters.AddWithValue("$model_id", updatedModel.Id);
+                        moveProfile.Parameters.AddWithValue("$name", name);
+                        moveProfile.Parameters.AddWithValue("$is_default", keepDefault ? 1 : 0);
                         moveProfile.Parameters.AddWithValue("$updated_at", DateTimeOffset.UtcNow.ToString("O"));
                         moveProfile.Parameters.AddWithValue("$id", profile.Id);
                         movedProfiles += await moveProfile.ExecuteNonQueryAsync();
-                        profileNames.Add(profile.Name);
-                        hasDefault |= profile.IsDefault;
+                        profileNames.Add(name);
+                        hasDefault |= keepDefault;
+                        if (!name.Equals(profile.Name, StringComparison.Ordinal) || profile.IsDefault != keepDefault)
+                            renamedProfiles.Add(new ModelReattachRenamedProfile(profile.Id, profile.Name, name, profile.IsDefault));
                     }
 
                     await using (var mergeFavorite = _connection.CreateCommand())
@@ -93,7 +113,7 @@ WHERE id = $id;
                 }
 
                 await transaction.CommitAsync();
-                return new ModelReattachPersistenceResult(removedDuplicates, movedProfiles);
+                return new ModelReattachPersistenceResult(removedDuplicates, movedProfiles, renamedProfiles);
             }
             catch
             {
@@ -117,6 +137,23 @@ WHERE id = $id;
             profiles.Add(new StoredProfileIdentity(reader.GetString(0), reader.GetString(1), reader.GetInt32(2) != 0));
         return profiles;
     }
+
+    internal static string RelocatedProfileName(string name, IReadOnlySet<string> existingNames)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var suffix = attempt == 1
+                ? " (relocated)"
+                : $" (relocated {attempt.ToString(CultureInfo.InvariantCulture)})";
+            var stem = name.Length + suffix.Length > MaxReattachProfileNameLength
+                ? name[..(MaxReattachProfileNameLength - suffix.Length)].TrimEnd()
+                : name;
+            var candidate = stem + suffix;
+            if (!existingNames.Contains(candidate)) return candidate;
+        }
+    }
+
+    private const int MaxReattachProfileNameLength = 200;
 
     private sealed record StoredProfileIdentity(string Id, string Name, bool IsDefault);
 }

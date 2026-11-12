@@ -38,6 +38,12 @@ keeps existing sessions running. Replacement stops old profiles
 before starting the new one; if its launch later fails, the stopped profiles
 remain stopped and the Overview reflects that state.
 
+When a reattach consolidates a duplicate registration, the duplicate's profiles
+move to the stable model with their IDs, groups, favorites, and startup
+selections. A profile whose name is already used, or a second default profile,
+is kept as a non-default profile named `<name> (relocated)` (numbered when
+needed, within the 200-character limit) and reported instead of being removed.
+
 The **Alias** additional runtime option (`--alias`) also names the saved profile
 in gateway discovery. Profiles sharing an alias receive readable `:2`, `:3`,
 and later suffixes. Save the profile after editing its alias; use distinct

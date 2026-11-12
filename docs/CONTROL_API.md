@@ -96,7 +96,12 @@ llwmctl models delete <model> --confirm
 App-owned deletion removes the Manager-owned model directory. Imported/external models are unregistered without deleting the external model folder.
 `models reattach` requires the registered model file to be missing, keeps the
 existing model and launch-profile IDs, and consolidates a duplicate registration
-for the selected path. It rejects loaded source or duplicate registrations.
+for the selected path. It rejects loaded source or duplicate registrations,
+re-checking them inside the session lifecycle gate immediately before the update.
+A consolidated profile whose name conflicts with an existing profile, or a
+second default profile, keeps its ID, group, favorite, and startup references
+under a unique `<name> (relocated)` name (non-default); the response lists these in
+`renamedLaunchProfiles` as `id`, `previousName`, `name`, and `wasDefault`.
 Use `--confirm-role` for a valid GGUF that is not classified as a main model and
 `--confirm-mismatch` only after reviewing reported differences from the stored
 GGUF identity.
