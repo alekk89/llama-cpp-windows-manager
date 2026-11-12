@@ -209,7 +209,7 @@ public sealed class RuntimeProcessLifecycleTests : ManagerRegressionTestBase
         var startInfo = WslRuntimeStopService.BuildStopStartInfo("wsl.exe", "Ubuntu-24.04", "echo stop");
 
         Assert.Contains("marker='marker'\"'\"'1'", markerCommand, StringComparison.Ordinal);
-        Assert.Contains("/proc/[0-9]*/cmdline", markerCommand, StringComparison.Ordinal);
+        Assert.Contains("\"$proc_root\"/[0-9]*/cmdline", markerCommand, StringComparison.Ordinal);
         Assert.Contains("remaining=0", markerCommand, StringComparison.Ordinal);
         Assert.Contains("exit \"$remaining\"", markerCommand, StringComparison.Ordinal);
         Assert.Contains("'/opt/llama/bin/llama-server'", fallbackCommand, StringComparison.Ordinal);
