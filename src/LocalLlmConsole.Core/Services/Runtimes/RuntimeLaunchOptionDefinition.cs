@@ -36,7 +36,54 @@ public static class RuntimeLaunchOptionPolicy
         "--rope-freq-base", "--rope-freq-scale", "--temp", "--top-k", "--top-p", "--min-p", "--predict", "--seed",
         "--repeat-last-n", "--repeat-penalty", "--presence-penalty", "--frequency-penalty", "--spec-type",
         "--n-gpu-layers-draft", "--spec-draft-n-min", "--spec-draft-n-max", "--spec-draft-p-split", "--spec-draft-p-min",
-        "--cache-type-k-draft", "--cache-type-v-draft", "--metrics"
+        "--cache-type-k-draft", "--cache-type-v-draft", "--metrics",
+        // Short aliases that replace application-managed model and companion files.
+        "-md", "-mm"
+    };
+
+    private const string RemoteContentReason = "downloads models or other content from a remote source";
+    private const string FileServingReason = "exposes local files or tools through the HTTP server";
+    private const string RemoteHostReason = "sends model data to remote hosts";
+    private const string FileWritingReason = "writes files outside the application's managed locations";
+    private const string EndpointReason = "changes how the application-managed endpoint is served";
+
+    // One deny policy for custom parameters, applied at launch, benchmark validation, profile
+    // editing, and profile import. Local tuning and local adapter files (for example --lora)
+    // remain allowed; only network, file-serving, and file-writing options are rejected.
+    private static readonly Dictionary<string, string> BlockedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["-mu"] = RemoteContentReason,
+        ["--model-url"] = RemoteContentReason,
+        ["-mmu"] = RemoteContentReason,
+        ["--mmproj-url"] = RemoteContentReason,
+        ["-hf"] = RemoteContentReason,
+        ["-hfr"] = RemoteContentReason,
+        ["--hf-repo"] = RemoteContentReason,
+        ["-hff"] = RemoteContentReason,
+        ["--hf-file"] = RemoteContentReason,
+        ["-hfd"] = RemoteContentReason,
+        ["-hfrd"] = RemoteContentReason,
+        ["--hf-repo-draft"] = RemoteContentReason,
+        ["--spec-draft-hf"] = RemoteContentReason,
+        ["-hfv"] = RemoteContentReason,
+        ["-hfrv"] = RemoteContentReason,
+        ["--hf-repo-v"] = RemoteContentReason,
+        ["-hffv"] = RemoteContentReason,
+        ["--hf-file-v"] = RemoteContentReason,
+        ["-hft"] = RemoteContentReason,
+        ["--hf-token"] = RemoteContentReason,
+        ["-dr"] = RemoteContentReason,
+        ["--docker-repo"] = RemoteContentReason,
+        ["--path"] = FileServingReason,
+        ["--media-path"] = FileServingReason,
+        ["--tools"] = FileServingReason,
+        ["--rpc"] = RemoteHostReason,
+        ["--log-file"] = FileWritingReason,
+        ["--slot-save-path"] = FileWritingReason,
+        ["-lcd"] = FileWritingReason,
+        ["--lookup-cache-dynamic"] = FileWritingReason,
+        ["--ssl-key-file"] = EndpointReason,
+        ["--ssl-cert-file"] = EndpointReason
     };
 
     private static readonly string[] UnsafeFragments =
@@ -60,6 +107,8 @@ public static class RuntimeLaunchOptionPolicy
 
     public static bool IsAppManaged(string name) => ManagedNames.Contains(name);
 
+    public static bool IsBlocked(string name) => BlockedNames.ContainsKey(name);
+
     private static bool IsProjectorOffloadSwitch(RuntimeLaunchOptionDefinition option)
         => option.ValueKind == RuntimeLaunchOptionValueKind.Switch
            && option.Aliases.Append(option.Name).All(name =>
@@ -68,6 +117,7 @@ public static class RuntimeLaunchOptionPolicy
     public static bool CanRender(RuntimeLaunchOptionDefinition option)
         => option.Name.StartsWith("--", StringComparison.Ordinal)
            && !option.Aliases.Any(IsAppManaged)
+           && !option.Aliases.Any(IsBlocked)
            && !option.Aliases.Any(UnsafeExactNames.Contains)
            && (IsProjectorOffloadSwitch(option)
                || !option.Aliases.Any(alias => UnsafeFragments.Any(fragment => alias.Contains(fragment, StringComparison.OrdinalIgnoreCase))))
@@ -75,11 +125,24 @@ public static class RuntimeLaunchOptionPolicy
 
     public static void ValidateCustomArguments(IReadOnlyList<string> arguments)
     {
+        var problem = CustomArgumentProblems(arguments).FirstOrDefault();
+        if (problem is not null)
+            throw new InvalidOperationException(problem);
+    }
+
+    /// <summary>Returns one message per managed or blocked option in <paramref name="arguments"/>.</summary>
+    public static IReadOnlyList<string> CustomArgumentProblems(IReadOnlyList<string> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        var problems = new List<string>();
         foreach (var argument in arguments.Where(value => value.StartsWith("-", StringComparison.Ordinal)))
         {
             var name = argument.Split('=', 2)[0];
             if (IsAppManaged(name))
-                throw new InvalidOperationException($"Custom parameter '{name}' is managed by the application and cannot be overridden.");
+                problems.Add($"Custom parameter '{name}' is managed by the application and cannot be overridden.");
+            else if (BlockedNames.TryGetValue(name, out var reason))
+                problems.Add($"Custom parameter '{name}' is not allowed because it {reason}. Remove it from Custom parameters.");
         }
+        return problems;
     }
 }

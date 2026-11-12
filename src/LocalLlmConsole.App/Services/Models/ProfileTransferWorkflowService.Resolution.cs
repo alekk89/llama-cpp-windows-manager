@@ -64,7 +64,19 @@ public sealed partial class ProfileTransferWorkflowService
                 && !ModelCatalogService.IsCompatibleCompanion(model.ModelPath, path, type, vision))
                 errors.Add($"The selected companion conflicts with the destination model or helper type: {path}.");
         if (!string.IsNullOrWhiteSpace(settings.CustomParameters))
-            warnings.Add("Review Custom parameters for runtime support and machine-specific file paths.");
+        {
+            try
+            {
+                var problems = RuntimeLaunchOptionPolicy.CustomArgumentProblems(CustomLaunchParameterParser.Parse(settings.CustomParameters));
+                errors.AddRange(problems);
+                if (problems.Count == 0)
+                    warnings.Add("Review Custom parameters for runtime support and machine-specific file paths.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                errors.Add($"Custom parameters could not be parsed: {ex.Message}");
+            }
+        }
         if (!string.IsNullOrWhiteSpace(settings.Host))
             warnings.Add($"Saved host override: {settings.Host}. The application's direct-model access policy still applies when loading.");
         return settings;

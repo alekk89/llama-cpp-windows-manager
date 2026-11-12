@@ -240,12 +240,13 @@ public sealed class RuntimeLaunchOptionsTests
               --model PATH             model
               --host HOST              listener
               --slot-save-path PATH    slot directory
+              --slot-prompt-similarity N  prompt similarity
               --help                   show help
             """);
 
         var rendered = parsed.Where(RuntimeLaunchOptionPolicy.CanRender).Select(option => option.Name).ToArray();
 
-        Assert.Equal(["--slot-save-path"], rendered);
+        Assert.Equal(["--slot-prompt-similarity"], rendered);
     }
 
     [Fact]
@@ -349,6 +350,61 @@ public sealed class RuntimeLaunchOptionsTests
         Assert.Contains("managed by the application", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("-hf", "remote source")]
+    [InlineData("--hf-repo-draft=owner/repo", "remote source")]
+    [InlineData("-hff", "remote source")]
+    [InlineData("-mu", "remote source")]
+    [InlineData("--MMPROJ-URL=https://example.invalid/m.gguf", "remote source")]
+    [InlineData("-dr", "remote source")]
+    [InlineData("--path", "HTTP server")]
+    [InlineData("--media-path=C:\\media", "HTTP server")]
+    [InlineData("--rpc", "remote hosts")]
+    [InlineData("--rpc=10.0.0.5:50052", "remote hosts")]
+    [InlineData("--slot-save-path", "managed locations")]
+    [InlineData("--log-file=C:\\Windows\\x.log", "managed locations")]
+    [InlineData("-lcd", "managed locations")]
+    [InlineData("--ssl-key-file", "endpoint")]
+    [InlineData("--ssl-cert-file", "endpoint")]
+    public void UnsafeCustomArgumentsAreRejectedWithAnActionableReason(string argument, string reason)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RuntimeLaunchOptionPolicy.ValidateCustomArguments(["--dry-multiplier", "0.8", argument, "value"]));
+
+        Assert.Contains($"'{argument.Split('=')[0]}'", error.Message, StringComparison.Ordinal);
+        Assert.Contains(reason, error.Message, StringComparison.Ordinal);
+        Assert.Contains("Remove it from Custom parameters", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("-md")]
+    [InlineData("-mm=projector.gguf")]
+    public void ShortAliasesOfManagedCompanionFilesCannotBeOverridden(string argument)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RuntimeLaunchOptionPolicy.ValidateCustomArguments([argument]));
+        Assert.Contains("managed by the application", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LocalTuningAndAdapterArgumentsRemainAllowed()
+    {
+        string[] arguments = ["-c", "8192", "-ngl", "99", "--lora", "C:\\adapters\\style.gguf", "--lora-scaled", "a.gguf", "0.5",
+            "--control-vector", "cv.gguf", "--dry-multiplier", "0.8", "--alias", "qwen", "--offline", "-o", "json"];
+
+        RuntimeLaunchOptionPolicy.ValidateCustomArguments(arguments);
+        Assert.Empty(RuntimeLaunchOptionPolicy.CustomArgumentProblems(arguments));
+    }
+
+    [Fact]
+    public void BlockedOptionsAreNotRenderedAsLaunchSettings()
+    {
+        Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--slot-save-path", ["--slot-save-path"], "PATH", "path to save slot kv cache", RuntimeLaunchOptionValueKind.Directory, [])));
+        Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--log-file", ["--log-file"], "FNAME", "log to file", RuntimeLaunchOptionValueKind.File, [])));
+        Assert.True(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--dry-multiplier", ["--dry-multiplier"], "N", "DRY sampling multiplier", RuntimeLaunchOptionValueKind.Text, [])));
+    }
+
     [Fact]
     public void PreviewUsesTheSameLlamaCppLaunchAsLaunch()
     {
@@ -359,7 +415,7 @@ public sealed class RuntimeLaunchOptionsTests
             Temperature = 0.4,
             ModelAccessMode = "models",
             Host = "10.10.10.21",
-            CustomParameters = "--slot-save-path \"C:\\slot cache\""
+            CustomParameters = "--lora \"C:\\adapter cache\\style.gguf\""
         };
         var runtime = new RuntimeChoice("runtime", "Runtime", RuntimeBackend.Cpu, RuntimeMode.Native, "llama-server.exe");
 
@@ -369,7 +425,7 @@ public sealed class RuntimeLaunchOptionsTests
         Assert.Contains("--ctx-size 8192", preview, StringComparison.Ordinal);
         Assert.Contains("--temp 0.4", preview, StringComparison.Ordinal);
         Assert.Contains("--host 10.10.10.21", preview, StringComparison.Ordinal);
-        Assert.Contains("--slot-save-path \"C:\\\\slot cache\"", preview, StringComparison.Ordinal);
+        Assert.Contains("--lora \"C:\\\\adapter cache\\\\style.gguf\"", preview, StringComparison.Ordinal);
     }
 
     [Fact]
