@@ -30,17 +30,7 @@ public static class AppUpdateAssetVerifier
     }
 
     public static string ExtractSha256(string checksumText, string assetName = "")
-    {
-        foreach (var line in (checksumText ?? "").Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            var match = Regex.Match(line, @"(?i)\b[a-f0-9]{64}\b");
-            if (!match.Success) continue;
-            if (string.IsNullOrWhiteSpace(assetName) || line.Contains(assetName, StringComparison.OrdinalIgnoreCase))
-                return match.Value.ToLowerInvariant();
-        }
-
-        return "";
-    }
+        => Sha256ChecksumFile.FindSha256(checksumText, assetName);
 
     public static string NormalizeSha256(string value)
         => Sha256Digest.NormalizeLooseHex(value);
