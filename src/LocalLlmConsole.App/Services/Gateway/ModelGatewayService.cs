@@ -155,7 +155,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             return;
         }
 
-        var requestedModel = ModelGatewayRequestResolver.ExtractRequestedModel(body);
+        var requestedModel = ModelGatewayRequestResolver.ExtractRequestedModel(body, context.Request.ContentType);
         if (string.IsNullOrWhiteSpace(requestedModel))
         {
             ObserveRejectedRequest(started);
@@ -204,7 +204,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
         using var activeUpstreamLease = upstreamLease;
         try
         {
-            var upstreamBody = ModelGatewayRequestResolver.BodyForRuntime(body, session.LaunchSettings);
+            var upstreamBody = ModelGatewayRequestResolver.BodyForRuntime(body, session.LaunchSettings, context.Request.ContentType);
             await _upstreamProxy.ForwardAsync(context, session, upstreamBody, cancellationToken, started.Elapsed);
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or IOException)
