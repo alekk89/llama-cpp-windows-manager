@@ -170,6 +170,7 @@ public sealed partial class LocalControlApi
             {
                 schemaVersion = ProfileBundleCodec.SchemaVersion,
                 maximumBytes = ProfileBundleCodec.MaximumBytes,
+                maximumImportRequestBytes = ControlRequestBodyLimits.ProfileImportBytes,
                 conflictActions = new { keepBoth = 0, replace = 1, skip = 2 },
                 defaultAction = "keepBoth",
                 importRequest = new { text = "JSON or JSONC bundle", dryRun = true, choices = "Optional per-profile index, action, name, runtimeId and local settings overrides" },

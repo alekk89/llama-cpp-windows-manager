@@ -164,7 +164,7 @@ public sealed class LocalAppService : ILocalAppServiceHost
         string path,
         CancellationToken cancellationToken)
     {
-        const int maxBodyBytes = 1024 * 1024;
+        var maxBodyBytes = ControlRequestBodyLimits.For(request.HttpMethod, path);
         var body = request.HasEntityBody
             ? await ControlRequestBodyReader.ReadJsonObjectAsync(
                 request.InputStream,
