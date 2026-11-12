@@ -103,13 +103,13 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
         context.Response.StatusCode = (int)response.StatusCode;
         foreach (var header in response.Headers)
         {
-            if (HopByHopHeaders.Contains(header.Key)) continue;
+            if (!IsCopiedResponseHeader(header.Key)) continue;
             TrySetResponseHeader(context.Response, header.Key, string.Join(",", header.Value));
         }
 
         foreach (var header in response.Content.Headers)
         {
-            if (HopByHopHeaders.Contains(header.Key)) continue;
+            if (!IsCopiedResponseHeader(header.Key)) continue;
             if (header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)) continue;
             TrySetResponseHeader(context.Response, header.Key, string.Join(",", header.Value));
         }
@@ -388,6 +388,12 @@ public sealed class ModelGatewayUpstreamProxy : IDisposable
     private readonly record struct GatewayResponseObservation(
         TimeSpan? TimeToFirstData,
         double? ResponseTokensPerSecond);
+
+    // CORS, Vary, and caching headers were already set by the gateway access
+    // policy; upstream values must not replace them.
+    private static bool IsCopiedResponseHeader(string name)
+        => !HopByHopHeaders.Contains(name)
+           && !ModelGatewayRequestAccessPolicy.IsGatewayOwnedResponseHeader(name);
 
     private static void TrySetResponseHeader(HttpListenerResponse response, string name, string value)
     {

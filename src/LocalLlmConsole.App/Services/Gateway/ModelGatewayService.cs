@@ -59,6 +59,11 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
                 await ModelGatewayResponseWriter.WriteJsonAsync(context, 403, new { error = new { message = "Host header rejected.", type = "forbidden" } }, cancellationToken);
                 return;
             }
+            if (!_accessPolicy.IsRequestOriginAllowed(context.Request.Headers["Origin"]))
+            {
+                await ModelGatewayResponseWriter.WriteJsonAsync(context, 403, new { error = new { message = "Browser origin rejected.", type = "forbidden" } }, cancellationToken);
+                return;
+            }
 
             if (context.Request.HttpMethod.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
             {
