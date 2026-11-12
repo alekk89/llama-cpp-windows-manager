@@ -100,6 +100,9 @@ Configure these protected-environment secrets:
 - `RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64`;
 - `RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64`.
 
+Map each secret into the `env` of only the workflow step that consumes it, never
+into job- or workflow-level `env`.
+
 Configure these repository or protected-environment variables:
 
 - `TRUSTED_RELEASE_ENABLED=true` after every required release credential is configured;

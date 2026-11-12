@@ -43,6 +43,12 @@ The workflow pins GitHub actions by commit and installs a fixed Inno Setup
 version before importing the signing certificate. Keep all package/tool setup
 before certificate import so third-party installer code never runs while the
 private key is available to the job.
+Release secrets are never declared in job-level `env`: each secret is mapped
+only into the step that consumes it (tag public key into tag verification; PFX,
+PFX password, and manifest private key into the import step), so package
+installs, restore, build, tests, and upgrade validation never receive them.
+Release-related checkouts set `persist-credentials: false`; publication uses
+`gh` with a step-scoped `GH_TOKEN` instead of a persisted checkout credential.
 
 ## Free Options
 
