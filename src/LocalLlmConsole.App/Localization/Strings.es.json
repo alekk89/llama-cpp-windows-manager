@@ -203,6 +203,7 @@
   "Models.Import.Role.Invalid": "no válido",
   "Models.Reattach.Action": "Localizar archivo…",
   "Models.Reattach.ToolTip": "Seleccione el archivo GGUF reubicado y conserve los perfiles de inicio de este modelo.",
+  "Models.Reattach.RenamedProfilesStatus": "Se conservaron {0} perfiles de inicio en conflicto con nombres nuevos: {1}.",
   "Models.ScanDiagnostics.Title": "Diagnóstico del análisis de modelos",
   "Models.ScanDiagnostics.Message": "Algunos archivos GGUF requieren revisión y no se registraron automáticamente.\n\n{0}\n\nUse Añadir archivo de modelo… para registrar explícitamente un archivo ambiguo válido.",
   "Models.ScanDiagnostics.MoreFiles": "…y {0} archivo(s) más.",

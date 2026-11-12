@@ -257,6 +257,7 @@
   "Models.Import.Role.Invalid": "không hợp lệ",
   "Models.Reattach.Action": "Định vị tệp…",
   "Models.Reattach.ToolTip": "Chọn tệp GGUF đã di chuyển và giữ lại các cấu hình khởi chạy của mô hình này.",
+  "Models.Reattach.RenamedProfilesStatus": "Đã giữ {0} hồ sơ khởi chạy bị xung đột với tên mới: {1}.",
   "Models.ScanDiagnostics.Title": "Chẩn đoán quét mô hình",
   "Models.ScanDiagnostics.Message": "Một số tệp GGUF cần được xem xét và chưa được đăng ký tự động.\n\n{0}\n\nDùng Thêm tệp mô hình… để đăng ký rõ ràng một tệp không rõ ràng nhưng hợp lệ.",
   "Models.ScanDiagnostics.MoreFiles": "…và thêm {0} tệp.",
