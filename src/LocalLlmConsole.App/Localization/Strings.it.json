@@ -1047,7 +1047,7 @@
   "Help.Article.updates-and-recovery.Action.2": "Apri Log",
   "Help.Article.updates-and-recovery.Action.3": "Apri Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "L'aggiornamento, la riparazione e la disinstallazione normale dell'installer preservano i dati a meno che la rimozione non sia esplicitamente selezionata.",
-  "Help.Article.updates-and-recovery.Detail.2": "Un aggiornamento portatile richiede il relativo compagno SHA-256 e ripristina la sostituzione incompleta.",
+  "Help.Article.updates-and-recovery.Detail.2": "Un aggiornamento portatile verifica il manifesto firmato, l'editore e il checksum. L'helper conferma la preparazione verificata prima della chiusura del Manager; in caso di sostituzione incompleta ripristina lo stato precedente, riavvia la versione precedente e spiega l'errore all'avvio.",
   "Help.Article.updates-and-recovery.Detail.3": "Usa i Log per l'attività dell'app, del runtime, del job e dell'API Control limitata e oscurata.",
   "Help.Article.updates-and-recovery.Summary": "Gli aggiornamenti preservano i dati dell'applicazione e verificano gli artefatti in fase di staging prima della sostituzione.",
   "Help.Article.updates-and-recovery.Title": "Aggiornamenti, log e ripristino",

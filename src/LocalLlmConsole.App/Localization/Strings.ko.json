@@ -1105,7 +1105,7 @@
   "Help.Article.updates-and-recovery.Title": "Updates, logs, and recovery",
   "Help.Article.updates-and-recovery.Summary": "Updates preserve application data and verify staged artifacts before replacement.",
   "Help.Article.updates-and-recovery.Detail.1": "Installer update, repair, and normal uninstall preserve data unless removal is explicitly selected.",
-  "Help.Article.updates-and-recovery.Detail.2": "A portable update requires its matching SHA-256 companion and rolls back incomplete replacement.",
+  "Help.Article.updates-and-recovery.Detail.2": "휴대용 업데이트는 서명된 매니페스트, 게시자, 체크섬을 확인합니다. 도우미는 Manager가 닫히기 전에 확인된 준비 상태를 알리며, 교체가 완료되지 않으면 롤백하고 이전 버전을 다시 시작한 뒤 시작할 때 실패 이유를 설명합니다.",
   "Help.Article.updates-and-recovery.Detail.3": "Use Logs for app, runtime, job, and bounded redacted Control API activity.",
   "Help.Article.updates-and-recovery.Action.1": "Check Updates",
   "Help.Article.updates-and-recovery.Action.2": "Open Logs",

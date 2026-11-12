@@ -1057,7 +1057,7 @@
   "Help.Article.updates-and-recovery.Action.2": "Buka Log",
   "Help.Article.updates-and-recovery.Action.3": "Buka Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "Pembaruan installer, perbaikan, dan uninstal normal tetap mempertahankan data kecuali jika penghapusan dipilih secara eksplisit.",
-  "Help.Article.updates-and-recovery.Detail.2": "Pembaruan portabel memerlukan pendamping SHA-256 yang sesuai dan membatalkan penggantian yang tidak lengkap.",
+  "Help.Article.updates-and-recovery.Detail.2": "Pembaruan portabel memverifikasi manifes bertanda tangan, penerbit, dan checksum. Pembantu mengonfirmasi staging yang terverifikasi sebelum Manager ditutup; penggantian yang tidak lengkap dibatalkan, versi sebelumnya dimulai ulang, dan penyebab kegagalan dijelaskan saat mulai.",
   "Help.Article.updates-and-recovery.Detail.3": "Gunakan Log untuk aktivitas aplikasi, runtime, job, dan Control API yang dibatasi dan disensor.",
   "Help.Article.updates-and-recovery.Summary": "Pembaruan mempertahankan data aplikasi dan memverifikasi artefak yang dijadwalkan sebelum penggantian.",
   "Help.Article.updates-and-recovery.Title": "Pembaruan, log, dan pemulihan",

@@ -1013,7 +1013,7 @@
   "Help.Article.updates-and-recovery.Action.2": "فتح السجلات",
   "Help.Article.updates-and-recovery.Action.3": "فتح Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "يحافظ تحديث المثبت، والإصلاح، وإلغاء التثبيت العادي على البيانات ما لم يتم اختيار الإزالة صراحةً.",
-  "Help.Article.updates-and-recovery.Detail.2": "يتطلب التحديث المحمول رفيق SHA-256 المطابق ويعيد إلى الحالة السابقة الاستبدال غير المكتمل.",
+  "Help.Article.updates-and-recovery.Detail.2": "يتحقق التحديث المحمول من البيان الموقّع والناشر والمجموع الاختباري. يؤكد المساعد التجهيز المتحقق منه قبل إغلاق المدير، وعند عدم اكتمال الاستبدال يعيد الحالة السابقة ويعيد تشغيل الإصدار السابق ويشرح سبب الفشل عند بدء التشغيل.",
   "Help.Article.updates-and-recovery.Detail.3": "استخدم السجلات لنشاط التطبيق، وبيئة التشغيل، والمهمة، ونشاط واجهة تحكم API المحدود والمعدل.",
   "Help.Article.updates-and-recovery.Summary": "تحافظ التحديثات على بيانات التطبيق وتتحقق من العناصر المرحلية قبل الاستبدال.",
   "Help.Article.updates-and-recovery.Title": "التحديثات، السجلات، والاسترداد",

@@ -1024,7 +1024,7 @@
   "Help.Article.updates-and-recovery.Action.2": "Abrir registros",
   "Help.Article.updates-and-recovery.Action.3": "Abrir Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "La actualización, reparación y desinstalación normal del instalador preservan los datos a menos que se seleccione explícitamente la eliminación.",
-  "Help.Article.updates-and-recovery.Detail.2": "Una actualización portátil requiere su compañero SHA-256 correspondiente y revierte el reemplazo incompleto.",
+  "Help.Article.updates-and-recovery.Detail.2": "Una actualización portátil verifica su manifiesto firmado, el editor y la suma de comprobación. El asistente confirma la preparación verificada antes de que el Manager se cierre; si el reemplazo queda incompleto, lo revierte, reinicia la versión anterior y explica el error al iniciar.",
   "Help.Article.updates-and-recovery.Detail.3": "Use Logs para la actividad de la aplicación, el entorno de ejecución, el trabajo y la API de Control limitada y redactada.",
   "Help.Article.updates-and-recovery.Summary": "Las actualizaciones preservan los datos de la aplicación y verifican los artefactos preparados antes del reemplazo.",
   "Help.Article.updates-and-recovery.Title": "Actualizaciones, registros y recuperación",

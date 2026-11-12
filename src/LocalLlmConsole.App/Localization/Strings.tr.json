@@ -1112,7 +1112,7 @@
   "Help.Article.updates-and-recovery.Title": "Updates, logs, and recovery",
   "Help.Article.updates-and-recovery.Summary": "Updates preserve application data and verify staged artifacts before replacement.",
   "Help.Article.updates-and-recovery.Detail.1": "Installer update, repair, and normal uninstall preserve data unless removal is explicitly selected.",
-  "Help.Article.updates-and-recovery.Detail.2": "A portable update requires its matching SHA-256 companion and rolls back incomplete replacement.",
+  "Help.Article.updates-and-recovery.Detail.2": "Taşınabilir güncelleme imzalı bildirimini, yayıncıyı ve sağlama toplamını doğrular. Yardımcı, Manager kapanmadan önce doğrulanmış hazırlığı onaylar; eksik kalan değiştirme geri alınır, önceki sürüm yeniden başlatılır ve hata başlangıçta açıklanır.",
   "Help.Article.updates-and-recovery.Detail.3": "Use Logs for app, runtime, job, and bounded redacted Control API activity.",
   "Help.Article.updates-and-recovery.Action.1": "Check Updates",
   "Help.Article.updates-and-recovery.Action.2": "Open Logs",
