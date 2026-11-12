@@ -49,13 +49,14 @@ public sealed class RuntimePackageInstallService
                 request.CancellationToken);
             Directory.CreateDirectory(cacheDir);
 
+            var checksumStatuses = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var asset in selection.AllAssets)
             {
                 request.CancellationToken.ThrowIfCancellationRequested();
                 var archivePath = Path.Combine(cacheDir, asset.Name);
                 var sizeText = asset.SizeBytes > 0 ? $" ({DisplayFormatService.Bytes(asset.SizeBytes)})" : "";
                 await ReportAsync(request, installDir, $"Downloading {asset.Name}{sizeText}...");
-                await RuntimePackageInstallFileService.DownloadAssetAsync(_client, asset, archivePath, request.RequireChecksum, request.CancellationToken);
+                checksumStatuses[asset.Name] = await RuntimePackageInstallFileService.DownloadAssetAsync(_client, asset, archivePath, request.RequireChecksum, request.CancellationToken);
                 await RuntimeBuildJobService.AppendJobLogAsync(request.LogPath, JobStatus.Running, $"Extracting {asset.Name}...", request.MaxLogBytes);
                 if (request.Preset.Mode == RuntimeMode.Wsl && IsTarArchive(archivePath))
                 {
@@ -73,9 +74,9 @@ public sealed class RuntimePackageInstallService
 
             var executable = RuntimePackageInstallFileService.FindRuntimeExecutable(installDir, request.Preset.Mode);
             var runtimeFolder = RuntimePackageInstallFileService.RuntimeFolderFromExecutable(executable);
-            await RuntimePackageInstallFileService.StampManagedMetadataAsync(runtimeFolder, installDir, selection, request.CancellationToken);
+            await RuntimePackageInstallFileService.StampManagedMetadataAsync(runtimeFolder, installDir, selection, checksumStatuses, request.CancellationToken);
             if (!string.Equals(runtimeFolder, installDir, StringComparison.OrdinalIgnoreCase))
-                await RuntimePackageInstallFileService.StampManagedMetadataAsync(installDir, installDir, selection, request.CancellationToken);
+                await RuntimePackageInstallFileService.StampManagedMetadataAsync(installDir, installDir, selection, checksumStatuses, request.CancellationToken);
             if (request.Preset.Mode == RuntimeMode.Wsl && request.PrepareWslExecutableAsync is not null)
                 await request.PrepareWslExecutableAsync(request.Preset, executable, request.LogPath);
             await _runtimes.RegisterFolderAsync(runtimeFolder);

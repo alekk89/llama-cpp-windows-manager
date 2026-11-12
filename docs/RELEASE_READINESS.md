@@ -129,7 +129,9 @@ builds and must be described that way.
 - Confirm runtime package downloads fail closed when the downloaded byte count
   exceeds or does not match release metadata, including when the response omits
   or misreports `Content-Length`, or when no SHA-256 metadata/companion checksum
-  is available for a required package asset.
+  is available for a required package asset. A package installed after
+  confirming the missing-checksum prompt shows **Checksum status: Not
+  verified** rather than verified.
 - Confirm installing a prebuilt runtime does not require Git, CMake, Visual Studio Build Tools, WSL build tools, or source checkout.
 - Confirm installed prebuilt runtimes are registered, can be selected per model, and show update/delete state on the Runtime Downloads page.
 - Select a newly installed managed runtime and confirm its details show provider,
