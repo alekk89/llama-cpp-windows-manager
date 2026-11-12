@@ -60,10 +60,11 @@ Groups contain profiles, not model records. A group load preflights duplicates,
 ports, runtimes, and aggregate VRAM before starting members. Retention controls
 automatic idle unload; it does not schedule inference.
 
-**Custom params** cannot download remote models, serve local folders, send
-tensors to RPC hosts, or write files such as logs and slot caches outside the
-Manager's locations. Profiles containing such options fail to load with a
-message naming the option, and profile import rejects them. See
+**Custom params** cannot download remote models, serve local folders, or send
+tensors to RPC hosts. Profiles containing such options fail to load with a
+message naming the option, and profile import rejects them. Imported profiles
+also cannot set file-writing options such as `--slot-save-path` or
+`--log-file`; set those locally after import. See
 [Blocked custom parameters](LAUNCH_SETTINGS_SCHEMA.md#blocked-custom-parameters).
 
 Vision projectors, draft models, and MTP heads are discovered automatically only

@@ -240,13 +240,12 @@ public sealed class RuntimeLaunchOptionsTests
               --model PATH             model
               --host HOST              listener
               --slot-save-path PATH    slot directory
-              --slot-prompt-similarity N  prompt similarity
               --help                   show help
             """);
 
         var rendered = parsed.Where(RuntimeLaunchOptionPolicy.CanRender).Select(option => option.Name).ToArray();
 
-        Assert.Equal(["--slot-prompt-similarity"], rendered);
+        Assert.Equal(["--slot-save-path"], rendered);
     }
 
     [Fact]
@@ -361,9 +360,6 @@ public sealed class RuntimeLaunchOptionsTests
     [InlineData("--media-path=C:\\media", "HTTP server")]
     [InlineData("--rpc", "remote hosts")]
     [InlineData("--rpc=10.0.0.5:50052", "remote hosts")]
-    [InlineData("--slot-save-path", "managed locations")]
-    [InlineData("--log-file=C:\\Windows\\x.log", "managed locations")]
-    [InlineData("-lcd", "managed locations")]
     [InlineData("--ssl-key-file", "endpoint")]
     [InlineData("--ssl-cert-file", "endpoint")]
     public void UnsafeCustomArgumentsAreRejectedWithAnActionableReason(string argument, string reason)
@@ -398,11 +394,30 @@ public sealed class RuntimeLaunchOptionsTests
     public void BlockedOptionsAreNotRenderedAsLaunchSettings()
     {
         Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
-            "--slot-save-path", ["--slot-save-path"], "PATH", "path to save slot kv cache", RuntimeLaunchOptionValueKind.Directory, [])));
+            "--rpc", ["--rpc"], "SERVERS", "comma separated list of RPC servers", RuntimeLaunchOptionValueKind.Text, [])));
         Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
-            "--log-file", ["--log-file"], "FNAME", "log to file", RuntimeLaunchOptionValueKind.File, [])));
+            "--media-path", ["--media-path"], "PATH", "directory for local media files", RuntimeLaunchOptionValueKind.Directory, [])));
+        Assert.True(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--slot-save-path", ["--slot-save-path"], "PATH", "path to save slot kv cache", RuntimeLaunchOptionValueKind.Directory, [])));
         Assert.True(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
             "--dry-multiplier", ["--dry-multiplier"], "N", "DRY sampling multiplier", RuntimeLaunchOptionValueKind.Text, [])));
+    }
+
+    [Theory]
+    [InlineData("--slot-save-path", "C:\\slots")]
+    [InlineData("--SLOT-SAVE-PATH=C:\\slots", null)]
+    [InlineData("--log-file", "C:\\logs\\server.log")]
+    [InlineData("-lcd", "lookup.bin")]
+    [InlineData("--lookup-cache-dynamic=lookup.bin", null)]
+    public void LocalFileWritingOptionsAreAllowedLocallyButRejectedFromImports(string argument, string? value)
+    {
+        string[] arguments = value is null ? ["--dry-multiplier", "0.8", argument] : ["--dry-multiplier", "0.8", argument, value];
+
+        RuntimeLaunchOptionPolicy.ValidateCustomArguments(arguments);
+        var problem = Assert.Single(RuntimeLaunchOptionPolicy.ImportedCustomArgumentProblems(arguments));
+
+        Assert.Contains($"'{argument.Split('=')[0]}' cannot be imported", problem, StringComparison.Ordinal);
+        Assert.Contains("set it locally after import", problem, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -415,7 +430,7 @@ public sealed class RuntimeLaunchOptionsTests
             Temperature = 0.4,
             ModelAccessMode = "models",
             Host = "10.10.10.21",
-            CustomParameters = "--lora \"C:\\adapter cache\\style.gguf\""
+            CustomParameters = "--slot-save-path \"C:\\slot cache\""
         };
         var runtime = new RuntimeChoice("runtime", "Runtime", RuntimeBackend.Cpu, RuntimeMode.Native, "llama-server.exe");
 
@@ -425,7 +440,7 @@ public sealed class RuntimeLaunchOptionsTests
         Assert.Contains("--ctx-size 8192", preview, StringComparison.Ordinal);
         Assert.Contains("--temp 0.4", preview, StringComparison.Ordinal);
         Assert.Contains("--host 10.10.10.21", preview, StringComparison.Ordinal);
-        Assert.Contains("--lora \"C:\\\\adapter cache\\\\style.gguf\"", preview, StringComparison.Ordinal);
+        Assert.Contains("--slot-save-path \"C:\\\\slot cache\"", preview, StringComparison.Ordinal);
     }
 
     [Fact]

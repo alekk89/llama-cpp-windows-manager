@@ -52,7 +52,7 @@ public sealed class ProfileTransferTests : ManagerRegressionTestBase
         using var sessions = CreateLoadedModelSessionManager();
         var (model, defaults) = await SeedAsync(store, root);
         var workflow = new ProfileTransferWorkflowService(store, sessions);
-        var bundle = Bundle(ModelLaunchSettings.FromAppSettings(defaults) with { CustomParameters = "--dry-multiplier 0.8 --rpc=10.0.0.5:50052 -hf owner/repo" });
+        var bundle = Bundle(ModelLaunchSettings.FromAppSettings(defaults) with { CustomParameters = "--dry-multiplier 0.8 --rpc=10.0.0.5:50052 -hf owner/repo --slot-save-path C:\\slots" });
 
         var preview = await workflow.PreviewAsync(model, bundle, defaults);
         var resolved = await workflow.PreviewAsync(model, bundle, defaults,
@@ -61,6 +61,7 @@ public sealed class ProfileTransferTests : ManagerRegressionTestBase
         Assert.False(preview.CanApply);
         Assert.Contains(preview.Rows[0].Errors, error => error.Contains("'--rpc'", StringComparison.Ordinal) && error.Contains("remote hosts", StringComparison.Ordinal));
         Assert.Contains(preview.Rows[0].Errors, error => error.Contains("'-hf'", StringComparison.Ordinal));
+        Assert.Contains(preview.Rows[0].Errors, error => error.Contains("'--slot-save-path' cannot be imported", StringComparison.Ordinal));
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => workflow.ApplyAsync(model, bundle, defaults, [], preview));
         Assert.True(resolved.CanApply);
     }

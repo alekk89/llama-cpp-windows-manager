@@ -67,7 +67,7 @@ public sealed partial class ProfileTransferWorkflowService
         {
             try
             {
-                var problems = RuntimeLaunchOptionPolicy.CustomArgumentProblems(CustomLaunchParameterParser.Parse(settings.CustomParameters));
+                var problems = RuntimeLaunchOptionPolicy.ImportedCustomArgumentProblems(CustomLaunchParameterParser.Parse(settings.CustomParameters));
                 errors.AddRange(problems);
                 if (problems.Count == 0)
                     warnings.Add("Review Custom parameters for runtime support and machine-specific file paths.");

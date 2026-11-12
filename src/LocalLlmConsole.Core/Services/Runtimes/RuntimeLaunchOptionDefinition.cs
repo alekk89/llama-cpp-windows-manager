@@ -44,12 +44,10 @@ public static class RuntimeLaunchOptionPolicy
     private const string RemoteContentReason = "downloads models or other content from a remote source";
     private const string FileServingReason = "exposes local files or tools through the HTTP server";
     private const string RemoteHostReason = "sends model data to remote hosts";
-    private const string FileWritingReason = "writes files outside the application's managed locations";
     private const string EndpointReason = "changes how the application-managed endpoint is served";
 
-    // One deny policy for custom parameters, applied at launch, benchmark validation, profile
-    // editing, and profile import. Local tuning and local adapter files (for example --lora)
-    // remain allowed; only network, file-serving, and file-writing options are rejected.
+    // Denied everywhere: launch, preview, benchmark validation, profile editing, and profile
+    // import. Local tuning and local input files (for example --lora) remain allowed.
     private static readonly Dictionary<string, string> BlockedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["-mu"] = RemoteContentReason,
@@ -78,12 +76,15 @@ public static class RuntimeLaunchOptionPolicy
         ["--media-path"] = FileServingReason,
         ["--tools"] = FileServingReason,
         ["--rpc"] = RemoteHostReason,
-        ["--log-file"] = FileWritingReason,
-        ["--slot-save-path"] = FileWritingReason,
-        ["-lcd"] = FileWritingReason,
-        ["--lookup-cache-dynamic"] = FileWritingReason,
         ["--ssl-key-file"] = EndpointReason,
         ["--ssl-cert-file"] = EndpointReason
+    };
+
+    // Local options that choose where llama-server writes files. A user may set them on this
+    // machine, but an imported profile bundle is untrusted and must not choose write locations.
+    private static readonly HashSet<string> ImportRestrictedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "--slot-save-path", "--log-file", "-lcd", "--lookup-cache-dynamic"
     };
 
     private static readonly string[] UnsafeFragments =
@@ -109,6 +110,8 @@ public static class RuntimeLaunchOptionPolicy
 
     public static bool IsBlocked(string name) => BlockedNames.ContainsKey(name);
 
+    public static bool IsImportRestricted(string name) => ImportRestrictedNames.Contains(name);
+
     private static bool IsProjectorOffloadSwitch(RuntimeLaunchOptionDefinition option)
         => option.ValueKind == RuntimeLaunchOptionValueKind.Switch
            && option.Aliases.Append(option.Name).All(name =>
@@ -132,6 +135,16 @@ public static class RuntimeLaunchOptionPolicy
 
     /// <summary>Returns one message per managed or blocked option in <paramref name="arguments"/>.</summary>
     public static IReadOnlyList<string> CustomArgumentProblems(IReadOnlyList<string> arguments)
+        => CustomArgumentProblems(arguments, imported: false);
+
+    /// <summary>
+    /// Validates custom parameters from an imported profile bundle: the launch policy plus
+    /// rejection of options that choose where files are written.
+    /// </summary>
+    public static IReadOnlyList<string> ImportedCustomArgumentProblems(IReadOnlyList<string> arguments)
+        => CustomArgumentProblems(arguments, imported: true);
+
+    private static IReadOnlyList<string> CustomArgumentProblems(IReadOnlyList<string> arguments, bool imported)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         var problems = new List<string>();
@@ -142,6 +155,8 @@ public static class RuntimeLaunchOptionPolicy
                 problems.Add($"Custom parameter '{name}' is managed by the application and cannot be overridden.");
             else if (BlockedNames.TryGetValue(name, out var reason))
                 problems.Add($"Custom parameter '{name}' is not allowed because it {reason}. Remove it from Custom parameters.");
+            else if (imported && IsImportRestricted(name))
+                problems.Add($"Custom parameter '{name}' cannot be imported because it chooses where files are written on this computer. Remove it from the imported Custom parameters and set it locally after import if needed.");
         }
         return problems;
     }
