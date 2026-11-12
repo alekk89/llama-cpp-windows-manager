@@ -116,3 +116,13 @@ any model load or profile swap. Once a response begins, streamed completion
 bodies are allowed to remain open until the client disconnects, the app shuts
 down, or the upstream finishes; long generations are not cut off by the header
 timeout.
+
+Under **Single active model**, a request that needs a swap first waits for
+gateway responses already in progress on the other sessions. New requests for
+those sessions wait until the swap finishes and then load their model again.
+If the active responses take longer than 10 minutes, the swapping request fails
+with `503 model_load_failed` instead of interrupting them. Idle unload skips a
+session while a gateway request on it is active, and a request that arrives
+while an idle session is stopping waits and reloads it. Requests sent directly
+to a model's own endpoint are not tracked by the gateway; explicit unloads and
+restarts still stop sessions immediately.

@@ -16,7 +16,8 @@ public sealed record ModelGatewayOptions(
     long MaxRequestBodyBytes = 64L * 1024 * 1024,
     int MaxConcurrentRequests = 8,
     int RequestBodyTimeoutSeconds = 120,
-    bool AutoLoadModels = true)
+    bool AutoLoadModels = true,
+    int SwapDrainTimeoutSeconds = 600)
 {
     public bool AllowLanAccess
         => AppPreferenceService.GatewayAllowsLanAccess(AccessMode);

@@ -4,7 +4,10 @@ public sealed record RuntimeIdleUnloadApplicationActions(
     Func<string, Task<ModelRecord?>> FindModelByIdAsync,
     Func<LoadedModelSessionSnapshot, Task> StopSessionRuntimeAsync,
     Action<string> SetStatus,
-    Func<string, int, EffectiveModelRetentionPolicy>? ResolveRetentionPolicy = null);
+    Func<string, int, EffectiveModelRetentionPolicy>? ResolveRetentionPolicy = null,
+    // Returns a reservation that keeps new gateway requests out of the session
+    // while it stops, or null when a gateway request is currently active.
+    Func<LoadedModelSessionSnapshot, IDisposable?>? TryReserveIdleUnload = null);
 
 public sealed class RuntimeTelemetryApplicationService
 {
@@ -156,8 +159,10 @@ public sealed class RuntimeTelemetryApplicationService
                     if (model is null) return;
 
                     var policy = policies[idle.RuntimeKey];
-                    actions.SetStatus(AutoUnloadStatus(model, policy.IdleMinutes, policy.GroupName));
-                    await actions.StopSessionRuntimeAsync(idle.Session);
+                    await StopIdleSessionAsync(
+                        idle,
+                        actions,
+                        AutoUnloadStatus(model, policy.IdleMinutes, policy.GroupName));
                 },
                 maximumUnloads: 1,
                 cancellationToken);
@@ -172,10 +177,38 @@ public sealed class RuntimeTelemetryApplicationService
                 var model = await actions.FindModelByIdAsync(idle.Session.ModelId);
                 if (model is null) return;
 
-                actions.SetStatus(AutoUnloadStatus(model, idleMinutes));
-                await actions.StopSessionRuntimeAsync(idle.Session);
+                await StopIdleSessionAsync(idle, actions, AutoUnloadStatus(model, idleMinutes));
             },
             cancellationToken);
+    }
+
+    // The idle decision comes from the last telemetry poll; a gateway request
+    // may have started since then, so re-check gateway activity at stop time.
+    private async Task StopIdleSessionAsync(
+        RuntimeMetricPollResult idle,
+        RuntimeIdleUnloadApplicationActions actions,
+        string status)
+    {
+        using var reservation = actions.TryReserveIdleUnload is null
+            ? NoGatewayReservation.Instance
+            : actions.TryReserveIdleUnload(idle.Session);
+        if (reservation is null)
+        {
+            _idleUnloadPolicy.Reset(idle.RuntimeKey);
+            return;
+        }
+
+        actions.SetStatus(status);
+        await actions.StopSessionRuntimeAsync(idle.Session);
+    }
+
+    private sealed class NoGatewayReservation : IDisposable
+    {
+        public static readonly NoGatewayReservation Instance = new();
+
+        public void Dispose()
+        {
+        }
     }
 
     public void ResetIdleCounters()

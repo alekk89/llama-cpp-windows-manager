@@ -15,10 +15,15 @@ public sealed class ModelGatewayHostFactoryService
         _createGatewayHost = createGatewayHost
             ?? ((options, runtime) => new ModelGatewayService(options, runtime,
                 upstreamProxy: new ModelGatewayUpstreamProxy(performance: Performance),
-                performance: Performance));
+                performance: Performance,
+                upstreamActivity: UpstreamActivity));
     }
 
     public GatewayPerformanceTracker Performance { get; }
+
+    // Shared across gateway restarts so idle unload sees requests that are
+    // still finishing on a previous gateway instance.
+    public ModelGatewayUpstreamActivity UpstreamActivity { get; } = new();
 
     public IModelGatewayRuntimeController CreateRuntimeController(ModelGatewayRuntimeControllerActions actions)
     {
