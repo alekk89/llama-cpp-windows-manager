@@ -267,6 +267,29 @@ ALTER TABLE model_launch_profiles ADD COLUMN annotations_json TEXT NULL;
 """)
     ];
 
+    internal static int LatestKnownSchemaMigrationId => SchemaMigrations.Max(migration => migration.Id);
+
+    // An older build must not run its idempotent table setup or migrations against a
+    // schema it does not understand. Detection only reads, leaving the file untouched.
+    private async Task ThrowIfSchemaIsNewerUnlockedAsync()
+    {
+        await using (var exists = _connection.CreateCommand())
+        {
+            exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'migrations';";
+            if (Convert.ToInt64(await exists.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture) == 0) return;
+        }
+
+        await using var unknown = _connection.CreateCommand();
+        unknown.CommandText = "SELECT id, name FROM migrations WHERE id > $latest ORDER BY id DESC LIMIT 1;";
+        unknown.Parameters.AddWithValue("$latest", LatestKnownSchemaMigrationId);
+        await using var reader = await unknown.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            throw new StateStoreSchemaTooNewException(
+                DatabasePath, reader.GetInt32(0), reader.GetString(1), LatestKnownSchemaMigrationId);
+        }
+    }
+
     private async Task ApplyMigrationsUnlockedAsync()
     {
         var applied = new HashSet<int>();
