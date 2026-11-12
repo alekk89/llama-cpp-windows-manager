@@ -121,7 +121,8 @@ try {
     "-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", $script,
     "-ParentPid", "999999", "-SourceExe", $sourceExe.FullName, "-TargetExe", $targetExe.FullName,
     "-NoticeSource", $noticeSource, "-NoticeTarget", $noticeTarget,
-    "-WorkingDirectory", $oldRoot, "-SkipRestart") 2>&1
+    "-WorkingDirectory", $oldRoot,
+    "-ExpectedSourceSha256", (Get-FileHash $sourceExe.FullName -Algorithm SHA256).Hash, "-SkipRestart") 2>&1
   if ($LASTEXITCODE -ne 0) {
     throw "Real portable update helper failed with exit code $LASTEXITCODE`: $($updaterOutput -join [Environment]::NewLine)"
   }

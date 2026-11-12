@@ -14,6 +14,8 @@ param(
   [string] $NoticeSource,
   [string] $NoticeTarget,
   [string] $WorkingDirectory,
+  [string] $ExpectedSourceSha256,
+  [string] $ExpectedCliSha256,
   [switch] $SkipRestart
 )
 $ErrorActionPreference = "Stop"
@@ -52,7 +54,7 @@ function Get-UpdateFileSha256 {
 }
 
 function New-VerifiedStage {
-  param([string] $Source, [string] $Target)
+  param([string] $Source, [string] $Target, [string] $ExpectedSha256)
   if (-not $Source -or -not $Target -or -not (Test-Path -LiteralPath $Source -PathType Leaf)) { return $null }
   $targetDirectory = Split-Path -Parent $Target
   New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
@@ -64,7 +66,10 @@ function New-VerifiedStage {
     if ($sourceHash -ne $stagedHash) {
       throw "Staged update verification failed for $Target"
     }
-    return [pscustomobject]@{ Target = $Target; Temporary = $temporary; Backup = ""; HadOriginal = (Test-Path -LiteralPath $Target) }
+    if ($ExpectedSha256 -and -not [string]::Equals($stagedHash, $ExpectedSha256.Trim(), [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "Staged update SHA-256 does not match the verified release for $Target"
+    }
+    return [pscustomobject]@{ Target = $Target; Temporary = $temporary; Sha256 = $stagedHash; Backup = ""; HadOriginal = (Test-Path -LiteralPath $Target) }
   } catch {
     Remove-UpdateArtifact -Path $temporary
     throw
@@ -74,6 +79,10 @@ function New-VerifiedStage {
 function Commit-VerifiedStage {
   param($Stage)
   if ($null -eq $Stage) { return }
+  # The staged copy waited for the Manager to exit; verify it again immediately before replacement.
+  if ((Get-UpdateFileSha256 -Path $Stage.Temporary) -ne $Stage.Sha256) {
+    throw "Staged update changed before replacement: $($Stage.Target)"
+  }
   if ($Stage.HadOriginal) {
     $Stage.Backup = Join-Path (Split-Path -Parent $Stage.Target) ("." + (Split-Path -Leaf $Stage.Target) + "." + [Guid]::NewGuid().ToString("N") + ".bak")
     [System.IO.File]::Replace($Stage.Temporary, $Stage.Target, $Stage.Backup, $true)
@@ -98,8 +107,35 @@ function Restore-CommittedStage {
   }
 }
 
+function Write-UpdateFailureNotice {
+  param([string] $Message)
+  if (-not $NoticeTarget) { return }
+  try {
+    $version = ""
+    $releaseName = ""
+    if ($NoticeSource -and (Test-Path -LiteralPath $NoticeSource)) {
+      $pending = Get-Content -LiteralPath $NoticeSource -Raw | ConvertFrom-Json
+      $version = [string] $pending.Version
+      $releaseName = [string] $pending.ReleaseName
+    }
+    $notice = [ordered]@{
+      Version = $version
+      ReleaseName = $releaseName
+      ReleaseNotes = ""
+      InstalledAt = [DateTimeOffset]::UtcNow.ToString("o", [System.Globalization.CultureInfo]::InvariantCulture)
+      FailureMessage = $Message
+    }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $NoticeTarget) -Force | Out-Null
+    [System.IO.File]::WriteAllText($NoticeTarget, ($notice | ConvertTo-Json -Compress), [System.Text.UTF8Encoding]::new($false))
+  } catch {
+    Write-Warning ("Could not record the failed-update notice: {0}" -f $_.Exception.Message)
+  }
+}
+
 $stages = @()
 $committed = @()
+$updateFailure = $null
+$managerExited = $false
 $handoffReady = $null
 $handoffProceed = $null
 $handoffFailed = $null
@@ -110,10 +146,10 @@ try {
     $handoffProceed = [System.Threading.EventWaitHandle]::OpenExisting($HandoffName + ".proceed")
     $handoffFailed = [System.Threading.EventWaitHandle]::OpenExisting($HandoffName + ".failed")
   }
-  $appStage = New-VerifiedStage -Source $SourceExe -Target $TargetExe
+  $appStage = New-VerifiedStage -Source $SourceExe -Target $TargetExe -ExpectedSha256 $ExpectedSourceSha256
   if ($null -eq $appStage) { throw "The staged application executable is missing." }
   $stages += $appStage
-  $cliStage = New-VerifiedStage -Source $SourceCli -Target $TargetCli
+  $cliStage = New-VerifiedStage -Source $SourceCli -Target $TargetCli -ExpectedSha256 $ExpectedCliSha256
   if ($SourceCli -and $null -eq $cliStage) { throw "The staged control executable is missing." }
   if ($null -ne $cliStage) { $stages += $cliStage }
   if ($handoffReady) {
@@ -122,6 +158,7 @@ try {
   }
   $parent = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
   if ($parent -and -not $parent.WaitForExit(90000)) { throw "The Manager did not exit; replacement was cancelled." }
+  $managerExited = $true
   Start-Sleep -Milliseconds 500
   foreach ($stage in $stages) {
     Commit-VerifiedStage -Stage $stage
@@ -129,12 +166,12 @@ try {
   }
   $replacementSucceeded = $true
 } catch {
+  $updateFailure = $_
   if ($handoffFailed) { $handoffFailed.Set() | Out-Null }
   for ($index = $committed.Count - 1; $index -ge 0; $index--) {
     try { Restore-CommittedStage -Stage $committed[$index] }
     catch { Write-Warning ("Rollback failed; preserve backup '{0}': {1}" -f $committed[$index].Backup, $_.Exception.Message) }
   }
-  throw
 } finally {
   foreach ($event in @($handoffReady, $handoffProceed, $handoffFailed)) {
     if ($event) { $event.Dispose() }
@@ -143,6 +180,22 @@ try {
     Remove-UpdateArtifact -Path $stage.Temporary
     if ($replacementSucceeded) { Remove-UpdateArtifact -Path $stage.Backup }
   }
+}
+if ($null -ne $updateFailure) {
+  # A Manager that already exited must not stay closed: restart the restored app and
+  # leave a notice it shows on startup. A Manager that is still running reports the error itself.
+  if ($managerExited) {
+    Write-UpdateFailureNotice -Message $updateFailure.Exception.Message
+    if (-not $SkipRestart -and (Test-Path -LiteralPath $TargetExe)) {
+      try {
+        Start-Process -FilePath $TargetExe -WorkingDirectory $WorkingDirectory | Out-Null
+        Write-Output "Restarted the previous application after the failed update."
+      } catch {
+        Write-Warning ("Could not restart the previous application: {0}" -f $_.Exception.Message)
+      }
+    }
+  }
+  throw $updateFailure
 }
 try {
   if ($ObsoleteExe -and

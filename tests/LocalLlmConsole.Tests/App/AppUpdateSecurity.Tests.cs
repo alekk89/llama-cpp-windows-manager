@@ -46,7 +46,8 @@ public sealed class AppUpdateSecurityTests : ManagerRegressionTestBase
                 "-TargetExe", targetExe,
                 "-SourceCli", sourceCli,
                 "-TargetCli", targetCli,
-                "-WorkingDirectory", root
+                "-WorkingDirectory", root,
+                "-SkipRestart"
             }
         }) ?? throw new InvalidOperationException("Could not start updater rollback test.");
         var standardOutput = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);

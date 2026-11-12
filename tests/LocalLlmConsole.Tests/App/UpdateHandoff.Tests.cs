@@ -7,10 +7,12 @@ namespace LocalLlmConsole.Tests;
 public sealed class UpdateHandoffTests : ManagerRegressionTestBase
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ActualLauncherRequiresVerifiedStageBeforeAuthorizingReplacement(bool missingSource)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task ActualLauncherRequiresVerifiedStageBeforeAuthorizingReplacement(bool missingSource, bool unexpectedHash)
     {
+        var rejected = missingSource || unexpectedHash;
         var root = CreateTempRoot();
         var script = Path.Combine(root, "update.ps1");
         var scriptText = (string)typeof(AppUpdateService).GetMethod("UpdaterScript", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, null)!;
@@ -44,17 +46,27 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
         timeout.CancelAfter(TimeSpan.FromSeconds(60));
         try
         {
-            var plan = new AppUpdateInstallPlan(script, source, target, Path.Combine(root, "notice.json"), SourceCli: sourceCli, TargetCli: targetCli);
-            if (missingSource)
+            var sourceHash = unexpectedHash ? new string('0', 64) : Sha256("new-app");
+            var plan = new AppUpdateInstallPlan(script, source, target, Path.Combine(root, "notice.json"), SourceCli: sourceCli, TargetCli: targetCli,
+                SourceExeSha256: sourceHash, SourceCliSha256: Sha256("new-cli"));
+            if (rejected)
                 await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartInstallerAsync(plan, 999999, timeout.Token));
             else
                 await service.StartInstallerAsync(plan, 999999, timeout.Token);
             Assert.NotNull(helper);
             await helper.WaitForExitAsync(timeout.Token);
             var diagnostics = (await output!) + (await error!);
-            Assert.Equal(missingSource ? "old-app" : "new-app", await File.ReadAllTextAsync(target, timeout.Token));
-            Assert.Equal(missingSource ? "old-cli" : "new-cli", await File.ReadAllTextAsync(targetCli, timeout.Token));
-            Assert.True(missingSource ? helper.ExitCode != 0 : helper.ExitCode == 0, diagnostics);
+            Assert.Equal(rejected ? "old-app" : "new-app", await File.ReadAllTextAsync(target, timeout.Token));
+            Assert.Equal(rejected ? "old-cli" : "new-cli", await File.ReadAllTextAsync(targetCli, timeout.Token));
+            Assert.True(rejected ? helper.ExitCode != 0 : helper.ExitCode == 0, diagnostics);
+            if (unexpectedHash)
+            {
+                // Windows PowerShell wraps redirected error records at the console width.
+                var unwrapped = diagnostics.ReplaceLineEndings("");
+                Assert.Contains("SHA-256 does not match", unwrapped, StringComparison.Ordinal);
+            }
+            // A rejected stage leaves the Manager running, so no failure notice is published for a restart.
+            Assert.False(File.Exists(Path.Combine(root, "notice.json")));
             Assert.Empty(Directory.EnumerateFiles(root, ".*.new"));
             Assert.Empty(Directory.EnumerateFiles(root, ".*.bak"));
         }
@@ -70,6 +82,9 @@ public sealed class UpdateHandoffTests : ManagerRegressionTestBase
             helper?.Dispose();
         }
     }
+
+    private static string Sha256(string text)
+        => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)));
 
     [Fact]
     public async Task MissingAcknowledgementCanBeCancelledWithoutAuthorizingTheHelper()

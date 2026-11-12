@@ -33,6 +33,8 @@ public sealed partial class AppUpdateService
         {
             psi.ArgumentList.Add(arg);
         }
+        AddOptionalArgument(psi, "-ExpectedSourceSha256", plan.SourceExeSha256);
+        AddOptionalArgument(psi, "-ExpectedCliSha256", plan.SourceCliSha256);
 
         _startProcess(psi);
         var outcome = await Task.Run(() => WaitHandle.WaitAny(
@@ -45,6 +47,13 @@ public sealed partial class AppUpdateService
         }
         proceed.Set();
         RecordDiagnostic("LLWM-UPDATE-HANDOFF", "success", "helper-acknowledged-staging");
+    }
+
+    private static void AddOptionalArgument(ProcessStartInfo psi, string name, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        psi.ArgumentList.Add(name);
+        psi.ArgumentList.Add(value);
     }
 
 }

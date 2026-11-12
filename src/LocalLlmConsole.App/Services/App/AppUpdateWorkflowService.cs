@@ -47,6 +47,23 @@ public sealed class AppUpdateWorkflowService
     public async Task<InstalledUpdateNotice?> TryConsumeInstalledNoticeAsync(CancellationToken cancellationToken = default)
         => await AppUpdateService.TryConsumeInstalledNoticeAsync(_workspaceRoot, cancellationToken);
 
+    public static (string Title, string Message, bool Failed) DescribeInstalledNotice(InstalledUpdateNotice notice)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        if (string.IsNullOrWhiteSpace(notice.FailureMessage))
+        {
+            return ("Update installed",
+                $"Updated to {notice.Version}.\n\n{notice.ReleaseName}\n\n{DisplayFormatService.TrimForDisplay(notice.ReleaseNotes, 2600)}",
+                false);
+        }
+
+        var target = string.IsNullOrWhiteSpace(notice.Version) ? "The update" : $"The update to {notice.Version}";
+        return ("Update not installed",
+            $"{target} could not be installed. The previous version was restored and restarted.\n\n" +
+            $"{notice.FailureMessage}\n\nClose programs that use the Manager files, such as llwmctl.exe, and try the update again.",
+            true);
+    }
+
     public static AppUpdateCheckWorkflowResult DescribeCheckResult(AppUpdateInfo update, bool manual)
     {
         if (update.IsAvailable)

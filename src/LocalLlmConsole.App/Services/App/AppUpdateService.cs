@@ -30,9 +30,12 @@ public sealed record AppUpdateInstallPlan(
     string NoticePath,
     string ObsoleteExe = "",
     string SourceCli = "",
-    string TargetCli = "");
+    string TargetCli = "",
+    string SourceExeSha256 = "",
+    string SourceCliSha256 = "");
 
-public sealed record InstalledUpdateNotice(string Version, string ReleaseName, string ReleaseNotes, DateTimeOffset InstalledAt);
+// FailureMessage is set by the update helper when it rolled back a failed replacement.
+public sealed record InstalledUpdateNotice(string Version, string ReleaseName, string ReleaseNotes, DateTimeOffset InstalledAt, string? FailureMessage = null);
 
 public sealed partial class AppUpdateService : IDisposable
 {
@@ -210,7 +213,10 @@ public sealed partial class AppUpdateService : IDisposable
             var controlCli = FindStagedControlCli(executable);
             if (update.AuthenticityVerified && !string.IsNullOrWhiteSpace(controlCli))
                 _signatureVerifier.Verify(controlCli, update.ExpectedWindowsPublisher, executable);
-            return (Executable: executable, ControlCli: controlCli);
+            // The helper re-checks these verified hashes after copying and before replacing files.
+            return (Executable: executable, ControlCli: controlCli,
+                ExecutableSha256: FileSha256(executable),
+                ControlCliSha256: string.IsNullOrWhiteSpace(controlCli) ? "" : FileSha256(controlCli));
         }, cancellationToken);
         var stagedExe = stagedFiles.Executable;
         var stagedCli = stagedFiles.ControlCli;
@@ -229,7 +235,8 @@ public sealed partial class AppUpdateService : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(noticePath)!);
         var scriptPath = Path.Combine(stageRoot, "Install-LlamaCppWindowsManagerUpdate.ps1");
         await File.WriteAllTextAsync(scriptPath, UpdaterScript(), new UTF8Encoding(false), cancellationToken);
-        return new AppUpdateInstallPlan(scriptPath, stagedExe, targetExe, noticePath, obsoleteExe, stagedCli, targetCli);
+        return new AppUpdateInstallPlan(scriptPath, stagedExe, targetExe, noticePath, obsoleteExe, stagedCli, targetCli,
+            stagedFiles.ExecutableSha256, stagedFiles.ControlCliSha256);
     }
 
     private void RecordDiagnostic(string code, string outcome, string message)
@@ -386,6 +393,12 @@ public sealed partial class AppUpdateService : IDisposable
 
     private static string TrimReleaseNotes(string notes)
         => string.IsNullOrWhiteSpace(notes) ? "No release notes were provided." : notes.Trim().Length <= 4000 ? notes.Trim() : notes.Trim()[..4000] + "\n\n...";
+
+    private static string FileSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
+    }
 
     private static string PendingNoticePath(string workspaceRoot)
         => Path.Combine(workspaceRoot, "cache", "app-updates", "installed-update.json");
