@@ -7,6 +7,17 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Runtime-aligned packages follow the target framework's major version.
+    # Move them to the next major together with the target framework.
+    ignore:
+      - dependency-name: "System.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Data.Sqlite*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Win32.*"
+        update-types: ["version-update:semver-major"]
     groups:
       nuget-minor-and-patch:
         update-types:

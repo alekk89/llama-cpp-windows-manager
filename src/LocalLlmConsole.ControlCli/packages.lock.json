@@ -4,9 +4,9 @@
     "net10.0-windows7.0": {
       "System.Security.Cryptography.ProtectedData": {
         "type": "Direct",
-        "requested": "[10.0.13, )",
-        "resolved": "10.0.13",
-        "contentHash": "aUSmC6cPjFLSE0rDTsmkR3wvUOnscqewebOaaELEToh12sNmoltZqT3f0C81mJ1zhxKjWco25soHTvYwsXCsUw=="
+        "requested": "[10.0.15, )",
+        "resolved": "10.0.15",
+        "contentHash": "AG49oTxB0R4YQJzeIIHRgqyaI3SOT8Q8vEfGUcju2WxOvsBkDJU4FKTQ8gYQAYCxmHOHqyJL0UDGcCf8nzRoiw=="
       }
     },
     "net10.0-windows7.0/win-x64": {}
