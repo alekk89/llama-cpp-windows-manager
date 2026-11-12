@@ -145,7 +145,8 @@ explicitly removed. Choose **Locate file…** on the missing row and select the
 relocated GGUF. The Manager keeps the model and profile IDs, including group,
 favorite, and startup-profile selections. If that path was already imported,
 the duplicate registration is consolidated after active-session and GGUF
-identity checks pass. Deleting
+identity checks pass. Its profiles whose names conflict, or a second default,
+are kept under a `(relocated)` name and listed in the status message. Deleting
 an imported external model removes its registration by default. Deleting an
 app-owned downloaded model may remove its managed directory after confirmation.
 

@@ -304,6 +304,7 @@
   "Models.Reattach.Busy": "Reattaching model file...",
   "Models.Reattach.CompletedStatus": "Reattached {0} and preserved its launch profiles.",
   "Models.Reattach.CompletedMergedStatus": "Reattached {0}, preserved its launch profiles, and removed {1} duplicate registration(s).",
+  "Models.Reattach.RenamedProfilesStatus": "Kept {0} conflicting launch profile(s) under new names: {1}.",
   "Models.Reattach.NotMissingStatus": "{0} is still available at its registered path.",
   "Models.Reattach.LoadedStatus": "Unload {0} before reattaching its model file.",
   "Models.Reattach.TargetLoadedStatus": "The selected file belongs to a loaded model. Unload it before consolidating the registrations.",

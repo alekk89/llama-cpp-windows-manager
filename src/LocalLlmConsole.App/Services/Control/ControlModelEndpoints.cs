@@ -105,16 +105,13 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
         {
             var file = RequiredString(request.Body, "file");
             var inspection = await _deps.ModelCatalog.InspectReattachFileAsync(model, file, cancellationToken);
-            var active = inspection.DuplicateModels.Prepend(model).FirstOrDefault(candidate =>
-                _deps.Sessions.SessionForModel(candidate.Id) is { IsRunning: true });
-            if (active is not null)
-                throw new InvalidOperationException($"Unload '{active.Name}' before reattaching or consolidating its model registration.");
-
-            var result = await _deps.ModelCatalog.ReattachFileAsync(
+            // The loaded-state check and the update run together inside the session lifecycle gate.
+            var result = await new ModelReattachWorkflowService(_deps.ModelCatalog, _deps.Sessions).ReattachAsync(
                 model,
                 inspection,
                 request.Body?["confirmRole"]?.GetValue<bool>() ?? false,
-                request.Body?["confirmIdentityMismatch"]?.GetValue<bool>() ?? false);
+                request.Body?["confirmIdentityMismatch"]?.GetValue<bool>() ?? false,
+                cancellationToken);
             await _deps.Actions.RefreshAsync(cancellationToken);
             return Ok(new
             {
@@ -122,6 +119,13 @@ internal sealed class ControlModelEndpoints : ControlEndpointHandler
                 previousPath = model.ModelPath,
                 removedDuplicateRecords = result.RemovedDuplicateRecords,
                 movedLaunchProfiles = result.MovedLaunchProfiles,
+                renamedLaunchProfiles = result.RenamedLaunchProfiles.Select(profile => new
+                {
+                    id = profile.Id,
+                    previousName = profile.PreviousName,
+                    name = profile.Name,
+                    wasDefault = profile.WasDefault
+                }),
                 identityWarnings = result.IdentityWarnings,
                 classification = ClassificationView(result.Classification),
                 model = ModelView(
