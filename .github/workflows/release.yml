@@ -27,14 +27,15 @@ jobs:
       attestations: write
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64: ${{ secrets.RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64 }}
       RELEASE_TAG_SIGNING_FINGERPRINT: ${{ vars.RELEASE_TAG_SIGNING_FINGERPRINT }}
-      RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64: ${{ secrets.RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64 }}
       RELEASE_MANIFEST_KEY_ID: ${{ vars.RELEASE_MANIFEST_KEY_ID }}
       RELEASE_MANIFEST_PUBLIC_KEY_SPKI: ${{ vars.RELEASE_MANIFEST_PUBLIC_KEY_SPKI }}
       RELEASE_MANIFEST_NEXT_KEY_ID: ${{ vars.RELEASE_MANIFEST_NEXT_KEY_ID }}
       RELEASE_MANIFEST_NEXT_PUBLIC_KEY_SPKI: ${{ vars.RELEASE_MANIFEST_NEXT_PUBLIC_KEY_SPKI }}
       WINDOWS_EXPECTED_PUBLISHER: ${{ vars.WINDOWS_EXPECTED_PUBLISHER }}
+    # Secrets are deliberately absent from job-level env. Each secret is mapped
+    # only into the step that consumes it, so package installs, restore, build,
+    # tests, and upgrade validation never receive release credentials.
 
     steps:
       - name: Checkout exact tag
@@ -42,6 +43,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -62,13 +64,14 @@ jobs:
       - name: Verify signed annotated tag and release identity
         id: identity
         shell: pwsh
+        env:
+          RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64: ${{ secrets.RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64 }}
         run: |
           foreach ($name in @(
             "RELEASE_TAG_SIGNING_PUBLIC_KEY_BASE64",
             "RELEASE_TAG_SIGNING_FINGERPRINT",
             "RELEASE_MANIFEST_KEY_ID",
             "RELEASE_MANIFEST_PUBLIC_KEY_SPKI",
-            "RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64",
             "WINDOWS_EXPECTED_PUBLISHER")) {
             if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
               throw "$name is required for a trusted stable release."
@@ -119,9 +122,11 @@ jobs:
         env:
           SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
           SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+          RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64: ${{ secrets.RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64 }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_BASE64)) { throw "WINDOWS_SIGNING_PFX_BASE64 is required." }
           if ([string]::IsNullOrWhiteSpace($env:SIGNING_PFX_PASSWORD)) { throw "WINDOWS_SIGNING_PFX_PASSWORD is required." }
+          if ([string]::IsNullOrWhiteSpace($env:RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64)) { throw "RELEASE_MANIFEST_SIGNING_KEY_PEM_BASE64 is required." }
           $pfxPath = Join-Path $env:RUNNER_TEMP "llwm-windows-signing.pfx"
           $manifestKeyPath = Join-Path $env:RUNNER_TEMP "llwm-release-manifest-private.pem"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
