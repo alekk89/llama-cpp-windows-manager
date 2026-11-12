@@ -6,7 +6,6 @@ public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations,
 {
     private const long DownloadProgressUpdateBytes = 32L * 1024L * 1024L;
     private static readonly TimeSpan DownloadProgressUpdateInterval = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan DownloadReadIdleTimeout = TimeSpan.FromSeconds(60);
 
     private sealed record RepoInfo(
         string Repo,
@@ -40,6 +39,7 @@ public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations,
         public required string Destination { get; init; }
     }
 
+    private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(60);
     private const int RepoInfoCacheLimit = 256;
     private static readonly TimeSpan RepoInfoCacheTtl = TimeSpan.FromMinutes(30);
     private readonly HttpClient _http;
@@ -65,10 +65,19 @@ public sealed partial class HuggingFaceService : IHuggingFaceDownloadOperations,
     internal HuggingFaceService(StateStore store, JobEngine jobs, ModelCatalogService catalog, HttpMessageHandler? handler)
     {
         _http = handler is null ? new HttpClient() : new HttpClient(handler);
-        _http.Timeout = TimeSpan.FromSeconds(60);
+        _http.Timeout = DefaultRequestTimeout;
         _store = store;
         _jobs = jobs;
         _catalog = catalog;
+    }
+
+    // Tests shorten these bounds; production keeps the 60-second defaults.
+    internal TimeSpan DownloadReadIdleTimeout { get; set; } = TimeSpan.FromSeconds(60);
+
+    internal TimeSpan RequestTimeout
+    {
+        get => _http.Timeout;
+        set => _http.Timeout = value;
     }
 
     public void Dispose()
