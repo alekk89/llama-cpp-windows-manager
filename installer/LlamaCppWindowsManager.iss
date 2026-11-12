@@ -113,6 +113,9 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
+  { The Manager writes its sidecar ownership record at runtime; it is not user data. }
+  if CurUninstallStep = usPostUninstall then
+    DeleteFile(ExpandConstant('{app}\.llwm-sidecars.json'));
   if (CurUninstallStep = usPostUninstall) and DeleteAppDataOnUninstall then
     DelTree(ExpandConstant('{app}\data'), True, True, True);
 end;

@@ -8,7 +8,7 @@ namespace LocalLlmConsole.Tests;
 
 public sealed class AgentSidecarsTests : ManagerRegressionTestBase
 {
-    private static readonly Dictionary<string, byte[]> AgentSidecarFiles = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly Dictionary<string, byte[]> AgentSidecarFiles = new(StringComparer.OrdinalIgnoreCase)
     {
         ["llwmctl.exe"] = Encoding.UTF8.GetBytes("cli-binary"),
         ["AGENTS.md"] = Encoding.UTF8.GetBytes("# comprehensive agent instructions"),
@@ -52,9 +52,12 @@ public sealed class AgentSidecarsTests : ManagerRegressionTestBase
         var root = CreateTempRoot();
         try
         {
-            Directory.CreateDirectory(Path.Combine(root, "docs"));
-            File.WriteAllBytes(Path.Combine(root, "llwmctl.exe"), AgentSidecarFiles["llwmctl.exe"]);
-            File.WriteAllText(Path.Combine(root, "AGENTS.md"), "outdated");
+            var previousRelease = new Dictionary<string, byte[]>(AgentSidecarFiles, StringComparer.OrdinalIgnoreCase)
+            {
+                ["AGENTS.md"] = Encoding.UTF8.GetBytes("outdated")
+            };
+            using (var previousBundle = CreateAgentSidecarBundle(previousRelease))
+                Assert.Equal(AgentSidecarBootstrapStatus.Installed, new AgentSidecarBootstrapService().Install(previousBundle, root).Status);
             using var bundle = CreateAgentSidecarBundle();
 
             var result = new AgentSidecarBootstrapService().Install(bundle, root);
@@ -219,6 +222,7 @@ public sealed class AgentSidecarsTests : ManagerRegressionTestBase
     [InlineData(AgentSidecarBootstrapStatus.Installed, 0)]
     [InlineData(AgentSidecarBootstrapStatus.BundleUnavailable, 1)]
     [InlineData(AgentSidecarBootstrapStatus.Failed, 1)]
+    [InlineData(AgentSidecarBootstrapStatus.ForeignFilesPreserved, 1)]
     public void SidecarVerificationExitCodeReportsFailures(AgentSidecarBootstrapStatus status, int expected)
     {
         Assert.Equal(expected, AgentSidecarBootstrapService.VerificationExitCode(status));
@@ -281,7 +285,7 @@ public sealed class AgentSidecarsTests : ManagerRegressionTestBase
         Assert.DoesNotContain(@"D:\LlamaCppConsole", quickGuide, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static MemoryStream CreateAgentSidecarBundle(
+    internal static MemoryStream CreateAgentSidecarBundle(
         IReadOnlyDictionary<string, byte[]>? archiveFiles = null,
         IReadOnlyDictionary<string, byte[]>? manifestFiles = null)
     {

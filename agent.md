@@ -75,7 +75,8 @@ the user asked to operate it, start `LlamaCppWindowsManager.exe` normally, then
 retry `status`; never start a second instance.
 
 Release builds restore the matching CLI and operator documentation beside the
-application executable. Verify this without starting the UI with:
+application executable, replacing only files the Manager installed. Verify this
+without starting the UI with:
 
 ```powershell
 LlamaCppWindowsManager.exe --bootstrap-agent-sidecars-only

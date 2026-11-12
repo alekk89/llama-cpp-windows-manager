@@ -17,8 +17,8 @@ public partial class App : System.Windows.Application
                 Environment.ProcessPath ?? "",
                 AppContext.BaseDirectory,
                 verifyBundleContents: true);
-            if (sidecars.Status == AgentSidecarBootstrapStatus.Failed)
-                Trace.TraceWarning($"Agent control sidecar bootstrap failed: {sidecars.Error}");
+            if (AgentSidecarBootstrapService.DescribeProblem(sidecars) is { } problem)
+                Trace.TraceWarning(problem);
             Shutdown(AgentSidecarBootstrapService.VerificationExitCode(sidecars.Status));
             return;
         }
@@ -44,8 +44,8 @@ public partial class App : System.Windows.Application
             var result = await Task.Run(() => new AgentSidecarBootstrapService().InstallPackaged(
                 Environment.ProcessPath ?? "",
                 AppContext.BaseDirectory));
-            if (result.Status == AgentSidecarBootstrapStatus.Failed)
-                Trace.TraceWarning($"Agent control sidecar bootstrap failed: {result.Error}");
+            if (AgentSidecarBootstrapService.DescribeProblem(result) is { } problem)
+                Trace.TraceWarning(problem);
         }
         catch (Exception ex)
         {
