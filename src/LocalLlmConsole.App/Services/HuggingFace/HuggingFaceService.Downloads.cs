@@ -320,7 +320,7 @@ public sealed partial class HuggingFaceService
             output.Close();
             await CompletePartialDownloadAsync(job, file, settings, destination, partial, total, cancellationToken);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             var existing = File.Exists(partial) ? new FileInfo(partial).Length : 0;
             var knownTotal = total > 0 ? total : file.SizeBytes;
@@ -333,8 +333,32 @@ public sealed partial class HuggingFaceService
         {
             var existing = File.Exists(partial) ? new FileInfo(partial).Length : 0;
             var knownTotal = total > 0 ? total : file.SizeBytes;
-            await _jobs.UpdateAsync(job, JobStatus.Failed, JsonSerializer.Serialize(new DownloadJobPayload(file, destination, existing, knownTotal, ex.Message), JsonOptions), CancellationToken.None);
-            TryDelete(partial);
+            var transient = IsTransientDownloadFailure(ex);
+            var error = transient ? ResumableDownloadError(ex, existing) : ex.Message;
+            await _jobs.UpdateAsync(job, JobStatus.Failed, JsonSerializer.Serialize(new DownloadJobPayload(file, destination, existing, knownTotal, error), JsonOptions), CancellationToken.None);
+            // Integrity failures discard the partial; transient network/disk failures keep it so Resume continues.
+            if (!transient)
+                TryDelete(partial);
         }
+    }
+
+    // A cancellation that the worker did not request is an HttpClient timeout, not a user stop.
+    internal static bool IsTransientDownloadFailure(Exception ex)
+        => ex switch
+        {
+            InvalidDataException => false,
+            OperationCanceledException or TimeoutException => true,
+            HttpRequestException or IOException => true,
+            _ => false
+        };
+
+    private static string ResumableDownloadError(Exception ex, long partialBytes)
+    {
+        var reason = ex is OperationCanceledException or TimeoutException
+            ? "The download request timed out."
+            : ex.Message;
+        return partialBytes > 0
+            ? $"{reason} The partial download was kept; resume to continue from {partialBytes:N0} bytes."
+            : $"{reason} Resume to retry the download.";
     }
 }

@@ -272,7 +272,7 @@ llwmctl jobs resume <job-id>
 llwmctl jobs cancel <job-id>
 ```
 
-The existing Manager download pipeline remains responsible for filename safety, byte-count/SHA-256 validation, resumable partials, companion projector discovery, registration, launch-profile suggestions, and UI/job updates. Generic `jobs pause|resume|cancel` commands apply only to Hugging Face download jobs. Runtime-build, runtime-package, and unknown job kinds return HTTP `409` without changing stored job state; use their matching runtime operations instead.
+The existing Manager download pipeline remains responsible for filename safety, byte-count/SHA-256 validation, resumable partials, companion projector discovery, registration, launch-profile suggestions, and UI/job updates. A network stall, connection reset, server error, or request timeout marks the job `Failed` but keeps its partial file, and the error says how many bytes `jobs resume` will continue from; only `jobs cancel` reports `Cancelled`. Size, SHA-256, or `Content-Range` mismatches still discard the partial. Generic `jobs pause|resume|cancel` commands apply only to Hugging Face download jobs. Runtime-build, runtime-package, and unknown job kinds return HTTP `409` without changing stored job state; use their matching runtime operations instead.
 
 ## Benchmarks
 
