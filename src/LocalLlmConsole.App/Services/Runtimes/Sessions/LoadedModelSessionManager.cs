@@ -347,11 +347,16 @@ public sealed partial class LoadedModelSessionManager : IDisposable
         }
     }
 
-    public int RemoveFailedOrStopped()
+    /// <summary>
+    /// Removes sessions whose runtime exited without a requested stop. Supervisors are
+    /// stopped and disposed asynchronously after the state lock is released, because WSL
+    /// cleanup runs <c>wsl.exe</c> and must never block the UI thread.
+    /// </summary>
+    public async Task<int> RemoveFailedOrStoppedAsync()
     {
+        List<LoadedModelSession> removed = [];
         lock (_stateLock)
         {
-            var removed = 0;
             foreach (var session in _sessions.Values.Where(session => !session.IsStopping && !session.Supervisor.IsRunning).ToArray())
             {
                 _sessions.Remove(session.SessionId);
@@ -360,12 +365,25 @@ public sealed partial class LoadedModelSessionManager : IDisposable
                     : $"[{DiagnosticErrorCodes.SessionUnexpectedExit}] Runtime process is no longer running. Create a diagnostics bundle from Logs if this repeats.";
                 AddRecentlyStoppedLocked(session, exit, LoadedModelSessionStatus.Failed);
                 RecordEventLocked(session, ToSnapshotLocked(session).Status.ToString(), "failed", "process-supervisor", "LLWM-SESSION-UNEXPECTED-EXIT", "unexpected", "not-applicable", "not-requested");
-                session.Supervisor.Dispose();
-                removed++;
+                removed.Add(session);
             }
             if (!string.IsNullOrWhiteSpace(_selectedSessionId) && !_sessions.ContainsKey(_selectedSessionId))
                 _selectedSessionId = _sessions.Keys.FirstOrDefault() ?? "";
-            return removed;
+        }
+        foreach (var session in removed)
+            await DisposeSupervisorAsync(session.Supervisor).ConfigureAwait(false);
+        return removed.Count;
+    }
+
+    private static async Task DisposeSupervisorAsync(LlamaProcessSupervisor supervisor)
+    {
+        try
+        {
+            await supervisor.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Could not release an exited llama runtime session: {ex.Message}");
         }
     }
 
@@ -399,17 +417,18 @@ public sealed partial class LoadedModelSessionManager : IDisposable
 
     public void Dispose()
     {
+        LlamaProcessSupervisor[] supervisors;
         lock (_stateLock)
         {
             if (_disposed) return;
             _disposed = true;
-            foreach (var session in _sessions.Values)
-                session.Supervisor.Dispose();
+            supervisors = [.. _sessions.Values.Select(session => session.Supervisor), _inactiveSupervisor];
             _sessions.Clear();
             _recentlyStopped.Clear();
             _diagnosticEvents.Clear();
-            _inactiveSupervisor.Dispose();
         }
+        foreach (var supervisor in supervisors)
+            supervisor.Dispose();
         _lifecycleGate.Dispose();
     }
 
