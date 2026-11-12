@@ -47,7 +47,11 @@ separate issue PRs.
 3. Open a focused release PR linked to the planning issue. Set the version,
    collect the completed entries from `docs/releases/unreleased` into
    `docs/releases/v<version>.md`, and update release-specific metadata or baseline
-   expectations when needed. Remove only the entries included in those notes;
+   expectations when needed. After each stable release is published, add its
+   `tests/release-baselines/v<version>.json` (asset sizes and SHA-256 values) and
+   point the upgrade and portable-update script defaults at it, so the next
+   release validates the update path from the latest published version.
+   Remove only the entries included in those notes;
    retain the unreleased directory's README. Keep unrelated implementation out
    of the release PR.
 4. Select the exact merged commit as the release candidate. Validate the combined

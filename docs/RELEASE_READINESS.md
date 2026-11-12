@@ -639,11 +639,14 @@ artifacts still require clean-machine installer install, repair, uninstall, and
 pinned previous-version upgrade validation. Installer compilation is not proof
 of installer lifecycle success.
 
-The default installer and portable upgrade baseline is now the published v2.6.0
+The default installer and portable upgrade baseline is now the published v2.8.0
 release, with asset sizes and SHA-256 values pinned in
-`tests/release-baselines/v2.6.0.json`. The earlier v2.4.0 baseline remains available
-for explicit compatibility runs. Changing the baseline does not itself validate
-an upgrade. The installer fallback version matches the 2.7.0 app and CLI.
+`tests/release-baselines/v2.8.0.json`. v2.8.0 publishes a standalone portable EXE
+instead of a ZIP, so its baseline uses `portableExecutable`; the portable-update
+test bootstraps that EXE's embedded `llwmctl.exe` before applying the candidate.
+The earlier v2.6.0 (portable ZIP) and v2.4.0 baselines remain available for
+explicit compatibility runs. Changing the baseline does not itself validate an
+upgrade. The installer fallback version matches the app and CLI project version.
 
 The candidate contains uncommitted and required untracked source files. Integrate
 all intended files, then rerun the release gate from a clean checkout. Signing
