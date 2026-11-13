@@ -65,6 +65,7 @@ public partial class MainWindow
         var panel = _launchSettingsPanel.FormControls.RuntimeOptions;
         var runtime = _launchSettingsPanel.RuntimeCombo?.SelectedItem as RuntimeChoice;
         if (panel is null) return;
+        ApplyRuntimeAdvertisedChoices(null);
         if (runtime is null)
         {
             panel.SetNoRuntime();
@@ -93,10 +94,11 @@ public partial class MainWindow
         var runtimeId = runtime.Id;
         try
         {
-            var options = await _runtimeLaunchOptionDiscovery.DiscoverAsync(runtime, _settings.WslDistro, cancellationToken);
+            var options = await _runtimeLaunchOptionDiscovery.DiscoverAllAsync(runtime, _settings.WslDistro, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (!string.Equals(runtimeId, SelectedLaunchRuntimeId(), StringComparison.OrdinalIgnoreCase)) return;
-            panel.SetOptions(options, runtime.DisplayName);
+            panel.SetOptions(options.Where(RuntimeLaunchOptionPolicy.CanRender).ToArray(), runtime.DisplayName);
+            ApplyRuntimeAdvertisedChoices(options);
             UpdateRuntimeCommandPreview();
         }
         catch (Exception ex) when (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
@@ -108,6 +110,8 @@ public partial class MainWindow
             UpdateRuntimeCommandPreview();
         }
     }
+
+    private void ApplyRuntimeAdvertisedChoices(IReadOnlyList<RuntimeLaunchOptionDefinition>? options) => _coreServices.Ui.LaunchSettingsEditor.RunProgrammaticUpdate(() => LaunchSettingsFormBinder.ApplyRuntimeAdvertisedChoices(_launchSettingsPanel.FormControls, options));
 
     private void UpdateRuntimeCommandPreview()
     {
