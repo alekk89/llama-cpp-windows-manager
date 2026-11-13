@@ -23,6 +23,13 @@ public static class ModelGatewayRequestResolver
     public static bool IsProxiedPostPath(string path)
         => ProxiedPostPaths.Contains(path);
 
+    // Audio transcription and image edit requests are multipart/form-data;
+    // their model is a form field rather than a JSON property.
+    public static string ExtractRequestedModel(byte[] body, string? contentType)
+        => ModelGatewayMultipartFormReader.TryGetBoundary(contentType, out var boundary)
+            ? ModelGatewayMultipartFormReader.ReadTextField(body, boundary, "model")
+            : ExtractRequestedModel(body);
+
     public static string ExtractRequestedModel(byte[] body)
     {
         if (body.Length == 0) return "";
@@ -70,6 +77,13 @@ public static class ModelGatewayRequestResolver
             ?? models.FirstOrDefault(model => string.Equals(Path.GetFileName(model.ModelPath), requested, StringComparison.OrdinalIgnoreCase))
             ?? models.FirstOrDefault(model => string.Equals(Path.GetFileNameWithoutExtension(model.ModelPath), requested, StringComparison.OrdinalIgnoreCase));
     }
+
+    // Multipart bodies are forwarded byte-for-byte; rewriting a form field would
+    // require re-encoding file parts, so only JSON bodies receive alias rewriting.
+    public static byte[] BodyForRuntime(byte[] body, AppSettings launchSettings, string? contentType)
+        => ModelGatewayMultipartFormReader.IsMultipartFormData(contentType)
+            ? body
+            : BodyForRuntime(body, launchSettings);
 
     public static byte[] BodyForRuntime(byte[] body, AppSettings launchSettings)
     {
