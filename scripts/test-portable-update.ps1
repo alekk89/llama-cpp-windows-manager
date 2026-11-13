@@ -22,6 +22,19 @@ function Test-CertificatePublisher {
   return [string]::Equals($simpleName, $Publisher, [StringComparison]::OrdinalIgnoreCase) -or
     [string]::Equals($Certificate.Subject, $Publisher, [StringComparison]::OrdinalIgnoreCase)
 }
+function Remove-TestRootWithRetry([string] $Path) {
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    try {
+      Remove-Item -LiteralPath $Path -Recurse -Force
+      return
+    } catch {
+      if ($attempt -ge 19) { throw }
+      Start-Sleep -Milliseconds 250
+    }
+  }
+}
+
 $RepoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $CandidateExe = [IO.Path]::GetFullPath($CandidateExePath)
 $BaselineFile = [IO.Path]::GetFullPath((Join-Path $RepoRoot $BaselinePath))
@@ -140,6 +153,6 @@ try {
 finally {
   $resolved = [IO.Path]::GetFullPath($testRoot)
   if (($resolved + '\').StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolved)) {
-    Remove-Item -LiteralPath $resolved -Recurse -Force
+    Remove-TestRootWithRetry $resolved
   }
 }
