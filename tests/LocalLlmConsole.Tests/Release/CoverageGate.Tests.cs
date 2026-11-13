@@ -78,7 +78,7 @@ public sealed class CoverageGateTests : ManagerRegressionTestBase
         var error = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
         try
         {
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(120), TestContext.Current.CancellationToken);
             return (process.ExitCode, await output + await error);
         }
         finally

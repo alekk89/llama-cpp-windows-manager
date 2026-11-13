@@ -34,21 +34,24 @@ public abstract partial class WpfUiTestBase
         Assert.Equal(6, page.Controls.CalendarMetric.Items.Count);
         Assert.NotNull(page.Controls.GpuEnergyValue);
         Assert.NotNull(page.Controls.GpuEnergyDetail);
+        // A fixed midday instant keeps the 10-minute-old bucket inside the one-day range
+        // regardless of when the test runs (it previously failed just after UTC midnight).
+        var now = new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.Zero);
         var energyReport = new UsageMetricsService().BuildReport(
             new UsageMetricsQuery(UsageMetricsRange.OneDay),
             [],
             [],
             UsageMetricDimensions.Empty,
-            DateTimeOffset.UtcNow,
+            now,
             TimeZoneInfo.Utc,
             energyBuckets:
             [
-                new GpuEnergyBucket(DateTimeOffset.UtcNow.AddMinutes(-10), 1250, 600, true, 2, 2, DateTimeOffset.UtcNow)
+                new GpuEnergyBucket(now.AddMinutes(-10), 1250, 600, true, 2, 2, now)
             ],
             energyDeviceBuckets:
             [
-                new GpuEnergyDeviceBucket(DateTimeOffset.UtcNow.AddMinutes(-10), "GPU 0: NVIDIA", 0, "NVIDIA", 750, 600, DateTimeOffset.UtcNow),
-                new GpuEnergyDeviceBucket(DateTimeOffset.UtcNow.AddMinutes(-10), "GPU 1: AMD", 1, "AMD", 500, 600, DateTimeOffset.UtcNow)
+                new GpuEnergyDeviceBucket(now.AddMinutes(-10), "GPU 0: NVIDIA", 0, "NVIDIA", 750, 600, now),
+                new GpuEnergyDeviceBucket(now.AddMinutes(-10), "GPU 1: AMD", 1, "AMD", 500, 600, now)
             ],
             electricityTariff: new ElectricityTariff("GBP", .30, .30, new TimeOnly(0, 0), new TimeOnly(7, 0)));
         var lifetimeState = new LifetimePageState();

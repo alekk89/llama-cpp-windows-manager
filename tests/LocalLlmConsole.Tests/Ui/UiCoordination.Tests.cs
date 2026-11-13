@@ -213,8 +213,16 @@ public sealed class UiCoordinationTests : ManagerRegressionTestBase
         Assert.Equal(1, calls);
 
         release.SetResult();
-        await Task.Delay(10, TestContext.Current.CancellationToken);
-        await timerFactory.Timers[0].FireAsync();
+        // The controller clears its in-flight flag on a thread-pool continuation after the
+        // first refresh completes. Keep ticking until it accepts the next refresh rather than
+        // assuming that continuation finishes within a fixed delay on a loaded machine.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (Volatile.Read(ref calls) < 2 && DateTime.UtcNow < deadline)
+        {
+            await timerFactory.Timers[0].FireAsync();
+            if (Volatile.Read(ref calls) < 2)
+                await Task.Delay(5, TestContext.Current.CancellationToken);
+        }
         Assert.Equal(2, calls);
     }
 

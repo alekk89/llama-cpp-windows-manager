@@ -75,7 +75,9 @@ public sealed class PackageAuditPolicyTests : ManagerRegressionTestBase
         var error = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
         try
         {
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+            // Windows PowerShell cold start under coverage on a shared CI runner can exceed 20 s;
+            // the bound only guards against a hung process.
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(120), TestContext.Current.CancellationToken);
             return (process.ExitCode, await output + await error);
         }
         finally
