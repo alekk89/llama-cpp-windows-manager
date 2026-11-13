@@ -1,8 +1,32 @@
 namespace LocalLlmConsole.Services;
 
+public static class RuntimePackageChecksumStatus
+{
+    /// <summary>Every downloaded asset matched a published SHA-256 digest.</summary>
+    public const string Verified = "verified";
+
+    /// <summary>The release published no SHA-256 metadata and the user chose to install without it.</summary>
+    public const string SkippedByUser = "skipped-by-user";
+
+    public static string Combine(IEnumerable<string> statuses)
+    {
+        ArgumentNullException.ThrowIfNull(statuses);
+        return statuses.All(status => status == Verified) ? Verified : SkippedByUser;
+    }
+
+    public static string Describe(string status)
+        => status switch
+        {
+            Verified => "Verified against the published SHA-256 digest",
+            SkippedByUser => "Not verified: the release published no SHA-256 digest and installation without verification was confirmed",
+            _ => status
+        };
+}
+
 public static class RuntimePackageAssetVerifier
 {
-    public static async Task VerifyAsync(
+    /// <summary>Verifies size and SHA-256 and returns the resulting <see cref="RuntimePackageChecksumStatus"/>.</summary>
+    public static async Task<string> VerifyAsync(
         HttpClient client,
         RuntimePackageAsset asset,
         string assetPath,
@@ -30,26 +54,17 @@ public static class RuntimePackageAssetVerifier
         {
             if (requireChecksum)
                 throw new InvalidOperationException($"Runtime package asset {asset.Name} is missing SHA-256 verification metadata.");
-            return;
+            return RuntimePackageChecksumStatus.SkippedByUser;
         }
 
         var actual = await ComputeSha256Async(assetPath, cancellationToken);
         if (!CryptographicOperations.FixedTimeEquals(Convert.FromHexString(expected), Convert.FromHexString(actual)))
             throw new InvalidOperationException($"Runtime package checksum mismatch for {asset.Name}. Expected SHA-256 {expected}, found {actual}.");
+        return RuntimePackageChecksumStatus.Verified;
     }
 
     public static string ExtractSha256(string checksumText, string assetName = "")
-    {
-        foreach (var line in (checksumText ?? "").Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            var match = Regex.Match(line, @"(?i)\b(?:sha256:)?(?<hash>[a-f0-9]{64})\b");
-            if (!match.Success) continue;
-            if (string.IsNullOrWhiteSpace(assetName) || line.Contains(assetName, StringComparison.OrdinalIgnoreCase))
-                return match.Groups["hash"].Value.ToLowerInvariant();
-        }
-
-        return "";
-    }
+        => Sha256ChecksumFile.FindSha256(checksumText, assetName);
 
     public static string NormalizeSha256(string value)
         => Sha256Digest.NormalizeHexOrAlgorithmPrefix(value);

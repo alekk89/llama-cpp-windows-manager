@@ -12,10 +12,11 @@ public static class RuntimePackageInstallFileService
     public static string DownloadCacheDir(string cacheRoot, RuntimePackageSelection selection)
         => Path.Combine(cacheRoot, "runtime-packages", selection.Preset.Id, ModelCatalogService.SafeId(selection.ReleaseTag));
 
-    public static async Task DownloadAssetAsync(HttpClient client, RuntimePackageAsset asset, string destination, CancellationToken cancellationToken = default)
+    public static async Task<string> DownloadAssetAsync(HttpClient client, RuntimePackageAsset asset, string destination, CancellationToken cancellationToken = default)
         => await DownloadAssetAsync(client, asset, destination, requireChecksum: true, cancellationToken);
 
-    public static async Task DownloadAssetAsync(HttpClient client, RuntimePackageAsset asset, string destination, bool requireChecksum, CancellationToken cancellationToken = default)
+    /// <summary>Downloads and verifies one asset, returning its <see cref="RuntimePackageChecksumStatus"/>.</summary>
+    public static async Task<string> DownloadAssetAsync(HttpClient client, RuntimePackageAsset asset, string destination, bool requireChecksum, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(destination) ?? ".");
         using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
@@ -48,7 +49,7 @@ public static class RuntimePackageInstallFileService
                 if (downloaded != maximumBytes)
                     throw new InvalidOperationException($"Runtime package size mismatch for {asset.Name}. Expected {maximumBytes:N0} bytes, received {downloaded:N0} bytes.");
             }
-            await RuntimePackageAssetVerifier.VerifyAsync(client, asset, destination, requireChecksum, cancellationToken);
+            return await RuntimePackageAssetVerifier.VerifyAsync(client, asset, destination, requireChecksum, cancellationToken);
         }
         catch
         {
@@ -108,8 +109,16 @@ public static class RuntimePackageInstallFileService
         return folder;
     }
 
-    public static async Task StampManagedMetadataAsync(string runtimeFolder, string installRoot, RuntimePackageSelection selection, CancellationToken cancellationToken = default)
+    public static async Task StampManagedMetadataAsync(
+        string runtimeFolder,
+        string installRoot,
+        RuntimePackageSelection selection,
+        IReadOnlyDictionary<string, string> assetChecksumStatuses,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(assetChecksumStatuses);
+        string AssetStatus(RuntimePackageAsset asset)
+            => assetChecksumStatuses.TryGetValue(asset.Name, out var status) ? status : RuntimePackageChecksumStatus.SkippedByUser;
         var metadata = new JsonObject
         {
             ["name"] = selection.Preset.Label,
@@ -128,7 +137,7 @@ public static class RuntimePackageInstallFileService
             ["publishedAt"] = selection.PublishedAt.ToString("O"),
             ["downloadedAt"] = DateTimeOffset.UtcNow.ToString("O"),
             ["runtimeVersion"] = selection.ReleaseTag,
-            ["checksumStatus"] = "verified",
+            ["checksumStatus"] = RuntimePackageChecksumStatus.Combine(selection.AllAssets.Select(AssetStatus)),
             ["signatureStatus"] = "not-provided",
             ["installRoot"] = Path.GetFullPath(installRoot),
             ["managedInstalledAt"] = DateTimeOffset.UtcNow.ToString("O")
@@ -143,7 +152,8 @@ public static class RuntimePackageInstallFileService
                 ["downloadUrl"] = asset.DownloadUrl,
                 ["sizeBytes"] = asset.SizeBytes,
                 ["sha256"] = asset.Sha256,
-                ["checksumUrl"] = asset.ChecksumUrl
+                ["checksumUrl"] = asset.ChecksumUrl,
+                ["checksumStatus"] = AssetStatus(asset)
             });
         }
         metadata["assets"] = assets;

@@ -221,7 +221,7 @@ public static class RuntimeInstallationVerificationService
         AddDetail(detailLines, "Assets", string.Join(", ", assetNames));
         AddDetail(detailLines, "Source", sourceUrl);
         AddDetail(detailLines, "SHA-256", string.Join(", ", hashes));
-        AddDetail(detailLines, "Checksum status", metadata?["checksumStatus"]?.ToString() ?? "");
+        AddDetail(detailLines, "Checksum status", RuntimePackageChecksumStatus.Describe(metadata?["checksumStatus"]?.ToString() ?? ""));
         AddDetail(detailLines, "Signature status", metadata?["signatureStatus"]?.ToString() ?? "");
         AddDetail(detailLines, "Downloaded", DisplayTimestamp(downloadedAt));
         AddDetail(detailLines, "Installed", DisplayTimestamp(installedAt));

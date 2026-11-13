@@ -614,7 +614,10 @@ Current:
 19. Treat `master` and latest-release endpoints as discovery channels rather than
     mutable installed identities. A downloaded source records its resolved Git
     commit; a package records its release tag, published target, selected assets,
-    verified asset checksums, and a local installed-file integrity baseline that
+    verified asset checksums (or `skipped-by-user` when the release published
+    no SHA-256 digest and the user confirmed installation without one; companion
+    checksum files must name the exact asset file), and a local installed-file
+    integrity baseline that
     detects changed, missing, and unexpected files without claiming publisher
     authentication. Existing installations remain pinned until the user
     explicitly updates them.

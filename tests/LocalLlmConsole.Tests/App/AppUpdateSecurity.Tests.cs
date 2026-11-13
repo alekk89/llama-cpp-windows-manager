@@ -132,6 +132,21 @@ public sealed class AppUpdateSecurityTests : ManagerRegressionTestBase
         Assert.Equal("", unrelated);
     }
 
+    [Theory]
+    [InlineData("{0}  LlamaCppWindowsManager.exe.old\n{1}  LlamaCppWindowsManager.exe\n", true)]
+    [InlineData("{0}  Old-LlamaCppWindowsManager.exe\n{1}  ./dist/LlamaCppWindowsManager.exe\n", true)]
+    [InlineData("SHA256 (LlamaCppWindowsManager.exe.sig) = {0}\nSHA256 (LlamaCppWindowsManager.exe) = {1}\n", true)]
+    [InlineData("{1}\n", true)]
+    [InlineData("{0}  LlamaCppWindowsManager.exe.old\n{0}  Old-LlamaCppWindowsManager.exe\n", false)]
+    public void AppUpdateChecksumLookupUsesTheExactAssetName(string template, bool found)
+    {
+        var other = new string('a', 64);
+        var target = new string('b', 64);
+        var text = string.Format(System.Globalization.CultureInfo.InvariantCulture, template, other, target);
+
+        Assert.Equal(found ? target : "", AppUpdateAssetVerifier.ExtractSha256(text, "LlamaCppWindowsManager.exe"));
+    }
+
     [Fact]
     public void AuthenticodeSignerIdentityRequiresExactPublisherAndCertificate()
     {
