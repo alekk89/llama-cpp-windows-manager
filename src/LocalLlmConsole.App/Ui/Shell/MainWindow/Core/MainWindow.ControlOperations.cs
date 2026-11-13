@@ -107,7 +107,7 @@ public partial class MainWindow
     {
         if (dryRun) return new { action = restart ? "restart" : "stop", enabled = _settings.AutoLoadGatewayEnabled, port = _settings.AutoLoadGatewayPort };
         var result = restart ? await RestartModelGatewayAsync() : await StopGatewayForControlAsync();
-        return new { action = restart ? "restart" : "stop", applied = result };
+        return ControlOperationFailure.GatewayResult(restart, result, _settings.AutoLoadGatewayEnabled, _settings.AutoLoadGatewayPort);
     }
 
     private async Task<bool> StopGatewayForControlAsync()

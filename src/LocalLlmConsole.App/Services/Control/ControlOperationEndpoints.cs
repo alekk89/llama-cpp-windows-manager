@@ -27,6 +27,16 @@ internal sealed class ControlOperationEndpoints : ControlEndpointHandler
             throw new InvalidOperationException($"Operation '{operation.Name}' requires confirm=true. Run it with dryRun=true first when consequences are unclear.");
 
         var result = await _deps.Actions.ExecuteOperationAsync(operation.Name, body, cancellationToken);
+        if (result is ControlOperationFailure failure)
+            return new LocalControlApiResponse(ControlOperationFailure.StatusCode, new
+            {
+                ok = false,
+                operation = operation.Name,
+                dryRun,
+                outcome = failure.Outcome,
+                error = failure.Error,
+                result = failure.Result
+            });
         return Ok(new { ok = true, operation = operation.Name, dryRun, result });
     }
 }
