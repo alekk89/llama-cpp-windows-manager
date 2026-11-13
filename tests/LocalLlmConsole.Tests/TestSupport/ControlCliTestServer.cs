@@ -52,8 +52,11 @@ public abstract partial class ManagerRegressionTestBase
                     context.Response.Close();
                 }
             }
-            catch (Exception ex) when (ex is HttpListenerException or ObjectDisposedException && Volatile.Read(ref stopping) == 1)
+            catch (Exception) when (Volatile.Read(ref stopping) == 1)
             {
+                // Stop() can race the accept: depending on timing it surfaces as
+                // HttpListenerException, ObjectDisposedException, or an invalid-handle
+                // ArgumentException. Failures before teardown still propagate.
             }
         }, TestContext.Current.CancellationToken);
 
