@@ -168,6 +168,10 @@ The OpenAI-compatible gateway is separate from the control API. When enabled, qu
 The gateway authenticates this catalog and all inference requests. Direct
 llama.cpp inference also requires the configured model API key, although some
 upstream builds expose health or model-catalog metadata without authentication.
+Requests carrying a browser `Origin` header are rejected with HTTP `403`, including
+preflight `OPTIONS`, unless the origin is a loopback `http`/`https` origin or the
+gateway is in a LAN mode, which always requires the API key. Requests without
+`Origin` are unaffected.
 
 - The default profile uses the model id.
 - A named profile uses `<model-id>--<profile-id>`, with the profile segment normalized for use in a URL/model field. If two stored ids normalize to the same value, each route receives a deterministic hash suffix.

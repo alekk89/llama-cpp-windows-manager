@@ -107,6 +107,16 @@ That URL reservation permission and the Windows Firewall rule are separate;
 both may be required for LAN access. API-key authentication remains required
 regardless of either permission.
 
+Browser requests are checked by their `Origin` header before any model is
+loaded. Requests without `Origin`, such as SDKs, scripts, and server-side
+harnesses, are unaffected. In **Local only** and **Direct models LAN only**
+modes, the gateway accepts only loopback `http`/`https` origins such as
+`http://localhost:5173`; any other browser origin, including preflight
+`OPTIONS` requests and opaque `null` origins, receives HTTP `403`. Gateway LAN
+modes always require the API key and keep accepting any `http`/`https` browser
+origin that presents it. Upstream llama-server responses cannot replace the
+gateway's CORS, `Vary`, or `Cache-Control` headers.
+
 The Manager control API is independent: always loopback-only with its own
 protected token. Do not expose its discovery file. Host, Origin, request-size,
 and bearer-token checks remain fail-secure. See [CONTROL_API.md](CONTROL_API.md).
