@@ -99,6 +99,31 @@ public sealed class ProfileTransferTests : ManagerRegressionTestBase
     }
 
     [Fact]
+    public async Task KeepBothShortensMaximumLengthNamesBeforeAddingTheSuffix()
+    {
+        var root = CreateTempRoot();
+        await using var store = new StateStore(Path.Combine(root, "state.db")); await store.InitializeAsync();
+        using var sessions = CreateLoadedModelSessionManager();
+        var (model, settings) = await SeedAsync(store, root);
+        var workflow = new ProfileTransferWorkflowService(store, sessions);
+        var bundle = await workflow.ExportAsync(model);
+        var longName = new string('n', 195) + "abcde";
+        var profile = bundle.Profiles[0] with { Name = longName };
+        bundle = bundle with { Profiles = [profile, profile, profile] };
+
+        var preview = await workflow.PreviewAsync(model, bundle, settings);
+
+        Assert.True(preview.CanApply);
+        Assert.Equal(new[] { longName, longName[..196] + " (2)", longName[..196] + " (3)" }, preview.Rows.Select(row => row.Name));
+        Assert.All(preview.Rows, row => Assert.True(row.Name.Length <= 200));
+        var imported = await workflow.ApplyAsync(model, bundle, settings, [], preview);
+        Assert.All(imported, saved => Assert.True(saved.Name.Length <= 200));
+        Assert.Equal("ab (2)", ProfileTransferWorkflowService.KeepBothName("ab", 2));
+        Assert.Equal(new string('x', 194) + " (100)", ProfileTransferWorkflowService.KeepBothName(new string('x', 200), 100));
+        Assert.Equal(new string('x', 195) + " (2)", ProfileTransferWorkflowService.KeepBothName(new string('x', 195) + "😀" + "yy", 2));
+    }
+
+    [Fact]
     public async Task ReplacePreservesDefaultIdStartupAndGroupReferencesAndNotes()
     {
         var root = CreateTempRoot();

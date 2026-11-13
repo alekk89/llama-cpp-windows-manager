@@ -13,7 +13,7 @@ public static class ControlRequestBodyReader
         ArgumentNullException.ThrowIfNull(encoding);
         if (maximumBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         if (contentLength > maximumBytes)
-            throw BodyTooLarge();
+            throw BodyTooLarge(maximumBytes);
 
         var initialCapacity = contentLength is > 0 and <= int.MaxValue
             ? (int)Math.Min(contentLength, maximumBytes)
@@ -27,7 +27,7 @@ public static class ControlRequestBodyReader
             if (count == 0) break;
             totalBytes = checked(totalBytes + count);
             if (totalBytes > maximumBytes)
-                throw BodyTooLarge();
+                throw BodyTooLarge(maximumBytes);
             await body.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
         }
 
@@ -43,6 +43,8 @@ public static class ControlRequestBodyReader
                ?? throw new InvalidOperationException("Control API request body must be a JSON object.");
     }
 
-    private static InvalidOperationException BodyTooLarge()
-        => new("Control API request bodies are limited to 1 MiB.");
+    private static InvalidOperationException BodyTooLarge(int maximumBytes)
+        => new(maximumBytes % (1024 * 1024) == 0
+            ? $"This control API request body is limited to {maximumBytes / (1024 * 1024)} MiB."
+            : $"This control API request body is limited to {maximumBytes} bytes.");
 }

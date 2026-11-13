@@ -23,7 +23,7 @@ At startup the Manager writes a discovery document to:
 <workspace>\state\control.json
 ```
 
-The document contains the current process ID, selected localhost port, workspace, and a DPAPI-protected per-process bearer token. The files are removed on normal shutdown. The control listener binds only to `127.0.0.1`, checks the `Host` and browser `Origin`, requires authentication for `/api/*` except health, limits JSON bodies to 1 MiB, and never uses the model-serving API key as its control credential.
+The document contains the current process ID, selected localhost port, workspace, and a DPAPI-protected per-process bearer token. The files are removed on normal shutdown. The control listener binds only to `127.0.0.1`, checks the `Host` and browser `Origin`, requires authentication for `/api/*` except health, limits JSON bodies to 1 MiB (25 MiB for profile import, see below), and never uses the model-serving API key as its control credential.
 
 Override discovery when necessary:
 
@@ -551,7 +551,11 @@ Each profile has `name`, `settings`, optional `runtime` hints (`name`, `backend`
 to text). Settings use camelCase launch field names, excluding runtimeId. JSONC
 comments and trailing commas are accepted. Comments themselves are not retained;
 annotations persist through saves and re-export. Files are limited to 4 MiB and
-100 profiles. Bundles exclude model binaries, credentials, startup/favourite/group
+100 profiles. Because the import request carries the bundle as an escaped JSON
+string, the import route alone accepts request bodies up to 25 MiB
+(`profileTransfer.maximumImportRequestBytes` in capabilities); the bundle text
+itself must still fit `profileTransfer.maximumBytes`. Keep both names that would
+exceed 200 characters with their ` (n)` suffix are shortened before the suffix. Bundles exclude model binaries, credentials, startup/favourite/group
 preferences and general app settings. Blank host continues to inherit the app's
 default; explicit hosts remain subject to the app's LAN policy.
 

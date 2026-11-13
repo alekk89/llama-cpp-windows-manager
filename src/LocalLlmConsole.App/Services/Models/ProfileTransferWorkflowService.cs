@@ -65,7 +65,7 @@ public sealed partial class ProfileTransferWorkflowService
             if (choice.Action == ProfileConflictAction.KeepBoth)
             {
                 var stem = name;
-                for (var suffix = 2; usedNames.Contains(name); suffix++) name = $"{stem} ({suffix})";
+                for (var suffix = 2; usedNames.Contains(name); suffix++) name = KeepBothName(stem, suffix);
             }
             else if (replace is null && usedNames.Contains(name)) errors.Add("Duplicate name in this import.");
             usedNames.Add(name);
@@ -112,6 +112,16 @@ public sealed partial class ProfileTransferWorkflowService
             row.Annotations ?? new ProfileAnnotations())).ToArray();
         await _store.ApplyProfileImportAsync(model.Id, current.CatalogRevision, imported);
         return imported;
+    }
+
+    /// <summary>Appends " (n)" while keeping the result within the 200-character profile name limit.</summary>
+    internal static string KeepBothName(string stem, int suffix)
+    {
+        const int maximumNameLength = 200;
+        var tail = $" ({suffix})";
+        var head = stem.Length + tail.Length <= maximumNameLength ? stem : stem[..(maximumNameLength - tail.Length)];
+        if (head.Length > 0 && char.IsHighSurrogate(head[^1])) head = head[..^1];
+        return head.TrimEnd() + tail;
     }
 
     private static ProfileModelHint ModelHint(ModelRecord model)
