@@ -1244,7 +1244,7 @@
   "Help.Article.updates-and-recovery.Title": "Updates, logs, and recovery",
   "Help.Article.updates-and-recovery.Summary": "Updates preserve application data and verify staged artifacts before replacement.",
   "Help.Article.updates-and-recovery.Detail.1": "Installer update, repair, and normal uninstall preserve data unless removal is explicitly selected.",
-  "Help.Article.updates-and-recovery.Detail.2": "A portable update verifies its signed manifest, publisher and checksum. The helper acknowledges verified staging before the Manager closes, and incomplete replacement rolls back.",
+  "Help.Article.updates-and-recovery.Detail.2": "A portable update verifies its signed manifest, publisher and checksum. The helper acknowledges verified staging before the Manager closes, and incomplete replacement rolls back, restarts the previous version and explains the failure on startup.",
   "Help.Article.updates-and-recovery.Detail.3": "Use Logs for app, runtime, job, and bounded redacted Control API activity.",
   "Help.Article.updates-and-recovery.Action.1": "Check Updates",
   "Help.Article.updates-and-recovery.Action.2": "Open Logs",

@@ -1029,7 +1029,7 @@
   "Help.Article.updates-and-recovery.Action.2": "Otevřít logy",
   "Help.Article.updates-and-recovery.Action.3": "Otevřít Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "Aktualizace, oprava a běžná odinstalace instalátoru zachovávají data, pokud není výslovně vybráno odstranění.",
-  "Help.Article.updates-and-recovery.Detail.2": "Přenositelná aktualizace vyžaduje odpovídající soubor SHA-256 companion a v případě neúplné nahrazení provede rollback.",
+  "Help.Article.updates-and-recovery.Detail.2": "Přenositelná aktualizace ověřuje podepsaný manifest, vydavatele a kontrolní součet. Pomocník potvrdí ověřenou přípravu před zavřením Manageru a při neúplném nahrazení provede rollback, znovu spustí předchozí verzi a při spuštění vysvětlí chybu.",
   "Help.Article.updates-and-recovery.Detail.3": "Pro aktivitu aplikace, runtime, úlohy a omezené redigované Control API použijte logy.",
   "Help.Article.updates-and-recovery.Summary": "Aktualizace zachovávají data aplikace a ověřují připravené artefakty před nahrazením.",
   "Help.Article.updates-and-recovery.Title": "Aktualizace, logy a obnovování",

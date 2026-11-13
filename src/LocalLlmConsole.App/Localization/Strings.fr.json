@@ -1040,7 +1040,7 @@
   "Help.Article.updates-and-recovery.Action.2": "Ouvrir les journaux",
   "Help.Article.updates-and-recovery.Action.3": "Ouvrir Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "La mise à jour, la réparation et la désinstallation normale de l'installateur préservent les données, sauf si la suppression est explicitement sélectionnée.",
-  "Help.Article.updates-and-recovery.Detail.2": "Une mise à jour portable nécessite son compagnon SHA-256 correspondant et revient en arrière en cas de remplacement incomplet.",
+  "Help.Article.updates-and-recovery.Detail.2": "Une mise à jour portable vérifie son manifeste signé, l'éditeur et la somme de contrôle. L'assistant confirme la préparation vérifiée avant la fermeture du Manager ; en cas de remplacement incomplet, il annule les changements, redémarre la version précédente et explique l'échec au démarrage.",
   "Help.Article.updates-and-recovery.Detail.3": "Utilisez les journaux pour l'activité de l'application, du runtime, des tâches et de l'API Control restreinte.",
   "Help.Article.updates-and-recovery.Summary": "Les mises à jour préservent les données de l'application et vérifient les artefacts mis en attente avant leur remplacement.",
   "Help.Article.updates-and-recovery.Title": "Mises à jour, journaux et récupération",

@@ -1024,7 +1024,7 @@
   "Help.Article.updates-and-recovery.Action.2": "باز کردن گزارش‌ها",
   "Help.Article.updates-and-recovery.Action.3": "باز کردن Metrics",
   "Help.Article.updates-and-recovery.Detail.1": "بروزرسانی، تعمیر و حذف معمولی نصب‌کننده، داده‌ها را حفظ می‌کنند مگر اینکه حذف صریح انتخاب شده باشد.",
-  "Help.Article.updates-and-recovery.Detail.2": "یک بروزرسانی قابل حمل به فایل همراه SHA-256 خود نیاز دارد و جایگزینی ناقص را بازگردانده (Rollback) می‌کند.",
+  "Help.Article.updates-and-recovery.Detail.2": "به‌روزرسانی قابل حمل، مانیفست امضاشده، ناشر و مجموع بررسی را تأیید می‌کند. دستیار پیش از بسته شدن Manager آماده‌سازی تأییدشده را اعلام می‌کند و در صورت ناقص ماندن جایگزینی، آن را بازمی‌گرداند، نسخه قبلی را دوباره اجرا می‌کند و علت خطا را هنگام شروع توضیح می‌دهد.",
   "Help.Article.updates-and-recovery.Detail.3": "از Logs برای فعالیت‌های اپلیکیشن، runtime، job و فعالیت‌های محدود شده‌ی Control API استفاده کنید.",
   "Help.Article.updates-and-recovery.Summary": "بروزرسانی‌ها داده‌های اپلیکیشن را حفظ کرده و مصنوعات مرحله‌بندی شده را قبل از جایگزینی تأیید می‌کنند.",
   "Help.Article.updates-and-recovery.Title": "بروزرسانی‌ها، گزارش‌ها و بازیابی",

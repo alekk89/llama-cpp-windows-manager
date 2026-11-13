@@ -1057,7 +1057,7 @@
   "Help.Article.updates-and-recovery.Action.2": "Protokolle öffnen",
   "Help.Article.updates-and-recovery.Action.3": "Metrics öffnen",
   "Help.Article.updates-and-recovery.Detail.1": "Installer-Updates, Reparaturen und normale Deinstallationen behalten Daten bei, sofern die Entfernung nicht explizit ausgewählt wurde.",
-  "Help.Article.updates-and-recovery.Detail.2": "Ein portables Update erfordert den passenden SHA-256-Begleiter und macht unvollständige Ersetzungen rückgängig.",
+  "Help.Article.updates-and-recovery.Detail.2": "Ein portables Update prüft das signierte Manifest, den Herausgeber und die Prüfsumme. Der Helfer bestätigt die geprüfte Bereitstellung, bevor der Manager schließt; eine unvollständige Ersetzung wird rückgängig gemacht, die vorherige Version neu gestartet und der Fehler beim Start erklärt.",
   "Help.Article.updates-and-recovery.Detail.3": "Verwenden Sie die Protokolle für App-, Runtime-, Job- und begrenzte, anonymisierte Control API-Aktivitäten.",
   "Help.Article.updates-and-recovery.Summary": "Updates behalten Anwendungsdaten bei und verifizieren gestufte Artefakte vor dem Ersetzen.",
   "Help.Article.updates-and-recovery.Title": "Updates, Protokolle und Wiederherstellung",

@@ -1015,7 +1015,7 @@
   "Help.Article.updates-and-recovery.Action.2": "लॉग्स खोलें",
   "Help.Article.updates-and-recovery.Action.3": "Metrics खोलें",
   "Help.Article.updates-and-recovery.Detail.1": "इंस्टॉलर अपडेट, मरम्मत और सामान्य अनइंस्टॉल डेटा को सुरक्षित रखते हैं जब तक कि स्पष्ट रूप से हटाने का चयन न किया गया हो।",
-  "Help.Article.updates-and-recovery.Detail.2": "एक पोर्टेबल अपडेट के लिए इसके मिलान वाले SHA-256 साथी की आवश्यकता होती है और यह अधूरे प्रतिस्थापन को वापस ले लेता है।",
+  "Help.Article.updates-and-recovery.Detail.2": "पोर्टेबल अपडेट अपने हस्ताक्षरित मैनिफ़ेस्ट, प्रकाशक और चेकसम की पुष्टि करता है। Manager बंद होने से पहले हेल्पर सत्यापित स्टेजिंग की पुष्टि करता है, और अधूरा प्रतिस्थापन होने पर बदलाव वापस लेता है, पिछला संस्करण फिर से शुरू करता है और शुरू होने पर विफलता का कारण बताता है।",
   "Help.Article.updates-and-recovery.Detail.3": "ऐप, रनटाइम, जॉब और सीमित रेडैक्टेड Control API गतिविधि के लिए लॉग्स का उपयोग करें।",
   "Help.Article.updates-and-recovery.Summary": "अपडेट एप्लिकेशन डेटा को सुरक्षित रखते हैं और प्रतिस्थापन से पहले स्टेज किए गए आर्टिफैक्ट्स को सत्यापित करते हैं।",
   "Help.Article.updates-and-recovery.Title": "अपडेट, लॉग और रिकवरी",

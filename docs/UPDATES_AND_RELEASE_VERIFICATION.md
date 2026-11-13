@@ -59,12 +59,16 @@ executable if that cleanup fails; cleanup residue is reported separately from
 update trust and replacement failures.
 
 Before closing for an update, the Manager requires the helper to verify the
-staged application and matching CLI and acknowledge readiness. A failed or timed-out
-handoff keeps the current Manager open. Replacement waits for the old process
-to exit. If replacement fails, the helper attempts rollback; if restoration also
-fails, it preserves available backups and reports their location rather than
-deleting the remaining recovery files. Keep those files and the error log when
-requesting support; rollback is not a guarantee against every filesystem failure.
+staged application and matching CLI against the SHA-256 values the Manager
+computed after release verification, and acknowledge readiness. A failed or
+timed-out handoff keeps the current Manager open. Replacement waits for the old
+process to exit and re-checks each staged file's hash immediately before
+replacing it. If replacement fails, the helper attempts rollback, restarts the
+restored Manager, and leaves a notice that the Manager shows on startup with the
+failure reason. If restoration also fails, it preserves available backups and
+reports their location rather than deleting the remaining recovery files. Keep
+those files and the error log when requesting support; rollback is not a
+guarantee against every filesystem failure.
 
 Key rotation stages the next public key in a release signed by the current key,
 then promotes it after deployed clients trust both. Required secrets and policy

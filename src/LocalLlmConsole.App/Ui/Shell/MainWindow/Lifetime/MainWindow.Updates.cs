@@ -103,11 +103,9 @@ public partial class MainWindow
     {
         var notice = await _coreServices.App.AppUpdateWorkflow.TryConsumeInstalledNoticeAsync();
         if (notice is null) return;
+        var display = AppUpdateWorkflowService.DescribeInstalledNotice(notice);
         _coreServices.App.Dialogs.Notify(
-            this,
-            $"Updated to {notice.Version}.\n\n{notice.ReleaseName}\n\n{DisplayFormatService.TrimForDisplay(notice.ReleaseNotes, 2600)}",
-            "Update installed",
-            MessageBoxImage.Information);
+            this, display.Message, display.Title, display.Failed ? MessageBoxImage.Warning : MessageBoxImage.Information);
     }
 
     private void UpdateAppUpdateNavigation()

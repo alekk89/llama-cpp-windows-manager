@@ -1024,7 +1024,7 @@
   "Help.Article.updates-and-recovery.Action.2": "ログを開く",
   "Help.Article.updates-and-recovery.Action.3": "Metricsを開く",
   "Help.Article.updates-and-recovery.Detail.1": "インストーラーの更新、修復、および通常のアンインストールでは、削除が明示的に選択されない限りデータは保持されます。",
-  "Help.Article.updates-and-recovery.Detail.2": "ポータブル更新には対応するSHA-256コンパニオンが必要であり、不完全な置換はロールバックされます。",
+  "Help.Article.updates-and-recovery.Detail.2": "ポータブル更新は署名付きマニフェスト、発行元、チェックサムを検証します。ヘルパーは Manager が終了する前に検証済みのステージングを確認し、置換が不完全な場合はロールバックして以前のバージョンを再起動し、起動時に失敗理由を表示します。",
   "Help.Article.updates-and-recovery.Detail.3": "アプリ、ランタイム、ジョブ、および制限された編集済みのControl APIアクティビティについてはログを使用してください。",
   "Help.Article.updates-and-recovery.Summary": "更新はアプリケーションデータを保持し、置換前にステージングされたアーティファクトを検証します。",
   "Help.Article.updates-and-recovery.Title": "更新、ログ、およびリカバリ",
