@@ -79,6 +79,8 @@ public sealed class ControlRequestAdmissionService
         var segments = request.Path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(Uri.UnescapeDataString)
             .ToArray();
+        if (ControlJsonFields.HasDotSegment(segments))
+            throw new ControlAdmissionException("Control request paths must be canonical; '.', '..', and backslash segments are not accepted.");
         if (segments.Length < 3
             || !segments[0].Equals("api", StringComparison.OrdinalIgnoreCase)
             || !segments[1].Equals("v1", StringComparison.OrdinalIgnoreCase))
@@ -88,6 +90,13 @@ public sealed class ControlRequestAdmissionService
             && method == "POST" && segments.Length == 4)
             return OperationConsequence(segments[3], request.Body, identity);
 
+        if (segments[2].Equals("benchmarks", StringComparison.OrdinalIgnoreCase)
+            && method == "POST" && segments.Length == 4
+            && segments[3].Equals("run", StringComparison.OrdinalIgnoreCase))
+            return ControlJsonFields.AnyNestedTrue(request.Body, "plan", "stopActiveSessions")
+                ? new(true, ControlJsonFields.AllTrue(request.Body, "dryRun"), identity.Identified, "benchmark that stops active sessions")
+                : ControlRequestConsequence.Safe;
+
         if (!segments[2].Equals("models", StringComparison.OrdinalIgnoreCase) || segments.Length < 4)
             return ControlRequestConsequence.Safe;
 
@@ -96,8 +105,8 @@ public sealed class ControlRequestAdmissionService
             : method == "POST" && segments.Length == 5
                 ? segments[4].ToLowerInvariant()
                 : "";
-        var unloadOthers = request.Body?["unloadOthers"]?.GetValue<bool>() ?? false;
-        var restart = action == "restart" || (action == "load" && (request.Body?["restart"]?.GetValue<bool>() ?? false));
+        var unloadOthers = ControlJsonFields.AnyTrue(request.Body, "unloadOthers");
+        var restart = action == "restart" || (action == "load" && ControlJsonFields.AnyTrue(request.Body, "restart"));
         var destructive = action is "delete" or "unload" || restart || unloadOthers;
         if (!destructive) return ControlRequestConsequence.Safe;
 
@@ -116,17 +125,24 @@ public sealed class ControlRequestAdmissionService
         JsonObject? body,
         ControlAdmissionIdentity identity)
     {
-        var dryRun = body?["dryRun"]?.GetValue<bool>() ?? false;
+        var dryRun = ControlJsonFields.DryRun(body);
         var name = operation.ToLowerInvariant();
-        var destructive = name is "app.shutdown" or "updates.install" or "runtime.delete"
-            || name == "wsl.setup" && (body?["action"]?.ToString().StartsWith("Delete", StringComparison.OrdinalIgnoreCase) ?? false);
+        var destructive = name is "app.shutdown" or "updates.install" or "runtime.delete" or "gateway.stop" or "gateway.restart"
+            || name == "wsl.setup" && ControlJsonFields.Strings(body, "action")
+                .Any(action => action.StartsWith("Delete", StringComparison.OrdinalIgnoreCase));
         if (!destructive) return ControlRequestConsequence.Safe;
 
         var stopsProtected = name switch
         {
             "app.shutdown" or "updates.install" => identity.Identified,
-            "runtime.delete" => identity.Identified && RuntimeMatches(identity, body?["runtime"]?.ToString()),
+            "runtime.delete" => identity.Identified
+                && ControlJsonFields.Strings(body, "runtime").Any(runtime => RuntimeMatches(identity, runtime)),
             "wsl.setup" => identity.Identified && identity.Mode == RuntimeMode.Wsl,
+            // Stopping or restarting the gateway aborts its in-flight requests; only a session
+            // proven to be reached directly through its own endpoint or port is unaffected.
+            "gateway.stop" or "gateway.restart" => identity.Identified
+                && !identity.MatchedBy.Equals("endpoint", StringComparison.OrdinalIgnoreCase)
+                && !identity.MatchedBy.Equals("port", StringComparison.OrdinalIgnoreCase),
             _ => false
         };
         return new(true, dryRun, stopsProtected, $"operation '{operation}'");

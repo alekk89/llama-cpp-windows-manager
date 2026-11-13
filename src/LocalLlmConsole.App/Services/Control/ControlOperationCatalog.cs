@@ -24,8 +24,8 @@ public static class ControlOperationCatalog
         [
             P("page", "Page name: overview, models, runtimes, windows, wsl, settings, lifetime, logs, updates, or help.", required: true)
         ]),
-        new("gateway.restart", "Restart the configured model auto-load gateway."),
-        new("gateway.stop", "Stop the model auto-load gateway."),
+        new("gateway.restart", "Restart the configured model auto-load gateway; in-flight gateway requests are aborted.", true),
+        new("gateway.stop", "Stop the model auto-load gateway; in-flight gateway requests are aborted.", true),
         new("cache.plan", "Inspect whether the application cache can be cleared."),
         new("cache.clear", "Delete safe disposable application cache contents.", true),
         new("logs.delete", "Delete one inactive application/runtime log.", true, Parameters:

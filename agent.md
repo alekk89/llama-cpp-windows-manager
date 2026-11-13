@@ -64,7 +64,10 @@ application's direct-model LAN access policy.
 Profiles without a saved `host` inherit the app host default; explicit loopback
 addresses remain overrides. Endpoint probes use the effective listener address.
 
-Run `self` before any action that can stop or replace a loaded model. Never use
+Run `self` before any action that can stop or replace a loaded model.
+`gateway.stop` and `gateway.restart` abort in-flight gateway requests, including
+your own; they require `--confirm` and, unless `self` matched your direct
+endpoint or port, `--allow-self-stop`. Never use
 `--allow-self-stop` or `--confirm` without explicit authorization for the stated
 consequence. Validate unfamiliar or consequential operations with the live
 schema and `operations run <name> --dry-run`.

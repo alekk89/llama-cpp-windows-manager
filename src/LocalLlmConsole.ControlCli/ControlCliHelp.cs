@@ -41,9 +41,11 @@ Full settings:
   Use --settings-file settings.json for large setting objects.
   Launch overrides are one-shot unless --save-profile[=NAME] is supplied.
   Self-stop operations are blocked when identity is known; use --allow-self-stop only on explicit request.
+  gateway.stop and gateway.restart abort in-flight gateway requests and are guarded the same way.
 
 Raw API:
   llwmctl request METHOD /api/v1/path [--body JSON|--body-file FILE]
+  Paths must be canonical; '.', '..', and backslash segments are rejected.
 
 Connection:
   The CLI auto-discovers the current app. Override with --connection FILE or --workspace PATH.
