@@ -63,6 +63,10 @@ Current:
 
 1. SQLite operations are serialized inside `StateStore` so UI timers, downloads, and localhost API reads do not share the connection concurrently.
 2. Schema migrations are applied idempotently and recorded in the `migrations` table.
+   A database that records a migration newer than the running build is refused
+   before any setup statement writes to it; startup reports the error and leaves
+   the file unchanged. Disposing `StateStore` completes queued callers with
+   `ObjectDisposedException` instead of leaving them waiting.
 3. Settings saves are transactional.
 4. Bad settings rows are backed up under `state\corrupt-settings` and replaced with defaults.
 5. Corrupt database files are quarantined under `state\corrupt-database-*` and recreated on startup.

@@ -47,9 +47,11 @@ public sealed partial class StateStore : IAsyncDisposable
         await WithConnectionAsync(async () =>
         {
             InvalidateCatalog();
+            await ExecuteUnlockedAsync("PRAGMA busy_timeout=5000;");
+            // Refuse a newer schema before any statement below can write to the file.
+            await ThrowIfSchemaIsNewerUnlockedAsync();
             await ExecuteUnlockedAsync("PRAGMA journal_mode=WAL;");
             await ExecuteUnlockedAsync("PRAGMA foreign_keys=ON;");
-            await ExecuteUnlockedAsync("PRAGMA busy_timeout=5000;");
             await ExecuteUnlockedAsync("""
 CREATE TABLE IF NOT EXISTS migrations (
   id INTEGER PRIMARY KEY,
@@ -341,8 +343,11 @@ CREATE TABLE IF NOT EXISTS token_usage (
         }
         finally
         {
+            // The gate is intentionally never disposed. Callers queued behind disposal must
+            // still acquire and release it so they observe ObjectDisposedException(StateStore)
+            // instead of failing inside the semaphore or waiting forever. SemaphoreSlim only
+            // owns an unmanaged handle when AvailableWaitHandle is used, which this type never does.
             _dbLock.Release();
-            _dbLock.Dispose();
         }
     }
 }
