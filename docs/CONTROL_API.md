@@ -6,7 +6,7 @@ The Manager exposes an authenticated, loopback-only control API for local agents
 
 Use `llwmctl` instead of calling the HTTP API directly. The CLI discovers the active Manager instance, decrypts its current-user DPAPI session token, sends the request, and prints structured JSON.
 
-Portable releases also embed `llwmctl.exe`, `AGENTS.md`, `agent.md`, this reference, `LICENSE`, and third-party/.NET notices in the main executable. The Manager verifies and restores those sidecars beside itself at startup, so an executable-only update from an older release acquires the complete control surface and compliance notices automatically. `LlamaCppWindowsManager.exe --bootstrap-agent-sidecars-only` runs that bootstrap and exits without opening the UI.
+Portable releases also embed `llwmctl.exe`, `AGENTS.md`, `agent.md`, this reference, `LICENSE`, and third-party/.NET notices in the main executable. The Manager verifies and restores those sidecars beside itself at startup, so an executable-only update from an older release acquires the complete control surface and compliance notices automatically. The Manager records the files it installed in `.llwm-sidecars.json` and replaces an existing sidecar only when it is absent or still matches that record; files it did not install, such as a source checkout's `AGENTS.md` or `LICENSE`, are left unchanged and reported. A folder from a release before this record existed is adopted once when it contains `llwmctl.exe`, any `AGENTS.md` there is the Manager's, and it has no `.git`, `*.sln`, or `global.json`. `LlamaCppWindowsManager.exe --bootstrap-agent-sidecars-only` runs that bootstrap and exits without opening the UI; it exits with 1 when bootstrap fails or foreign files were preserved.
 
 ## Operator interface and API logs
 

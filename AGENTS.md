@@ -282,8 +282,9 @@ After restart, re-read the restored `AGENTS.md`, then run `status`,
 the pre-restart snapshot. Reload only the sessions included in the request.
 
 Release builds embed and restore the matching `llwmctl.exe`, this file,
-`agent.md`, and `docs/CONTROL_API.md`. To verify those sidecars without opening
-the UI:
+`agent.md`, and `docs/CONTROL_API.md`. They replace only sidecars the Manager
+installed (recorded in `.llwm-sidecars.json`) and leave other files in place.
+To verify those sidecars without opening the UI:
 
 ```powershell
 LlamaCppWindowsManager.exe --bootstrap-agent-sidecars-only

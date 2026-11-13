@@ -7,14 +7,19 @@ public enum AgentSidecarBootstrapStatus
     BundleUnavailable,
     Current,
     Installed,
-    Failed
+    Failed,
+    // Some target paths hold files the Manager did not install; they were left unchanged.
+    ForeignFilesPreserved
 }
 
 public sealed record AgentSidecarBootstrapResult(
     AgentSidecarBootstrapStatus Status,
     IReadOnlyList<string> InstalledFiles,
     IReadOnlyList<string> CurrentFiles,
-    string? Error = null);
+    string? Error = null)
+{
+    public IReadOnlyList<string> PreservedFiles { get; init; } = [];
+}
 
 public sealed class AgentSidecarBootstrapService
 {
@@ -43,6 +48,19 @@ public sealed class AgentSidecarBootstrapService
 
     public static int VerificationExitCode(AgentSidecarBootstrapStatus status)
         => status is AgentSidecarBootstrapStatus.Current or AgentSidecarBootstrapStatus.Installed ? 0 : 1;
+
+    public static string? DescribeProblem(AgentSidecarBootstrapResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Status switch
+        {
+            AgentSidecarBootstrapStatus.Failed => $"Agent control sidecar bootstrap failed: {result.Error}",
+            AgentSidecarBootstrapStatus.ForeignFilesPreserved =>
+                "Agent control sidecars were not replaced because these files beside the executable were not installed by the Manager: " +
+                string.Join(", ", result.PreservedFiles) + $". See {AgentSidecarOwnership.RecordFileName}.",
+            _ => null
+        };
+    }
 
     public AgentSidecarBootstrapResult InstallPackaged(
         string executablePath,
@@ -79,6 +97,7 @@ public sealed class AgentSidecarBootstrapService
         string? stagingRoot = null;
         var installed = new List<string>();
         var current = new List<string>();
+        IReadOnlyList<string> preserved = [];
 
         try
         {
@@ -90,8 +109,17 @@ public sealed class AgentSidecarBootstrapService
             var manifest = ReadManifest(entries["manifest.json"]);
             var manifestFiles = ValidateManifest(manifest);
             var currentTargets = CurrentTargets(normalizedRoot, manifestFiles);
-            if (!verifyBundleContents && currentTargets.Count == RequiredPaths.Length)
-                return new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.Current, [], RequiredPaths);
+            var ownership = AgentSidecarOwnership.Read(normalizedRoot);
+            var adoptLegacy = ownership is null && AgentSidecarOwnership.IsLegacyManagerInstallation(normalizedRoot);
+            preserved = RequiredPaths
+                .Where(path => !currentTargets.Contains(path) && !CanReplace(normalizedRoot, path, ownership, adoptLegacy))
+                .ToArray();
+            if (!verifyBundleContents && currentTargets.Count + preserved.Count == RequiredPaths.Length)
+            {
+                current.AddRange(RequiredPaths.Where(currentTargets.Contains));
+                RecordOwnership(normalizedRoot, manifest.Version!, manifestFiles, current, preserved, ownership);
+                return new AgentSidecarBootstrapResult(StatusFor(installed, preserved), [], current) { PreservedFiles = preserved };
+            }
 
             stagingRoot = Path.Combine(normalizedRoot, $".llwm-sidecars-{Environment.ProcessId}-{Guid.NewGuid():N}");
             Directory.CreateDirectory(stagingRoot);
@@ -131,6 +159,7 @@ public sealed class AgentSidecarBootstrapService
                     current.Add(relativePath);
                     continue;
                 }
+                if (preserved.Contains(relativePath, StringComparer.OrdinalIgnoreCase)) continue;
 
                 Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
                 var temporaryTarget = targetPath + $".{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
@@ -154,14 +183,15 @@ public sealed class AgentSidecarBootstrapService
                 }
             }
 
-            var status = installed.Count == 0
-                ? AgentSidecarBootstrapStatus.Current
-                : AgentSidecarBootstrapStatus.Installed;
-            return new AgentSidecarBootstrapResult(status, installed, current);
+            RecordOwnership(normalizedRoot, manifest.Version!, manifestFiles, installed.Concat(current), preserved, ownership);
+            return new AgentSidecarBootstrapResult(StatusFor(installed, preserved), installed, current) { PreservedFiles = preserved };
         }
         catch (Exception ex)
         {
-            return new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.Failed, installed, current, ex.Message);
+            return new AgentSidecarBootstrapResult(AgentSidecarBootstrapStatus.Failed, installed, current, ex.Message)
+            {
+                PreservedFiles = preserved
+            };
         }
         finally
         {
@@ -178,6 +208,42 @@ public sealed class AgentSidecarBootstrapService
             }
         }
     }
+
+    private static AgentSidecarBootstrapStatus StatusFor(IReadOnlyCollection<string> installed, IReadOnlyCollection<string> preserved)
+        => preserved.Count > 0 ? AgentSidecarBootstrapStatus.ForeignFilesPreserved
+            : installed.Count == 0 ? AgentSidecarBootstrapStatus.Current
+            : AgentSidecarBootstrapStatus.Installed;
+
+    // Absent targets may be created. Existing ones are replaced only when the Manager
+    // recorded installing exactly that content, or when adopting a pre-ownership release.
+    private static bool CanReplace(
+        string root,
+        string relativePath,
+        IReadOnlyDictionary<string, string>? ownership,
+        bool adoptLegacy)
+    {
+        var targetPath = ResolveContainedPath(root, relativePath);
+        if (Directory.Exists(targetPath)) return false;
+        if (!File.Exists(targetPath) || adoptLegacy) return true;
+        return ownership is not null
+            && ownership.TryGetValue(relativePath, out var ownedHash)
+            && string.Equals(ownedHash, ComputeSha256(targetPath), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void RecordOwnership(
+        string root,
+        string version,
+        IReadOnlyDictionary<string, AgentSidecarManifestFile> manifestFiles,
+        IEnumerable<string> owned,
+        IReadOnlyList<string> preserved,
+        IReadOnlyDictionary<string, string>? previous)
+        => AgentSidecarOwnership.Write(
+            root,
+            version,
+            owned.Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(path => path, path => manifestFiles[path].Sha256!, StringComparer.OrdinalIgnoreCase),
+            preserved,
+            previous);
 
     private static Dictionary<string, ZipArchiveEntry> ValidateArchive(ZipArchive archive)
     {
