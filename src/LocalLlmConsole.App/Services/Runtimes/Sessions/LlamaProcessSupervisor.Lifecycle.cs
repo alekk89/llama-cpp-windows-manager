@@ -6,7 +6,9 @@ public sealed partial class LlamaProcessSupervisor
 
     public void Stop()
     {
-        var result = StopVerifiedAsync().GetAwaiter().GetResult();
+        // Synchronous callers include UI-thread Dispose paths. Run the asynchronous stop on the
+        // thread pool so no continuation needs the caller's SynchronizationContext (dispatcher).
+        var result = Task.Run(() => StopVerifiedAsync()).GetAwaiter().GetResult();
         if (!result.VerifiedStopped)
             Trace.TraceWarning($"Could not verify llama runtime shutdown: {result.Error}");
     }

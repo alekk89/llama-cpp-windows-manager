@@ -21,6 +21,15 @@ public sealed partial class LlamaProcessSupervisor
             AttachRecoveredNativeProcess(processId);
     }
 
+    /// <summary>Records that an attached runtime host exited without a requested stop.</summary>
+    internal void MarkAttachedHostExited(int? exitCode)
+    {
+        LastExitCode = exitCode;
+        _attached = false;
+        if (State != LlamaRuntimeState.Stopped)
+            State = LlamaRuntimeState.Failed;
+    }
+
     private void AttachRecoveredNativeProcess(int processId)
     {
         try

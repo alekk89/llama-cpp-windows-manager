@@ -31,16 +31,20 @@ public sealed partial class LoadedModelSessionManager
             LaunchProfileName = launchProfileName ?? "",
             EndpointHealth = RuntimeEndpointHealth.Healthy
         };
+        LoadedModelSession? replaced;
+        LoadedModelSessionSnapshot snapshot;
         lock (_stateLock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_sessions.Remove(resolvedSessionId, out var replaced))
-                replaced.Supervisor.Dispose();
+            _sessions.Remove(resolvedSessionId, out replaced);
             _sessions[resolvedSessionId] = session;
             if (string.IsNullOrWhiteSpace(_selectedSessionId))
                 _selectedSessionId = resolvedSessionId;
             RecordEventLocked(session, "detached", state.ToString(), "recovery", "LLWM-SESSION-RECOVERED", "running", "recovered", "not-requested");
-            return ToSnapshotLocked(session);
+            snapshot = ToSnapshotLocked(session);
         }
+        // Stopping a replaced supervisor can run wsl.exe; never do that while holding the state lock.
+        replaced?.Supervisor.Dispose();
+        return snapshot;
     }
 }

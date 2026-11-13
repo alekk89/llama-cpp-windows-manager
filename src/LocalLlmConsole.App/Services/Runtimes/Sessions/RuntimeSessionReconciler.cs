@@ -25,7 +25,7 @@ public sealed class RuntimeSessionReconciler
         ArgumentNullException.ThrowIfNull(loadingSessionReady);
 
         var priorSessionIds = sessions.Snapshots().Select(session => session.SessionId).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var removed = sessions.RemoveFailedOrStopped();
+        var removed = await sessions.RemoveFailedOrStoppedAsync();
         removed += await sessions.StopUnavailableRecoveredSessionsAsync(recoveredSessionAvailable);
 
         var loadedTransitions = new List<RuntimeSessionLoadedTransition>();
