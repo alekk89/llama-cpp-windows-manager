@@ -178,6 +178,7 @@ public sealed class ReleaseRepositoryTests : ManagerRegressionTestBase
         Assert.Contains("showOverviewHardware=false", previousVersionUpgrade, StringComparison.Ordinal);
         Assert.Contains("Restarted candidate Manager", previousVersionUpgrade, StringComparison.Ordinal);
         Assert.Contains("Remove-TestRootWithRetry", previousVersionUpgrade, StringComparison.Ordinal);
+        Assert.Contains("Remove-TestRootWithRetry", File.ReadAllText(FindRepositoryFile("scripts", "test-portable-update.ps1")), StringComparison.Ordinal);
         Assert.Contains("external-preserve.canary", previousVersionUpgrade, StringComparison.Ordinal);
         foreach (var installerTest in new[] { installerSmoke, previousVersionUpgrade })
         {
