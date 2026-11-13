@@ -7,6 +7,13 @@ namespace LocalLlmConsole.Tests;
 
 public sealed class GatewayClientDisconnectTests : ManagerRegressionTestBase
 {
+    [Theory]
+    [InlineData("/v1/chat/completions", "/v1/chat/completions")]
+    [InlineData("/v1/x\r\nFAKE entry", "/v1/xFAKE entry")]
+    [InlineData(null, "")]
+    public void ClientSuppliedLogTextCannotStartANewLogLine(string? value, string expected)
+        => Assert.Equal(expected, ModelGatewayResponseWriter.ForLog(value));
+
     [Fact]
     public async Task ClientDisconnectDuringStreamingCancelsUpstreamAndReleasesRequestCapacity()
     {

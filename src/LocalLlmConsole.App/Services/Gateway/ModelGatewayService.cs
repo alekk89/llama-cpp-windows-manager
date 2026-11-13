@@ -128,7 +128,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             {
                 Interlocked.Increment(ref _clientDisconnects);
                 Trace.TraceInformation(
-                    $"Model gateway client disconnected during {context.Request.HttpMethod} {context.Request.Url?.AbsolutePath}: {ModelGatewayResponseWriter.InnermostMessage(ex)}");
+                    $"Model gateway client disconnected during {ModelGatewayResponseWriter.ForLog(context.Request.HttpMethod)} {ModelGatewayResponseWriter.ForLog(context.Request.Url?.AbsolutePath)}: {ModelGatewayResponseWriter.InnermostMessage(ex)}");
             }
             ModelGatewayResponseWriter.TryAbort(context.Response);
         }

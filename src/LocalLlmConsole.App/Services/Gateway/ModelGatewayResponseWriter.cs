@@ -82,6 +82,12 @@ public static class ModelGatewayResponseWriter
         return string.IsNullOrWhiteSpace(ex.Message) ? ex.GetType().Name : ex.Message;
     }
 
+    /// <summary>Strips line breaks from client-supplied text so it cannot forge separate log entries.</summary>
+    public static string ForLog(string? value)
+        => string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", string.Empty, StringComparison.Ordinal);
+
     public static object[] RunningModelRows(IReadOnlyList<LoadedModelSessionSnapshot> sessions)
         => sessions
             .Where(session => session.IsRunning)
