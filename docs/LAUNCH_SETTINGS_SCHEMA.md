@@ -22,7 +22,7 @@ After a runtime is selected:
 1. The previous runtime's structured values are first materialized back into `CustomParameters`, and its controls are cleared immediately so stale settings are never presented as belonging to the new runtime.
 2. `RuntimeLaunchOptionDiscoveryService` invokes that exact executable with `--help`.
 3. Native and WSL runtimes are handled separately; stdout and stderr are always combined.
-4. `RuntimeLaunchHelpParser` preserves every advertised alias and infers switch, choice, text, file, or directory semantics. It parses only the declaration column as aliases, joins wrapped descriptions, treats bracketed/explicit enumerations as choices, and keeps descriptive default/disabled/range text as a free-form value instead of inventing duplicate choices.
+4. `RuntimeLaunchHelpParser` preserves every advertised alias and infers switch, choice, text, file, or directory semantics. It parses only the declaration column as aliases, joins wrapped descriptions, treats bracketed/explicit enumerations (including llama.cpp's `allowed values: a, b, c` lists) as choices, and keeps descriptive default/disabled/range text as a free-form value instead of inventing duplicate choices.
 5. `RuntimeLaunchOptionPolicy` removes application-managed, credential-bearing, network/security, utility/action, removed, deprecated, and model-replacement flags.
 6. `RuntimeLaunchOptionGroupingService` classifies the safe remainder into stable, ordered sections such as Performance & Memory, Context & Model Behavior, Generation & Sampling, Speculative & Draft, Vision & Multimodal, Server & Slots, and Diagnostics & Output. Unrecognized flags remain visible under Other Runtime Options.
 7. `LaunchRuntimeOptionsPanel` renders those groups only in Advanced mode, using the same 28px editors, compact label proportions, visual section language, and two-column field rhythm as the curated form. Raw flags are converted to readable display labels while the exact advertised long alias remains in the tooltip, search index, persistence, and emitted command. Options without an advertised default render a blank text/choice value instead of generic placeholder copy. Choice controls distinguish inheritance (`Inherit (runtime default: X)`) from explicitly setting the same raw value. Discovered positive/negative switch pairs become one tri-state Default/Enabled/Disabled control: Default emits nothing, while Enabled or Disabled emits only the corresponding alias actually advertised by the runtime. Unpaired switches expose only their supported direction. Search results reflow across the two columns so filtered groups do not retain empty cells.
@@ -30,6 +30,16 @@ After a runtime is selected:
 Discovery is generation-safe: each selector change captures the newly selected runtime, cancels the previous scan, and accepts a result only while that runtime is still selected. Loading and discovery errors remain available in Advanced mode; the successful form does not add a redundant discovered-setting count.
 
 Native discovery is cached by runtime identity, executable path, and file modification time. WSL discovery is repeated because a reliable remote executable timestamp is not available locally.
+
+## Runtime-defined managed settings
+
+Some curated settings pass their value verbatim to one runtime flag, so the runtime, not the Manager, defines which values are valid: K/V cache types (`--cache-type-k/v`), draft K/V cache types (`--cache-type-k/v-draft`), reasoning format, and RoPE scaling. `RuntimeDefinedChoicePolicy` lists them. For these settings:
+
+- The curated choice list shows the values the selected runtime advertises for that flag (for example the `turbo2`/`turbo3`/`turbo4` cache types of TurboQuant forks), plus Manager-only values such as `auto` (omit the flag). When the runtime advertises no list, or discovery fails, the built-in list applies.
+- A saved value that the current list lacks stays listed and selected; it is never silently replaced.
+- Launch, profile import, and benchmark validation only require a well-formed value token (letters, digits, `.`, `_`, `+`, `-`; at most 64 characters). The runtime rejects values it does not support when it starts, and that error appears in the session log.
+
+The flags stay application-managed, so they are still rejected in custom parameters; set the value in its curated field or with `llwmctl profiles update --set cacheTypeK=<value>`.
 
 ## Discovery diagnostics
 

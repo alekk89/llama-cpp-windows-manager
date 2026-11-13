@@ -232,7 +232,7 @@ public sealed class ProfileTransferTests : ManagerRegressionTestBase
             ModelLaunchSettings.FromAppSettings(defaults) with { SpeculativeType = "atomic-mtp" }
         })
             Assert.False((await workflow.PreviewAsync(model, Bundle(settings), defaults)).CanApply);
-        Assert.Throws<InvalidOperationException>(() => ProfileBundleCodec.ApplySettings(ModelLaunchSettings.FromAppSettings(defaults), new JsonObject { ["cacheTypeK"] = "unknown-cache" }));
+        Assert.Throws<InvalidOperationException>(() => ProfileBundleCodec.ApplySettings(ModelLaunchSettings.FromAppSettings(defaults), new JsonObject { ["cacheTypeK"] = "unknown cache" }));
         var incompatible = Path.Combine(root, "mmproj-llama-3.gguf"); WriteMinimalGguf(incompatible);
         Assert.False(ModelCatalogService.IsCompatibleCompanion("qwen-3-8b.gguf", incompatible, "", vision: true));
         Assert.False(ModelCatalogService.IsCompatibleCompanion(model.ModelPath, incompatible, "draft-mtp"));

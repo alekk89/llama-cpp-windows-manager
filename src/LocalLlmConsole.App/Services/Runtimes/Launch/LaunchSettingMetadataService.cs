@@ -8,11 +8,12 @@ public static class LaunchSettingMetadataService
     public static readonly IReadOnlyList<string> AutoOnOffOptions = ["auto", "on", "off"];
     public static readonly IReadOnlyList<string> OnOffOptions = ["on", "off"];
     public static readonly IReadOnlyList<string> OffOnOptions = ["off", "on"];
-    public static readonly IReadOnlyList<string> CacheTypeOptions = ["f16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1", "f32", "bf16"];
+    // Runtime-defined settings: defaults only. The UI replaces them with the selected runtime's advertised values.
+    public static readonly IReadOnlyList<string> CacheTypeOptions = RuntimeDefinedChoicePolicy.DefaultChoices(RuntimeDefinedChoicePolicy.CacheTypeK);
     public static readonly IReadOnlyList<string> SpeculativeTypeOptions = SpeculativeTypePolicy.SupportedTypes;
-    public static readonly IReadOnlyList<string> ReasoningFormatOptions = ["auto", "none", "deepseek", "deepseek-legacy"];
+    public static readonly IReadOnlyList<string> ReasoningFormatOptions = RuntimeDefinedChoicePolicy.DefaultChoices(RuntimeDefinedChoicePolicy.ReasoningFormat);
     public static readonly IReadOnlyList<string> ReasoningEffortOptions = ["default", "minimal", "low", "medium", "high", "xhigh", "max"];
-    public static readonly IReadOnlyList<string> RopeScalingOptions = ["auto", "none", "linear", "yarn"];
+    public static readonly IReadOnlyList<string> RopeScalingOptions = RuntimeDefinedChoicePolicy.DefaultChoices(RuntimeDefinedChoicePolicy.RopeScaling);
     public static readonly IReadOnlyList<string> GpuModeOptions = ["auto", "single", "layer", "row", "tensor"];
 
     public static string NormalizeSpeculativeType(string value)

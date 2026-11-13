@@ -14,7 +14,18 @@ public sealed class RuntimeLaunchOptionDiscoveryService
         _diagnostics = diagnostics;
     }
 
+    /// <summary>The runtime options that may be rendered as extra launch settings.</summary>
     public async Task<IReadOnlyList<RuntimeLaunchOptionDefinition>> DiscoverAsync(
+        RuntimeChoice runtime,
+        string wslDistro,
+        CancellationToken cancellationToken = default)
+        => (await DiscoverAllAsync(runtime, wslDistro, cancellationToken)).Where(RuntimeLaunchOptionPolicy.CanRender).ToArray();
+
+    /// <summary>
+    /// Every option the runtime advertises, including Manager-managed flags, whose advertised
+    /// values feed runtime-defined managed settings such as the KV cache type.
+    /// </summary>
+    public async Task<IReadOnlyList<RuntimeLaunchOptionDefinition>> DiscoverAllAsync(
         RuntimeChoice runtime,
         string wslDistro,
         CancellationToken cancellationToken = default)
@@ -48,10 +59,10 @@ public sealed class RuntimeLaunchOptionDiscoveryService
             throw new InvalidOperationException($"{runtime.DisplayName}: {message}");
         }
 
-        var parsed = discovered.Where(RuntimeLaunchOptionPolicy.CanRender).ToArray();
-        await RecordDiagnosticAsync(runtime, wslDistro, result.ExitCode, combined, discovered.Count, parsed.Length, "success", "Runtime launch options discovered.", cancellationToken);
-        if (runtime.Mode == RuntimeMode.Native) _cache[cacheKey] = parsed;
-        return parsed;
+        var renderable = discovered.Count(RuntimeLaunchOptionPolicy.CanRender);
+        await RecordDiagnosticAsync(runtime, wslDistro, result.ExitCode, combined, discovered.Count, renderable, "success", "Runtime launch options discovered.", cancellationToken);
+        if (runtime.Mode == RuntimeMode.Native) _cache[cacheKey] = discovered;
+        return discovered;
     }
 
     private async Task RecordDiagnosticAsync(

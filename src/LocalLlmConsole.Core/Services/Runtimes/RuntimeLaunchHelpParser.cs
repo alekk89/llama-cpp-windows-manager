@@ -127,6 +127,12 @@ public static partial class RuntimeLaunchHelpParser
                 return DistinctChoices(values.Split(separator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         }
 
+        // llama.cpp prints enumerations as "allowed values: a, b, c" (for example the KV cache
+        // types). Forks extend these lists, so they are the authoritative values for that runtime.
+        var allowed = AllowedValuesList().Match(description);
+        if (allowed.Success)
+            return DistinctChoices(allowed.Groups["values"].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
         var bullets = BulletChoice().Matches(description)
             .Select(candidate => candidate.Groups["value"].Value)
             .ToArray();
@@ -195,6 +201,9 @@ public static partial class RuntimeLaunchHelpParser
 
     [GeneratedRegex("(?<open>[\\[<{(])(?<values>[^\\]}>)]*[|,][^\\]}>)]*)[\\]}>)]")]
     private static partial Regex ChoiceGroup();
+
+    [GeneratedRegex("(?i:\\ballowed values\\s*:)\\s*(?<values>[A-Za-z0-9][A-Za-z0-9_.+-]*(?:\\s*,\\s*[A-Za-z0-9][A-Za-z0-9_.+-]*)+)")]
+    private static partial Regex AllowedValuesList();
 
     [GeneratedRegex("(?:^|\\s)-\\s+(?<value>[A-Za-z0-9][A-Za-z0-9+.-]*)\\s*:")]
     private static partial Regex BulletChoice();

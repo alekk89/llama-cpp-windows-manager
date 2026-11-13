@@ -172,9 +172,9 @@ public sealed partial class BenchmarkPlanService
         ValidateAllowed(plan.Options.LoadModes, "Load mode", ["auto", "none", "mmap", "mlock", "mmap+mlock", "dio"], errors);
         ValidateAllowed(plan.Options.LazyModes, "Lazy mode", ["auto", "on", "off"], errors);
         ValidateDimension(plan.Options.LazyModes, "lazy-mode", errors);
-        ValidateAllowed(plan.Options.CacheTypesK, "K cache type", ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"], errors);
-        ValidateAllowed(plan.Options.CacheTypesV, "V cache type", ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"], errors);
-        ValidateAllowed(plan.Options.CacheTypesKv, "K/V cache type", ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"], errors);
+        ValidateRuntimeDefined(plan.Options.CacheTypesK, "K cache type", errors);
+        ValidateRuntimeDefined(plan.Options.CacheTypesV, "V cache type", errors);
+        ValidateRuntimeDefined(plan.Options.CacheTypesKv, "K/V cache type", errors);
         if (plan.Options.CacheTypesKv.Count > 0 && (plan.Options.CacheTypesK.Count > 0 || plan.Options.CacheTypesV.Count > 0))
             errors.Add("Matched K/V cache types cannot be combined with independent K or V cache lists.");
         if (plan.Options.AdditionalArguments.Count > 256) errors.Add("At most 256 expert argument tokens are allowed.");
@@ -419,6 +419,14 @@ public sealed partial class BenchmarkPlanService
         if (values.Select(value => Convert.ToString(value, CultureInfo.InvariantCulture) ?? "")
             .GroupBy(value => value, StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
             errors.Add($"Duplicate {name} values are not allowed.");
+    }
+
+    // Cache types belong to the runtime (forks add their own), so only their shape is checked here;
+    // the benchmark runtime rejects values it does not support.
+    private static void ValidateRuntimeDefined(IReadOnlyList<string> values, string name, ICollection<string> errors)
+    {
+        if (values.Any(value => !RuntimeDefinedChoicePolicy.IsWellFormed(value)))
+            errors.Add($"{name} values must be runtime value tokens such as q8_0 (letters, digits, '.', '_', '+', or '-').");
     }
 
     private static void ValidateAllowed(
