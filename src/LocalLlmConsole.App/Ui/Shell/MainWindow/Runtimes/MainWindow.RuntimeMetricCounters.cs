@@ -72,10 +72,8 @@ public partial class MainWindow
             SetStatus,
             groupSnapshot is null
                 ? null
-                : (launchProfileId, globalIdleMinutes) => ModelGroupService.EffectivePolicy(groupSnapshot, launchProfileId, globalIdleMinutes));
-
-    private RuntimeIdleUnloadApplicationActions RuntimeIdleUnloadActions()
-        => RuntimeIdleUnloadActions(groupSnapshot: null);
+                : (launchProfileId, globalIdleMinutes) => ModelGroupService.EffectivePolicy(groupSnapshot, launchProfileId, globalIdleMinutes),
+            session => _coreServices.Models.ModelGatewayHostFactory.UpstreamActivity.TryBlockIdle(session.ModelId, session.LaunchProfileId));
 
     private void ResetIdleCounters()
     {

@@ -12,6 +12,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly SemaphoreSlim _requestSlots;
     private readonly ModelGatewayRequestGate _modelRequestGate = new();
+    private readonly ModelGatewayUpstreamActivity _upstreamActivity;
     private readonly HttpListenerRequestTracker _requestTracker = new();
     private Task? _loop;
     private Task _ownedResourceDisposalCompletion = Task.CompletedTask;
@@ -22,7 +23,8 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
         ModelGatewayOptions options,
         IModelGatewayRuntimeController runtime,
         ModelGatewayUpstreamProxy? upstreamProxy = null,
-        GatewayPerformanceTracker? performance = null)
+        GatewayPerformanceTracker? performance = null,
+        ModelGatewayUpstreamActivity? upstreamActivity = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(runtime);
@@ -32,6 +34,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
         _accessPolicy = new(options);
         _upstreamProxy = upstreamProxy ?? new ModelGatewayUpstreamProxy();
         _performance = performance;
+        _upstreamActivity = upstreamActivity ?? new ModelGatewayUpstreamActivity();
         _requestSlots = new SemaphoreSlim(Math.Max(1, options.MaxConcurrentRequests));
     }
 
@@ -168,9 +171,10 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             route.Profile.Id,
             cancellationToken);
         LoadedModelSessionSnapshot? session;
+        IDisposable? upstreamLease;
         try
         {
-            session = await EnsureLoadedAsync(route, cancellationToken);
+            (session, upstreamLease) = await AcquireUpstreamSessionAsync(route, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -192,6 +196,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
             return;
         }
 
+        using var activeUpstreamLease = upstreamLease;
         try
         {
             var upstreamBody = ModelGatewayRequestResolver.BodyForRuntime(body, session.LaunchSettings);
@@ -218,19 +223,70 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
         return routes.Where(route => sessions.Any(route.MatchesRunningSession)).ToArray();
     }
 
+    // Returns a running session together with an upstream-activity lease that
+    // keeps Single active swaps and idle unload from stopping it mid-response.
+    // A swap or idle unload may stop the session while this request waits for
+    // the lease, so the session is re-checked once the lease is held.
+    private async Task<(LoadedModelSessionSnapshot? Session, IDisposable? Lease)> AcquireUpstreamSessionAsync(
+        ModelGatewayModelRoute route,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            var generation = _upstreamActivity.BlockGeneration;
+            var session = await EnsureLoadedAsync(route, cancellationToken);
+            if (session is null) return (null, null);
+
+            var (lease, mayHaveStopped) = await _upstreamActivity.EnterAsync(
+                route.Model.Id,
+                route.Profile.Id,
+                generation,
+                cancellationToken);
+            try
+            {
+                var current = mayHaveStopped ? await RunningSessionAsync(route, cancellationToken) : session;
+                if (current is not null) return (current, lease);
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+
+            lease.Dispose();
+            if (attempt >= maximumAttempts)
+                throw new InvalidOperationException($"{route.Name} was unloaded repeatedly while the request was waiting to start.");
+        }
+    }
+
+    private async Task<LoadedModelSessionSnapshot?> RunningSessionAsync(ModelGatewayModelRoute route, CancellationToken cancellationToken)
+        => (await _runtime.RunningSessionsAsync(cancellationToken))
+            .FirstOrDefault(session => route.MatchesRunningSession(session));
+
     private async Task<LoadedModelSessionSnapshot?> EnsureLoadedAsync(ModelGatewayModelRoute route, CancellationToken cancellationToken)
     {
-        var running = (await _runtime.RunningSessionsAsync(cancellationToken))
-            .FirstOrDefault(session => route.MatchesRunningSession(session));
+        var running = await RunningSessionAsync(route, cancellationToken);
         if (running is not null) return running;
         if (!_options.AutoLoadModels) return null;
 
         await _loadGate.WaitAsync(cancellationToken);
         try
         {
-            running = (await _runtime.RunningSessionsAsync(cancellationToken))
-                .FirstOrDefault(session => route.MatchesRunningSession(session));
-            return running ?? await _runtime.EnsureModelLoadedAsync(route, _options.SwapPolicy, cancellationToken);
+            running = await RunningSessionAsync(route, cancellationToken);
+            if (running is not null) return running;
+            if (_options.SwapPolicy != ModelGatewaySwapPolicy.SingleActive)
+                return await _runtime.EnsureModelLoadedAsync(route, _options.SwapPolicy, cancellationToken);
+
+            // Single active stops every other session before loading. Hold new
+            // requests for those sessions and let current responses finish first.
+            // Same-model profiles are already drained by the per-model request gate.
+            using var drained = await _upstreamActivity.BlockAndDrainAsync(
+                (modelId, profileId) => !string.Equals(modelId, route.Model.Id, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(profileId, route.Profile.Id, StringComparison.OrdinalIgnoreCase),
+                TimeSpan.FromSeconds(_options.SwapDrainTimeoutSeconds),
+                cancellationToken);
+            return await _runtime.EnsureModelLoadedAsync(route, _options.SwapPolicy, cancellationToken);
         }
         finally
         {

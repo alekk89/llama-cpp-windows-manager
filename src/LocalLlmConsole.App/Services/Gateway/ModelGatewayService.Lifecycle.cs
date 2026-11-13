@@ -84,6 +84,8 @@ public sealed partial class ModelGatewayService
             throw new InvalidOperationException("Gateway concurrent request limit must be greater than zero.");
         if (_options.RequestBodyTimeoutSeconds <= 0)
             throw new InvalidOperationException("Gateway request body timeout must be greater than zero.");
+        if (_options.SwapDrainTimeoutSeconds <= 0)
+            throw new InvalidOperationException("Gateway swap drain timeout must be greater than zero.");
     }
 
     private Task ListenAsync(CancellationToken cancellationToken)
