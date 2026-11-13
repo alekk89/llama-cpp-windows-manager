@@ -54,16 +54,14 @@ public static class CommandLineService
         var modernMarkerValue = $"LLAMA_CPP_WINDOWS_MANAGER_BUILD_MARKER={marker}";
         var legacyConsoleMarkerValue = $"LLAMA_CPP_CONSOLE_BUILD_MARKER={marker}";
         var legacyMarkerValue = $"LOCAL_LLM_CONSOLE_BUILD_MARKER={marker}";
-        return string.Join(" ", new[]
-        {
-            $"modern_marker={BashQuote(modernMarkerValue)};",
-            $"legacy_console_marker={BashQuote(legacyConsoleMarkerValue)};",
-            $"legacy_marker={BashQuote(legacyMarkerValue)};",
-            "for environ in /proc/[0-9]*/environ; do",
-            "test -r \"$environ\" || continue;",
-            "env=$(tr '\\0' '\\n' < \"$environ\" 2>/dev/null || true);",
-            "case \"$env\" in *\"$modern_marker\"*|*\"$legacy_console_marker\"*|*\"$legacy_marker\"*) pid=${environ#/proc/}; pid=${pid%/environ}; kill \"$pid\" 2>/dev/null || true;; esac;",
-            "done"
-        });
+        return WslProcessKillScript.Build(
+            [
+                $"modern_marker={BashQuote(modernMarkerValue)};",
+                $"legacy_console_marker={BashQuote(legacyConsoleMarkerValue)};",
+                $"legacy_marker={BashQuote(legacyMarkerValue)};"
+            ],
+            WslProcessKillScript.ScanSource.Environment,
+            "*\"$modern_marker\"*|*\"$legacy_console_marker\"*|*\"$legacy_marker\"*",
+            verify: false);
     }
 }

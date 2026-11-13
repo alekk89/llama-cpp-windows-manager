@@ -95,7 +95,7 @@ public sealed class WslTests : ManagerRegressionTestBase
         Assert.Contains("LLAMA_CPP_WINDOWS_MANAGER_BUILD_MARKER=marker'\"'\"'1", cleanup, StringComparison.Ordinal);
         Assert.Contains("LLAMA_CPP_CONSOLE_BUILD_MARKER=marker'\"'\"'1", cleanup, StringComparison.Ordinal);
         Assert.Contains("LOCAL_LLM_CONSOLE_BUILD_MARKER=marker'\"'\"'1", cleanup, StringComparison.Ordinal);
-        Assert.Contains("/proc/[0-9]*/environ", cleanup, StringComparison.Ordinal);
+        Assert.Contains("\"$proc_root\"/[0-9]*/environ", cleanup, StringComparison.Ordinal);
         Assert.Contains("kill \"$pid\"", cleanup, StringComparison.Ordinal);
         Assert.Contains("--install -d 'Ubuntu-24.04'", ubuntuInstall, StringComparison.Ordinal);
         Assert.Contains("Installing llama.cpp CPU build tools", ubuntuInstall, StringComparison.Ordinal);

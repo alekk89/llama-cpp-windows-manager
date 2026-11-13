@@ -122,43 +122,19 @@ public sealed class WslRuntimeStopService
     public static string WslKillByExecutableAndPortCommand(string executablePath, int port)
     {
         if (string.IsNullOrWhiteSpace(executablePath)) return "";
-        var executable = executablePath.Replace('\\', '/');
-        return string.Join(" ", new[]
-        {
-            "for pid in $(pgrep -f -- llama-server 2>/dev/null); do",
-            "cmd=$(tr '\\0' ' ' < /proc/$pid/cmdline 2>/dev/null || true);",
-            $"case \"$cmd\" in *{CommandLineService.BashQuote(executable)}*\"--port\"*{CommandLineService.BashQuote(port.ToString(CultureInfo.InvariantCulture))}*) kill \"$pid\" 2>/dev/null || true;; esac;",
-            "done;",
-            "sleep 0.2;",
-            "remaining=0;",
-            "for cmdline in /proc/[0-9]*/cmdline; do",
-            "test -r \"$cmdline\" || continue;",
-            "cmd=$(tr '\\0' ' ' < \"$cmdline\" 2>/dev/null || true);",
-            $"case \"$cmd\" in *{CommandLineService.BashQuote(executable)}*\"--port\"*{CommandLineService.BashQuote(port.ToString(CultureInfo.InvariantCulture))}*) remaining=1;; esac;",
-            "done;",
-            "exit \"$remaining\""
-        });
+        var executable = CommandLineService.BashQuote(executablePath.Replace('\\', '/'));
+        var portText = CommandLineService.BashQuote(port.ToString(CultureInfo.InvariantCulture));
+        return WslProcessKillScript.Build(
+            [],
+            WslProcessKillScript.ScanSource.CommandLine,
+            $"*{executable}*\"--port\"*{portText}*",
+            verify: true);
     }
 
     public static string WslKillByMarkerCommand(string processMarker)
-    {
-        var marker = CommandLineService.BashQuote(processMarker);
-        return string.Join(" ", new[]
-        {
-            $"marker={marker};",
-            "for cmdline in /proc/[0-9]*/cmdline; do",
-            "test -r \"$cmdline\" || continue;",
-            "cmd=$(tr '\\0' ' ' < \"$cmdline\" 2>/dev/null || true);",
-            "case \"$cmd\" in *\"$marker\"*) pid=${cmdline#/proc/}; pid=${pid%/cmdline}; kill \"$pid\" 2>/dev/null || true;; esac;",
-            "done;",
-            "sleep 0.2;",
-            "remaining=0;",
-            "for cmdline in /proc/[0-9]*/cmdline; do",
-            "test -r \"$cmdline\" || continue;",
-            "cmd=$(tr '\\0' ' ' < \"$cmdline\" 2>/dev/null || true);",
-            "case \"$cmd\" in *\"$marker\"*) remaining=1;; esac;",
-            "done;",
-            "exit \"$remaining\""
-        });
-    }
+        => WslProcessKillScript.Build(
+            [$"marker={CommandLineService.BashQuote(processMarker)};"],
+            WslProcessKillScript.ScanSource.CommandLine,
+            "*\"$marker\"*",
+            verify: true);
 }
