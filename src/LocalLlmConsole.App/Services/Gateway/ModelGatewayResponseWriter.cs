@@ -22,6 +22,15 @@ public static class ModelGatewayResponseWriter
         }
     }
 
+    public static void TryAbort(HttpListenerResponse response)
+    {
+        try { response.Abort(); }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Could not abort model gateway response: {ex.Message}");
+        }
+    }
+
     public static object ModelsResponse(IReadOnlyList<ModelGatewayModelRoute> models)
         => new
         {
@@ -72,6 +81,12 @@ public static class ModelGatewayResponseWriter
             ex = ex.InnerException;
         return string.IsNullOrWhiteSpace(ex.Message) ? ex.GetType().Name : ex.Message;
     }
+
+    /// <summary>Strips line breaks from client-supplied text so it cannot forge separate log entries.</summary>
+    public static string ForLog(string? value)
+        => string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", string.Empty, StringComparison.Ordinal);
 
     public static object[] RunningModelRows(IReadOnlyList<LoadedModelSessionSnapshot> sessions)
         => sessions

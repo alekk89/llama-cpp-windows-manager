@@ -18,6 +18,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
     private Task _ownedResourceDisposalCompletion = Task.CompletedTask;
     private int _disposed;
     private int _ownedResourcesDisposed;
+    private long _clientDisconnects;
 
     public ModelGatewayService(
         ModelGatewayOptions options,
@@ -43,6 +44,7 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
     public bool IsListening => _listener.IsListening && _loop is { IsCompleted: false };
     internal bool OwnedResourcesDisposed => Volatile.Read(ref _ownedResourcesDisposed) != 0;
     internal Task OwnedResourceDisposalCompletion => Volatile.Read(ref _ownedResourceDisposalCompletion);
+    internal long ClientDisconnectCount => Interlocked.Read(ref _clientDisconnects);
 
     private async Task HandleAsync(HttpListenerContext context, CancellationToken cancellationToken)
     {
@@ -118,6 +120,17 @@ public sealed partial class ModelGatewayService : IModelGatewayHost
         catch (OperationCanceledException)
         {
             ModelGatewayResponseWriter.TryClose(context.Response);
+        }
+        catch (Exception ex) when (ModelGatewayClientDisconnectedException.IsClientConnectionFailure(ex))
+        {
+            // The client went away; there is nobody to send an error response to.
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                Interlocked.Increment(ref _clientDisconnects);
+                Trace.TraceInformation(
+                    $"Model gateway client disconnected during {ModelGatewayResponseWriter.ForLog(context.Request.HttpMethod)} {ModelGatewayResponseWriter.ForLog(context.Request.Url?.AbsolutePath)}: {ModelGatewayResponseWriter.InnermostMessage(ex)}");
+            }
+            ModelGatewayResponseWriter.TryAbort(context.Response);
         }
         catch (Exception ex)
         {
