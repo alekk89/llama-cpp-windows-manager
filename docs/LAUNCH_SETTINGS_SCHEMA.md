@@ -57,6 +57,39 @@ The Runtime Command panel remains visible in Basic and Advanced modes. Its gener
 
 Custom arguments are validated before application-owned arguments such as metrics are appended. Model, host, port, credentials, curated performance fields, and other managed flags cannot be overridden through raw parameters.
 
+### Blocked custom parameters
+
+`RuntimeLaunchOptionPolicy` also owns the deny policy for options that are not
+application-managed but are unsafe to pass through. The options below are
+rejected everywhere: profile launches, launch previews, profile benchmarks, the
+Custom params editor, **Apply added flags**, discovered runtime settings, and
+profile import. Long names, short aliases, and `--name=value` forms are matched
+case-insensitively.
+
+| Category | Rejected options |
+| --- | --- |
+| Remote downloads | `-mu`/`--model-url`, `-mmu`/`--mmproj-url`, `-hf`/`-hfr`/`--hf-repo`, `-hff`/`--hf-file`, `-hfd`/`-hfrd`/`--hf-repo-draft`, `--spec-draft-hf`, `-hfv`/`-hfrv`/`--hf-repo-v`, `-hffv`/`--hf-file-v`, `-hft`/`--hf-token`, `-dr`/`--docker-repo` |
+| Serving local files or tools over HTTP | `--path`, `--media-path`, `--tools` |
+| Sending data to remote hosts | `--rpc` |
+| Changing the managed endpoint | `--ssl-key-file`, `--ssl-cert-file` |
+
+Local options that choose where `llama-server` writes files, `--slot-save-path`,
+`--log-file`, and `-lcd`/`--lookup-cache-dynamic`, remain available when set on
+this computer; `--slot-save-path` keeps its folder picker. They are rejected only
+in imported profile bundles, because a shared bundle must not choose where the
+Manager writes files. Set them locally after import if needed.
+
+The short aliases `-md` and `-mm` are treated as application-managed because
+they replace the draft model and vision projector. Local tuning and local input
+files remain allowed, including `-c`, `-ngl`, `--lora`, `--lora-scaled`, and
+`--control-vector`.
+
+A saved profile that already contains a blocked option is not rewritten. Its
+next load, preview, or benchmark fails with a message naming the option; remove
+it from **Custom params** and save the profile. Profile import reports each
+blocked or file-writing option as an error, and the import cannot be applied
+until the `customParameters` override removes it.
+
 Host is a curated per-profile Server setting. It defaults from the application
 settings, round-trips through `ModelLaunchSettings`, and is projected to
 `--host`. The direct-model LAN access policy remains authoritative: a profile
@@ -98,6 +131,9 @@ Tests cover:
 - readable runtime-option labels with exact raw-flag search and emission;
 - safe/app-managed filtering;
 - rejection of model, port, and credential overrides;
+- rejection of remote-download, file-serving, remote-host, and endpoint options
+  in launches, saved profiles, and profile import, and of file-writing options
+  in profile import only;
 - shared preview/launch argument generation;
 - curated schema validity and uniqueness;
 - the existing application architecture and full regression suite.

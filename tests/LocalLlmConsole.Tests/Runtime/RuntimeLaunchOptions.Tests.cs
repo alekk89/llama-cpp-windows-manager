@@ -349,6 +349,77 @@ public sealed class RuntimeLaunchOptionsTests
         Assert.Contains("managed by the application", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("-hf", "remote source")]
+    [InlineData("--hf-repo-draft=owner/repo", "remote source")]
+    [InlineData("-hff", "remote source")]
+    [InlineData("-mu", "remote source")]
+    [InlineData("--MMPROJ-URL=https://example.invalid/m.gguf", "remote source")]
+    [InlineData("-dr", "remote source")]
+    [InlineData("--path", "HTTP server")]
+    [InlineData("--media-path=C:\\media", "HTTP server")]
+    [InlineData("--rpc", "remote hosts")]
+    [InlineData("--rpc=10.0.0.5:50052", "remote hosts")]
+    [InlineData("--ssl-key-file", "endpoint")]
+    [InlineData("--ssl-cert-file", "endpoint")]
+    public void UnsafeCustomArgumentsAreRejectedWithAnActionableReason(string argument, string reason)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RuntimeLaunchOptionPolicy.ValidateCustomArguments(["--dry-multiplier", "0.8", argument, "value"]));
+
+        Assert.Contains($"'{argument.Split('=')[0]}'", error.Message, StringComparison.Ordinal);
+        Assert.Contains(reason, error.Message, StringComparison.Ordinal);
+        Assert.Contains("Remove it from Custom parameters", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("-md")]
+    [InlineData("-mm=projector.gguf")]
+    public void ShortAliasesOfManagedCompanionFilesCannotBeOverridden(string argument)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => RuntimeLaunchOptionPolicy.ValidateCustomArguments([argument]));
+        Assert.Contains("managed by the application", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LocalTuningAndAdapterArgumentsRemainAllowed()
+    {
+        string[] arguments = ["-c", "8192", "-ngl", "99", "--lora", "C:\\adapters\\style.gguf", "--lora-scaled", "a.gguf", "0.5",
+            "--control-vector", "cv.gguf", "--dry-multiplier", "0.8", "--alias", "qwen", "--offline", "-o", "json"];
+
+        RuntimeLaunchOptionPolicy.ValidateCustomArguments(arguments);
+        Assert.Empty(RuntimeLaunchOptionPolicy.CustomArgumentProblems(arguments));
+    }
+
+    [Fact]
+    public void BlockedOptionsAreNotRenderedAsLaunchSettings()
+    {
+        Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--rpc", ["--rpc"], "SERVERS", "comma separated list of RPC servers", RuntimeLaunchOptionValueKind.Text, [])));
+        Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--media-path", ["--media-path"], "PATH", "directory for local media files", RuntimeLaunchOptionValueKind.Directory, [])));
+        Assert.True(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--slot-save-path", ["--slot-save-path"], "PATH", "path to save slot kv cache", RuntimeLaunchOptionValueKind.Directory, [])));
+        Assert.True(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+            "--dry-multiplier", ["--dry-multiplier"], "N", "DRY sampling multiplier", RuntimeLaunchOptionValueKind.Text, [])));
+    }
+
+    [Theory]
+    [InlineData("--slot-save-path", "C:\\slots")]
+    [InlineData("--SLOT-SAVE-PATH=C:\\slots", null)]
+    [InlineData("--log-file", "C:\\logs\\server.log")]
+    [InlineData("-lcd", "lookup.bin")]
+    [InlineData("--lookup-cache-dynamic=lookup.bin", null)]
+    public void LocalFileWritingOptionsAreAllowedLocallyButRejectedFromImports(string argument, string? value)
+    {
+        string[] arguments = value is null ? ["--dry-multiplier", "0.8", argument] : ["--dry-multiplier", "0.8", argument, value];
+
+        RuntimeLaunchOptionPolicy.ValidateCustomArguments(arguments);
+        var problem = Assert.Single(RuntimeLaunchOptionPolicy.ImportedCustomArgumentProblems(arguments));
+
+        Assert.Contains($"'{argument.Split('=')[0]}' cannot be imported", problem, StringComparison.Ordinal);
+        Assert.Contains("set it locally after import", problem, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void PreviewUsesTheSameLlamaCppLaunchAsLaunch()
     {

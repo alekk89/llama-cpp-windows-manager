@@ -105,6 +105,26 @@ public sealed class RuntimeProcessLifecycleTests : ManagerRegressionTestBase
     }
 
     [Fact]
+    public async Task SavedProfileWithANewlyBlockedCustomParameterFailsBeforeLaunch()
+    {
+        using var supervisor = CreateTestLlamaSupervisor();
+        var root = CreateTempRoot();
+        var executable = Path.Combine(root, "llama-server.exe");
+        File.WriteAllBytes(executable, []);
+        var modelPath = Path.Combine(root, "model.gguf");
+        File.WriteAllBytes(modelPath, []);
+        var runtime = new RuntimeRecord("runtime-1", "Native CPU", RuntimeMode.Native, RuntimeBackend.Cpu, executable, "{}", DateTimeOffset.UtcNow);
+        var model = new ModelRecord("model-1", "Model", modelPath, OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+        var settings = AppSettings.CreateDefault(root) with { CustomParameters = "--dry-multiplier 0.8 --rpc 10.0.0.5:50052" };
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => supervisor.StartAsync(runtime, model, settings, Path.Combine(root, "logs")));
+
+        Assert.Contains("'--rpc' is not allowed", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Remove it from Custom parameters", error.Message, StringComparison.Ordinal);
+        Assert.False(supervisor.IsRunning);
+    }
+
+    [Fact]
     public async Task LlamaProcessSupervisorDistinguishesUnreadableEmbeddedMtpMetadataFromMissingCompanion()
     {
         using var supervisor = CreateTestLlamaSupervisor();
