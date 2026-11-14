@@ -169,7 +169,8 @@ public sealed class BenchmarkSpeculativeConfigurationPicker : StackPanel
     [
         new("none", "None"), new("atomic-mtp", "Atomic MTP"), new("draft-mtp", "Draft MTP"),
         new("draft-simple", "Draft simple"), new("draft-eagle3", "Draft Eagle 3"),
-        new("draft-dflash", "Draft DFlash"), new("draft-dspark", "Draft DSpark"),
+        new("draft-dflash", "Draft DFlash"), new("draft-dflash2", "Draft DFlash2"),
+        new("draft-lilicorr", "Draft LiliCorr"), new("draft-dspark", "Draft DSpark"),
         new("ngram-simple", "N-gram simple"), new("ngram-map-k", "N-gram map K"),
         new("ngram-map-k4v", "N-gram map K4V"), new("ngram-mod", "N-gram mod"),
         new("ngram-cache", "N-gram cache")

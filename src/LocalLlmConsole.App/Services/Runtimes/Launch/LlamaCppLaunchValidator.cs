@@ -200,7 +200,7 @@ public static class LlamaCppLaunchValidator
             errors.Add(RuntimeDefinedChoicePolicy.InvalidValueMessage(label, setting));
     }
 
-    private static readonly string[] SpeculativeTypes = ["none", "atomic-mtp", "draft-mtp", "draft-simple", "draft-eagle3", "draft-dflash", "draft-dspark", "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-mod", "ngram-cache"];
+    private static readonly string[] SpeculativeTypes = [.. SpeculativeTypePolicy.SupportedTypes];
 
     private static bool IsOneOf(string value, params string[] allowed)
         => allowed.Contains(value, StringComparer.OrdinalIgnoreCase);

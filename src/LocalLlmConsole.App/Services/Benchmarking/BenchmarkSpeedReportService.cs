@@ -97,7 +97,9 @@ public static class BenchmarkSpeedReportService
         if (result.ExecutionMode != BenchmarkExecutionMode.ProfileServing) return "";
         return (result.SpeculativeType ?? "").Trim().ToLowerInvariant() switch
         {
-            "draft-dflash" => "DFlash2",
+            "draft-dflash" => "DFlash",
+            "draft-dflash2" => "DFlash2",
+            "draft-lilicorr" => "LiliCorr",
             "draft-mtp" => "MTP",
             "atomic-mtp" => "Atomic MTP",
             "draft-eagle3" => "Eagle 3",

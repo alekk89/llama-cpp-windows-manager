@@ -160,7 +160,7 @@ public sealed class BenchmarkPlanningTests
         ]);
 
         var generation = Assert.Single(sections, section => section.Kind == BenchmarkSpeedReportKind.Generation);
-        Assert.Contains(generation.Bars, bar => bar.ConfigurationLabel == "DFlash2");
+        Assert.Contains(generation.Bars, bar => bar.ConfigurationLabel == "DFlash");
         Assert.Contains(generation.Bars, bar => bar.ConfigurationLabel == "MTP");
     }
 

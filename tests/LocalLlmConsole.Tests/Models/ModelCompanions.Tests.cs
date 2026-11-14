@@ -55,6 +55,28 @@ public sealed class ModelCompanionsTests : ManagerRegressionTestBase
         Assert.Equal(Path.GetFullPath(dflash), Path.GetFullPath(found!));
     }
 
+    [Theory]
+    [InlineData("draft-dflash2")]
+    [InlineData("draft-lilicorr")]
+    public void DFlashVariantsUseTheDFlashDraftModel(string speculativeType)
+    {
+        var root = CreateTempRoot();
+        var models = Path.Combine(root, "models");
+        Directory.CreateDirectory(models);
+        var main = Path.Combine(models, "Qwen3.6-27B-Q4_K_M.gguf");
+        var dflash = Path.Combine(models, "Qwen3.6-27B-DFlash-b16-Q4_K_M.gguf");
+        var dspark = Path.Combine(models, "Qwen3.6-27B-DSpark.gguf");
+        File.WriteAllText(main, "main");
+        File.WriteAllText(dflash, "dflash");
+        File.WriteAllText(dspark, "dspark");
+
+        Assert.Equal([Path.GetFullPath(dflash)], ModelCatalogService.FindDraftModels(main, speculativeType).Select(Path.GetFullPath));
+        Assert.True(ModelCatalogService.IsCompatibleCompanion(main, dflash, speculativeType));
+        Assert.False(ModelCatalogService.IsCompatibleCompanion(main, dspark, speculativeType));
+        var request = ValidLaunchRequest() with { SpeculativeType = speculativeType, SpecDraftModelPath = dflash };
+        Assert.True(LlamaCppLaunchValidator.Validate(request).Ok, string.Join("; ", LlamaCppLaunchValidator.Validate(request).Errors));
+    }
+
     [Fact]
     public void ModelCatalogFindsAndPrefersAdjacentDSparkHead()
     {
