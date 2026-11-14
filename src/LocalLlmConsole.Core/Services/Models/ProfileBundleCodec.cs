@@ -93,12 +93,13 @@ public static class ProfileBundleCodec
             Choice(value, ["auto", "on", "off"]);
         Choice(s.MlockMode, ["auto", "on", "off"]);
         Choice(s.GpuMode, ["auto", "single", "layer", "row", "tensor"]);
-        Choice(s.ReasoningFormat, ["auto", "none", "deepseek", "deepseek-legacy"]);
         Choice(s.ReasoningEffort, ["default", "minimal", "low", "medium", "high", "xhigh", "max"]);
-        Choice(s.RopeScaling, ["auto", "none", "linear", "yarn"]);
         Choice(s.SpeculativeType, SpeculativeTypePolicy.SupportedTypes);
-        foreach (var cache in new[] { s.CacheTypeK, s.CacheTypeV, s.SpecDraftCacheTypeK, s.SpecDraftCacheTypeV })
-            Choice(cache, ["f16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1", "f32", "bf16"]);
+        // Runtime-defined values (cache types, formats) are only checked for shape: a profile may
+        // come from a runtime fork that supports values the built-in lists do not know.
+        foreach (var value in new[] { s.CacheTypeK, s.CacheTypeV, s.SpecDraftCacheTypeK, s.SpecDraftCacheTypeV, s.ReasoningFormat, s.RopeScaling })
+            if (!RuntimeDefinedChoicePolicy.IsWellFormed(value))
+                throw new InvalidOperationException($"Unsupported launch setting value '{value}'. Expected a runtime value token such as q8_0.");
     }
 
     private static void Choice(string value, IReadOnlyList<string> accepted)

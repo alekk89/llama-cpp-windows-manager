@@ -21,6 +21,11 @@ public sealed class LaunchSettingsFormControls
 
     public LaunchRuntimeOptionsPanel? RuntimeOptions { get; }
 
+    /// <summary>Every option the selected runtime advertised, or null before discovery or after it failed.</summary>
+    public IReadOnlyList<RuntimeLaunchOptionDefinition>? RuntimeAdvertisedOptions { get; set; }
+
+    public WpfComboBox? RuntimeDefinedCombo(RuntimeDefinedChoiceSetting setting) => Combo(setting.Id);
+
     public WpfTextBox? LaunchPortBox => Text(nameof(AppSettings.Port));
     public WpfTextBox? HostBox => Text(nameof(AppSettings.Host));
     public WpfTextBox? ContextSizeBox => Text(nameof(AppSettings.ContextSize));
@@ -235,13 +240,13 @@ public static class LaunchSettingsFormBinder
         SetCombo(controls.MetricsCombo, settings.EnableMetrics ? "on" : "off");
         SetCombo(controls.GpuModeCombo, LocalLlmConsole.Services.LaunchSettingMetadataService.NormalizeGpuMode(settings.GpuMode));
         SetCombo(controls.ReasoningCombo, settings.ReasoningMode);
-        SetCombo(controls.ReasoningFormatCombo, settings.ReasoningFormat);
+        SetRuntimeDefinedCombo(controls, RuntimeDefinedChoicePolicy.ReasoningFormat, settings.ReasoningFormat);
         SetCombo(controls.ReasoningEffortCombo, settings.ReasoningEffort);
         SetCombo(controls.ReasoningPreserveCombo, settings.ReasoningPreserve);
         SetCombo(controls.VisionCombo, settings.VisionMode);
         SetCombo(controls.FlashAttentionCombo, settings.FlashAttention);
-        SetCombo(controls.CacheTypeKCombo, settings.CacheTypeK);
-        SetCombo(controls.CacheTypeVCombo, settings.CacheTypeV);
+        SetRuntimeDefinedCombo(controls, RuntimeDefinedChoicePolicy.CacheTypeK, settings.CacheTypeK);
+        SetRuntimeDefinedCombo(controls, RuntimeDefinedChoicePolicy.CacheTypeV, settings.CacheTypeV);
         SetCombo(controls.KvOffloadCombo, settings.KvOffload);
         SetCombo(controls.KvUnifiedCombo, settings.KvUnified);
         SetCombo(controls.PromptCacheCombo, settings.PromptCacheMode);
@@ -253,10 +258,10 @@ public static class LaunchSettingsFormBinder
         SetCombo(controls.JinjaCombo, settings.JinjaMode);
         SetCombo(controls.MmapCombo, settings.MmapMode);
         SetCombo(controls.MlockCombo, settings.MlockMode);
-        SetCombo(controls.RopeScalingCombo, settings.RopeScaling);
+        SetRuntimeDefinedCombo(controls, RuntimeDefinedChoicePolicy.RopeScaling, settings.RopeScaling);
         SetCombo(controls.SpeculativeTypeCombo, LocalLlmConsole.Services.LaunchSettingMetadataService.NormalizeSpeculativeType(settings.SpeculativeType));
-        SetCombo(controls.SpecDraftCacheTypeKCombo, settings.SpecDraftCacheTypeK);
-        SetCombo(controls.SpecDraftCacheTypeVCombo, settings.SpecDraftCacheTypeV);
+        SetRuntimeDefinedCombo(controls, RuntimeDefinedChoicePolicy.SpecDraftCacheTypeK, settings.SpecDraftCacheTypeK);
+        SetRuntimeDefinedCombo(controls, RuntimeDefinedChoicePolicy.SpecDraftCacheTypeV, settings.SpecDraftCacheTypeV);
     }
 
     public static void AttachChangeHandlers(LaunchSettingsFormControls controls, Action changed, RoutedEventHandler contextSizeLostFocus)
@@ -306,6 +311,34 @@ public static class LaunchSettingsFormBinder
     private static void SetText(WpfTextBox? box, string value)
     {
         if (box is not null) box.Text = value;
+    }
+
+    /// <summary>
+    /// Lists the selected runtime's advertised values in the runtime-defined combos (or the
+    /// built-in defaults when it advertises none), keeping each combo's current value. Callers run
+    /// this as a programmatic update: it is not a user edit and must not mark the profile changed.
+    /// </summary>
+    public static void ApplyRuntimeAdvertisedChoices(
+        LaunchSettingsFormControls controls,
+        IReadOnlyList<RuntimeLaunchOptionDefinition>? runtimeOptions)
+    {
+        controls.RuntimeAdvertisedOptions = runtimeOptions;
+        foreach (var setting in RuntimeDefinedChoicePolicy.Settings)
+        {
+            var combo = controls.RuntimeDefinedCombo(setting);
+            if (combo is not null)
+                SetRuntimeDefinedCombo(controls, setting, ComboValue(combo));
+        }
+    }
+
+    // A saved value the list does not contain (for example one set through llwmctl for a runtime
+    // fork) is listed rather than silently replaced by the first item.
+    private static void SetRuntimeDefinedCombo(LaunchSettingsFormControls controls, RuntimeDefinedChoiceSetting setting, string value)
+    {
+        var combo = controls.RuntimeDefinedCombo(setting);
+        if (combo is null) return;
+        combo.ItemsSource = RuntimeDefinedChoicePolicy.Choices(setting, controls.RuntimeAdvertisedOptions, value).ToArray();
+        SetCombo(combo, value);
     }
 
     private static void SetCombo(WpfComboBox? combo, string value)

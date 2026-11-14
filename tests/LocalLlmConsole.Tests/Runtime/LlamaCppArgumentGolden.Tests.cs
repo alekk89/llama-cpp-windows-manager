@@ -154,7 +154,7 @@ public sealed class LlamaCppArgumentGoldenTests : ManagerRegressionTestBase
             "endpoint" => ValidLaunchRequest() with { Port = 0 },
             "compute" => ValidLaunchRequest() with { GpuLayers = -1 },
             "context" => ValidLaunchRequest() with { ContextSize = 128 },
-            "cache" => ValidLaunchRequest() with { CacheTypeK = "invalid" },
+            "cache" => ValidLaunchRequest() with { CacheTypeK = "q8_0 --invalid" },
             "sampling" => ValidLaunchRequest() with { TopP = 2 },
             "reasoning" => ValidLaunchRequest() with { ReasoningEffort = "ultra" },
             "vision" => ValidLaunchRequest() with { VisionMode = "on", VisionProjectorPath = "" },

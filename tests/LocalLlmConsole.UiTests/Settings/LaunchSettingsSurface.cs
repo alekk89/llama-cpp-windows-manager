@@ -171,6 +171,21 @@ public abstract partial class WpfUiTestBase
         Assert.Empty(panel.FormControls.RuntimeOptions.GroupTitles);
         Assert.Contains("Official CUDA", panel.FormControls.RuntimeOptions.StatusText, StringComparison.Ordinal);
 
+        // Runtime-defined values: a value the built-in list lacks survives a load/read round trip,
+        // and the selected runtime's advertised values replace the built-in list.
+        LocalLlmConsole.LaunchSettingsFormBinder.Apply(panel.FormControls, settings with { CacheTypeK = "turbo3" });
+        Assert.Equal("turbo3", LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls).CacheTypeK);
+        LocalLlmConsole.LaunchSettingsFormBinder.ApplyRuntimeAdvertisedChoices(panel.FormControls, [
+            new RuntimeLaunchOptionDefinition("--cache-type-k", ["-ctk", "--cache-type-k"], "TYPE", "KV cache data type for K",
+                RuntimeLaunchOptionValueKind.Choice, ["f16", "q8_0", "turbo2", "turbo3", "turbo4"], "f16")
+        ]);
+        Assert.Equal(["f16", "q8_0", "turbo2", "turbo3", "turbo4"], cacheTypeKCombo.Items.Cast<string>().ToArray());
+        Assert.Equal("turbo3", cacheTypeKCombo.SelectedItem);
+        Assert.Contains("iq4_nl", panel.FormControls.CacheTypeVCombo!.Items.Cast<string>());
+        LocalLlmConsole.LaunchSettingsFormBinder.ApplyRuntimeAdvertisedChoices(panel.FormControls, null);
+        Assert.Equal("turbo3", LocalLlmConsole.LaunchSettingsFormBinder.Read(settings, panel.FormControls).CacheTypeK);
+        Assert.Contains("q5_1", cacheTypeKCombo.Items.Cast<string>());
+
 
         return settings;
     }

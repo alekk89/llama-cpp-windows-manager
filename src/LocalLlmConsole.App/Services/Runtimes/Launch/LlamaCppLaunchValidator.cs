@@ -101,10 +101,8 @@ public static class LlamaCppLaunchValidator
             errors.Add("Frequency penalty must be between -10 and 10.");
         if (!IsOneOf(request.FlashAttention, "auto", "on", "off"))
             errors.Add("Flash attention must be auto, on, or off.");
-        if (!IsOneOf(request.CacheTypeK, CacheTypes))
-            errors.Add($"K cache type must be one of: {string.Join(", ", CacheTypes)}.");
-        if (!IsOneOf(request.CacheTypeV, CacheTypes))
-            errors.Add($"V cache type must be one of: {string.Join(", ", CacheTypes)}.");
+        RuntimeDefined(request.CacheTypeK, "K cache type", RuntimeDefinedChoicePolicy.CacheTypeK, errors);
+        RuntimeDefined(request.CacheTypeV, "V cache type", RuntimeDefinedChoicePolicy.CacheTypeV, errors);
         if (!IsOneOf(request.KvOffload, "auto", "on", "off"))
             errors.Add("KV offload must be auto, on, or off.");
         if (!IsOneOf(request.KvUnified, "auto", "on", "off"))
@@ -135,8 +133,7 @@ public static class LlamaCppLaunchValidator
             errors.Add("Continuous batching must be on or off.");
         if (!IsOneOf(request.ReasoningMode, "auto", "on", "off"))
             errors.Add("Reasoning mode must be auto, on, or off.");
-        if (!IsOneOf(request.ReasoningFormat, "auto", "none", "deepseek", "deepseek-legacy"))
-            errors.Add("Reasoning format must be auto, none, deepseek, or deepseek-legacy.");
+        RuntimeDefined(request.ReasoningFormat, "Reasoning format", RuntimeDefinedChoicePolicy.ReasoningFormat, errors);
         if (!IsOneOf(request.ReasoningEffort, "default", "minimal", "low", "medium", "high", "xhigh", "max"))
             errors.Add("Reasoning effort must be default, minimal, low, medium, high, xhigh, or max.");
         if ((request.ReasoningBudgetMessage ?? "").Length > 4096)
@@ -165,8 +162,7 @@ public static class LlamaCppLaunchValidator
             errors.Add("Mmap mode must be auto, on, or off.");
         if (!IsOneOf(request.MlockMode, "on", "off"))
             errors.Add("Mlock mode must be on or off.");
-        if (!IsOneOf(request.RopeScaling, "auto", "none", "linear", "yarn"))
-            errors.Add("RoPE scaling must be auto, none, linear, or yarn.");
+        RuntimeDefined(request.RopeScaling, "RoPE scaling", RuntimeDefinedChoicePolicy.RopeScaling, errors);
         if (request.RopeScale < 0)
             errors.Add("RoPE scale cannot be negative.");
         if (request.RopeFreqBase < 0)
@@ -192,14 +188,18 @@ public static class LlamaCppLaunchValidator
             errors.Add("Draft split probability must be -1 for default or between 0 and 1.");
         if (request.SpecDraftPMin > 1 || (request.SpecDraftPMin < 0 && Math.Abs(request.SpecDraftPMin + 1) > 0.000_001))
             errors.Add("Draft min probability must be -1 for default or between 0 and 1.");
-        if (!IsOneOf(request.SpecDraftCacheTypeK, CacheTypes))
-            errors.Add($"Draft K cache type must be one of: {string.Join(", ", CacheTypes)}.");
-        if (!IsOneOf(request.SpecDraftCacheTypeV, CacheTypes))
-            errors.Add($"Draft V cache type must be one of: {string.Join(", ", CacheTypes)}.");
+        RuntimeDefined(request.SpecDraftCacheTypeK, "Draft K cache type", RuntimeDefinedChoicePolicy.SpecDraftCacheTypeK, errors);
+        RuntimeDefined(request.SpecDraftCacheTypeV, "Draft V cache type", RuntimeDefinedChoicePolicy.SpecDraftCacheTypeV, errors);
         return errors.Count == 0 ? ValidationResult.Success : ValidationResult.Fail(errors);
     }
 
-    private static readonly string[] CacheTypes = ["f16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1", "f32", "bf16"];
+    // The runtime owns these value sets (forks add cache types); it rejects unknown values at startup.
+    private static void RuntimeDefined(string value, string label, RuntimeDefinedChoiceSetting setting, List<string> errors)
+    {
+        if (!RuntimeDefinedChoicePolicy.IsWellFormed(value))
+            errors.Add(RuntimeDefinedChoicePolicy.InvalidValueMessage(label, setting));
+    }
+
     private static readonly string[] SpeculativeTypes = ["none", "atomic-mtp", "draft-mtp", "draft-simple", "draft-eagle3", "draft-dflash", "draft-dspark", "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-mod", "ngram-cache"];
 
     private static bool IsOneOf(string value, params string[] allowed)

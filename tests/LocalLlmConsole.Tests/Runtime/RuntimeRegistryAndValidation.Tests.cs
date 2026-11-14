@@ -163,7 +163,7 @@ public sealed class RuntimeRegistryAndValidationTests : ManagerRegressionTestBas
             SpecDraftPSplit = 2,
             PromptCacheMode = "maybe",
             ContextCheckpointsMode = "maybe",
-            RopeScaling = "banana"
+            RopeScaling = "--banana"
         };
 
         var result = LlamaCppLaunchValidator.Validate(request);

@@ -43,7 +43,7 @@ public static partial class BenchmarksPageFactory
         var threads = Picker("thread count", halfProcessors, logicalProcessors);
         var gpuLayers = Picker("GPU-layer", "-1", "0");
         var flashAttention = Picker("Flash Attention", "auto", "on", "off");
-        var cacheKv = Picker("K/V cache type", "f16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1", "f32", "bf16");
+        var cacheKv = Picker("K/V cache type", [.. RuntimeDefinedChoicePolicy.CacheTypes]);
         var kvOffload = Picker("KV offload", "on", "off");
         var gpuConfigurations = new BenchmarkGpuConfigurationPicker();
         var speculativeConfigurations = new BenchmarkSpeculativeConfigurationPicker();
