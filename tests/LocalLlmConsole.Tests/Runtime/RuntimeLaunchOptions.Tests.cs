@@ -362,6 +362,18 @@ public sealed class RuntimeLaunchOptionsTests
     [InlineData("--rpc=10.0.0.5:50052", "remote hosts")]
     [InlineData("--ssl-key-file", "endpoint")]
     [InlineData("--ssl-cert-file", "endpoint")]
+    [InlineData("--api-prefix=/x", "endpoint")]
+    [InlineData("--connect", "outside the local network")]
+    [InlineData("--connect-code", "outside the local network")]
+    [InlineData("--allow-unauthenticated-tools", "without an API key")]
+    [InlineData("--media-allow-private-urls", "private network addresses")]
+    [InlineData("--mcp-servers-config", "run commands")]
+    [InlineData("--mcp-servers-json={}", "run commands")]
+    [InlineData("-ag", "run commands")]
+    [InlineData("--agent", "run commands")]
+    [InlineData("--tools-runtime=docker:img", "run commands")]
+    [InlineData("--ui-mcp-proxy", "run commands")]
+    [InlineData("--webui-mcp-proxy", "run commands")]
     public void UnsafeCustomArgumentsAreRejectedWithAnActionableReason(string argument, string reason)
     {
         var error = Assert.Throws<InvalidOperationException>(() => RuntimeLaunchOptionPolicy.ValidateCustomArguments(["--dry-multiplier", "0.8", argument, "value"]));
@@ -391,8 +403,15 @@ public sealed class RuntimeLaunchOptionsTests
     }
 
     [Fact]
+    public void DisablingFormsOfToolOptionsRemainAllowed()
+        => Assert.Empty(RuntimeLaunchOptionPolicy.CustomArgumentProblems(["--no-agent", "--no-webui-mcp-proxy", "--no-ui-mcp-proxy"]));
+
+    [Fact]
     public void BlockedOptionsAreNotRenderedAsLaunchSettings()
     {
+        foreach (var name in new[] { "--connect", "--media-allow-private-urls", "--allow-unauthenticated-tools" })
+            Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
+                name, [name], "", "upstream server option", RuntimeLaunchOptionValueKind.Switch, [])));
         Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(
             "--rpc", ["--rpc"], "SERVERS", "comma separated list of RPC servers", RuntimeLaunchOptionValueKind.Text, [])));
         Assert.False(RuntimeLaunchOptionPolicy.CanRender(new RuntimeLaunchOptionDefinition(

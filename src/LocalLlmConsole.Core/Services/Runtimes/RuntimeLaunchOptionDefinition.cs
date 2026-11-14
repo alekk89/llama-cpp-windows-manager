@@ -45,6 +45,10 @@ public static class RuntimeLaunchOptionPolicy
     private const string FileServingReason = "exposes local files or tools through the HTTP server";
     private const string RemoteHostReason = "sends model data to remote hosts";
     private const string EndpointReason = "changes how the application-managed endpoint is served";
+    private const string TunnelReason = "opens a tunnel that reaches the server from outside the local network";
+    private const string ToolExecutionReason = "starts tools, MCP servers, or containers that can run commands";
+    private const string UnauthenticatedToolsReason = "enables server tools without an API key on network addresses";
+    private const string PrivateFetchReason = "lets requests make the server fetch local or private network addresses";
 
     // Denied everywhere: launch, preview, benchmark validation, profile editing, and profile
     // import. Local tuning and local input files (for example --lora) remain allowed.
@@ -77,7 +81,19 @@ public static class RuntimeLaunchOptionPolicy
         ["--tools"] = FileServingReason,
         ["--rpc"] = RemoteHostReason,
         ["--ssl-key-file"] = EndpointReason,
-        ["--ssl-cert-file"] = EndpointReason
+        ["--ssl-cert-file"] = EndpointReason,
+        ["--api-prefix"] = EndpointReason,
+        ["--connect"] = TunnelReason,
+        ["--connect-code"] = TunnelReason,
+        ["--allow-unauthenticated-tools"] = UnauthenticatedToolsReason,
+        ["--media-allow-private-urls"] = PrivateFetchReason,
+        ["--mcp-servers-config"] = ToolExecutionReason,
+        ["--mcp-servers-json"] = ToolExecutionReason,
+        ["-ag"] = ToolExecutionReason,
+        ["--agent"] = ToolExecutionReason,
+        ["--tools-runtime"] = ToolExecutionReason,
+        ["--ui-mcp-proxy"] = ToolExecutionReason,
+        ["--webui-mcp-proxy"] = ToolExecutionReason
     };
 
     // Local options that choose where llama-server writes files. A user may set them on this
