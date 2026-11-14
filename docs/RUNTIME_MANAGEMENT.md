@@ -18,6 +18,12 @@ assuming that the first release or asset returned by a feed is current. Windows
 and WSL assets remain separate, and a preset is shown as unavailable when its
 release has no checksum-verifiable asset for that platform and backend.
 
+Official CUDA packages install with the matching `cudart-llama` CUDA runtime
+archive for the same CUDA version. On WSL its libraries are placed in the `lib`
+folder beside the runtime folder, which every WSL launch puts on
+`LD_LIBRARY_PATH`, so the bundled CUDA libraries take precedence over an older
+CUDA Toolkit installed in the distribution.
+
 The curated repository list includes upstream `llama.cpp` plus compatible
 Atomic TurboQuant, `ik_llama.cpp`, and TheTom TurboQuant `llama-server` forks.
 TheTom release packages are offered only for its published CUDA Windows,
