@@ -81,7 +81,10 @@ case-insensitively.
 | Remote downloads | `-mu`/`--model-url`, `-mmu`/`--mmproj-url`, `-hf`/`-hfr`/`--hf-repo`, `-hff`/`--hf-file`, `-hfd`/`-hfrd`/`--hf-repo-draft`, `--spec-draft-hf`, `-hfv`/`-hfrv`/`--hf-repo-v`, `-hffv`/`--hf-file-v`, `-hft`/`--hf-token`, `-dr`/`--docker-repo` |
 | Serving local files or tools over HTTP | `--path`, `--media-path`, `--tools` |
 | Sending data to remote hosts | `--rpc` |
-| Changing the managed endpoint | `--ssl-key-file`, `--ssl-cert-file` |
+| Changing the managed endpoint | `--ssl-key-file`, `--ssl-cert-file`, `--api-prefix` |
+| Reaching the server from outside the local network | `--connect`, `--connect-code` |
+| Running tools, MCP servers, or containers | `--mcp-servers-config`, `--mcp-servers-json`, `-ag`/`--agent`, `--tools-runtime`, `--ui-mcp-proxy`/`--webui-mcp-proxy` (the `--no-...` forms stay allowed) |
+| Weakening request safety | `--allow-unauthenticated-tools`, `--media-allow-private-urls` |
 
 Local options that choose where `llama-server` writes files, `--slot-save-path`,
 `--log-file`, and `-lcd`/`--lookup-cache-dynamic`, remain available when set on
