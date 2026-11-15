@@ -381,6 +381,7 @@ public sealed class LaunchSettingsApplicationsTests : ManagerRegressionTestBase
         var applied = 0;
         var runtimeRequests = new List<string?>();
         var saveStateUpdates = 0;
+        var steps = new List<string>();
         (string ModelId, string ProfileId)? askedFor = null;
 
         await new LaunchSettingsRenderApplicationService().RenderSelectedAsync(model, settings, new LaunchSettingsRenderActions(
@@ -392,9 +393,10 @@ public sealed class LaunchSettingsApplicationsTests : ManagerRegressionTestBase
             _ => loaded++,
             runtimeId => { runtimeRequests.Add(runtimeId); return Task.CompletedTask; },
             _ => applied++,
-            (_, _) => Task.CompletedTask,
-            () => saveStateUpdates++,
-            (modelId, profileId) => { askedFor = (modelId, profileId); return hasUnsavedEdits; }),
+            (_, _) => { steps.Add("capabilities"); return Task.CompletedTask; },
+            () => { saveStateUpdates++; steps.Add("save-state"); },
+            (modelId, profileId) => { askedFor = (modelId, profileId); return hasUnsavedEdits; },
+            () => steps.Add("baseline")),
             TestContext.Current.CancellationToken);
 
         Assert.Equal((model.Id, "profile-1"), askedFor);
@@ -402,6 +404,40 @@ public sealed class LaunchSettingsApplicationsTests : ManagerRegressionTestBase
         Assert.Equal(hasUnsavedEdits ? 0 : 1, applied);
         Assert.Equal([hasUnsavedEdits ? null : "cpu"], runtimeRequests);
         Assert.Equal(1, saveStateUpdates);
+        // A freshly rendered profile becomes the comparison baseline once capabilities have
+        // adjusted the form; kept edits keep their earlier baseline.
+        Assert.Equal(hasUnsavedEdits
+            ? ["capabilities", "save-state"]
+            : ["capabilities", "baseline", "save-state"], steps);
+    }
+
+    [Fact]
+    public void RenderedFormBaselineTreatsNormalizedOldProfilesAsSaved()
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot());
+        var stored = ModelLaunchSettings.FromAppSettings(settings) with { ContextSize = 32768 };
+        // Stands in for any value the form reads back in normalized form.
+        var rendered = stored with { ContextSize = 32000 };
+        var session = new LaunchSettingsEditorSession();
+        session.Load(new ModelLaunchSettingsViewState("model-1", stored, true, "cpu", stored.ApplyTo(settings), "profile-1", "Fast"));
+
+        Assert.True(Evaluate(session, rendered).HasUnsavedChanges);
+        session.UseRenderedFormAsBaseline(rendered);
+        Assert.False(Evaluate(session, rendered).HasUnsavedChanges);
+        Assert.True(Evaluate(session, rendered with { ContextSize = 16384 }).HasUnsavedChanges);
+
+        var unsaved = new LaunchSettingsEditorSession();
+        unsaved.UseRenderedFormAsBaseline(rendered);
+        Assert.Null(unsaved.SavedProfile);
+
+        static LaunchSettingsSaveState Evaluate(LaunchSettingsEditorSession editor, ModelLaunchSettings current)
+            => LaunchSettingsSaveStateService.Evaluate(new LaunchSettingsSaveStateRequest(
+                new ModelRecord("model-1", "Qwen", "qwen.gguf", OwnershipKind.External, "{}", DateTimeOffset.UtcNow),
+                editor.HasSavedProfile,
+                editor.SavedProfile,
+                true,
+                current,
+                ""));
     }
 
     [Fact]

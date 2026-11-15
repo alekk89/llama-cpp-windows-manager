@@ -100,8 +100,25 @@ public sealed class LaunchSettingsPageController
                 ApplyToControls,
                 _actions.ApplyModelCapabilitiesAsync,
                 UpdateSaveButtonState,
-                HasUnsavedEditsFor),
+                HasUnsavedEditsFor,
+                CaptureFormBaseline),
             cancellationToken);
+    }
+
+    /// <summary>Records the rendered form as the unchanged state of the loaded profile.</summary>
+    private void CaptureFormBaseline()
+    {
+        var editor = _ui.LaunchSettingsEditor;
+        if (!editor.HasSavedProfile || editor.SavedProfile is null) return;
+        try
+        {
+            editor.UseRenderedFormAsBaseline(
+                ModelLaunchSettings.FromAppSettings(ReadFromControls(), _actions.SelectedRuntimeId()));
+        }
+        catch
+        {
+            // A form that cannot be read keeps the stored profile as its baseline.
+        }
     }
 
     /// <summary>Records which model, profile and form the editor now shows.</summary>

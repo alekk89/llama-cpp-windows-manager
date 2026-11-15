@@ -11,7 +11,8 @@ public sealed record LaunchSettingsRenderActions(
     Action<AppSettings> ApplyLaunchSettingsToControls,
     Func<ModelRecord?, CancellationToken, Task> ApplyModelCapabilitiesAsync,
     Action UpdateLaunchSaveButtonState,
-    Func<string, string, bool>? HasUnsavedEditsFor = null);
+    Func<string, string, bool>? HasUnsavedEditsFor = null,
+    Action? CaptureFormBaseline = null);
 
 public sealed class LaunchSettingsRenderApplicationService
 {
@@ -63,6 +64,11 @@ public sealed class LaunchSettingsRenderApplicationService
         }
         await actions.ApplyModelCapabilitiesAsync(model, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        // The form shows a freshly loaded profile in its own normalized shape (current
+        // defaults, runtime-defined choices); that shape, not the stored record, is what
+        // later edits are compared with.
+        if (!keepEdits)
+            actions.CaptureFormBaseline?.Invoke();
         actions.UpdateLaunchSaveButtonState();
     }
 }
