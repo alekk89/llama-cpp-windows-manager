@@ -64,6 +64,32 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="ComboBoxEditableTextBox" TargetType="TextBox">
+      <Setter Property="OverridesDefaultStyle" Value="True"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource Accent}"/>
+      <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}"/>
+      <Setter Property="SelectionOpacity" Value="1"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="KeyboardNavigation.TabNavigation" Value="None"/>
+      <Setter Property="AllowDrop" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <ScrollViewer x:Name="PART_ContentHost"
+                          Background="Transparent"
+                          Focusable="False"
+                          HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Hidden"/>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="ComboBox">
       <Setter Property="MinHeight" Value="32"/>
       <Setter Property="Margin" Value="0,0,7,5"/>
@@ -126,6 +152,16 @@
                         Margin="0,0,9,0"/>
                 </Grid>
               </ToggleButton>
+              <TextBox x:Name="PART_EditableTextBox"
+                       Style="{StaticResource ComboBoxEditableTextBox}"
+                       Visibility="Collapsed"
+                       Margin="6,1,24,1"
+                       HorizontalAlignment="Stretch"
+                       VerticalAlignment="Center"
+                       Foreground="{TemplateBinding Foreground}"
+                       AutomationProperties.Name="{TemplateBinding AutomationProperties.Name}"
+                       AutomationProperties.HelpText="{TemplateBinding AutomationProperties.HelpText}"
+                       IsReadOnly="{Binding IsReadOnly, RelativeSource={RelativeSource TemplatedParent}}"/>
               <Popup x:Name="PART_Popup"
                      AllowsTransparency="True"
                      Focusable="False"
@@ -145,7 +181,20 @@
               </Popup>
             </Grid>
             <ControlTemplate.Triggers>
+              <Trigger Property="IsEditable" Value="True">
+                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                <Setter TargetName="SelectionPresenter" Property="Visibility" Value="Collapsed"/>
+                <Setter Property="IsTabStop" Value="False"/>
+              </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsEditable" Value="True"/>
+                  <Condition Property="IsKeyboardFocusWithin" Value="True"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Toggle" Property="BorderBrush" Value="{DynamicResource FocusRing}"/>
+              </MultiTrigger>
               <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="PART_EditableTextBox" Property="Foreground" Value="{DynamicResource DisabledControlForeground}"/>
                 <Setter Property="Background" Value="{DynamicResource DisabledControlBack}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource DisabledControlBorder}"/>
                 <Setter TargetName="SelectionPresenter" Property="TextElement.Foreground" Value="{DynamicResource DisabledControlForeground}"/>
