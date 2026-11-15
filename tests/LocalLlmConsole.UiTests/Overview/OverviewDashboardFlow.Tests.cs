@@ -37,6 +37,55 @@ public sealed class WpfOverviewDashboardFlowTests : WpfUiTestBase
     }
 
     [Fact]
+    public async Task DraggingShowsTheDropSlotAndReflowsTheOtherCardsBeforeDropping()
+    {
+        await RunStaAsync(async () =>
+        {
+            var dashboard = Dashboard(900, _ => { });
+            var pitch = OverviewDashboardLayoutEngine.ColumnPitch(900);
+            var cpu = Card(dashboard, "cpu");
+            var grab = new Point(Canvas.GetLeft(cpu.Root) + 20, Canvas.GetTop(cpu.Root) + 20);
+
+            dashboard.BeginDragAt(cpu, grab);
+            Assert.False(dashboard.DragTo(grab + new Vector(2, 1)), "Small pointer jitter is not a drag.");
+            Assert.Null(dashboard.DropPlaceholder);
+
+            Assert.True(dashboard.DragTo(grab + new Vector(8 * pitch, 0)));
+            var placeholder = Assert.IsType<System.Windows.Shapes.Rectangle>(dashboard.DropPlaceholder);
+            Assert.Equal(8 * pitch, Canvas.GetLeft(placeholder), precision: 3);
+            Assert.Equal(cpu.Root.Width, placeholder.Width, precision: 3);
+            // The other cards slide left to make room; the dragged card follows the pointer.
+            Assert.Equal(0, Canvas.GetLeft(Card(dashboard, "gpu-0").Root));
+            Assert.Equal(4 * pitch, Canvas.GetLeft(Card(dashboard, "status").Root), precision: 3);
+            Assert.Equal(8 * pitch, Canvas.GetLeft(cpu.Root), precision: 3);
+
+            await dashboard.CompleteDragAsync(cpu);
+            Arrange(dashboard, 900);
+
+            Assert.Null(dashboard.DropPlaceholder);
+            Assert.Equal(["gpu-0", "status", "cpu"], VisibleIds(dashboard));
+            Assert.Equal(1, Card(dashboard, "cpu").Root.Opacity);
+        });
+    }
+
+    [Fact]
+    public async Task ReleasingWithoutDraggingLeavesTheOrderAlone()
+    {
+        await RunStaAsync(async () =>
+        {
+            var persisted = 0;
+            var dashboard = Dashboard(900, _ => persisted++);
+            var cpu = Card(dashboard, "cpu");
+
+            dashboard.BeginDragAt(cpu, new Point(20, 20));
+            await dashboard.CompleteDragAsync(cpu);
+
+            Assert.Equal(["cpu", "gpu-0", "status"], VisibleIds(dashboard));
+            Assert.Equal(0, persisted);
+        });
+    }
+
+    [Fact]
     public async Task WideningACardSnapsToColumnsAndWrapsTheCardsAfterIt()
     {
         await RunStaAsync(async () =>

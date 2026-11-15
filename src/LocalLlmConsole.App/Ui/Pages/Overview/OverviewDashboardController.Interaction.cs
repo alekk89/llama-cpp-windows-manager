@@ -144,24 +144,39 @@ public sealed partial class OverviewDashboardController
     private void BeginDrag(OverviewDashboardCardView view, MouseButtonEventArgs args)
     {
         if (args.ChangedButton != MouseButton.Left) return;
-        var pointer = args.GetPosition(_surface);
+        BeginDragAt(view, args.GetPosition(_surface));
+        view.DragSurface.CaptureMouse();
+        args.Handled = true;
+    }
+
+    internal void BeginDragAt(OverviewDashboardCardView view, System.Windows.Point pointer)
+    {
         _dragView = view;
         _dragOrigin = pointer;
         _dragPointerOffset = pointer - new System.Windows.Point(Canvas.GetLeft(view.Root), Canvas.GetTop(view.Root));
         _dragMoved = false;
         _dragTargetIndex = VisibleCards().ToList().FindIndex(card =>
             string.Equals(card.Id, view.Layout.Id, StringComparison.OrdinalIgnoreCase));
-        view.DragSurface.CaptureMouse();
-        args.Handled = true;
     }
 
     private void TrackDrag(System.Windows.Input.MouseEventArgs args)
     {
         if (_dragView is null || args.LeftButton != MouseButtonState.Pressed) return;
-        var pointer = args.GetPosition(_surface);
+        if (DragTo(args.GetPosition(_surface)))
+            args.Handled = true;
+    }
+
+    /// <summary>
+    /// Moves the held card with the pointer and reflows the other cards around
+    /// the slot it would drop into. Returns false until the pointer has moved
+    /// far enough to count as a drag.
+    /// </summary>
+    internal bool DragTo(System.Windows.Point pointer)
+    {
+        if (_dragView is null) return false;
         if (!_dragMoved)
         {
-            if ((pointer - _dragOrigin).Length < DragStartDistance) return;
+            if ((pointer - _dragOrigin).Length < DragStartDistance) return false;
             _dragMoved = true;
             StopAnimation(_dragView.Root);
             _dragView.Root.Opacity = .85;
@@ -184,8 +199,11 @@ public sealed partial class OverviewDashboardController
             ApplyPlacements(placements, width, animate: true, floatingCardId: _dragView.Layout.Id);
             MoveDropPlaceholder(_placements[_dragView.Layout.Id]);
         }
-        args.Handled = true;
+        return true;
     }
+
+    internal System.Windows.Shapes.Rectangle? DropPlaceholder
+        => _dropPlaceholder is { Visibility: Visibility.Visible } ? _dropPlaceholder : null;
 
     /// <summary>
     /// Chooses the position in the card order whose resulting slot for the
@@ -222,6 +240,14 @@ public sealed partial class OverviewDashboardController
     {
         if (_dragView is null) return;
         view.DragSurface.ReleaseMouseCapture();
+        args.Handled = _dragMoved;
+        await CompleteDragAsync(view);
+    }
+
+    /// <summary>Drops the held card into the slot chosen while dragging.</summary>
+    internal async Task CompleteDragAsync(OverviewDashboardCardView view)
+    {
+        if (_dragView is null) return;
         view.Root.Opacity = 1;
         view.SetInteractionPreview(false);
         view.ResetPointer();
@@ -231,7 +257,6 @@ public sealed partial class OverviewDashboardController
         _dragView = null;
         _dragMoved = false;
         _dragTargetIndex = -1;
-        args.Handled = moved;
         if (!moved)
         {
             ApplyPlacement(_dashboard.ActualWidth);
