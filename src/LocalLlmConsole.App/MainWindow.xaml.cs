@@ -119,12 +119,12 @@ public partial class MainWindow : Window
             ShowOverview(refresh: false);
             await RefreshAllAsync();
             await RecoverActiveRuntimeSessionAsync();
-            await AppServices.StartupLaunchProfiles.LoadConfiguredAsync(new(
-                (model, profile, token) => EnsureGatewayModelLoadedAsync(new(model, profile), ModelGatewaySwapPolicy.KeepLoaded, token),
-                (model, profile) => _sessions.SessionForProfile(model.Id, profile.Id) is { IsRunning: true }, SetStatus));
             await StartModelGatewaySafelyAsync();
             StartGpuEnergyTrackingTimer();
             RunBackground(AutoSelectDetectedWslDistroAsync, "WSL distro auto-select failed");
+            RunBackground(() => StartupLoadsPanel.RunAsync(AppServices.StartupLaunchProfiles.LoadConfiguredAsync, new(
+                (model, profile, token) => EnsureGatewayModelLoadedAsync(new(model, profile), ModelGatewaySwapPolicy.KeepLoaded, token),
+                (model, profile) => _sessions.SessionForProfile(model.Id, profile.Id) is { IsRunning: true }, SetStatus)), "Startup profile loading failed");
         });
         await ShowCompletedAppUpdateNoticeAsync();
         RunBackground(CheckForAppUpdatesOnStartupAsync, "App update check failed");

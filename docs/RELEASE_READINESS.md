@@ -482,7 +482,9 @@ builds and must be described that way.
   model/profile pairs, and confirm the dropdown and Add button match the compact
   height of the surrounding settings controls. Remove
   one row, then toggle another with **Load on startup** from Saved Launch
-  Profiles. Restart and confirm only the remaining selections load, a failed
+  Profiles. Restart and confirm the window and gateway are usable immediately,
+  the sidebar status card lists per-profile progress, **Cancel** skips queued
+  profiles, only the remaining selections load, a failed
   selection does not prevent later selections, and deleting a saved profile
   removes its startup reference.
 - Resize and reorder representative table columns on Overview, Models, Runtimes,

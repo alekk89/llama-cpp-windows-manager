@@ -321,7 +321,10 @@ managed sessions first, leaves matching profiles alone, and then starts the
 remaining selections independently. One failure does not prevent later
 selections from being attempted. Every selected profile still needs a valid
 runtime and a unique direct API port, and normal memory admission rules still
-apply.
+apply. The window and gateway are usable while startup profiles load in the
+background; the status card in the sidebar lists each profile's progress.
+**Cancel** skips the profiles that have not started (a model that is already
+loading continues), and failures stay listed until closed.
 
 Model-serving API-key authentication is enabled by default and is separate from
 the Manager's control credential. Authentication may be disabled only with
