@@ -40,6 +40,7 @@ public sealed partial class OverviewDashboardController
     private bool _readingsApplyPending;
     private bool _pendingGraphPush;
     private bool _placementDirty = true;
+    private bool _placementAfterLoadQueued;
     private double _lastPlacementWidth = double.NaN;
 
     public OverviewDashboardController(
@@ -293,6 +294,7 @@ public sealed partial class OverviewDashboardController
             view.DragSurface.PreviewMouseLeftButtonUp += async (_, args) => await EndPointerInteractionAsync(view, args);
             view.DragSurface.MouseLeave += (_, _) => ResetPointerWhenIdle(view);
             ConfigureKeyboardInteraction(view);
+            view.ContentGeometryChanged += RequestPlacementAfterLoad;
             _cardViews[card.Id] = view;
             _surface.Children.Add(view.Root);
             ReplayHistory(view);
@@ -332,6 +334,23 @@ public sealed partial class OverviewDashboardController
         if (_dragView is null && _resizeView is null
             && (_placementDirty || !SameLength(width, _lastPlacementWidth)))
             ApplyPlacement(width);
+    }
+
+    /// <summary>
+    /// Places the cards again once loaded cards have been measured with the
+    /// window's text styles. Several cards loading together share one pass.
+    /// </summary>
+    private void RequestPlacementAfterLoad()
+    {
+        _placementDirty = true;
+        if (_placementAfterLoadQueued) return;
+        _placementAfterLoadQueued = true;
+        _ = _root.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+        {
+            _placementAfterLoadQueued = false;
+            if (_dragView is null && _resizeView is null && _placementDirty)
+                ApplyPlacement(_dashboard.ActualWidth);
+        });
     }
 
     private void CompleteDeferredUpdate()

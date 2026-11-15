@@ -121,7 +121,17 @@ public sealed partial class OverviewDashboardCardView
 
         Root.Child = _content;
         UpdateMinimumSize(ContentMinimumWidth);
+        // Theme text styles (such as display text formatting) apply only once the
+        // card joins the window, so heights measured earlier can be too small.
+        Root.Loaded += (_, _) =>
+        {
+            InvalidateMinimumSize();
+            ContentGeometryChanged?.Invoke();
+        };
     }
+
+    /// <summary>Raised when the card's content needs to be measured and placed again.</summary>
+    public event Action? ContentGeometryChanged;
 
     public OverviewDashboardCardLayout Layout { get; }
     public Border Root { get; }

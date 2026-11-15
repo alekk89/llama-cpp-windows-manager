@@ -86,6 +86,58 @@ public sealed class WpfOverviewDashboardFlowTests : WpfUiTestBase
     }
 
     [Fact]
+    public async Task CardsGrowToFitTextStylesAppliedWhenTheyJoinTheWindow()
+    {
+        await RunStaAsync(() =>
+        {
+            var dashboard = Dashboard(900, _ => { });
+            var status = Card(dashboard, "status");
+            var detachedHeight = status.Root.Height;
+
+            var tallText = new Style(typeof(TextBlock));
+            tallText.Setters.Add(new Setter(TextBlock.PaddingProperty, new Thickness(0, 40, 0, 40)));
+            var window = new Window
+            {
+                Width = 900,
+                ResizeMode = ResizeMode.NoResize,
+                Height = 900,
+                Left = -20000,
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                WindowStyle = WindowStyle.None,
+                Content = dashboard.Root
+            };
+            window.Resources.Add(typeof(TextBlock), tallText);
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                DrainDispatcher();
+                window.UpdateLayout();
+
+                status = Card(dashboard, "status");
+                Assert.True(status.Root.Height > detachedHeight + 10,
+                    $"Card stayed {status.Root.Height} high after loading (was {detachedHeight}).");
+                Assert.Equal(status.MinimumHeight, status.Root.Height, precision: 1);
+            }
+            finally
+            {
+                window.Content = null;
+                window.Close();
+            }
+        });
+    }
+
+    private static void DrainDispatcher()
+    {
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            () => frame.Continue = false);
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+    }
+
+    [Fact]
     public async Task WideningACardSnapsToColumnsAndWrapsTheCardsAfterIt()
     {
         await RunStaAsync(async () =>
