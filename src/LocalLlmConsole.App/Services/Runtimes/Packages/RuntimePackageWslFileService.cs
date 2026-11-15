@@ -6,7 +6,8 @@ public sealed record RuntimePackageWslArchiveRequest(
     string InstallDir,
     string LogPath,
     long MaxLogBytes,
-    CancellationToken CancellationToken = default);
+    CancellationToken CancellationToken = default,
+    int StripComponents = 0);
 
 public sealed record RuntimePackageWslExecutableRequest(
     RuntimePackagePreset Preset,
@@ -58,7 +59,8 @@ public sealed class RuntimePackageWslFileService
 
         var installDir = CommandLineService.BashQuote(WindowsPathToWslPath(request.InstallDir));
         var archivePath = CommandLineService.BashQuote(WindowsPathToWslPath(request.ArchivePath));
-        var command = $"mkdir -p {installDir} && tar --overwrite -xzf {archivePath} -C {installDir}";
+        var strip = request.StripComponents > 0 ? $" --strip-components={request.StripComponents}" : "";
+        var command = $"mkdir -p {installDir} && tar --overwrite{strip} -xzf {archivePath} -C {installDir}";
         var result = await RunWslShellCommandAsync(request.DistroName, command, TimeSpan.FromMinutes(10), request.CancellationToken);
         if (!string.IsNullOrWhiteSpace(result.Output) || !string.IsNullOrWhiteSpace(result.Error))
             await BoundedLogFile.AppendAsync(request.LogPath, result.Output + result.Error + Environment.NewLine, request.MaxLogBytes);

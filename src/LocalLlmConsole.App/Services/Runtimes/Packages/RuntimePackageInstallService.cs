@@ -12,7 +12,7 @@ public sealed record RuntimePackageInstallRequest(
     string LogPath,
     long MaxLogBytes,
     Func<RuntimePackageInstallProgress, Task> ProgressAsync,
-    Func<string, string, string, Task>? ExtractWslArchiveAsync = null,
+    Func<string, string, string, int, Task>? ExtractWslArchiveAsync = null,
     Func<RuntimePackagePreset, string, string, Task>? PrepareWslExecutableAsync = null,
     CancellationToken CancellationToken = default,
     bool RequireChecksum = true);
@@ -62,7 +62,15 @@ public sealed class RuntimePackageInstallService
                 {
                     if (request.ExtractWslArchiveAsync is null)
                         throw new InvalidOperationException("WSL archive extraction is not configured.");
-                    await request.ExtractWslArchiveAsync(archivePath, installDir, request.LogPath);
+                    // The CUDA runtime library archive has its own top-level folder. Its libraries go
+                    // into the "lib" folder beside the executable folder, which WSL launches put on
+                    // LD_LIBRARY_PATH, so they take precedence over an older toolkit in the distro.
+                    var libraryArchive = RuntimePackageAssetSelector.IsCudaRuntimeLibraryArchive(asset.Name);
+                    await request.ExtractWslArchiveAsync(
+                        archivePath,
+                        libraryArchive ? Path.Combine(installDir, "lib") : installDir,
+                        request.LogPath,
+                        libraryArchive ? 1 : 0);
                 }
                 else
                 {

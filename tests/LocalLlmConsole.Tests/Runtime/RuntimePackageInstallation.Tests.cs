@@ -120,6 +120,43 @@ public sealed class RuntimePackageInstallationTests : ManagerRegressionTestBase
     }
 
     [Fact]
+    public void WslCudaPackagesPairTheBuildTaggedCudaRuntimeArchive()
+    {
+        // Asset names as published by llama.cpp b12387.
+        var release = RuntimePackageReleaseClient.ParseReleaseJson("""
+        {
+          "tag_name": "b12387",
+          "html_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b12387",
+          "published_at": "2026-11-14T19:26:34Z",
+          "assets": [
+            { "name": "cudart-llama-b12387-bin-ubuntu-cuda-12.8-x64.tar.gz", "browser_download_url": "https://example.com/1", "size": 1 },
+            { "name": "cudart-llama-b12387-bin-ubuntu-cuda-13.5-arm64.tar.gz", "browser_download_url": "https://example.com/2", "size": 1 },
+            { "name": "cudart-llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", "browser_download_url": "https://example.com/3", "size": 1 },
+            { "name": "cudart-llama-bin-win-cuda-13.5-x64.zip", "browser_download_url": "https://example.com/4", "size": 1 },
+            { "name": "llama-b12387-bin-ubuntu-cuda-12.8-x64.tar.gz", "browser_download_url": "https://example.com/5", "size": 1 },
+            { "name": "llama-b12387-bin-ubuntu-cuda-13.5-arm64.tar.gz", "browser_download_url": "https://example.com/6", "size": 1 },
+            { "name": "llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", "browser_download_url": "https://example.com/7", "size": 1 },
+            { "name": "llama-b12387-bin-win-cuda-13.5-x64.zip", "browser_download_url": "https://example.com/8", "size": 1 }
+          ]
+        }
+        """);
+        var presets = RuntimePackageSourceCatalog.PresetRows();
+        var wsl = presets.Single(preset => preset.Id == "official-prebuilt-cuda");
+
+        var latest = RuntimePackageAssetSelector.SelectAssets(wsl, release);
+        var compatibility = RuntimePackageAssetSelector.SelectAssets(wsl, release, "compatibility");
+        var windows = RuntimePackageAssetSelector.SelectAssets(presets.Single(preset => preset.Id == "official-prebuilt-windows-cuda"), release);
+
+        Assert.Equal("llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", latest.PrimaryAsset.Name);
+        Assert.Equal("cudart-llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", Assert.Single(latest.AdditionalAssets).Name);
+        Assert.Equal("cudart-llama-b12387-bin-ubuntu-cuda-12.8-x64.tar.gz", Assert.Single(compatibility.AdditionalAssets).Name);
+        Assert.Equal("cudart-llama-bin-win-cuda-13.5-x64.zip", Assert.Single(windows.AdditionalAssets).Name);
+        Assert.True(RuntimePackageAssetSelector.IsCudaRuntimeLibraryArchive(latest.AdditionalAssets[0].Name));
+        Assert.True(RuntimePackageAssetSelector.IsCudaRuntimeLibraryArchive(windows.AdditionalAssets[0].Name));
+        Assert.False(RuntimePackageAssetSelector.IsCudaRuntimeLibraryArchive(latest.PrimaryAsset.Name));
+    }
+
+    [Fact]
     public void RuntimePackageAssetSelectorSelectsOfficialReleaseAssets()
     {
         var release = RuntimePackageReleaseClient.ParseReleaseJson("""
@@ -511,6 +548,62 @@ public sealed class RuntimePackageInstallationTests : ManagerRegressionTestBase
         Assert.False(File.Exists(unknownDestination));
     }
 
+
+    [Fact]
+    public async Task WslCudaInstallPutsTheCudaRuntimeLibrariesOnTheLaunchLibraryPath()
+    {
+        var root = CreateTempRoot();
+        byte[] mainBytes = [1, 2, 3], cudartBytes = [4, 5, 6];
+        var releaseJson = $$"""
+        {
+          "tag_name": "b12387",
+          "html_url": "https://example.com/release",
+          "published_at": "2026-11-14T19:26:34Z",
+          "assets": [
+            { "name": "llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", "browser_download_url": "https://example.com/main.tar.gz", "size": 3, "digest": "sha256:{{Sha256Hex(mainBytes)}}" },
+            { "name": "cudart-llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", "browser_download_url": "https://example.com/cudart.tar.gz", "size": 3, "digest": "sha256:{{Sha256Hex(cudartBytes)}}" }
+          ]
+        }
+        """;
+        using var handler = new CapturingHttpHandler(request => request.RequestUri?.ToString() switch
+        {
+            RuntimePackageSourceCatalog.LatestReleaseApiUrl => new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(releaseJson) },
+            "https://example.com/main.tar.gz" => new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(mainBytes) },
+            "https://example.com/cudart.tar.gz" => new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(cudartBytes) },
+            _ => new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+        });
+        using var http = new HttpClient(handler);
+        await using var store = new StateStore(Path.Combine(root, "state", "local-llm-console.db"));
+        await store.InitializeAsync();
+        var installer = new RuntimePackageInstallService(http, new RuntimeRegistryService(store));
+        var preset = RuntimePackageSourceCatalog.PresetRows().Single(candidate => candidate.Id == "official-prebuilt-cuda");
+        var extractions = new List<(string Archive, string Target, int Strip)>();
+
+        var result = await installer.InstallAsync(new RuntimePackageInstallRequest(
+            preset,
+            AppSettings.CreateDefault(root),
+            Path.Combine(root, "logs", "runtime-package.log"),
+            BoundedLogFile.MegabytesToBytes(1),
+            _ => Task.CompletedTask,
+            (archive, target, _, strip) =>
+            {
+                // Stand-in for WSL tar: lay out what each upstream archive contains.
+                extractions.Add((Path.GetFileName(archive), target, strip));
+                var file = strip == 0 ? Path.Combine(target, "llama-b12387", "llama-server") : Path.Combine(target, "libcudart.so.13");
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+                File.WriteAllText(file, "x");
+                return Task.CompletedTask;
+            },
+            CancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            [("llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", result.InstallDir, 0),
+             ("cudart-llama-b12387-bin-ubuntu-cuda-13.5-x64.tar.gz", Path.Combine(result.InstallDir, "lib"), 1)],
+            extractions);
+        // WSL launches add the executable folder and its sibling "lib" folder to LD_LIBRARY_PATH.
+        Assert.Equal(Path.Combine(result.InstallDir, "llama-b12387"), result.RuntimeFolder);
+        Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(result.RuntimeFolder)!, "lib", "libcudart.so.13")));
+    }
 
     [Fact]
     public async Task RuntimePackageInstallServiceDownloadsExtractsStampsAndRegistersRuntime()

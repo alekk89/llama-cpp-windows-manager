@@ -173,6 +173,16 @@ public sealed class RuntimePackageJobsTests : ManagerRegressionTestBase
         Assert.Contains("chmod +x", chmodCommand, StringComparison.Ordinal);
         Assert.Contains(CommandLineService.BashQuote(RuntimePackageWslFileService.WindowsPathToWslPath(executable)), chmodCommand, StringComparison.Ordinal);
         Assert.Contains("ok", log, StringComparison.Ordinal);
+
+        await service.ExtractArchiveAsync(new RuntimePackageWslArchiveRequest(
+            "Ubuntu-24.04",
+            archivePath,
+            Path.Combine(installDir, "lib"),
+            logPath,
+            BoundedLogFile.MegabytesToBytes(1),
+            TestContext.Current.CancellationToken,
+            StripComponents: 1));
+        Assert.Contains("tar --overwrite --strip-components=1 -xzf", runner.Commands[^1].Last(), StringComparison.Ordinal);
     }
 
     [Fact]

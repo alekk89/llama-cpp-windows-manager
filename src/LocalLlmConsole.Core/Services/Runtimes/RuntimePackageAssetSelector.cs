@@ -23,6 +23,11 @@ public static class RuntimePackageAssetSelector
             _ => throw new InvalidOperationException($"No prebuilt asset rule exists for {preset.Label}.")
         };
 
+    // Official CUDA packages ship their CUDA runtime libraries as a separate "cudart-llama" archive.
+    // Linux names carry the build tag (cudart-llama-b12387-bin-ubuntu-...); Windows names do not.
+    public static bool IsCudaRuntimeLibraryArchive(string assetName)
+        => Regex.IsMatch(assetName ?? "", @"^cudart-llama(?:-b\d+)?-bin-", RegexOptions.IgnoreCase);
+
     public static bool AssetSummariesMatch(string left, string right)
     {
         static string Normalize(string text)
@@ -51,7 +56,7 @@ public static class RuntimePackageAssetSelector
             .Where(match => !string.IsNullOrWhiteSpace(match.Version))
             .ToList();
         var runtimeDlls = release.Assets
-            .Select(asset => new { Asset = asset, Version = MatchGroup(asset.Name, @"^cudart-llama-bin-win-cuda-(?<version>[0-9.]+)-x64\.zip$", "version") })
+            .Select(asset => new { Asset = asset, Version = MatchGroup(asset.Name, @"^cudart-llama(?:-b\d+)?-bin-win-cuda-(?<version>[0-9.]+)-x64\.zip$", "version") })
             .Where(match => !string.IsNullOrWhiteSpace(match.Version))
             .ToDictionary(match => match.Version, match => match.Asset, StringComparer.OrdinalIgnoreCase);
 
@@ -81,9 +86,9 @@ public static class RuntimePackageAssetSelector
             .Select(asset => new
             {
                 Asset = asset,
-                Version = MatchGroup(asset.Name, @"^cudart-llama-bin-(?:ubuntu|linux)-cuda(?:-(?<version>[0-9.]+))?-x64\.tar\.gz$", "version")
+                Version = MatchGroup(asset.Name, @"^cudart-llama(?:-b\d+)?-bin-(?:ubuntu|linux)-cuda(?:-(?<version>[0-9.]+))?-x64\.tar\.gz$", "version")
             })
-            .Where(match => Regex.IsMatch(match.Asset.Name, @"^cudart-llama-bin-(?:ubuntu|linux)-cuda(?:-[0-9.]+)?-x64\.tar\.gz$", RegexOptions.IgnoreCase))
+            .Where(match => Regex.IsMatch(match.Asset.Name, @"^cudart-llama(?:-b\d+)?-bin-(?:ubuntu|linux)-cuda(?:-[0-9.]+)?-x64\.tar\.gz$", RegexOptions.IgnoreCase))
             .GroupBy(match => match.Version ?? "", StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First().Asset, StringComparer.OrdinalIgnoreCase);
 

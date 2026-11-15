@@ -51,13 +51,14 @@ public sealed class RuntimePackageInstallWorkflowService
                         installDir = progress.InstallDir;
                     await UpdateJobAsync(request, job, progress.Status, progress.Action, progress.InstallDir, progress.Message);
                 },
-                async (archivePath, installPath, logPath) => await _wslFiles.ExtractArchiveAsync(new RuntimePackageWslArchiveRequest(
+                async (archivePath, installPath, logPath, stripComponents) => await _wslFiles.ExtractArchiveAsync(new RuntimePackageWslArchiveRequest(
                     request.Settings.WslDistro,
                     archivePath,
                     installPath,
                     logPath,
                     request.MaxLogBytes,
-                    request.CancellationToken)),
+                    request.CancellationToken,
+                    stripComponents)),
                 async (packagePreset, executable, logPath) => await _wslFiles.TryPrepareExecutableAsync(new RuntimePackageWslExecutableRequest(
                     packagePreset,
                     request.Settings.WslDistro,
