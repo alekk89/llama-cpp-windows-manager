@@ -166,6 +166,7 @@
                          FontWeight="SemiBold"
                          AutomationProperties.LiveSetting="Polite"
                          TextWrapping="Wrap"/>
+              <local:StartupLaunchProfileLoadPanel x:Name="StartupLoadsPanel"/>
             </StackPanel>
           </Border>
           <StackPanel Grid.Row="2">

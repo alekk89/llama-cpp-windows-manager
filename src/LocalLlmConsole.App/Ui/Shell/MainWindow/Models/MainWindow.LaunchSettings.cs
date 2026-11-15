@@ -10,6 +10,7 @@ public partial class MainWindow
         _launchSettingsController.CancelRefresh();
         _coreServices.Ui.SettingsAutoApply.Cancel();
         CancelRuntimeLaunchOptionDiscovery();
+        StartupLoadsPanel.Abort();
     }
 
     private Task RenderSelectedModelLaunchSettingsAsync(CancellationToken cancellationToken = default)

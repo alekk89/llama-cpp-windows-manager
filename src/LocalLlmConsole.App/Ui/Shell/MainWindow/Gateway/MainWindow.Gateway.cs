@@ -58,20 +58,10 @@ public partial class MainWindow
             (route, policy, cancellationToken) => RunOnUiThreadAsync(() => EnsureGatewayModelLoadedAsync(route, policy, cancellationToken))));
 
     private Task<T> RunOnUiThreadAsync<T>(Func<Task<T>> action)
-    {
-        if (Dispatcher.CheckAccess())
-            return action();
-
-        return Dispatcher.InvokeAsync(action).Task.Unwrap();
-    }
+        => Dispatcher.CheckAccess() ? action() : Dispatcher.InvokeAsync(action).Task.Unwrap();
 
     private Task RunOnUiThreadAsync(Func<Task> action)
-    {
-        if (Dispatcher.CheckAccess())
-            return action();
-
-        return Dispatcher.InvokeAsync(action).Task.Unwrap();
-    }
+        => Dispatcher.CheckAccess() ? action() : Dispatcher.InvokeAsync(action).Task.Unwrap();
 
     private async Task<LoadedModelSessionSnapshot> EnsureGatewayModelLoadedAsync(ModelGatewayModelRoute route, ModelGatewaySwapPolicy policy, CancellationToken cancellationToken)
     {

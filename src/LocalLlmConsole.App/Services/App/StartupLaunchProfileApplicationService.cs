@@ -22,28 +22,56 @@ public sealed record StartupLaunchProfileLoadFailure(
     StartupLaunchProfileChoice Choice,
     Exception Exception);
 
+public enum StartupLaunchProfileLoadState
+{
+    Pending,
+    Loading,
+    Loaded,
+    AlreadyRunning,
+    Failed,
+    Skipped
+}
+
+public sealed record StartupLaunchProfileLoadProgress(
+    StartupLaunchProfileChoice Choice,
+    int Index,
+    int Total,
+    StartupLaunchProfileLoadState State,
+    Exception? Error = null);
+
 public sealed record StartupLaunchProfileLoadResult(
     int ConfiguredCount,
     int LoadedCount,
     int AlreadyRunningCount,
-    IReadOnlyList<StartupLaunchProfileLoadFailure> Failures)
+    IReadOnlyList<StartupLaunchProfileLoadFailure> Failures,
+    int SkippedCount = 0)
 {
+    public bool Cancelled => SkippedCount > 0;
+
     public string StatusMessage
     {
         get
         {
             if (ConfiguredCount == 0) return "";
+            if (Cancelled)
+                return Loc.T("StartupProfiles.Status.Cancelled", LoadedCount, ConfiguredCount);
             if (Failures.Count == 0)
-                return $"Loaded {LoadedCount.ToString(CultureInfo.InvariantCulture)} startup profile{(LoadedCount == 1 ? "" : "s")}.";
-            return $"Loaded {LoadedCount.ToString(CultureInfo.InvariantCulture)} of {ConfiguredCount.ToString(CultureInfo.InvariantCulture)} startup profiles; {Failures.Count.ToString(CultureInfo.InvariantCulture)} failed.";
+                return Loc.T("StartupProfiles.Status.Loaded", LoadedCount, ConfiguredCount);
+            return Loc.T("StartupProfiles.Status.LoadedWithFailures", LoadedCount, ConfiguredCount, Failures.Count);
         }
     }
 }
 
+/// <summary>
+/// Callbacks used to load startup profiles. <see cref="ReportProgress"/> receives every
+/// profile as <see cref="StartupLaunchProfileLoadState.Pending"/> before the first load,
+/// then each state change in order.
+/// </summary>
 public sealed record StartupLaunchProfileLoadActions(
     Func<ModelRecord, NamedModelLaunchProfile, CancellationToken, Task<LoadedModelSessionSnapshot>> LoadAsync,
     Func<ModelRecord, NamedModelLaunchProfile, bool> IsRunning,
-    Action<string> SetStatus);
+    Action<string> SetStatus,
+    Action<StartupLaunchProfileLoadProgress>? ReportProgress = null);
 
 public sealed class StartupLaunchProfileApplicationService
 {
@@ -94,6 +122,11 @@ public sealed class StartupLaunchProfileApplicationService
         return loadOnStartup;
     }
 
+    /// <summary>
+    /// Loads the configured startup profiles one at a time in their saved order. Cancelling
+    /// <paramref name="cancellationToken"/> skips every profile that has not started loading;
+    /// the token is also passed to the in-flight load, which decides whether to abort.
+    /// </summary>
     public async Task<StartupLaunchProfileLoadResult> LoadConfiguredAsync(
         StartupLaunchProfileLoadActions actions,
         CancellationToken cancellationToken = default)
@@ -104,41 +137,62 @@ public sealed class StartupLaunchProfileApplicationService
         ArgumentNullException.ThrowIfNull(actions.SetStatus);
 
         var snapshot = await GetSettingsSnapshotAsync();
+        var selected = snapshot.Selected;
         var loaded = 0;
         var alreadyRunning = 0;
+        var skipped = 0;
         var failures = new List<StartupLaunchProfileLoadFailure>();
-        foreach (var choice in snapshot.Selected)
+        void Report(int index, StartupLaunchProfileLoadState state, Exception? error = null)
+            => actions.ReportProgress?.Invoke(new(selected[index], index, selected.Count, state, error));
+
+        for (var index = 0; index < selected.Count; index++)
+            Report(index, StartupLaunchProfileLoadState.Pending);
+
+        for (var index = 0; index < selected.Count; index++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            var choice = selected[index];
+            if (cancellationToken.IsCancellationRequested)
+            {
+                skipped++;
+                Report(index, StartupLaunchProfileLoadState.Skipped);
+                continue;
+            }
+
             if (actions.IsRunning(choice.Model, choice.Profile))
             {
                 alreadyRunning++;
                 loaded++;
+                Report(index, StartupLaunchProfileLoadState.AlreadyRunning);
                 continue;
             }
 
-            actions.SetStatus($"Loading startup profile {choice.DisplayName}...");
+            actions.SetStatus(Loc.T("StartupProfiles.Status.Loading", choice.DisplayName));
+            Report(index, StartupLaunchProfileLoadState.Loading);
             try
             {
                 await actions.LoadAsync(choice.Model, choice.Profile, cancellationToken);
                 loaded++;
+                Report(index, StartupLaunchProfileLoadState.Loaded);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                throw;
+                skipped++;
+                Report(index, StartupLaunchProfileLoadState.Skipped);
             }
             catch (Exception ex)
             {
                 Trace.TraceError($"Startup profile '{choice.DisplayName}' failed to load: {ex}");
                 failures.Add(new StartupLaunchProfileLoadFailure(choice, ex));
+                Report(index, StartupLaunchProfileLoadState.Failed, ex);
             }
         }
 
         var result = new StartupLaunchProfileLoadResult(
-            snapshot.Selected.Count,
+            selected.Count,
             loaded,
             alreadyRunning,
-            failures);
+            failures,
+            skipped);
         if (!string.IsNullOrWhiteSpace(result.StatusMessage))
             actions.SetStatus(result.StatusMessage);
         return result;

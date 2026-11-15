@@ -29,10 +29,14 @@ The startup workspace is fixed for the process and defaults to `data` beside `Ll
 
 Saved startup-profile selections are ordered foreign-key references to named
 launch profiles, so deleting a profile or model removes its selection. After
-active-session recovery, startup attempts each remaining selection through the
-normal keep-loaded gateway/runtime lifecycle before the gateway listener starts.
-This preserves readiness checks, port and admission rules, and same-model
-multi-profile session identity.
+active-session recovery, the gateway listener starts and the shell becomes
+usable; startup then attempts each remaining selection in order, in the
+background, through the normal keep-loaded gateway/runtime lifecycle. Those
+loads share the session lifecycle gate with gateway and manual loads, which
+preserves readiness checks, port and admission rules, and same-model
+multi-profile session identity. `StartupLaunchProfileLoadPanel` shows
+per-profile progress; its cancel skips queued profiles and shutdown aborts the
+in-flight load.
 
 ## Runtime Shape
 
