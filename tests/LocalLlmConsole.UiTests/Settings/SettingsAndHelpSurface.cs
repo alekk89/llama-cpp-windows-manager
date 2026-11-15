@@ -136,7 +136,25 @@ public abstract partial class WpfUiTestBase
             Assert.Equal(28, combo.MinHeight);
             Assert.Equal(HorizontalAlignment.Stretch, combo.HorizontalAlignment);
             Assert.Equal(new Thickness(0, 0, 3, 0), combo.Margin);
+            Assert.Equal(((EditableSettingRow)combo.DataContext).Label, AutomationProperties.GetName(combo));
         });
+        Assert.All(
+            VisualDescendants<TextBox>(settingsControls.Root).Where(box => box.DataContext is EditableSettingRow),
+            box => Assert.Equal(((EditableSettingRow)box.DataContext).Label, AutomationProperties.GetName(box)));
+        var themeLabel = LocalLlmConsole.Localization.Loc.T("Settings.ThemeLabel");
+        Assert.Equal(themeLabel, AutomationProperties.GetName(settingsControls.ThemeCombo));
+        Assert.Equal(themeLabel, Assert.IsType<TextBlock>(AutomationProperties.GetLabeledBy(settingsControls.ThemeCombo)).Text);
+        var themeChoices = settingsControls.ThemeCombo.Items.Cast<LocalLlmConsole.SettingsThemeChoice>().ToArray();
+        Assert.Equal(["system", "light", "dark"], themeChoices.Select(choice => choice.Value));
+        Assert.Equal(
+            [
+                LocalLlmConsole.Localization.Loc.T("Settings.Theme.System"),
+                LocalLlmConsole.Localization.Loc.T("Settings.Theme.Light"),
+                LocalLlmConsole.Localization.Loc.T("Settings.Theme.Dark")
+            ],
+            themeChoices.Select(choice => choice.Label));
+        Assert.Equal(["System", "Light", "Dark"], themeChoices.Select(choice => choice.Label));
+        Assert.Equal(AppPreferenceService.ThemeMode(persistedSettings.ThemeMode), settingsState.SelectedThemeValue);
         var scaleSlider = Assert.Single(
             VisualDescendants<Slider>(settingsControls.Root),
             slider => slider.DataContext is EditableSettingRow { Key: "uiScalePercent" });
@@ -263,8 +281,12 @@ public abstract partial class WpfUiTestBase
         var idleRow = Assert.Single(settingsViewModel.Rows, row => row.Key == "autoUnloadIdleMinutes");
         idleRow.Value = "15";
         Assert.Equal(1, applyRequests);
-        settingsControls.ThemeCombo.SelectedItem = "dark";
+        settingsControls.ThemeCombo.SelectedValue = "dark";
         Assert.Equal(2, applyRequests);
+        Assert.Equal("dark", settingsState.SelectedThemeValue);
+        Assert.Equal(
+            LocalLlmConsole.Localization.Loc.T("Settings.Theme.Dark"),
+            Assert.IsType<LocalLlmConsole.SettingsThemeChoice>(settingsControls.ThemeCombo.SelectedItem).Label);
 
         apiKeyAuthentication.Value = "Disable";
         Assert.Equal(1, authenticationDisabledNotices);

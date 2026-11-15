@@ -73,6 +73,11 @@ public sealed class StartupLaunchProfileSettingsControls
 
 }
 
+public sealed record SettingsThemeChoice(string Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
 public sealed record SettingsPageControls(
     DockPanel Root,
     WpfComboBox ThemeCombo,
@@ -136,16 +141,27 @@ public static class SettingsPageFactory
         themeBar.Children.Add(themeLabel);
         themeCombo = new WpfComboBox
         {
-            ItemsSource = new[] { "system", "light", "dark" },
-            SelectedItem = AppPreferenceService.ThemeMode(request.ThemeMode),
-            Width = 110
+            ItemsSource = ThemeChoices,
+            DisplayMemberPath = nameof(SettingsThemeChoice.Label),
+            SelectedValuePath = nameof(SettingsThemeChoice.Value),
+            SelectedValue = AppPreferenceService.ThemeMode(request.ThemeMode),
+            MinWidth = 110
         };
+        AutomationProperties.SetName(themeCombo, Loc.T("Settings.ThemeLabel"));
+        AutomationProperties.SetLabeledBy(themeCombo, themeLabel);
         themeCombo.SelectionChanged += request.Actions.ThemeChanged;
         themeBar.Children.Add(themeCombo);
         Grid.SetColumn(themeBar, 1);
         toolbar.Children.Add(themeBar);
         return toolbar;
     }
+
+    private static SettingsThemeChoice[] ThemeChoices =>
+    [
+        new("system", Loc.T("Settings.Theme.System")),
+        new("light", Loc.T("Settings.Theme.Light")),
+        new("dark", Loc.T("Settings.Theme.Dark"))
+    ];
 
     private static (ScrollViewer Root, DataGrid FirstGrid, Grid Columns) SettingsSections(
         IReadOnlyList<EditableSettingRow> rows,

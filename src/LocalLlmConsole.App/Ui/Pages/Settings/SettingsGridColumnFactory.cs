@@ -77,6 +77,7 @@ public static class SettingsGridColumnFactory
         var editor = new FrameworkElementFactory(typeof(Grid));
 
         var textBox = new FrameworkElementFactory(typeof(WpfTextBox));
+        textBox.SetBinding(AutomationProperties.NameProperty, new WpfBinding(nameof(EditableSettingRow.Label)));
         textBox.SetBinding(WpfTextBox.TextProperty, new WpfBinding(nameof(EditableSettingRow.Value))
         {
             Mode = BindingMode.TwoWay,
@@ -101,6 +102,7 @@ public static class SettingsGridColumnFactory
         editor.AppendChild(textBox);
 
         var combo = new FrameworkElementFactory(typeof(WpfComboBox));
+        combo.SetBinding(AutomationProperties.NameProperty, new WpfBinding(nameof(EditableSettingRow.Label)));
         combo.SetBinding(ItemsControl.ItemsSourceProperty, new WpfBinding(nameof(EditableSettingRow.Options)));
         combo.SetBinding(WpfComboBox.SelectedItemProperty, new WpfBinding(nameof(EditableSettingRow.Value))
         {
