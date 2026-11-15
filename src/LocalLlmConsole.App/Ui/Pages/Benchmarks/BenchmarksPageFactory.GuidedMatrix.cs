@@ -35,16 +35,16 @@ public static partial class BenchmarksPageFactory
 
     private static GuidedBenchmarkMatrix CreateGuidedBenchmarkMatrix()
     {
-        var contextSizes = Picker("context length", "4096", "8192", "16384", "32768", "65536", "131072", "262144");
-        var batches = Picker("batch size", "256", "512", "1024", "2048", "4096", "8192", "16384", "32768");
-        var microBatches = Picker("micro-batch size", "128", "256", "512", "1024", "2048", "4096", "8192");
+        var contextSizes = Picker("context length", BenchmarkValuePicker.PositiveInteger, "4096", "8192", "16384", "32768", "65536", "131072", "262144");
+        var batches = Picker("batch size", BenchmarkValuePicker.PositiveInteger, "256", "512", "1024", "2048", "4096", "8192", "16384", "32768");
+        var microBatches = Picker("micro-batch size", BenchmarkValuePicker.PositiveInteger, "128", "256", "512", "1024", "2048", "4096", "8192");
         var logicalProcessors = Environment.ProcessorCount.ToString(CultureInfo.InvariantCulture);
         var halfProcessors = Math.Max(Environment.ProcessorCount / 2, 1).ToString(CultureInfo.InvariantCulture);
-        var threads = Picker("thread count", halfProcessors, logicalProcessors);
-        var gpuLayers = Picker("GPU-layer", "-1", "0");
-        var flashAttention = Picker("Flash Attention", "auto", "on", "off");
-        var cacheKv = Picker("K/V cache type", [.. RuntimeDefinedChoicePolicy.CacheTypes]);
-        var kvOffload = Picker("KV offload", "on", "off");
+        var threads = Picker("thread count", BenchmarkValuePicker.PositiveInteger, halfProcessors, logicalProcessors);
+        var gpuLayers = Picker("GPU-layer", BenchmarkValuePicker.GpuLayerCount, "-1", "0");
+        var flashAttention = Picker("Flash Attention", BenchmarkValuePicker.OneOf("auto", "on", "off"), "auto", "on", "off");
+        var cacheKv = Picker("K/V cache type", null, [.. RuntimeDefinedChoicePolicy.CacheTypes]);
+        var kvOffload = Picker("KV offload", BenchmarkValuePicker.OneOf("on", "off"), "on", "off");
         var gpuConfigurations = new BenchmarkGpuConfigurationPicker();
         var speculativeConfigurations = new BenchmarkSpeculativeConfigurationPicker();
         var compareContexts = Check("Compare custom context lengths");
@@ -127,6 +127,6 @@ public static partial class BenchmarksPageFactory
             compareCacheKv, compareKvOffload, compareGpuConfigurations, compareSpeculativeConfigurations);
     }
 
-    private static BenchmarkValuePicker Picker(string name, params string[] values)
-        => new(name, values);
+    private static BenchmarkValuePicker Picker(string name, Func<string, string?>? validate, params string[] values)
+        => new(name, values, validate: validate);
 }

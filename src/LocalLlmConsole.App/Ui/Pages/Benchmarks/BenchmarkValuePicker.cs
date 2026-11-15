@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -7,6 +8,8 @@ using System.Windows.Threading;
 using LocalLlmConsole.Localization;
 using Button = System.Windows.Controls.Button;
 using ComboBox = System.Windows.Controls.ComboBox;
+using KeyEventHandler = System.Windows.Input.KeyEventHandler;
+using TextBoxBase = System.Windows.Controls.Primitives.TextBoxBase;
 using WpfPanel = System.Windows.Controls.Panel;
 
 namespace LocalLlmConsole;
@@ -14,6 +17,7 @@ namespace LocalLlmConsole;
 public sealed class BenchmarkValuePicker : StackPanel
 {
     private readonly char _separator;
+    private readonly Func<string, string?>? _validate;
     private readonly string[] _availableValues;
     private readonly List<string> _values = [];
     private readonly WrapPanel _selected = new() { Margin = new Thickness(0, 3, 0, 0) };
@@ -23,15 +27,21 @@ public sealed class BenchmarkValuePicker : StackPanel
     private string _pendingMouseValue = "";
     private bool _updating;
 
-    public BenchmarkValuePicker(string name, IEnumerable<string> availableValues, char separator = ',')
+    public BenchmarkValuePicker(
+        string name,
+        IEnumerable<string> availableValues,
+        char separator = ',',
+        Func<string, string?>? validate = null)
     {
         _separator = separator;
+        _validate = validate;
         _availableValues = availableValues.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         _selectionHost = _selected;
         Orientation = System.Windows.Controls.Orientation.Vertical;
         Input = new ComboBox
         {
             IsEditable = true,
+            IsTextSearchEnabled = false,
             StaysOpenOnEdit = true,
             ItemsSource = _availableValues,
             Height = 28,
@@ -51,12 +61,16 @@ public sealed class BenchmarkValuePicker : StackPanel
             new MouseButtonEventHandler(InputPreviewMouseLeftButtonDown), true);
         Input.AddHandler(UIElement.PreviewMouseLeftButtonUpEvent,
             new MouseButtonEventHandler(InputPreviewMouseLeftButtonUp), true);
-        Input.KeyDown += (_, args) =>
+        Input.AddHandler(TextBoxBase.TextChangedEvent, new TextChangedEventHandler((_, _) =>
+        {
+            if (!_updating) ShowValidation(null);
+        }));
+        Input.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, args) =>
         {
             if (args.Key != Key.Enter) return;
             AddValues(Input.SelectedItem as string ?? Input.Text, Input.IsDropDownOpen);
             args.Handled = true;
-        };
+        }), true);
 
         AddButton = new Button
         {
@@ -80,12 +94,22 @@ public sealed class BenchmarkValuePicker : StackPanel
         Grid.SetColumn(AddButton, 1);
         editor.Children.Add(Input);
         editor.Children.Add(AddButton);
+        ValidationText = new TextBlock
+        {
+            Margin = new Thickness(2, 3, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed
+        };
+        ValidationText.SetResourceReference(TextBlock.ForegroundProperty, "Danger");
+        AutomationProperties.SetLiveSetting(ValidationText, AutomationLiveSetting.Assertive);
         Children.Add(editor);
+        Children.Add(ValidationText);
         Children.Add(_selected);
     }
 
     public ComboBox Input { get; }
     public Button AddButton { get; }
+    public TextBlock ValidationText { get; }
     public ItemCollection Items => Input.Items;
     public bool IsEditable => Input.IsEditable;
     public IReadOnlyList<string> Values => _values;
@@ -117,10 +141,31 @@ public sealed class BenchmarkValuePicker : StackPanel
         RenderSelected();
     }
 
+    public static string? PositiveInteger(string value)
+        => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) && number > 0
+            ? null
+            : Loc.T("Benchmarks.ValuePicker.InvalidPositiveInteger", value);
+
+    public static string? GpuLayerCount(string value)
+        => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number) && number >= -1
+            ? null
+            : Loc.T("Benchmarks.ValuePicker.InvalidGpuLayers", value);
+
+    public static Func<string, string?> OneOf(params string[] allowed)
+        => value => allowed.Contains(value, StringComparer.OrdinalIgnoreCase)
+            ? null
+            : Loc.T("Benchmarks.ValuePicker.InvalidChoice", value, string.Join(", ", allowed));
+
     private void AddValues(string? text, bool keepDropDownOpen = false)
     {
+        var entries = Split(text).ToArray();
+        var error = _validate is null
+            ? null
+            : entries.Select(_validate).FirstOrDefault(message => message is not null);
+        ShowValidation(error);
+        if (error is not null) return;
         var changed = false;
-        foreach (var value in Split(text))
+        foreach (var value in entries)
         {
             if (_values.Contains(value, StringComparer.OrdinalIgnoreCase)) continue;
             _values.Add(value);
@@ -132,6 +177,13 @@ public sealed class BenchmarkValuePicker : StackPanel
         Changed?.Invoke(this, EventArgs.Empty);
         if (keepDropDownOpen)
             ReopenDropDown();
+    }
+
+    private void ShowValidation(string? error)
+    {
+        ValidationText.Text = error ?? "";
+        ValidationText.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
+        AutomationProperties.SetHelpText(Input, error ?? "");
     }
 
     private IEnumerable<string> Split(string? text)
