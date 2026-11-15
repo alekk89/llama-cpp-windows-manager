@@ -6,9 +6,6 @@ namespace LocalLlmConsole;
 
 public sealed partial class OverviewDashboardController
 {
-    private const double KeyboardHorizontalStep = .25;
-    private const double KeyboardVerticalStep = 4;
-
     private void ConfigureKeyboardInteraction(OverviewDashboardCardView view)
     {
         view.Root.PreviewKeyDown += async (_, args) => await HandleCardKeyAsync(view, args);
@@ -49,40 +46,36 @@ public sealed partial class OverviewDashboardController
         args.Handled = true;
     }
 
+    /// <summary>
+    /// Ctrl+Left or Ctrl+Up moves the card one place earlier in the flow;
+    /// Ctrl+Right or Ctrl+Down moves it one place later.
+    /// </summary>
     private async Task MoveCardFromKeyboardAsync(OverviewDashboardCardView view, Key key)
     {
-        var bounds = RenderedBounds(view, _dashboard.ActualWidth);
-        var candidate = OverviewDashboardLayoutPolicy.ConstrainBounds(bounds with
-        {
-            X = bounds.X + (key == Key.Left ? -KeyboardHorizontalStep : key == Key.Right ? KeyboardHorizontalStep : 0),
-            Y = bounds.Y + (key == Key.Up ? -KeyboardVerticalStep : key == Key.Down ? KeyboardVerticalStep : 0)
-        });
-        candidate = VisibleBounds(view, candidate, _dashboard.ActualWidth);
-        candidate = OverviewDashboardLayoutEngine.SnapMove(
-            candidate,
-            InteractionObstacles(view.Layout.Id, _dashboard.ActualWidth),
-            _dashboard.ActualWidth);
-        var persisted = PersistedBounds(candidate, _dashboard.ActualWidth);
-        await MutateAsync(layout => OverviewDashboardLayoutPolicy.SetCardBounds(layout, view.Layout.Id, persisted));
+        var visible = VisibleCards().ToList();
+        var current = visible.FindIndex(card => string.Equals(card.Id, view.Layout.Id, StringComparison.OrdinalIgnoreCase));
+        var target = current + (key is Key.Left or Key.Up ? -1 : 1);
+        if (current < 0 || target < 0 || target >= visible.Count) return;
+        await MoveCardAsync(view.Layout.Id, target);
         FocusCard(view.Layout.Id);
     }
 
+    /// <summary>
+    /// Ctrl+Shift+Left or Right narrows or widens the card by one grid column.
+    /// Card height follows its content.
+    /// </summary>
     private async Task ResizeCardFromKeyboardAsync(OverviewDashboardCardView view, Key key)
     {
-        if (_layout.CardSizesLocked) return;
-        var bounds = RenderedBounds(view, _dashboard.ActualWidth);
-        view.UpdateMinimumSize(view.Root.Width);
-        var minimumWidth = Math.Max(
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutEngine.ToHorizontalUnits(
-                view.MinimumWidth + OverviewDashboardLayoutPolicy.CardGap,
-                _dashboard.ActualWidth));
-        var resized = OverviewDashboardLayoutPolicy.ConstrainBounds(bounds with
-        {
-            Width = Math.Max(minimumWidth, bounds.Width + (key == Key.Left ? -KeyboardHorizontalStep : key == Key.Right ? KeyboardHorizontalStep : 0)),
-            Height = Math.Max(view.MinimumHeight, bounds.Height + (key == Key.Up ? -KeyboardVerticalStep : key == Key.Down ? KeyboardVerticalStep : 0))
-        });
-        await MutateAsync(layout => OverviewDashboardLayoutPolicy.SetCardBounds(layout, view.Layout.Id, resized));
+        if (_layout.CardSizesLocked || key is not (Key.Left or Key.Right)) return;
+        var pitch = OverviewDashboardLayoutEngine.ColumnPitch(_dashboard.ActualWidth);
+        var rendered = _placements.TryGetValue(view.Layout.Id, out var placement)
+            ? OverviewDashboardLayoutEngine.SpanForWidth(placement.Width, pitch)
+            : OverviewDashboardLayoutPolicy.CardSpan(view.Layout);
+        var span = Math.Clamp(rendered + (key == Key.Left ? -1 : 1),
+            OverviewDashboardLayoutEngine.MinimumSpan(view.MinimumWidth, pitch),
+            OverviewDashboardLayoutEngine.Columns);
+        if (span == OverviewDashboardLayoutPolicy.CardSpan(view.Layout)) return;
+        await SetCardSpanAsync(view.Layout.Id, span);
         FocusCard(view.Layout.Id);
     }
 

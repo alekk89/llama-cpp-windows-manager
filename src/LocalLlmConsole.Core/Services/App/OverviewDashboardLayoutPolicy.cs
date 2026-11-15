@@ -2,7 +2,7 @@ namespace LocalLlmConsole.Services;
 
 public static partial class OverviewDashboardLayoutPolicy
 {
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
     public const int AtomicMetricLayoutVersion = 2;
     public const int MultiChartLayoutVersion = 4;
     public const int AverageRateLayoutVersion = 5;
@@ -10,6 +10,8 @@ public static partial class OverviewDashboardLayoutPolicy
     public const int CuratedMetricsLayoutVersion = 10;
     public const int ResponsiveDefaultLayoutVersion = 11;
     public const int CompactDefaultLayoutVersion = 12;
+    /// <summary>Cards flow in list order; earlier layouts ordered them by position.</summary>
+    public const int FlowLayoutVersion = 13;
     public const int MaximumCards = 24; // Defensive persistence boundary; ordinary customization remains below it.
     public const int MaximumMetricsPerCard = 64;
     private static readonly string[] HardwareMetricIds =
@@ -108,7 +110,7 @@ public static partial class OverviewDashboardLayoutPolicy
 
         var cards = new List<OverviewDashboardCardLayout>();
         var cardIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var candidate in layout.Cards ?? [])
+        foreach (var candidate in OrderedForFlow(layout))
         {
             if (cards.Count >= MaximumCards) break;
             var expandedMetrics = (candidate.MetricIds ?? [])

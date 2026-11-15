@@ -227,24 +227,22 @@ builds and must be described that way.
 - At the default window size, confirm Overview uses two metric-card columns with
   no clipped card content and the loaded-session Runtime column remains readable;
   maximize the window and confirm the cards reflow to three columns. Enter
-  Drag cards directly and resize the visible outer card from the top, bottom,
-  left, right, and all four corners without entering an edit mode. Confirm each
-  edge and corner shows the corresponding Windows resize cursor, no overlay
-  handles exist, and only the visible card border highlights on hover.
+  Drag a card over the others without entering an edit mode: confirm the other
+  cards slide aside around a dashed outline, the card drops into the outlined
+  slot, and the new order survives restart. Confirm only the left and right
+  borders show the horizontal resize cursor, widths snap to whole columns, and
+  card heights always fit their content with no empty space below the last row.
   Confirm idle cards have no decorative blue line in their upper-left corner.
-  Confirm nearby cards snap together, cannot overlap, and retain a minimum gap.
+  Confirm cards never overlap, keep a minimum gap, and leave no narrow empty
+  strip at the right edge of a row. With Windows animations turned off, confirm
+  cards move without sliding.
   Select **Lock** beside **Add card**, resize the application wider and narrower,
-  and confirm card dimensions remain fixed while cards wrap to new rows. Confirm
+  and confirm card widths remain fixed while cards wrap to new rows. Confirm
   border resize cursors are disabled while locked, **Unlock** restores responsive
   sizing and manual resizing, and the lock state survives an application restart.
-  With two cards snapped side by side, drag one card's top and bottom borders
-  near the matching neighbor edges and confirm the corresponding edges align;
-  confirm the card still respects the minimum height required by its rows.
-  Confirm cards stop shrinking when
-  their wrapped labels, values, details, or inline chart need the space. Confirm exact bounds survive
-  restart and horizontal positions scale with the window width. Resize the window
-  narrowly and add charts/details that increase card height; confirm measured
-  outer cards are separated again before rendering.
+  Resize the window narrowly and confirm cards widen before their labels or
+  charts are cut off, then stack one per row. Upgrade from a layout saved by
+  v2.9.0 and confirm cards keep their previous reading order.
 - Open another page, wait for at least one hardware polling interval, and return
   to Overview. Confirm the existing cards and charts appear immediately without
   an empty rebuild phase, and hardware readings update without switching pages twice.
@@ -264,7 +262,7 @@ builds and must be described that way.
   given an optional title or returned to a headerless state, removed, and only
   chart-capable metrics are offered in the Chart submenu.
   Confirm there is no Size submenu, one separator remains immediately above
-  Remove card, and direct side/corner dragging remains the only resize control.
+  Remove card, and dragging a side border remains the only resize control.
   Click Remove metric and Chart, select a child command, and confirm the card
   updates after the popup closes. Enable and disable charts for multiple metrics
   in the same card independently. Right-click open dashboard space to add a card.

@@ -219,31 +219,6 @@ public sealed class OverviewDashboardTests : ManagerRegressionTestBase
             id => id.StartsWith("overview.runtime.mtp.", StringComparison.Ordinal));
     }
 
-    [Theory]
-    [InlineData(600, 200, 400)]
-    [InlineData(900, 300, 600)]
-    [InlineData(1200, 400, 800)]
-    public void OverviewDashboardLayoutEngineScalesHorizontalBoundsWithoutRepacking(
-        double surfaceWidth,
-        double expectedLeft,
-        double expectedWidth)
-    {
-        var cards = new[]
-        {
-            new OverviewDashboardCardLayout(
-                "freeform",
-                [OverviewDashboardMetricIds.AverageGenerationRate],
-                Bounds: new OverviewDashboardCardBounds(4, 37, 8, 143))
-        };
-
-        var placement = Assert.Single(OverviewDashboardLayoutEngine.Place(cards, surfaceWidth));
-
-        Assert.Equal(expectedLeft, placement.Left);
-        Assert.Equal(expectedWidth, placement.Width);
-        Assert.Equal(37, placement.Top);
-        Assert.Equal(143, placement.Height);
-    }
-
     [Fact]
     public void OverviewDashboardMetricOrderPersistsOnlyACompleteCardPermutation()
     {
@@ -273,79 +248,6 @@ public sealed class OverviewDashboardTests : ManagerRegressionTestBase
         Assert.Equal(new OverviewDashboardCardBounds(2.125, 48, 5.375, 219), card.Bounds);
         Assert.Equal(1, card.ColumnSpan);
         Assert.Equal(OverviewDashboardCardHeight.Tall, card.Height);
-    }
-
-    [Fact]
-    public void OverviewDashboardGeometrySnapsAndMaintainsCardSpacing()
-    {
-        var obstacle = new OverviewDashboardCardBounds(0, 0, 4, 100);
-        var horizontallySnapped = OverviewDashboardLayoutEngine.SnapMove(
-            new OverviewDashboardCardBounds(4.1, 0, 4, 100),
-            [obstacle],
-            1200);
-        var verticallySnapped = OverviewDashboardLayoutEngine.SnapMove(
-            new OverviewDashboardCardBounds(0, 105, 4, 100),
-            [obstacle],
-            1200);
-        var separated = OverviewDashboardLayoutEngine.SnapMove(
-            new OverviewDashboardCardBounds(2, 0, 4, 100),
-            [obstacle],
-            1200);
-
-        Assert.Equal(4, horizontallySnapped.X);
-        Assert.Equal(110, verticallySnapped.Y);
-        Assert.Equal(4, separated.X);
-    }
-
-    [Fact]
-    public void OverviewDashboardResizeSnapsTheVisibleEdgeBeforeAnotherCard()
-    {
-        var start = new OverviewDashboardCardBounds(0, 0, 4, 100);
-        var resized = OverviewDashboardLayoutEngine.SnapResize(
-            start,
-            new OverviewDashboardCardBounds(0, 0, 6.1, 100),
-            OverviewDashboardResizeEdge.Right,
-            [new OverviewDashboardCardBounds(6, 0, 4, 100)],
-            1200,
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutPolicy.MinimumCardHeight);
-
-        Assert.Equal(6, resized.Width);
-    }
-
-    [Fact]
-    public void OverviewDashboardResizeAlignsVerticalEdgesOfAdjacentCards()
-    {
-        var neighbor = new OverviewDashboardCardBounds(4, 0, 4, 140);
-        var bottom = OverviewDashboardLayoutEngine.SnapResize(
-            new OverviewDashboardCardBounds(0, 0, 4, 100),
-            new OverviewDashboardCardBounds(0, 0, 4, 132),
-            OverviewDashboardResizeEdge.Bottom,
-            [neighbor],
-            1200,
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutPolicy.MinimumCardHeight);
-        var top = OverviewDashboardLayoutEngine.SnapResize(
-            new OverviewDashboardCardBounds(0, 40, 4, 100),
-            new OverviewDashboardCardBounds(0, 12, 4, 128),
-            OverviewDashboardResizeEdge.Top,
-            [neighbor],
-            1200,
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutPolicy.MinimumCardHeight);
-        var separated = OverviewDashboardLayoutEngine.SnapResize(
-            new OverviewDashboardCardBounds(0, 0, 3.5, 100),
-            new OverviewDashboardCardBounds(0, 0, 3.5, 132),
-            OverviewDashboardResizeEdge.Bottom,
-            [neighbor],
-            1200,
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutPolicy.MinimumCardHeight);
-
-        Assert.Equal(140, bottom.Height);
-        Assert.Equal(0, top.Y);
-        Assert.Equal(140, top.Height);
-        Assert.Equal(132, separated.Height);
     }
 
     [Fact]

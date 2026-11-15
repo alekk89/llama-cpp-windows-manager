@@ -33,12 +33,9 @@ public sealed partial class OverviewDashboardController
     private OverviewDashboardLayout _layout;
     private OverviewDashboardCardView? _dragView;
     private System.Windows.Point _dragOrigin;
-    private OverviewDashboardCardBounds? _dragStartBounds;
-    private OverviewDashboardCardBounds? _interactionBounds;
     private OverviewDashboardCardView? _resizeView;
     private OverviewDashboardResizeEdge _resizeEdge;
     private System.Windows.Point _resizeOrigin;
-    private OverviewDashboardCardBounds? _resizeStartBounds;
     private int _deferredUpdateDepth;
     private bool _readingsApplyPending;
     private bool _pendingGraphPush;

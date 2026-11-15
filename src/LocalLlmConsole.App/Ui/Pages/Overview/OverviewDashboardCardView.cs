@@ -192,14 +192,12 @@ public sealed partial class OverviewDashboardCardView
         var height = Root.ActualHeight > 0 ? Root.ActualHeight : Root.Height;
         if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0) return 0;
         var edge = (OverviewDashboardResizeEdge)0;
+        // Cards resize by width only; their height follows content.
+        if (point.Y < 0 || point.Y > height) return 0;
         if (point.X >= 0 && point.X <= ResizeHitThickness)
             edge |= OverviewDashboardResizeEdge.Left;
         else if (point.X <= width && point.X >= width - ResizeHitThickness)
             edge |= OverviewDashboardResizeEdge.Right;
-        if (point.Y >= 0 && point.Y <= ResizeHitThickness)
-            edge |= OverviewDashboardResizeEdge.Top;
-        else if (point.Y <= height && point.Y >= height - ResizeHitThickness)
-            edge |= OverviewDashboardResizeEdge.Bottom;
         return edge;
     }
 
@@ -333,6 +331,13 @@ public sealed partial class OverviewDashboardCardView
             Math.Ceiling(_content.DesiredSize.Height + verticalChrome));
         _lastMeasuredWidth = measuredWidth;
         _measuredContentGeometryVersion = _contentGeometryVersion;
+    }
+
+    /// <summary>The card's content height when it is <paramref name="width"/> wide.</summary>
+    public double HeightAt(double width)
+    {
+        UpdateMinimumSize(width);
+        return MinimumHeight;
     }
 
     private void InvalidateMinimumSize()

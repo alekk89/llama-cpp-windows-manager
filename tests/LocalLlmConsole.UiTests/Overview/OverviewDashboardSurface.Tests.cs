@@ -46,7 +46,8 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
                 });
             });
             Assert.IsType<Style>(System.Windows.Application.Current.Resources["KeyboardFocusVisual"]);
-            Assert.All(dashboard.Cards, card => Assert.True(card.Root.Height >= card.Layout.Bounds!.Height));
+            // Card heights follow their content rather than a saved height.
+            Assert.All(dashboard.Cards, card => Assert.Equal(card.MinimumHeight, card.Root.Height, precision: 1));
             var metricDashboard = dashboard.DashboardGrid;
             var metricCanvas = dashboard.DashboardCanvas;
             Assert.Empty(metricDashboard.ColumnDefinitions);
@@ -130,13 +131,13 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
             Assert.Equal(1, Grid.GetRowSpan(overview.LoadButton));
             var gpuCard = dashboard.Cards.Single(card => card.MetricIds.Contains(OverviewDashboardMetricIds.Gpu(0)));
             Assert.Equal(0, Canvas.GetTop(gpuCard.Root));
-            Assert.Equal(Math.Max(metricDashboard.ActualWidth, dashboard.Layout.LockedSurfaceWidth!) * gpuCard.Layout.Bounds!.X / 12, Canvas.GetLeft(gpuCard.Root), precision: 1);
+            Assert.Equal(OverviewDashboardLayoutEngine.ColumnPitch(metricDashboard.ActualWidth) * gpuCard.Layout.Bounds!.X, Canvas.GetLeft(gpuCard.Root), precision: 1);
             overview.Root.InvalidateMeasure();
             overview.Root.Measure(new Size(1180, 680));
             overview.Root.Arrange(new Rect(0, 0, 1180, 680));
             overview.Root.UpdateLayout();
             Assert.Empty(metricDashboard.ColumnDefinitions);
-            Assert.Equal(Math.Max(metricDashboard.ActualWidth, dashboard.Layout.LockedSurfaceWidth!) * gpuCard.Layout.Bounds!.X / 12, Canvas.GetLeft(gpuCard.Root), precision: 1);
+            Assert.Equal(OverviewDashboardLayoutEngine.ColumnPitch(metricDashboard.ActualWidth) * gpuCard.Layout.Bounds!.X, Canvas.GetLeft(gpuCard.Root), precision: 1);
             Assert.All(graphCards, card => Assert.Equal(30 + MetricSparkline.CaptionHeight, card.Graph!.ActualHeight));
 
             var overviewState = new LocalLlmConsole.OverviewPageState();
@@ -193,7 +194,7 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
             Assert.Equal(originalMetricCount + 1, dashboard.Cards[0].MetricIds.Count);
             Assert.True(dashboard.Cards[0].Root.Height >= 176);
             Assert.Equal(8, dashboard.Cards[0].Layout.Bounds!.Width);
-            var configuredCardWidth = metricDashboard.ActualWidth * 8 / 12 - OverviewDashboardLayoutPolicy.CardGap;
+            var configuredCardWidth = OverviewDashboardLayoutEngine.SpanWidth(8, OverviewDashboardLayoutEngine.ColumnPitch(metricDashboard.ActualWidth));
             Assert.InRange(dashboard.Cards[0].Root.Width, dashboard.Cards[0].MinimumWidth, configuredCardWidth);
 
             Assert.True(dashboard.IsEditing);
@@ -209,20 +210,13 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
                     card.ResizeEdgeAt(new Point(1, height / 2)));
                 Assert.Equal(OverviewDashboardResizeEdge.Right,
                     card.ResizeEdgeAt(new Point(width - 1, height / 2)));
-                Assert.Equal(OverviewDashboardResizeEdge.Top,
-                    card.ResizeEdgeAt(new Point(width / 2, 1)));
-                Assert.Equal(OverviewDashboardResizeEdge.Bottom,
-                    card.ResizeEdgeAt(new Point(width / 2, height - 1)));
-                Assert.Equal(OverviewDashboardResizeEdge.Left | OverviewDashboardResizeEdge.Top,
-                    card.ResizeEdgeAt(new Point(1, 1)));
-                Assert.Equal(OverviewDashboardResizeEdge.Right | OverviewDashboardResizeEdge.Top,
-                    card.ResizeEdgeAt(new Point(width - 1, 1)));
-                Assert.Equal(OverviewDashboardResizeEdge.Left | OverviewDashboardResizeEdge.Bottom,
-                    card.ResizeEdgeAt(new Point(1, height - 1)));
-                Assert.Equal(OverviewDashboardResizeEdge.Right | OverviewDashboardResizeEdge.Bottom,
-                    card.ResizeEdgeAt(new Point(width - 1, height - 1)));
+                // Height follows content, so only the side edges resize.
+                Assert.Equal((OverviewDashboardResizeEdge)0, card.ResizeEdgeAt(new Point(width / 2, 1)));
+                Assert.Equal((OverviewDashboardResizeEdge)0, card.ResizeEdgeAt(new Point(width / 2, height - 1)));
+                Assert.Equal(OverviewDashboardResizeEdge.Left, card.ResizeEdgeAt(new Point(1, 1)));
+                Assert.Equal(OverviewDashboardResizeEdge.Right, card.ResizeEdgeAt(new Point(width - 1, height - 1)));
                 card.UpdatePointer(new Point(width - 1, height - 1));
-                Assert.Equal(Cursors.SizeNWSE, card.Root.Cursor);
+                Assert.Equal(Cursors.SizeWE, card.Root.Cursor);
                 card.ResetPointer();
                 Assert.Equal(Cursors.SizeAll, card.Root.Cursor);
             });
@@ -264,7 +258,7 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
             overview.Root.UpdateLayout();
             Assert.Empty(metricDashboard.ColumnDefinitions);
             Assert.All(dashboard.Cards, card => Assert.True(
-                card.Root.ActualHeight >= card.Layout.Bounds!.Height));
+                card.Root.ActualHeight >= card.MinimumHeight - .5));
             Assert.All(dashboard.Cards, card => Assert.True(
                 card.Root.ActualWidth >= card.MinimumWidth));
             AssertDashboardCardsSeparated(dashboard);

@@ -345,6 +345,79 @@ public static partial class OverviewDashboardLayoutPolicy
             };
         });
 
+    /// <summary>The card's width in grid columns.</summary>
+    public static int CardSpan(OverviewDashboardCardLayout card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        var width = card.Bounds is { } bounds && double.IsFinite(bounds.Width)
+            ? bounds.Width
+            : Math.Clamp(card.ColumnSpan, 1, 3) * 4d;
+        return Math.Clamp((int)Math.Round(width, MidpointRounding.AwayFromZero), 1, (int)HorizontalUnits);
+    }
+
+    /// <summary>
+    /// Sets a card's width in grid columns. Its position and height follow from
+    /// the flow layout, so only the span is stored.
+    /// </summary>
+    public static OverviewDashboardLayout SetCardSpan(OverviewDashboardLayout layout, string cardId, int span)
+        => UpdateCard(layout, cardId, card =>
+        {
+            var bounds = card.Bounds ?? LegacyBounds(card, 0, 0);
+            return card with
+            {
+                Bounds = ConstrainBounds(bounds with { Width = Math.Clamp(span, 1, (int)HorizontalUnits) }),
+                ColumnSpan = Math.Clamp((int)Math.Round(span / 4d, MidpointRounding.AwayFromZero), 1, 3)
+            };
+        });
+
+    /// <summary>
+    /// Records where the flow layout placed each card. Order and spans are what
+    /// define the layout; stored positions keep the saved layout readable by
+    /// earlier versions, which place cards by position.
+    /// </summary>
+    public static OverviewDashboardLayout SetCardBounds(
+        OverviewDashboardLayout layout,
+        IReadOnlyDictionary<string, OverviewDashboardCardBounds> bounds)
+    {
+        ArgumentNullException.ThrowIfNull(bounds);
+        var normalized = Normalize(layout);
+        return normalized with
+        {
+            Cards = normalized.Cards.Select(card => bounds.TryGetValue(card.Id, out var placed) && ValidBounds(placed)
+                ? card with
+                {
+                    Bounds = ConstrainBounds(placed),
+                    ColumnSpan = Math.Clamp((int)Math.Round(ConstrainBounds(placed).Width / 4, MidpointRounding.AwayFromZero), 1, 3),
+                    Height = NearestLegacyHeight(ConstrainBounds(placed).Height)
+                }
+                : card).ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Layouts saved before cards flowed in list order kept their arrangement in
+    /// positions; read them top to bottom, then left to right, to keep that order.
+    /// </summary>
+    private static IEnumerable<OverviewDashboardCardLayout> OrderedForFlow(OverviewDashboardLayout layout)
+    {
+        var cards = layout.Cards ?? [];
+        if (layout.Version >= FlowLayoutVersion) return cards;
+        var positioned = cards.Where(card => ValidBounds(card.Bounds))
+            .OrderBy(card => card.Bounds!.Y)
+            .ToList();
+        var ordered = new List<OverviewDashboardCardLayout>(cards.Count);
+        while (positioned.Count > 0)
+        {
+            // Cards whose tops start within a row band were laid out side by side.
+            var bandTop = positioned[0].Bounds!.Y;
+            var band = positioned.Where(card => card.Bounds!.Y < bandTop + MinimumCardHeight / 2).ToArray();
+            ordered.AddRange(band.OrderBy(card => card.Bounds!.X));
+            positioned.RemoveAll(card => band.Contains(card));
+        }
+        ordered.AddRange(cards.Where(card => !ValidBounds(card.Bounds)));
+        return ordered;
+    }
+
     public static OverviewDashboardCardBounds ConstrainBounds(OverviewDashboardCardBounds bounds)
     {
         var width = FiniteOr(bounds.Width, 4);

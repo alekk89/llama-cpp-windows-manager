@@ -7,356 +7,168 @@ public sealed record OverviewDashboardPlacement(
     double Width,
     double Height);
 
-public sealed record OverviewDashboardMinimumSize(double Width, double Height);
+/// <summary>
+/// One card to flow: its saved column span, the narrowest width its content
+/// can use, and its content height at a given width.
+/// </summary>
+public sealed record OverviewDashboardFlowItem(
+    string CardId,
+    int Span,
+    double MinimumWidth,
+    Func<double, double> HeightAt);
 
 /// <summary>
-/// Translates persisted responsive bounds into device-independent pixels.
-/// User positions remain stable because this layer never repacks cards.
+/// Flows dashboard cards through a 12-column grid in their saved order. Each card
+/// takes the highest free slot that fits its width (then the leftmost), so the
+/// grid stays compact at every window width. Cards whose content would not fit
+/// their span are widened, slivers no card could use are given to the card
+/// beside them, and heights follow content.
 /// </summary>
-public static partial class OverviewDashboardLayoutEngine
+public static class OverviewDashboardLayoutEngine
 {
-    public const double SnapDistance = 14;
+    public const int Columns = 12;
+    private const double Tolerance = .5;
+    private const double RowTolerance = 24;
+    private static double Gap => OverviewDashboardLayoutPolicy.CardGap;
 
-    public static IReadOnlyList<OverviewDashboardPlacement> Place(
-        IReadOnlyList<OverviewDashboardCardLayout> cards,
+    /// <summary>Horizontal distance from one column start to the next.</summary>
+    public static double ColumnPitch(double availableWidth, double? lockedSurfaceWidth = null)
+    {
+        var sizingWidth = lockedSurfaceWidth is { } locked && double.IsFinite(locked) && locked > 0
+            ? locked
+            : EffectiveWidth(availableWidth);
+        return (sizingWidth + Gap) / Columns;
+    }
+
+    public static double SpanWidth(int span, double pitch)
+        => Math.Clamp(span, 1, Columns) * pitch - Gap;
+
+    public static int SpanForWidth(double pixelWidth, double pitch)
+        => Math.Clamp((int)Math.Round((pixelWidth + Gap) / pitch, MidpointRounding.AwayFromZero), 1, Columns);
+
+    /// <summary>The smallest span whose width holds <paramref name="minimumWidth"/>.</summary>
+    public static int MinimumSpan(double minimumWidth, double pitch)
+        => Math.Clamp((int)Math.Ceiling((minimumWidth + Gap) / pitch - .001), 1, Columns);
+
+    public static IReadOnlyList<OverviewDashboardPlacement> Flow(
+        IReadOnlyList<OverviewDashboardFlowItem> items,
         double availableWidth,
         double? lockedSurfaceWidth = null)
     {
-        ArgumentNullException.ThrowIfNull(cards);
-        var width = EffectiveWidth(availableWidth);
-        var positionPixelsPerUnit = width / OverviewDashboardLayoutPolicy.HorizontalUnits;
-        var sizePixelsPerUnit = lockedSurfaceWidth is { } lockedWidth
-                                && double.IsFinite(lockedWidth)
-                                && lockedWidth > 0
-            ? lockedWidth / OverviewDashboardLayoutPolicy.HorizontalUnits
-            : positionPixelsPerUnit;
-        return cards.Select(card =>
+        ArgumentNullException.ThrowIfNull(items);
+        var surface = EffectiveWidth(availableWidth);
+        var locked = lockedSurfaceWidth is { } value && double.IsFinite(value) && value > 0;
+        var pitch = ColumnPitch(surface, lockedSurfaceWidth);
+        var placed = new List<OverviewDashboardPlacement>(items.Count);
+        foreach (var item in items)
         {
-            var bounds = OverviewDashboardLayoutPolicy.ConstrainBounds(card.Bounds
-                ?? new OverviewDashboardCardBounds(
-                    0,
-                    0,
-                    Math.Clamp(card.ColumnSpan, 1, 3) * 4,
-                    OverviewDashboardLayoutPolicy.CardHeight(card.Height)));
-            return new OverviewDashboardPlacement(
-                card.Id,
-                bounds.X * positionPixelsPerUnit,
-                bounds.Y,
-                Math.Max(80, bounds.Width * sizePixelsPerUnit -
-                    (bounds.X + bounds.Width < OverviewDashboardLayoutPolicy.HorizontalUnits
-                        ? OverviewDashboardLayoutPolicy.CardGap
-                        : 0)),
-                bounds.Height);
-        }).ToArray();
+            var span = Math.Clamp(item.Span, 1, Columns);
+            var minimum = Math.Min(surface, Math.Max(0, item.MinimumWidth));
+            if (!locked)
+                span = Math.Max(span, MinimumSpan(minimum, pitch));
+            var width = Math.Min(surface, Math.Max(SpanWidth(span, pitch), minimum));
+            var height = CardHeight(item, width);
+            var (left, top) = BestSlot(placed, width, surface);
+            placed.Add(new OverviewDashboardPlacement(item.CardId, left, top, width, height));
+        }
+
+        if (!locked)
+            AbsorbSlivers(placed, items, surface);
+        return placed;
     }
 
     public static double SurfaceHeight(IReadOnlyList<OverviewDashboardPlacement> placements)
-        => placements.Select(item => item.Top + item.Height + OverviewDashboardLayoutPolicy.CardGap)
+        => placements.Select(item => item.Top + item.Height + Gap)
             .DefaultIfEmpty(0)
             .Max();
-
-    public static IReadOnlyList<OverviewDashboardPlacement> ResolveVisiblePlacements(
-        IReadOnlyList<OverviewDashboardPlacement> desiredPlacements,
-        IReadOnlyDictionary<string, OverviewDashboardMinimumSize> minimumSizes,
-        double availableWidth)
-    {
-        ArgumentNullException.ThrowIfNull(desiredPlacements);
-        ArgumentNullException.ThrowIfNull(minimumSizes);
-        var surfaceWidth = EffectiveWidth(availableWidth);
-        var responsivePlacements = CompressVisibleRows(desiredPlacements, minimumSizes, surfaceWidth);
-        var resolved = new List<OverviewDashboardPlacement>(responsivePlacements.Count);
-        foreach (var desired in responsivePlacements)
-        {
-            minimumSizes.TryGetValue(desired.CardId, out var minimum);
-            var width = Math.Min(surfaceWidth, Math.Max(desired.Width, minimum?.Width ?? 0));
-            var height = Math.Max(desired.Height, minimum?.Height ?? 0);
-            var desiredLeft = Math.Clamp(desired.Left, 0, Math.Max(0, surfaceWidth - width));
-            var desiredTop = Math.Max(0, desired.Top);
-            var xCandidates = new HashSet<double> { desiredLeft, 0, Math.Max(0, surfaceWidth - width) };
-            var yCandidates = new HashSet<double> { desiredTop, 0 };
-            foreach (var placed in resolved)
-            {
-                xCandidates.Add(Math.Clamp(
-                    placed.Left + placed.Width + OverviewDashboardLayoutPolicy.CardGap,
-                    0,
-                    Math.Max(0, surfaceWidth - width)));
-                xCandidates.Add(Math.Clamp(
-                    placed.Left - OverviewDashboardLayoutPolicy.CardGap - width,
-                    0,
-                    Math.Max(0, surfaceWidth - width)));
-                yCandidates.Add(Math.Max(0,
-                    placed.Top + placed.Height + OverviewDashboardLayoutPolicy.CardGap));
-                yCandidates.Add(Math.Max(0,
-                    placed.Top - OverviewDashboardLayoutPolicy.CardGap - height));
-            }
-
-            var placement = xCandidates
-                .SelectMany(left => yCandidates.Select(top => new OverviewDashboardPlacement(
-                    desired.CardId, left, top, width, height)))
-                .Where(candidate => resolved.All(placed => !VisiblePlacementsConflict(candidate, placed)))
-                .OrderBy(candidate => VisiblePlacementDistanceSquared(candidate, desiredLeft, desiredTop))
-                .ThenBy(candidate => candidate.Top)
-                .ThenBy(candidate => candidate.Left)
-                .FirstOrDefault();
-            if (placement is null)
-            {
-                placement = new OverviewDashboardPlacement(
-                    desired.CardId,
-                    desiredLeft,
-                    resolved.Select(item => item.Top + item.Height + OverviewDashboardLayoutPolicy.CardGap)
-                        .DefaultIfEmpty(desiredTop)
-                        .Max(),
-                    width,
-                    height);
-            }
-            resolved.Add(placement);
-        }
-        return resolved;
-    }
 
     public static double ToHorizontalUnits(double pixels, double availableWidth)
         => pixels / EffectiveWidth(availableWidth) * OverviewDashboardLayoutPolicy.HorizontalUnits;
 
-    public static OverviewDashboardCardBounds SnapMove(
-        OverviewDashboardCardBounds candidate,
-        IReadOnlyList<OverviewDashboardCardBounds> obstacles,
-        double availableWidth)
-    {
-        var snapX = ToHorizontalUnits(SnapDistance, availableWidth);
-        var bestX = (Distance: double.PositiveInfinity, Value: candidate.X);
-        var bestY = (Distance: double.PositiveInfinity, Value: candidate.Y);
-        foreach (var obstacle in obstacles)
-        {
-            if (OverlapsVertically(candidate, obstacle, SnapDistance))
-            {
-                Consider(candidate.X, obstacle.X + obstacle.Width, ref bestX, snapX);
-                Consider(candidate.X, obstacle.X - candidate.Width, ref bestX, snapX);
-            }
-            if (OverlapsHorizontally(candidate, obstacle, snapX))
-            {
-                Consider(candidate.Y, obstacle.Y + obstacle.Height + OverviewDashboardLayoutPolicy.CardGap,
-                    ref bestY, SnapDistance);
-                Consider(candidate.Y, obstacle.Y - OverviewDashboardLayoutPolicy.CardGap - candidate.Height,
-                    ref bestY, SnapDistance);
-            }
-        }
-
-        candidate = OverviewDashboardLayoutPolicy.ConstrainBounds(candidate with
-        {
-            X = bestX.Value,
-            Y = bestY.Value
-        });
-        return Separate(candidate, obstacles);
-    }
-
-    public static OverviewDashboardCardBounds SnapResize(
-        OverviewDashboardCardBounds start,
-        OverviewDashboardCardBounds candidate,
-        OverviewDashboardResizeEdge edge,
-        IReadOnlyList<OverviewDashboardCardBounds> obstacles,
-        double availableWidth,
-        double minimumWidth,
-        double minimumHeight)
-    {
-        var snapX = ToHorizontalUnits(SnapDistance, availableWidth);
-        var left = candidate.X;
-        var right = candidate.X + candidate.Width;
-        var top = candidate.Y;
-        var bottom = candidate.Y + candidate.Height;
-        foreach (var obstacle in obstacles)
-        {
-            if (OverlapsVertically(candidate, obstacle, SnapDistance))
-            {
-                if (edge.HasFlag(OverviewDashboardResizeEdge.Left)
-                    && Math.Abs(left - obstacle.X - obstacle.Width) <= snapX)
-                    left = obstacle.X + obstacle.Width;
-                if (edge.HasFlag(OverviewDashboardResizeEdge.Right)
-                    && Math.Abs(right - obstacle.X) <= snapX)
-                    right = obstacle.X;
-            }
-        }
-
-        var horizontallyAdjusted = candidate with { X = left, Width = right - left };
-        var bestTop = (Distance: double.PositiveInfinity, Value: top);
-        var bestBottom = (Distance: double.PositiveInfinity, Value: bottom);
-        var adjacencyTolerance = ToHorizontalUnits(2, availableWidth);
-        foreach (var obstacle in obstacles)
-        {
-            if (OverlapsHorizontally(horizontallyAdjusted, obstacle, snapX))
-            {
-                if (edge.HasFlag(OverviewDashboardResizeEdge.Top))
-                    Consider(top, obstacle.Y + obstacle.Height + OverviewDashboardLayoutPolicy.CardGap,
-                        ref bestTop, SnapDistance);
-                if (edge.HasFlag(OverviewDashboardResizeEdge.Bottom))
-                    Consider(bottom, obstacle.Y - OverviewDashboardLayoutPolicy.CardGap,
-                        ref bestBottom, SnapDistance);
-            }
-            if (HorizontallyAdjacent(horizontallyAdjusted, obstacle, adjacencyTolerance))
-            {
-                if (edge.HasFlag(OverviewDashboardResizeEdge.Top))
-                    Consider(top, obstacle.Y, ref bestTop, SnapDistance);
-                if (edge.HasFlag(OverviewDashboardResizeEdge.Bottom))
-                    Consider(bottom, obstacle.Y + obstacle.Height, ref bestBottom, SnapDistance);
-            }
-        }
-        top = bestTop.Value;
-        bottom = bestBottom.Value;
-
-        candidate = ResizeFromEdges(start, edge, left, top, right, bottom, minimumWidth, minimumHeight);
-        for (var pass = 0; pass < 3; pass++)
-        {
-            var changed = false;
-            foreach (var obstacle in obstacles.Where(item => Conflicts(candidate, item)))
-            {
-                var alternatives = ResizeAlternatives(start, candidate, obstacle, edge, minimumWidth, minimumHeight)
-                    .Where(item => !Conflicts(item, obstacle))
-                    .OrderBy(item => DistanceSquared(candidate, item))
-                    .ToArray();
-                if (alternatives.Length == 0) continue;
-                candidate = alternatives[0];
-                changed = true;
-            }
-            if (!changed) break;
-        }
-        return OverviewDashboardLayoutPolicy.ConstrainBounds(candidate);
-    }
-
-    private static OverviewDashboardCardBounds Separate(
-        OverviewDashboardCardBounds candidate,
-        IReadOnlyList<OverviewDashboardCardBounds> obstacles)
-    {
-        for (var pass = 0; pass < 4; pass++)
-        {
-            var changed = false;
-            foreach (var obstacle in obstacles.Where(item => Conflicts(candidate, item)))
-            {
-                var alternatives = new[]
-                    {
-                        candidate with { X = obstacle.X - candidate.Width },
-                        candidate with { X = obstacle.X + obstacle.Width },
-                        candidate with { Y = obstacle.Y - OverviewDashboardLayoutPolicy.CardGap - candidate.Height },
-                        candidate with { Y = obstacle.Y + obstacle.Height + OverviewDashboardLayoutPolicy.CardGap }
-                    }
-                    .Select(OverviewDashboardLayoutPolicy.ConstrainBounds)
-                    .Where(item => !Conflicts(item, obstacle))
-                    .OrderBy(item => DistanceSquared(candidate, item))
-                    .ToArray();
-                if (alternatives.Length == 0) continue;
-                candidate = alternatives[0];
-                changed = true;
-            }
-            if (!changed) break;
-        }
-        return candidate;
-    }
-
-    private static IEnumerable<OverviewDashboardCardBounds> ResizeAlternatives(
-        OverviewDashboardCardBounds start,
-        OverviewDashboardCardBounds candidate,
-        OverviewDashboardCardBounds obstacle,
-        OverviewDashboardResizeEdge edge,
-        double minimumWidth,
-        double minimumHeight)
-    {
-        var startRight = start.X + start.Width;
-        var startBottom = start.Y + start.Height;
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Right) && start.X <= obstacle.X)
-            yield return ResizeFromEdges(start, edge, candidate.X, candidate.Y, obstacle.X,
-                candidate.Y + candidate.Height, minimumWidth, minimumHeight);
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Left) && startRight >= obstacle.X + obstacle.Width)
-            yield return ResizeFromEdges(start, edge, obstacle.X + obstacle.Width, candidate.Y,
-                candidate.X + candidate.Width, candidate.Y + candidate.Height, minimumWidth, minimumHeight);
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Bottom) && start.Y <= obstacle.Y)
-            yield return ResizeFromEdges(start, edge, candidate.X, candidate.Y,
-                candidate.X + candidate.Width, obstacle.Y - OverviewDashboardLayoutPolicy.CardGap,
-                minimumWidth, minimumHeight);
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Top) && startBottom >= obstacle.Y + obstacle.Height)
-            yield return ResizeFromEdges(start, edge, candidate.X,
-                obstacle.Y + obstacle.Height + OverviewDashboardLayoutPolicy.CardGap,
-                candidate.X + candidate.Width, candidate.Y + candidate.Height,
-                minimumWidth, minimumHeight);
-    }
-
-    private static OverviewDashboardCardBounds ResizeFromEdges(
-        OverviewDashboardCardBounds start,
-        OverviewDashboardResizeEdge edge,
-        double left,
-        double top,
-        double right,
-        double bottom,
-        double minimumWidth,
-        double minimumHeight)
-    {
-        if (!edge.HasFlag(OverviewDashboardResizeEdge.Left)) left = start.X;
-        if (!edge.HasFlag(OverviewDashboardResizeEdge.Right)) right = start.X + start.Width;
-        if (!edge.HasFlag(OverviewDashboardResizeEdge.Top)) top = start.Y;
-        if (!edge.HasFlag(OverviewDashboardResizeEdge.Bottom)) bottom = start.Y + start.Height;
-        if (right - left < minimumWidth)
-        {
-            if (edge.HasFlag(OverviewDashboardResizeEdge.Left)) left = right - minimumWidth;
-            else right = left + minimumWidth;
-        }
-        if (bottom - top < minimumHeight)
-        {
-            if (edge.HasFlag(OverviewDashboardResizeEdge.Top)) top = bottom - minimumHeight;
-            else bottom = top + minimumHeight;
-        }
-        return OverviewDashboardLayoutPolicy.ConstrainBounds(new(left, top, right - left, bottom - top));
-    }
-
-    private static bool Conflicts(OverviewDashboardCardBounds first, OverviewDashboardCardBounds second)
-        => OverlapsHorizontally(first, second, 0)
-           && first.Y < second.Y + second.Height + OverviewDashboardLayoutPolicy.CardGap
-           && first.Y + first.Height + OverviewDashboardLayoutPolicy.CardGap > second.Y;
-
-    private static bool OverlapsHorizontally(
-        OverviewDashboardCardBounds first,
-        OverviewDashboardCardBounds second,
-        double tolerance)
-        => first.X < second.X + second.Width + tolerance
-           && first.X + first.Width + tolerance > second.X;
-
-    private static bool OverlapsVertically(
-        OverviewDashboardCardBounds first,
-        OverviewDashboardCardBounds second,
-        double tolerance)
-        => first.Y < second.Y + second.Height + tolerance
-           && first.Y + first.Height + tolerance > second.Y;
-
-    private static bool HorizontallyAdjacent(
-        OverviewDashboardCardBounds first,
-        OverviewDashboardCardBounds second,
-        double tolerance)
-        => Math.Abs(first.X + first.Width - second.X) <= tolerance
-           || Math.Abs(second.X + second.Width - first.X) <= tolerance;
-
-    private static void Consider(
-        double current,
-        double target,
-        ref (double Distance, double Value) best,
-        double threshold)
-    {
-        var distance = Math.Abs(current - target);
-        if (distance <= threshold && distance < best.Distance)
-            best = (distance, target);
-    }
-
-    private static double DistanceSquared(OverviewDashboardCardBounds first, OverviewDashboardCardBounds second)
-        => Math.Pow(first.X - second.X, 2) + Math.Pow(first.Y - second.Y, 2);
-
-    private static bool VisiblePlacementsConflict(
-        OverviewDashboardPlacement first,
-        OverviewDashboardPlacement second)
-        => first.Left < second.Left + second.Width + OverviewDashboardLayoutPolicy.CardGap - .1
-           && first.Left + first.Width + OverviewDashboardLayoutPolicy.CardGap > second.Left + .1
-           && first.Top < second.Top + second.Height + OverviewDashboardLayoutPolicy.CardGap - .1
-           && first.Top + first.Height + OverviewDashboardLayoutPolicy.CardGap > second.Top + .1;
-
-    private static double VisiblePlacementDistanceSquared(
+    /// <summary>
+    /// Persistable bounds for a rendered placement: column position and span in
+    /// grid units, top and height in pixels.
+    /// </summary>
+    public static OverviewDashboardCardBounds ToBounds(
         OverviewDashboardPlacement placement,
-        double desiredLeft,
-        double desiredTop)
-        => Math.Pow(placement.Left - desiredLeft, 2) + Math.Pow(placement.Top - desiredTop, 2);
+        double availableWidth,
+        double? lockedSurfaceWidth = null)
+    {
+        var pitch = ColumnPitch(availableWidth, lockedSurfaceWidth);
+        var renderPitch = ColumnPitch(availableWidth);
+        return OverviewDashboardLayoutPolicy.ConstrainBounds(new OverviewDashboardCardBounds(
+            Math.Round(placement.Left / renderPitch, MidpointRounding.AwayFromZero),
+            Math.Round(placement.Top),
+            SpanForWidth(placement.Width, pitch),
+            Math.Round(placement.Height)));
+    }
+
+    private static (double Left, double Top) BestSlot(
+        IReadOnlyList<OverviewDashboardPlacement> placed,
+        double width,
+        double surface)
+    {
+        var lefts = new SortedSet<double> { 0 };
+        foreach (var item in placed)
+            lefts.Add(item.Left + item.Width + Gap);
+        var slots = new List<(double Left, double Top)>();
+        foreach (var left in lefts)
+        {
+            if (left + width > surface + Tolerance) break;
+            var top = placed
+                .Where(item => item.Left < left + width - Tolerance && item.Left + item.Width > left + Tolerance)
+                .Select(item => item.Top + item.Height + Gap)
+                .DefaultIfEmpty(0)
+                .Max();
+            slots.Add((left, top));
+        }
+        if (slots.Count == 0)
+            return (0, SurfaceHeight(placed));
+        // Slots at nearly the same height read as one row, so take the leftmost.
+        var highest = slots.Min(slot => slot.Top);
+        return slots.Where(slot => slot.Top <= highest + RowTolerance).MinBy(slot => slot.Left);
+    }
+
+    /// <summary>
+    /// Gives a card the empty space to its right when that space is narrower
+    /// than any card can be, so rows end at the window edge instead of a dead strip.
+    /// </summary>
+    private static void AbsorbSlivers(
+        List<OverviewDashboardPlacement> placed,
+        IReadOnlyList<OverviewDashboardFlowItem> items,
+        double surface)
+    {
+        if (placed.Count == 0) return;
+        // A gap narrower than any card's minimum width can never hold a card.
+        var narrowest = items.Min(item => Math.Max(item.MinimumWidth, 1));
+        var byId = items.ToDictionary(item => item.CardId, StringComparer.OrdinalIgnoreCase);
+        foreach (var index in Enumerable.Range(0, placed.Count).OrderByDescending(index => placed[index].Left))
+        {
+            var card = placed[index];
+            var right = card.Left + card.Width;
+            var limit = placed
+                .Where(other => !ReferenceEquals(other, card)
+                                && other.Left >= right - Tolerance
+                                && other.Top < card.Top + card.Height + Gap - Tolerance
+                                && other.Top + other.Height + Gap > card.Top + Tolerance)
+                .Select(other => other.Left - Gap)
+                .DefaultIfEmpty(surface)
+                .Min();
+            var spare = limit - right;
+            if (spare <= Tolerance || spare - Gap >= narrowest - Tolerance) continue;
+            var width = card.Width + spare;
+            var height = byId.TryGetValue(card.CardId, out var item) ? CardHeight(item, width) : card.Height;
+            placed[index] = card with { Width = width, Height = Math.Min(card.Height, height) };
+        }
+    }
+
+    private static double CardHeight(OverviewDashboardFlowItem item, double width)
+    {
+        var height = item.HeightAt(width);
+        return Math.Clamp(double.IsFinite(height) ? Math.Ceiling(height) : OverviewDashboardLayoutPolicy.MinimumCardHeight,
+            OverviewDashboardLayoutPolicy.MinimumCardHeight,
+            OverviewDashboardLayoutPolicy.MaximumCardHeight);
+    }
 
     private static double EffectiveWidth(double availableWidth)
         => double.IsFinite(availableWidth) && availableWidth > 1 ? availableWidth : 1000;

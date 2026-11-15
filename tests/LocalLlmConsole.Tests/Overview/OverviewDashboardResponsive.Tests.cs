@@ -1,177 +1,178 @@
+using LocalLlmConsole.Models;
+using LocalLlmConsole.Services;
+
 namespace LocalLlmConsole.Tests;
 
 public sealed class OverviewDashboardResponsiveTests : ManagerRegressionTestBase
 {
+    private const double Gap = OverviewDashboardLayoutPolicy.CardGap;
+
+    private static OverviewDashboardFlowItem Item(string id, int span, double height, double minimumWidth = 180)
+        => new(id, span, minimumWidth, _ => height);
+
     [Fact]
-    public void OverviewDashboardVisiblePlacementAccountsForMeasuredContentHeight()
+    public void FlowFillsRowsInOrderAndSpansEndAtTheSurfaceEdge()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("first", 0, 0, 290, 112),
-            new OverviewDashboardPlacement("second", 0, 122, 290, 112)
-        };
-        var minimums = new Dictionary<string, OverviewDashboardMinimumSize>
-        {
-            ["first"] = new(180, 160),
-            ["second"] = new(180, 112)
-        };
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 4, 100), Item("b", 4, 100), Item("c", 4, 100), Item("d", 6, 100)],
+            1190);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 900);
-
-        Assert.Equal(160, resolved[0].Height);
-        Assert.Equal(170, resolved[1].Top);
+        Assert.Equal(["a", "b", "c", "d"], placements.Select(item => item.CardId));
+        Assert.Equal([0d, 400, 800], placements.Take(3).Select(item => item.Left));
+        Assert.All(placements.Take(3), item => Assert.Equal(390, item.Width));
+        Assert.Equal(1190, placements[2].Left + placements[2].Width);
+        Assert.Equal(0, placements[3].Left);
+        Assert.Equal(100 + Gap, placements[3].Top);
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementMovesExpandedCardsOutOfOverlap()
+    public void FlowPacksLaterCardsIntoTheHighestFreeSlot()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("first", 0, 0, 290, 112),
-            new OverviewDashboardPlacement("second", 300, 0, 290, 112)
-        };
-        var minimums = new Dictionary<string, OverviewDashboardMinimumSize>
-        {
-            ["first"] = new(310, 112),
-            ["second"] = new(290, 112)
-        };
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("tall", 4, 300), Item("short", 4, 100), Item("other", 4, 100), Item("next", 4, 100)],
+            1190);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 600);
-
-        Assert.Equal(0, resolved[0].Top);
-        Assert.Equal(122, resolved[1].Top);
+        var next = placements.Single(item => item.CardId == "next");
+        Assert.Equal(400, next.Left);
+        Assert.Equal(100 + Gap, next.Top);
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementCompressesWideCardsBeforeWrappingTheRow()
+    public void FlowTreatsNearlyEqualSlotsAsOneRowAndReadsLeftToRight()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("wide", 0, 0, 290, 112),
-            new OverviewDashboardPlacement("second", 300, 0, 180, 112),
-            new OverviewDashboardPlacement("third", 490, 0, 180, 112)
-        };
-        var minimums = desired.ToDictionary(
-            placement => placement.CardId,
-            _ => new OverviewDashboardMinimumSize(180, 112));
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 4, 206), Item("b", 4, 202), Item("c", 4, 202), Item("d", 4, 100)],
+            1190);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 600);
-
-        Assert.Equal([0, 0, 0], resolved.Select(placement => placement.Top));
-        Assert.Equal([220, 180, 180], resolved.Select(placement => placement.Width));
-        Assert.Equal([0, 230, 420], resolved.Select(placement => placement.Left));
+        var next = placements.Single(item => item.CardId == "d");
+        Assert.Equal(0, next.Left);
+        Assert.Equal(206 + Gap, next.Top);
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementReclaimsRowGapsBeforeWrapping()
+    public void FlowHeightsFollowContentAtTheRenderedWidth()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("first", 0, 0, 180, 112),
-            new OverviewDashboardPlacement("second", 250, 0, 180, 112),
-            new OverviewDashboardPlacement("third", 500, 0, 180, 112)
-        };
-        var minimums = desired.ToDictionary(
-            placement => placement.CardId,
-            _ => new OverviewDashboardMinimumSize(180, 112));
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [new OverviewDashboardFlowItem("wraps", 4, 180, width => width < 300 ? 220 : 120)],
+            1190);
+        var narrow = OverviewDashboardLayoutEngine.Flow(
+            [new OverviewDashboardFlowItem("wraps", 4, 180, width => width < 300 ? 220 : 120)],
+            850);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 600);
-
-        Assert.Equal([0, 0, 0], resolved.Select(placement => placement.Top));
-        Assert.Equal([180, 180, 180], resolved.Select(placement => placement.Width));
-        Assert.Equal([0, 190, 380], resolved.Select(placement => placement.Left));
+        Assert.Equal(120, placements[0].Height);
+        Assert.Equal(220, narrow[0].Height);
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementFillsEachResponsiveRowBeforeWrappingAnotherCard()
+    public void FlowWidensCardsThatWouldBeNarrowerThanTheirContent()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("gpu-0", 329, 0, 153, 316),
-            new OverviewDashboardPlacement("status", 0, 0, 153, 358),
-            new OverviewDashboardPlacement("gpu-2", 654, 0, 153, 329),
-            new OverviewDashboardPlacement("gpu-1", 491, 0, 153, 316),
-            new OverviewDashboardPlacement("cpu", 163, 0, 156, 316)
-        };
-        var minimums = desired.ToDictionary(
-            placement => placement.CardId,
-            _ => new OverviewDashboardMinimumSize(180, 112));
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 4, 100), Item("b", 4, 100), Item("c", 4, 100)],
+            500);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 890)
-            .ToDictionary(placement => placement.CardId, StringComparer.Ordinal);
-
-        Assert.Equal((0d, 0d), (resolved["status"].Left, resolved["status"].Top));
-        Assert.Equal((190d, 0d), (resolved["cpu"].Left, resolved["cpu"].Top));
-        Assert.Equal((380d, 0d), (resolved["gpu-0"].Left, resolved["gpu-0"].Top));
-        Assert.Equal((570d, 0d), (resolved["gpu-1"].Left, resolved["gpu-1"].Top));
-        Assert.Equal((0d, 368d), (resolved["gpu-2"].Left, resolved["gpu-2"].Top));
+        Assert.All(placements, item => Assert.True(item.Width >= 180, $"{item.CardId} is {item.Width} wide."));
+        Assert.All(placements, item => Assert.True(item.Left + item.Width <= 500 + .5));
+        Assert.Equal(0, placements[0].Top);
+        Assert.True(placements[2].Top > 0, "The third card wraps to the next row.");
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementReclaimsRightSpaceAfterMinimumWidthExpansion()
+    public void FlowStacksEveryCardWhenOnlyOneFitsPerRow()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("gpu-0", 364, 0, 170, 316),
-            new OverviewDashboardPlacement("status", 0, 0, 170, 358),
-            new OverviewDashboardPlacement("gpu-2", 723, 0, 170, 329),
-            new OverviewDashboardPlacement("gpu-1", 543, 0, 170, 316),
-            new OverviewDashboardPlacement("cpu", 180, 0, 174, 316)
-        };
-        var minimums = desired.ToDictionary(
-            placement => placement.CardId,
-            _ => new OverviewDashboardMinimumSize(180, 112));
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 4, 100), Item("b", 4, 100)],
+            300);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 983)
-            .ToDictionary(placement => placement.CardId, StringComparer.Ordinal);
-
-        Assert.Equal((0d, 0d), (resolved["status"].Left, resolved["status"].Top));
-        Assert.Equal((190d, 0d), (resolved["cpu"].Left, resolved["cpu"].Top));
-        Assert.Equal((380d, 0d), (resolved["gpu-0"].Left, resolved["gpu-0"].Top));
-        Assert.Equal((570d, 0d), (resolved["gpu-1"].Left, resolved["gpu-1"].Top));
-        Assert.Equal((760d, 0d), (resolved["gpu-2"].Left, resolved["gpu-2"].Top));
+        Assert.All(placements, item => Assert.Equal(0, item.Left));
+        Assert.All(placements, item => Assert.Equal(300, item.Width));
+        Assert.Equal(100 + Gap, placements[1].Top);
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementBackfillsWrappedRowSpaceBeforeUsingAnotherRow()
+    public void FlowGivesUnusableSliversToTheNeighbouringCard()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("wide", 0, 0, 400, 112),
-            new OverviewDashboardPlacement("medium", 410, 0, 300, 112),
-            new OverviewDashboardPlacement("small", 720, 0, 180, 112)
-        };
-        var minimums = desired.ToDictionary(
-            placement => placement.CardId,
-            placement => new OverviewDashboardMinimumSize(placement.Width, 112));
+        // Two 5-column cards leave two columns that no 180 px card can use.
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 5, 100, 300), Item("b", 5, 100, 300)],
+            1190);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 600)
-            .ToDictionary(placement => placement.CardId, StringComparer.Ordinal);
-
-        Assert.Equal((0d, 0d), (resolved["wide"].Left, resolved["wide"].Top));
-        Assert.Equal((410d, 0d), (resolved["small"].Left, resolved["small"].Top));
-        Assert.Equal((0d, 122d), (resolved["medium"].Left, resolved["medium"].Top));
+        Assert.Equal(1190, placements[1].Left + placements[1].Width, precision: 3);
+        Assert.Equal(500 - Gap, placements[0].Width, precision: 3);
     }
 
     [Fact]
-    public void OverviewDashboardVisiblePlacementDoesNotMergeRowsAfterContentHeightExpansion()
+    public void FlowKeepsSpaceThatAnotherCardCouldUse()
     {
-        var desired = new[]
-        {
-            new OverviewDashboardPlacement("first", 0, 0, 290, 112),
-            new OverviewDashboardPlacement("peer", 300, 0, 290, 112),
-            new OverviewDashboardPlacement("next-row", 0, 122, 290, 112)
-        };
-        var minimums = new Dictionary<string, OverviewDashboardMinimumSize>
-        {
-            ["first"] = new(180, 160),
-            ["peer"] = new(180, 112),
-            ["next-row"] = new(180, 112)
-        };
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 4, 100), Item("b", 4, 100)],
+            1190);
 
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 600);
+        Assert.Equal(790, placements[1].Left + placements[1].Width);
+    }
 
-        Assert.Equal(290, resolved.Single(item => item.CardId == "next-row").Width);
-        Assert.Equal(170, resolved.Single(item => item.CardId == "next-row").Top);
+    [Fact]
+    public void LockedWidthsStayFixedAndWrapInsteadOfShrinking()
+    {
+        var items = new[] { Item("a", 4, 100), Item("b", 4, 100) };
+
+        var atCapture = OverviewDashboardLayoutEngine.Flow(items, 890, 890);
+        var wider = OverviewDashboardLayoutEngine.Flow(items, 1400, 890);
+        var narrower = OverviewDashboardLayoutEngine.Flow(items, 500, 890);
+
+        Assert.Equal(atCapture.Select(item => item.Width), wider.Select(item => item.Width));
+        Assert.Equal(atCapture.Select(item => item.Width), narrower.Select(item => item.Width));
+        Assert.Equal(0, narrower[1].Left);
+        Assert.Equal(100 + Gap, narrower[1].Top);
+    }
+
+    [Theory]
+    [InlineData(390, 4)]
+    [InlineData(400, 4)]
+    [InlineData(1190, 12)]
+    [InlineData(10, 1)]
+    public void SpanForWidthRoundsToTheNearestColumn(double width, int expected)
+        => Assert.Equal(expected, OverviewDashboardLayoutEngine.SpanForWidth(width, OverviewDashboardLayoutEngine.ColumnPitch(1190)));
+
+    [Fact]
+    public void BoundsRecordColumnPositionSpanAndPixelHeight()
+    {
+        var bounds = OverviewDashboardLayoutEngine.ToBounds(new OverviewDashboardPlacement("a", 400, 110, 390, 152.4), 1190);
+
+        Assert.Equal(new OverviewDashboardCardBounds(4, 110, 4, 152), bounds);
+    }
+
+    [Fact]
+    public void LayoutsSavedBeforeFlowKeepTheirVisualOrder()
+    {
+        var legacy = new OverviewDashboardLayout(
+            OverviewDashboardLayoutPolicy.CompactDefaultLayoutVersion,
+            [
+                new("lower", [OverviewDashboardMetricIds.Ram], Bounds: new(0, 300, 4, 112)),
+                new("right", [OverviewDashboardMetricIds.Cpu], Bounds: new(8, 0, 4, 112)),
+                new("left", [OverviewDashboardMetricIds.Gpu(0)], Bounds: new(0, 6, 4, 112)),
+                new("unplaced", [OverviewDashboardMetricIds.Gpu(1)])
+            ]);
+
+        var migrated = OverviewDashboardLayoutPolicy.Normalize(legacy);
+
+        Assert.Equal(OverviewDashboardLayoutPolicy.CurrentVersion, migrated.Version);
+        Assert.Equal(["left", "right", "lower", "unplaced"], migrated.Cards.Select(card => card.Id));
+        Assert.Equal(migrated.Cards.Select(card => card.Id),
+            OverviewDashboardLayoutPolicy.Normalize(migrated).Cards.Select(card => card.Id));
+    }
+
+    [Fact]
+    public void SpanChangesAndRecordedPositionsKeepTheCardOrder()
+    {
+        var layout = OverviewDashboardLayoutPolicy.Default;
+        var first = layout.Cards[0].Id;
+
+        var widened = OverviewDashboardLayoutPolicy.SetCardSpan(layout, first, 7);
+        Assert.Equal(7, OverviewDashboardLayoutPolicy.CardSpan(widened.Cards[0]));
+
+        var positioned = OverviewDashboardLayoutPolicy.SetCardBounds(widened,
+            new Dictionary<string, OverviewDashboardCardBounds> { [first] = new(0, 0, 7, 150) });
+        Assert.Equal(layout.Cards.Select(card => card.Id), positioned.Cards.Select(card => card.Id));
+        Assert.Equal(new OverviewDashboardCardBounds(0, 0, 7, 150), positioned.Cards[0].Bounds);
     }
 }
