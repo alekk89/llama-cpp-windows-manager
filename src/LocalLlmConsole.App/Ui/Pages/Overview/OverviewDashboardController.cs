@@ -253,6 +253,7 @@ public sealed partial class OverviewDashboardController
 
     private void SetReading(OverviewDashboardMetricReading reading)
     {
+        reading = reading with { SampledAt = reading.SampledAt ?? DateTimeOffset.UtcNow };
         _readings[reading.MetricId] = reading;
         if (string.IsNullOrWhiteSpace(reading.RuntimeKey)) return;
         if (!_histories.TryGetValue(reading.MetricId, out var history))
@@ -354,7 +355,7 @@ public sealed partial class OverviewDashboardController
         {
             if (!_histories.TryGetValue(metricId, out var history)) continue;
             foreach (var reading in history.Readings)
-                graph.Push(reading.RuntimeKey, reading.Primary, reading.Secondary);
+                graph.Push(reading.RuntimeKey, reading.Primary, reading.Secondary, reading.SampledAt, reading.Unit);
         }
     }
 

@@ -85,12 +85,13 @@ public sealed partial class OverviewDashboardCardView
             {
                 graph = new MetricSparkline
                 {
-                    Height = 30,
-                    Margin = new Thickness(4, 2, 4, 1),
+                    Height = 30 + MetricSparkline.CaptionHeight,
+                    Margin = new Thickness(4, 1, 4, 1),
                     PrimaryBrushKey = definition.PrimaryBrushKey,
                     SecondaryBrushKey = definition.SecondaryBrushKey,
                     FixedMaximum = definition.FixedMaximum,
-                    ToolTip = Loc.T("Dashboard.ChartTooltip", definition.DisplayName)
+                    Scale = layout.ChartScale,
+                    MetricName = definition.DisplayName
                 };
                 _graphs[metricId] = graph;
             }
@@ -235,7 +236,8 @@ public sealed partial class OverviewDashboardCardView
             foreach (var (metricId, graph) in _graphs)
             {
                 if (_rows[metricId].IsAvailable && readings.TryGetValue(metricId, out var graphReading))
-                    graph.Push(graphReading.RuntimeKey, graphReading.Primary, graphReading.Secondary);
+                    graph.Push(graphReading.RuntimeKey, graphReading.Primary, graphReading.Secondary,
+                        graphReading.SampledAt, graphReading.Unit);
             }
         }
         return geometryChanged;

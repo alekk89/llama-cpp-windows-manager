@@ -143,7 +143,35 @@ public sealed partial class OverviewDashboardController
                 chartItems.Add(chartItem);
                 menu.Items.Add(chartItem);
             }
-            menu.IsEnabled = menu.Items.Count > 2;
+            menu.IsEnabled = chartItems.Count > 0;
+            AddChartScaleItems(owner, menu, current, availableCharts.Any(item => item.FixedMaximum is not > 0));
+        }
+    }
+
+    private void AddChartScaleItems(
+        ContextMenu owner,
+        MenuItem menu,
+        OverviewDashboardCardLayout card,
+        bool hasUnboundedChart)
+    {
+        if (!hasUnboundedChart) return;
+        menu.Items.Add(new Separator());
+        var scaleItems = new List<(MenuItem Item, OverviewDashboardChartScale Scale)>();
+        foreach (var (scale, key) in new[]
+                 {
+                     (OverviewDashboardChartScale.Stable, "Dashboard.ChartScaleStable"),
+                     (OverviewDashboardChartScale.FitToData, "Dashboard.ChartScaleFit")
+                 })
+        {
+            var item = AsyncCheckItem(owner, Loc.T(key), card.ChartScale == scale, async _ =>
+            {
+                foreach (var (other, otherScale) in scaleItems)
+                    other.IsChecked = otherScale == scale;
+                await MutateAsync(layout => OverviewDashboardLayoutPolicy.SetChartScale(layout, card.Id, scale));
+            });
+            item.ToolTip = Loc.T("Dashboard.ChartScaleTooltip");
+            scaleItems.Add((item, scale));
+            menu.Items.Add(item);
         }
     }
 

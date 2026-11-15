@@ -234,7 +234,21 @@ public sealed record OverviewDashboardCardLayout(
     string ChartMetricId = "",
     OverviewDashboardCardBounds? Bounds = null,
     IReadOnlyList<string>? ChartMetricIds = null,
-    string Title = "");
+    string Title = "",
+    OverviewDashboardChartScale ChartScale = OverviewDashboardChartScale.Stable);
+
+/// <summary>
+/// Vertical scale for a card's charts of unbounded metrics. Percentage charts
+/// always use their fixed 0-100 range.
+/// </summary>
+public enum OverviewDashboardChartScale
+{
+    /// <summary>Zero-based axis whose maximum grows at once but shrinks only after a large drop.</summary>
+    Stable,
+
+    /// <summary>Axis fitted to the minimum and maximum of the visible samples.</summary>
+    FitToData
+}
 
 public sealed record OverviewDashboardLayout(
     int Version,

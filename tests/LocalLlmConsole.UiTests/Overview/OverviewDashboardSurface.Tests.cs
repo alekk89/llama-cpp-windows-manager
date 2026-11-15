@@ -137,7 +137,7 @@ public sealed class WpfOverviewDashboardTests : WpfUiTestBase
             overview.Root.UpdateLayout();
             Assert.Empty(metricDashboard.ColumnDefinitions);
             Assert.Equal(Math.Max(metricDashboard.ActualWidth, dashboard.Layout.LockedSurfaceWidth!) * gpuCard.Layout.Bounds!.X / 12, Canvas.GetLeft(gpuCard.Root), precision: 1);
-            Assert.All(graphCards, card => Assert.Equal(30, card.Graph!.ActualHeight));
+            Assert.All(graphCards, card => Assert.Equal(30 + MetricSparkline.CaptionHeight, card.Graph!.ActualHeight));
 
             var overviewState = new LocalLlmConsole.OverviewPageState();
             overviewState.Apply(overview);

@@ -143,6 +143,7 @@ public static partial class OverviewDashboardLayoutPolicy
                     ChartMetricId = chartMetricIds.FirstOrDefault() ?? "",
                     ChartMetricIds = chartMetricIds,
                     Title = NormalizeCardTitle(layout.Version >= CardTitleLayoutVersion ? candidate.Title : ""),
+                    ChartScale = Enum.IsDefined(candidate.ChartScale) ? candidate.ChartScale : OverviewDashboardChartScale.Stable,
                     Bounds = ValidBounds(candidate.Bounds) ? ConstrainBounds(candidate.Bounds!) : null
                 });
             }
@@ -297,6 +298,12 @@ public static partial class OverviewDashboardLayoutPolicy
                 charts.Add(metricId);
             return card with { ChartMetricIds = charts };
         });
+
+    public static OverviewDashboardLayout SetChartScale(
+        OverviewDashboardLayout layout,
+        string cardId,
+        OverviewDashboardChartScale scale)
+        => UpdateCard(layout, cardId, card => card with { ChartScale = scale });
 
     public static OverviewDashboardLayout ClearCharts(OverviewDashboardLayout layout, string cardId)
         => UpdateCard(layout, cardId, card => card with { ChartMetricId = "", ChartMetricIds = [] });
