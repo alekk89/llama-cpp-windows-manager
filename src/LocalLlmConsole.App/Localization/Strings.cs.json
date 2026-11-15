@@ -165,6 +165,8 @@
   "Dashboard.Done": "Hotovo",
   "Dashboard.Customize": "Přizpůsobit",
   "Dashboard.AddCard": "Přidat kartu",
+  "Dashboard.AutoArrange": "Automaticky uspořádat",
+  "Dashboard.AutoArrangeTooltip": "Seskupí související karty a dá jim stejnou šířku podle velikosti okna.",
   "Dashboard.Metric.LoadedModels": "Načtené modely",
   "Dashboard.Metric.SpeculativeSpeedup": "Zrychlení spekulativního dekódování",
   "Dashboard.Tooltip.SpeculativeSpeedup": "Průměrný počet tokenů na krok ověření cílovým modelem: (přijaté tokeny konceptu + kroky ověření) ÷ kroky ověření. Dekódování bez spekulace vytvoří jeden token na krok, takže jde o horní mez zrychlení; čas tvorby konceptu není započten. Zobrazuje se, jen pokud běhové prostředí hlásí počítadlo kroků ověření.",

@@ -197,6 +197,8 @@
   "Dashboard.Done": "Klar",
   "Dashboard.Customize": "Anpassa",
   "Dashboard.AddCard": "Lägg till kort",
+  "Dashboard.AutoArrange": "Ordna automatiskt",
+  "Dashboard.AutoArrangeTooltip": "Grupperar relaterade kort och ger dem samma bredd anpassad efter fönstret.",
   "Dashboard.CardTitle": "Kortrubrik…",
   "Dashboard.CopyReadings": "Kopiera mätvärden",
   "Dashboard.CopyReadingsTooltip": "Kopiera kortets aktuella mätvärden som oformaterad text (Ctrl+C).",

@@ -197,6 +197,8 @@
   "Dashboard.Done": "完成",
   "Dashboard.Customize": "自定义",
   "Dashboard.AddCard": "添加卡片",
+  "Dashboard.AutoArrange": "自动排列",
+  "Dashboard.AutoArrangeTooltip": "将相关卡片分组，并设置适合窗口的相同宽度。",
   "Dashboard.CardTitle": "卡片标题…",
   "Dashboard.CopyReadings": "复制读数",
   "Dashboard.CopyReadingsTooltip": "将此卡片的当前读数复制为纯文本 (Ctrl+C)。",

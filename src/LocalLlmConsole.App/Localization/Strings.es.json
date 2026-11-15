@@ -166,6 +166,8 @@
   "Dashboard.Done": "Listo",
   "Dashboard.Customize": "Personalizar",
   "Dashboard.AddCard": "Añadir tarjeta",
+  "Dashboard.AutoArrange": "Organizar automáticamente",
+  "Dashboard.AutoArrangeTooltip": "Agrupa las tarjetas relacionadas y les da el mismo ancho ajustado a la ventana.",
   "Dashboard.Metric.LoadedModels": "Modelos cargados",
   "Dashboard.Metric.SpeculativeSpeedup": "Aceleración especulativa",
   "Dashboard.Tooltip.SpeculativeSpeedup": "Promedio de tokens producidos por paso de verificación del modelo objetivo: (tokens de borrador aceptados + pasos de verificación) ÷ pasos de verificación. La decodificación sin especulación produce un token por paso, así que este es el límite superior de la aceleración; no incluye el tiempo de borrador. Solo se muestra cuando el runtime informa su contador de pasos de verificación.",

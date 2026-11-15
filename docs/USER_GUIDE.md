@@ -105,7 +105,9 @@ dashboard stays compact at any window width. Drag a card to move it: the other
 cards make room around a dashed outline that shows where it will land. Drag a
 card's left or right border to change its width in whole columns; its height
 always fits its content. Cards that would be too narrow for their content are
-widened, and on narrow windows they stack. **Lock** keeps card widths fixed
+widened, and on narrow windows they stack. **Auto arrange** groups runtime
+and gateway cards, Loaded models, GPU cards in device order, and other hardware,
+and gives every card the same width, as many per row as fit comfortably. **Lock** keeps card widths fixed
 while the window changes size; cards wrap to new rows instead of shrinking.
 Saved layouts are versioned and migrated without discarding unrelated
 customization.

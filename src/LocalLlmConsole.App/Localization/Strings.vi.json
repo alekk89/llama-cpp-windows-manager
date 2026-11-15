@@ -197,6 +197,8 @@
   "Dashboard.Done": "Xong",
   "Dashboard.Customize": "Tùy chỉnh",
   "Dashboard.AddCard": "Thêm thẻ",
+  "Dashboard.AutoArrange": "Tự động sắp xếp",
+  "Dashboard.AutoArrangeTooltip": "Nhóm các thẻ liên quan và đặt chiều rộng bằng nhau vừa với cửa sổ.",
   "Dashboard.CardTitle": "Tiêu đề thẻ…",
   "Dashboard.CopyReadings": "Sao chép số đo",
   "Dashboard.CopyReadingsTooltip": "Sao chép các số đo hiện tại của thẻ này dưới dạng văn bản thuần (Ctrl+C).",

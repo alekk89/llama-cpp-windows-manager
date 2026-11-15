@@ -159,6 +159,8 @@
   "Dashboard.Done": "Done",
   "Dashboard.Customize": "Customize",
   "Dashboard.AddCard": "Add card",
+  "Dashboard.AutoArrange": "Auto arrange",
+  "Dashboard.AutoArrangeTooltip": "Group related cards and give them equal widths that fit the window.",
   "Dashboard.CardTitle": "Card title…",
   "Dashboard.CopyReadings": "Copy readings",
   "Dashboard.CopyReadingsTooltip": "Copy this card's current readings as plain text (Ctrl+C).",

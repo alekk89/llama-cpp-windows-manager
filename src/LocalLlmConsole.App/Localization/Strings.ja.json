@@ -166,6 +166,8 @@
   "Dashboard.Done": "完了",
   "Dashboard.Customize": "カスタマイズ",
   "Dashboard.AddCard": "カードを追加",
+  "Dashboard.AutoArrange": "自動整列",
+  "Dashboard.AutoArrangeTooltip": "関連するカードをまとめ、ウィンドウに合わせて同じ幅にそろえます。",
   "Dashboard.Metric.LoadedModels": "読み込み済みモデル",
   "Dashboard.Metric.SpeculativeSpeedup": "投機的デコードの高速化",
   "Dashboard.Tooltip.SpeculativeSpeedup": "ターゲット モデルの検証ステップあたりの平均生成トークン数: (受理されたドラフト トークン + 検証ステップ) ÷ 検証ステップ。投機なしのデコードは 1 ステップで 1 トークンを生成するため、これは高速化の上限です。ドラフト生成の時間は含みません。ランタイムが検証ステップ数を報告する場合にのみ表示されます。",

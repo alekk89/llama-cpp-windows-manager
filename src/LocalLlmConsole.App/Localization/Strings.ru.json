@@ -197,6 +197,8 @@
   "Dashboard.Done": "Готово",
   "Dashboard.Customize": "Настроить",
   "Dashboard.AddCard": "Добавить карточку",
+  "Dashboard.AutoArrange": "Автоупорядочить",
+  "Dashboard.AutoArrangeTooltip": "Группирует связанные карточки и задаёт им одинаковую ширину по размеру окна.",
   "Dashboard.CardTitle": "Заголовок карточки…",
   "Dashboard.CopyReadings": "Копировать показания",
   "Dashboard.CopyReadingsTooltip": "Скопировать текущие показания карточки как обычный текст (Ctrl+C).",
