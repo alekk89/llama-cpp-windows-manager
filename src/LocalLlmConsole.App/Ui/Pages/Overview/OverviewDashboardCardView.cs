@@ -33,6 +33,8 @@ public sealed partial class OverviewDashboardCardView
     private long _contentGeometryVersion;
     private long _measuredContentGeometryVersion = -1;
     private double _lastMeasuredWidth = double.NaN;
+    private readonly Dictionary<int, double> _heightCache = [];
+    private long _heightCacheVersion = -1;
 
     public OverviewDashboardCardView(
         OverviewDashboardCardLayout layout,
@@ -334,9 +336,21 @@ public sealed partial class OverviewDashboardCardView
     }
 
     /// <summary>The card's content height when it is <paramref name="width"/> wide.</summary>
+    /// <remarks>
+    /// Dragging evaluates many candidate layouts per pointer move, so heights are
+    /// cached per width until the card's content changes.
+    /// </remarks>
     public double HeightAt(double width)
     {
+        if (_heightCacheVersion != _contentGeometryVersion)
+        {
+            _heightCache.Clear();
+            _heightCacheVersion = _contentGeometryVersion;
+        }
+        var key = (int)Math.Round(width * 2);
+        if (_heightCache.TryGetValue(key, out var height)) return height;
         UpdateMinimumSize(width);
+        _heightCache[key] = MinimumHeight;
         return MinimumHeight;
     }
 
