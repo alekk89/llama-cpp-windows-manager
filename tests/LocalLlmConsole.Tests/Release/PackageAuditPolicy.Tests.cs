@@ -56,6 +56,22 @@ public sealed class PackageAuditPolicyTests : ManagerRegressionTestBase
         Assert.Contains("version-update:semver-major", dependabot, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PublishGraphAuditLeavesLockFilesUnchangedForCleanTreeReleases()
+    {
+        // --force-evaluate rewrites lock files with platform line endings, and the
+        // release gate later publishes from a checkout that must be clean (#214).
+        var audit = File.ReadAllText(FindRepositoryFile("scripts", "test-vulnerabilities.ps1"));
+        var restore = audit.IndexOf("--locked-mode --force-evaluate", StringComparison.Ordinal);
+        var snapshot = audit.IndexOf("ReadAllBytes($lockFile.FullName)", StringComparison.Ordinal);
+        var putBack = audit.IndexOf("WriteAllBytes($path, $original)", StringComparison.Ordinal);
+
+        Assert.True(restore > 0, "The publish-graph audit restore was not found.");
+        Assert.True(snapshot >= 0 && snapshot < restore, "Lock files must be captured before the publish restores.");
+        Assert.True(putBack > restore, "Lock files must be written back after the publish restores.");
+        Assert.Contains("} finally {", audit[restore..putBack], StringComparison.Ordinal);
+    }
+
     private static async Task<(int ExitCode, string Output)> EvaluateAsync(string fixture)
     {
         var policy = FindRepositoryFile("scripts", "package-audit-policy.ps1").Replace("'", "''", StringComparison.Ordinal);
