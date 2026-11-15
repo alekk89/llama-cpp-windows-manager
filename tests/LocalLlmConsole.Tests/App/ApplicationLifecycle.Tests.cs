@@ -360,6 +360,43 @@ public sealed class ApplicationLifecycleTests : ManagerRegressionTestBase
 
 
     [Fact]
+    public async Task AppShutdownAsksAboutUnsavedWorkUnlessAutomationConfirmed()
+    {
+        var answers = new Queue<bool>([false, true]);
+        var asked = 0;
+        var cleanups = 0;
+        var shutdown = new AppShutdownApplicationService(new AppShutdownDecisionService(), new AppShutdownStateController())
+        {
+            ConfirmUnsavedWorkAsync = () =>
+            {
+                asked++;
+                return Task.FromResult(answers.Dequeue());
+            }
+        };
+        var actions = new AppShutdownApplicationActions(_ => Task.FromResult(true), () => { }, _ => { }, () =>
+        {
+            cleanups++;
+            return Task.CompletedTask;
+        });
+
+        var cancelled = await shutdown.BeginShutdownAsync(new AppShutdownApplicationRequest(0, 0), actions);
+        Assert.Equal(AppShutdownApplicationOutcomeKind.CancelledByUser, cancelled.Kind);
+        Assert.True(cancelled.CancelClosingEvent);
+        Assert.Equal(0, cleanups);
+
+        var closed = await shutdown.BeginShutdownAsync(new AppShutdownApplicationRequest(0, 0), actions);
+        Assert.Equal(AppShutdownApplicationOutcomeKind.CleanupCompleted, closed.Kind);
+        Assert.Equal(2, asked);
+
+        var automated = new AppShutdownApplicationService(new AppShutdownDecisionService(), new AppShutdownStateController())
+        {
+            ConfirmUnsavedWorkAsync = () => throw new InvalidOperationException("Automation must not prompt.")
+        };
+        Assert.Equal(AppShutdownApplicationOutcomeKind.CleanupCompleted,
+            (await automated.BeginShutdownAsync(new AppShutdownApplicationRequest(0, 0, Confirmed: true), actions)).Kind);
+    }
+
+    [Fact]
     public async Task ConfirmedControlShutdownSkipsInteractivePrompts()
     {
         var application = new AppShutdownApplicationService(

@@ -37,6 +37,12 @@ public sealed class AppShutdownApplicationService
         _state = state ?? throw new ArgumentNullException(nameof(state));
     }
 
+    /// <summary>
+    /// Asks about unsaved editor work before a user-initiated close; false keeps the app open.
+    /// Confirmed (automation) shutdowns skip it.
+    /// </summary>
+    public Func<Task<bool>>? ConfirmUnsavedWorkAsync { get; set; }
+
     public async Task<AppShutdownApplicationOutcome> BeginShutdownAsync(
         AppShutdownApplicationRequest request,
         AppShutdownApplicationActions actions)
@@ -62,6 +68,15 @@ public sealed class AppShutdownApplicationService
 
         try
         {
+            if (!request.Confirmed && ConfirmUnsavedWorkAsync is not null && !await ConfirmUnsavedWorkAsync())
+            {
+                _state.ResetRequest();
+                return new AppShutdownApplicationOutcome(
+                    AppShutdownApplicationOutcomeKind.CancelledByUser,
+                    CancelClosingEvent: true,
+                    RequestClose: false);
+            }
+
             var decision = _decisions.Build(request.RunningModelSessions, request.ActiveDownloads);
             foreach (var confirmation in request.Confirmed ? [] : decision.Confirmations)
             {

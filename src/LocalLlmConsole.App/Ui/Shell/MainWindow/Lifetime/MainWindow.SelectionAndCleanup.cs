@@ -44,18 +44,20 @@ public partial class MainWindow
             _modelsPage.SelectDefaultLaunchProfile(_viewModel.Models.VariantRows);
         }
 
-        if (!_launchSettingsController.ConfirmLeavingEdits(SelectedModel()?.Id ?? "", SelectedModelLaunchProfileId()))
-        {
-            var editor = _coreServices.Ui.LaunchSettingsEditor;
-            Dispatcher.BeginInvoke(() =>
-            {
-                _viewModel.Models.ShowLaunchProfilesForModel(editor.ModelId);
-                SelectModelAfterRefresh(editor.ModelId, editor.ProfileId);
-            });
-            return;
-        }
+        if (_launchSettingsController.NeedsLeaveConfirmation(SelectedModel()?.Id ?? "", SelectedModelLaunchProfileId()))
+            RunBackground(ConfirmModelSelectionChangeAsync, "Launch settings selection failed");
+        else
+            ScheduleSelectedModelLaunchSettingsRefresh();
+    }
 
-        ScheduleSelectedModelLaunchSettingsRefresh();
+    // Saving or cancelling finishes before the new row's settings load; otherwise the edited row is selected again.
+    private async Task ConfirmModelSelectionChangeAsync()
+    {
+        if (await _launchSettingsController.ConfirmLeavingEditsAsync()) { ScheduleSelectedModelLaunchSettingsRefresh(); return; }
+        var editor = _coreServices.Ui.LaunchSettingsEditor;
+        await System.Windows.Threading.Dispatcher.Yield();
+        _viewModel.Models.ShowLaunchProfilesForModel(editor.ModelId);
+        SelectModelAfterRefresh(editor.ModelId, editor.ProfileId);
     }
 
     private RuntimeRecord? RuntimeFromRowButton(object sender)

@@ -44,6 +44,7 @@ public partial class MainWindow
         ApplyLaunchSettingsPanelControls(panel);
         _launchSettingsController.ScheduleProfileFitCapabilityProbe();
         AttachLaunchSettingsChangeHandlers();
+        _coreServices.App.ShutdownApplication.ConfirmUnsavedWorkAsync = () => _launchSettingsController.ConfirmLeavingEditsAsync();
         ApplyLaunchSettingsToControls();
         RunBackground(() => RenderSelectedModelLaunchSettingsAsync(), "Launch settings refresh failed");
         return panel.Root;
