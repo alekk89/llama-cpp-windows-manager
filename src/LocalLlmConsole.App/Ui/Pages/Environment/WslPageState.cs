@@ -144,7 +144,7 @@ public sealed class WslPageState
         if (InstallVulkanToolsButton is not null)
             InstallVulkanToolsButton.Content = WslEnvironmentService.VulkanToolsActionLabel(tools);
         if (InstallSyclRuntimeButton is not null)
-            InstallSyclRuntimeButton.Content = tools.SyclToolsInstalled ? "Update Intel GPU" : "Install Intel GPU";
+            InstallSyclRuntimeButton.Content = Loc.T(tools.SyclToolsInstalled ? "Wsl.Sycl.Update" : "Wsl.Sycl.Install");
         if (InstallSyclOneApiButton is not null)
             InstallSyclOneApiButton.Content = WslEnvironmentService.SyclToolsActionLabel(tools);
     }

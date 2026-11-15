@@ -13,7 +13,7 @@ namespace LocalLlmConsole;
 
 public sealed class BenchmarkGpuConfigurationPicker : StackPanel
 {
-    private const string Automatic = "Automatic";
+    private static string Automatic => Loc.T("Benchmarks.Automatic");
     private readonly List<BenchmarkGpuConfiguration> _values = [];
     private readonly WrapPanel _selected = new() { Margin = new Thickness(0, 3, 0, 0) };
     private readonly List<Button> _renderedChips = [];
@@ -27,10 +27,10 @@ public sealed class BenchmarkGpuConfigurationPicker : StackPanel
         {
             ItemsSource = new[]
             {
-                new GpuModeChoice("single", "Single"),
-                new GpuModeChoice("layer", "Layer"),
-                new GpuModeChoice("row", "Row"),
-                new GpuModeChoice("tensor", "Tensor")
+                new GpuModeChoice("single", ModeLabel("single")),
+                new GpuModeChoice("layer", ModeLabel("layer")),
+                new GpuModeChoice("row", ModeLabel("row")),
+                new GpuModeChoice("tensor", ModeLabel("tensor"))
             },
             DisplayMemberPath = nameof(GpuModeChoice.Label),
             SelectedValuePath = nameof(GpuModeChoice.Value),
@@ -163,7 +163,7 @@ public sealed class BenchmarkGpuConfigurationPicker : StackPanel
         {
             var chip = new Button
             {
-                Content = $"Multi-GPU: {Display(configuration)}  ×",
+                Content = $"{Loc.T("Benchmarks.Compare.MultiGpu")}: {Display(configuration)}  ×",
                 Tag = configuration,
                 MinHeight = 24,
                 MinWidth = 0,
@@ -212,12 +212,19 @@ public sealed class BenchmarkGpuConfigurationPicker : StackPanel
 
     private static string Display(BenchmarkGpuConfiguration configuration)
     {
-        var mode = TitleCase(configuration.Mode);
+        var mode = ModeLabel(configuration.Mode);
         return $"{mode} · {(string.IsNullOrWhiteSpace(configuration.Split) ? Automatic : configuration.Split)}";
     }
 
-    private static string TitleCase(string value)
-        => value.Length == 0 ? "?" : char.ToUpperInvariant(value[0]) + value[1..].ToLowerInvariant();
+    private static string ModeLabel(string value) => value.ToLowerInvariant() switch
+    {
+        "single" => Loc.T("Benchmarks.Gpu.Single"),
+        "layer" => Loc.T("Benchmarks.Gpu.Layer"),
+        "row" => Loc.T("Benchmarks.Gpu.Row"),
+        "tensor" => Loc.T("Benchmarks.Gpu.Tensor"),
+        "" => "?",
+        _ => char.ToUpperInvariant(value[0]) + value[1..].ToLowerInvariant()
+    };
 
     private static bool IsValidDistribution(string value)
     {

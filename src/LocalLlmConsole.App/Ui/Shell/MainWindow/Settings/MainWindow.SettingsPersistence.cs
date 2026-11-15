@@ -11,7 +11,7 @@ public partial class MainWindow
             StringComparer.OrdinalIgnoreCase);
         _coreServices.Ui.SettingsAutoApply.Schedule(
             cancellationToken => SaveSettingsAsync(themeMode, values, cancellationToken),
-            action => RunBackground(action, "Automatic settings apply failed"));
+            action => RunBackground(action, Loc.T("Status.Failure.AutomaticSettingsApply")));
     }
 
     private void ApplyLiveUiScale(int percent)
@@ -53,7 +53,7 @@ public partial class MainWindow
                 _overviewPage.ApplyUiPreferences(settings);
                 _modelsPage.ApplyUiPreferences(settings);
                 if (runtimeLogOrderChanged)
-                    RunBackground(RefreshRuntimeLogOrderAsync, "Runtime log order refresh failed");
+                    RunBackground(RefreshRuntimeLogOrderAsync, Loc.T("Status.Failure.RuntimeLogOrderRefresh"));
             },
             ApplicationThemeService.Apply,
             () => ApplyLaunchSettingsToControls(),

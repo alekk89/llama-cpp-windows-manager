@@ -86,7 +86,7 @@ public partial class MainWindow
         _ = Dispatcher.InvokeAsync(() =>
         {
             if (_trayProfileMenu is not null)
-                RunBackground(_trayProfileMenu.RefreshIfOpenAsync, "Tray profile menu refresh failed");
+                RunBackground(_trayProfileMenu.RefreshIfOpenAsync, Loc.T("Status.Failure.TrayProfileMenuRefresh"));
         });
     }
 

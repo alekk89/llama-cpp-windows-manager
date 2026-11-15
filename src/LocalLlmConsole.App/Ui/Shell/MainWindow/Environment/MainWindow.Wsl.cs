@@ -29,7 +29,7 @@ public partial class MainWindow
         ApplyPendingHelpFocus();
         if (_environmentPageSnapshots.TryStartWslAutoRefresh())
             RunBackground(RefreshWslLinuxAsync,
-                $"[{DiagnosticErrorCodes.WslProbe}] WSL refresh failed. Create a diagnostics bundle from Logs if this repeats");
+                $"[{DiagnosticErrorCodes.WslProbe}] {Loc.T("Status.Failure.WslRefresh")}");
     }
 
     private async Task RefreshWslLinuxAsync()

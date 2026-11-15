@@ -43,10 +43,10 @@ public static class OutOfMemoryRecoveryDialog
             TextWrapping = TextWrapping.Wrap
         });
         var buttons = new WrapPanel { HorizontalAlignment = System.Windows.HorizontalAlignment.Right };
-        buttons.Children.Add(Button("Create fitted profile", true, OutOfMemoryRecoveryAction.CreateFittedProfile));
-        buttons.Children.Add(Button("Edit memory settings", false, OutOfMemoryRecoveryAction.EditMemorySettings));
-        buttons.Children.Add(Button("View log", false, OutOfMemoryRecoveryAction.ViewLog));
-        buttons.Children.Add(Button("Close", false, OutOfMemoryRecoveryAction.Close));
+        buttons.Children.Add(Button(Loc.T("ProfileFit.CreateFittedProfile"), true, OutOfMemoryRecoveryAction.CreateFittedProfile));
+        buttons.Children.Add(Button(Loc.T("ProfileFit.EditMemorySettings"), false, OutOfMemoryRecoveryAction.EditMemorySettings));
+        buttons.Children.Add(Button(Loc.T("ProfileFit.ViewLog"), false, OutOfMemoryRecoveryAction.ViewLog));
+        buttons.Children.Add(Button(Loc.T("Common.Close"), false, OutOfMemoryRecoveryAction.Close));
         panel.Children.Add(buttons);
         window.Content = panel;
         window.ShowDialog();

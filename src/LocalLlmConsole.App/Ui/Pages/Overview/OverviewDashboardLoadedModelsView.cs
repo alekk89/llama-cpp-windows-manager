@@ -111,7 +111,7 @@ public sealed class OverviewDashboardLoadedModelsView
     {
         var unavailable = Loc.T("Dashboard.ValueUnavailable");
         var rate = session.AverageGenerationRate is { } generation && double.IsFinite(generation)
-            ? $"{generation.ToString("0.0", CultureInfo.CurrentCulture)} t/s"
+            ? $"{generation.ToString("0.0", CultureInfo.CurrentCulture)} {Loc.T("Dashboard.Unit.TokensPerSecond")}"
             : unavailable;
         var slots = session.ActiveSlots is { } active && session.SlotCapacity is { } capacity
             ? Loc.T("Dashboard.LoadedModels.Slots",

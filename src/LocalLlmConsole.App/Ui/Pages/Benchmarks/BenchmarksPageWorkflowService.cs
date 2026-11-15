@@ -15,14 +15,14 @@ public static class BenchmarksPageWorkflowService
         if (page?.Summary is null) return preview;
         if (page.RunButton is not null) page.RunButton.IsEnabled = !page.IsRunActive;
         var details = preview.IsValid
-            ? $"{preview.WorkItems.Count} work item(s) · {preview.ExpectedResultRows} result row(s) · {preview.TimedRepetitions} timed repetition(s). "
-              + (preview.DeduplicatedWorkItems > 0 ? $"Collapsed {preview.DeduplicatedWorkItems} equivalent profile item(s)." : "Ready to run.")
+            ? Loc.T("Benchmarks.Validation.Counts", preview.WorkItems.Count, preview.ExpectedResultRows, preview.TimedRepetitions) + " "
+              + (preview.DeduplicatedWorkItems > 0 ? Loc.T("Benchmarks.Validation.Collapsed", preview.DeduplicatedWorkItems) : Loc.T("Benchmarks.Validation.Ready"))
               + (preview.Warnings.Count > 0 ? $"{Environment.NewLine}{string.Join(Environment.NewLine, preview.Warnings)}" : "")
               + CommandPreview(plan, preview)
             : string.Join(Environment.NewLine, preview.Errors);
         page.Workspace?.SetValidationDetails(details);
         page.Workspace?.ShowPreview(preview);
-        page.Summary.Text = preview.IsValid ? (preview.Warnings.Count > 0 ? "Ready · review validation details for runtime notes." : "Ready to run.")
+        page.Summary.Text = preview.IsValid ? (preview.Warnings.Count > 0 ? Loc.T("Benchmarks.Validation.ReadyWithNotes") : Loc.T("Benchmarks.Validation.Ready"))
             : string.Join(Environment.NewLine, preview.Errors.Take(2));
         page.Summary.ToolTip = details;
         if (page.RunButton is not null) page.RunButton.IsEnabled = preview.IsValid && !page.IsRunActive;
@@ -34,12 +34,12 @@ public static class BenchmarksPageWorkflowService
         var item = preview.WorkItems.FirstOrDefault();
         if (item is null) return "";
         if (plan.ExecutionMode == BenchmarkExecutionMode.ProfileServing)
-            return $"{Environment.NewLine}First saved-profile variant: {item.ProfileNames.FirstOrDefault()} · {item.RuntimeName} · "
-                   + $"context {item.LaunchSettings?.ContextSize ?? 0} · batch {item.LaunchSettings?.BatchSize ?? 0} · "
-                   + $"micro-batch {item.LaunchSettings?.MicroBatchSize ?? 0} · concurrency {string.Join(',', plan.Serving.Concurrencies)}.";
+            return Environment.NewLine + Loc.T("Benchmarks.Validation.FirstVariant", item.ProfileNames.FirstOrDefault() ?? "", item.RuntimeName,
+                item.LaunchSettings?.ContextSize ?? 0, item.LaunchSettings?.BatchSize ?? 0, item.LaunchSettings?.MicroBatchSize ?? 0,
+                string.Join(',', plan.Serving.Concurrencies));
         var modelPath = BenchmarkRuntimeToolAdapter.RuntimeVisiblePath(item.RuntimeMode, item.ModelPath);
         var arguments = BenchmarkCommandBuilder.Build(plan, item, modelPath);
-        return $"{Environment.NewLine}First logical argv: {JsonSerializer.Serialize(arguments)}";
+        return Environment.NewLine + Loc.T("Benchmarks.Validation.FirstArgv", JsonSerializer.Serialize(arguments));
     }
 
     public static async Task<BenchmarkRunSnapshot?> StartAsync(
@@ -54,19 +54,19 @@ public static class BenchmarksPageWorkflowService
         if (!preview.IsValid) return null;
         var active = sessions.Where(session => session.IsRunning).ToArray();
         var sessionNotice = active.Length == 0
-            ? "No model sessions are currently running."
+            ? Loc.T("Benchmarks.Start.NoSessions")
             : plan.StopActiveSessions
-                ? $"The following {active.Length} active session(s) will be stopped first:\n{string.Join(Environment.NewLine, active.Select(session => $"• {session.ModelName}"))}"
-                : $"{active.Length} active session(s) block this run. Stop them first or explicitly select the stop-sessions option.";
+                ? Loc.T("Benchmarks.Start.SessionsStopped", active.Length, string.Join(Environment.NewLine, active.Select(session => $"• {session.ModelName}")))
+                : Loc.T("Benchmarks.Start.SessionsBlock", active.Length);
         if (active.Length > 0 && !plan.StopActiveSessions)
         {
-            dialogs.Notify(owner, sessionNotice, "Benchmark blocked", MessageBoxImage.Warning);
+            dialogs.Notify(owner, sessionNotice, Loc.T("Benchmarks.Start.BlockedTitle"), MessageBoxImage.Warning);
             return null;
         }
         if (!dialogs.Confirm(
                 owner,
-                $"Run {preview.WorkItems.Count} benchmark work item(s) sequentially?\n\n{sessionNotice}\n\nBenchmarking applies sustained CPU/GPU load.",
-                "Start benchmark",
+                Loc.T("Benchmarks.Start.Confirm", preview.WorkItems.Count, sessionNotice),
+                Loc.T("Benchmarks.Start.Title"),
                 MessageBoxImage.Warning))
             return null;
         return await benchmarks.StartAsync(plan, confirmed: true);
@@ -79,7 +79,7 @@ public static class BenchmarksPageWorkflowService
         IReadOnlyList<NamedModelLaunchProfile> profiles)
     {
         var source = await benchmarks.InspectAsync(jobId);
-        var clone = source.Payload.Plan with { Name = $"{source.Payload.Plan.Name} copy", StopActiveSessions = false };
+        var clone = source.Payload.Plan with { Name = Loc.T("Benchmarks.CloneName", source.Payload.Plan.Name), StopActiveSessions = false };
         BenchmarksPagePlanService.Apply(page, clone, profiles);
     }
 
@@ -117,7 +117,7 @@ public static class BenchmarksPageWorkflowService
     public static async Task ExportPlanAsync(BenchmarkPlan plan, Action<string> setStatus)
     {
         var path = await BenchmarksPagePlanFileService.ExportAsync(plan);
-        if (!string.IsNullOrWhiteSpace(path)) setStatus($"Exported benchmark plan to {path}.");
+        if (!string.IsNullOrWhiteSpace(path)) setStatus(Loc.T("Benchmarks.PlanExported", path));
     }
 
     public static async Task OpenLogAsync(BenchmarkApplicationService benchmarks, string jobId, Action<string> openLog)
@@ -134,8 +134,8 @@ public static class BenchmarksPageWorkflowService
     {
         var run = await benchmarks.InspectAsync(jobId);
         if (run.Job.Status is JobStatus.Queued or JobStatus.Running or JobStatus.Paused)
-            throw new InvalidOperationException("Active benchmark runs cannot be deleted. Cancel the run first.");
-        if (!dialogs.Confirm(owner, $"Delete benchmark run '{run.Payload.Plan.Name}' and all of its results?", "Delete benchmark run", MessageBoxImage.Warning))
+            throw new InvalidOperationException(Loc.T("Benchmarks.Delete.Active"));
+        if (!dialogs.Confirm(owner, Loc.T("Benchmarks.Delete.Confirm", run.Payload.Plan.Name), Loc.T("Benchmarks.Delete.Title"), MessageBoxImage.Warning))
             return false;
         await benchmarks.DeleteAsync(run.Job.Id, confirmed: true);
         return true;

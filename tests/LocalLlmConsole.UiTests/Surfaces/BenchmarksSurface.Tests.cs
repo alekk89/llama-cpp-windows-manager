@@ -182,21 +182,21 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.Equal("q4_0", controls.CacheTypesK.Text);
             Assert.Contains("q8_0", controls.CacheTypesK.Items.Cast<string>());
 
-            Assert.Equal(new[] { "Quick check", "Standard", "Short", "Medium", "Long", "Custom" }, controls.Preset.Items.Cast<string>());
+            Assert.Equal(new[] { "Quick check", "Standard", "Short", "Medium", "Long", "Custom" }, controls.Preset.Items.Cast<object>().Select(item => item.ToString()));
             Assert.Empty(controls.PromptSizes.Text);
             Assert.Empty(controls.GenerationSizes.Text);
             Assert.Equal("512/128", controls.PromptGenerationPairs.Text);
             Assert.Empty(controls.ContextSizes.Text);
             Assert.Equal("1800", controls.RequestTimeoutSeconds.Text);
 
-            controls.Preset.SelectedItem = "Short";
+            controls.Preset.SelectedItem = new LocalLlmConsole.BenchmarkPresetItem("Short");
             Assert.Empty(controls.PromptSizes.Text);
             Assert.Empty(controls.GenerationSizes.Text);
             Assert.Equal("512/128, 2048/256, 4096/256", controls.PromptGenerationPairs.Text);
             Assert.Equal("8192", controls.ContextSizes.Text);
             Assert.Equal("5", controls.Repetitions.Text);
 
-            controls.Preset.SelectedItem = "Long";
+            controls.Preset.SelectedItem = new LocalLlmConsole.BenchmarkPresetItem("Long");
             Assert.Empty(controls.PromptSizes.Text);
             Assert.Empty(controls.GenerationSizes.Text);
             Assert.Equal("32768/1024, 65536/1024, 131072/1024", controls.PromptGenerationPairs.Text);
@@ -357,7 +357,7 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
                 ["View report", "Compare selected", "Pause after current test", "Resume selected run", "Export results", "Clone selected plan", "Import plan", "Export current plan", "Open run log", "Refresh runs"],
                 controls.History.ContextMenu!.Items.OfType<MenuItem>().Select(item => item.Header?.ToString()).ToArray());
             var completedRun = new LocalLlmConsole.BenchmarkRunRow("run", "now", "Completed", "1 item", "1/1", "Done");
-            var runningRun = completedRun with { RunId = "active", Status = "Running" };
+            var runningRun = completedRun with { RunId = "active", Status = "Running", JobStatus = LocalLlmConsole.Models.JobStatus.Running };
             Assert.Equal("Delete", completedRun.RemoveAction);
             Assert.True(completedRun.CanRemove);
             Assert.False(runningRun.CanRemove);

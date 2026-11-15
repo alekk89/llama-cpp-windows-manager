@@ -26,33 +26,33 @@ public sealed class BenchmarkResultsView : StackPanel
 
     public BenchmarkResultsView()
     {
-        System.Windows.Automation.AutomationProperties.SetName(_raw, "Raw measurement JSON");
-        System.Windows.Automation.AutomationProperties.SetName(_baseline, "Baseline configuration");
+        System.Windows.Automation.AutomationProperties.SetName(_raw, Loc.T("Benchmarks.Results.RawJson"));
+        System.Windows.Automation.AutomationProperties.SetName(_baseline, Loc.T("Benchmarks.Results.BaselineConfiguration"));
         Children.Add(_title);
         Children.Add(_selection);
         _speeds.Children.Add(SpeedCard(new TextBlock { Text = Loc.T("Lifetime.Insight.GenerationRate") }, _generationSpeed,
-            "Output tokens generated per second, using runtime generation timings when available."));
+            Loc.T("Benchmarks.Results.GenerationHelp")));
         _speeds.Children.Add(SpeedCard(new TextBlock { Text = Loc.T("Lifetime.Insight.PromptRate") }, _promptSpeed,
-            "Input tokens processed per second. Missing runtime timings show —."));
+            Loc.T("Benchmarks.Results.PromptHelp")));
         _totalCard = SpeedCard(_totalLabel, _totalSpeed,
-            "Serving: output tokens across all requests divided by elapsed time. Direct llama-bench: combined prompt and generation speed.");
+            Loc.T("Benchmarks.Results.TotalHelp"));
         _speeds.Children.Add(_totalCard);
         Children.Add(_speeds);
-        Children.Add(BenchmarkWorkspaceView.Field("Baseline", _baseline));
+        Children.Add(BenchmarkWorkspaceView.Field(Loc.T("Benchmarks.Results.Baseline"), _baseline));
         Table = PageSectionFactory.GridFor(
-            ("Profile / configuration", nameof(BenchmarkResultTableRow.Name), 2.5),
-            ("Runtime", nameof(BenchmarkResultTableRow.Runtime), 1.4),
-            ("Generation tok/s", nameof(BenchmarkResultTableRow.Decode), 1),
-            ("Prompt tok/s", nameof(BenchmarkResultTableRow.Prompt), .9),
-            ("Total tok/s", nameof(BenchmarkResultTableRow.Total), .9),
-            ("Change", nameof(BenchmarkResultTableRow.Change), .9));
+            (Loc.T("Benchmarks.Results.Configuration"), nameof(BenchmarkResultTableRow.Name), 2.5),
+            (Loc.T("Benchmarks.Label.Runtime"), nameof(BenchmarkResultTableRow.Runtime), 1.4),
+            (Loc.T("Benchmarks.Results.Generation"), nameof(BenchmarkResultTableRow.Decode), 1),
+            (Loc.T("Benchmarks.Results.Prompt"), nameof(BenchmarkResultTableRow.Prompt), .9),
+            (Loc.T("Benchmarks.Results.Total"), nameof(BenchmarkResultTableRow.Total), .9),
+            (Loc.T("Benchmarks.Results.Change"), nameof(BenchmarkResultTableRow.Change), .9));
         foreach (var column in Table.Columns.Skip(2).Take(3).Cast<DataGridTextColumn>())
         {
             var style = new Style(typeof(TextBlock), column.ElementStyle);
             style.Setters.Add(new Setter(TextBlock.FontWeightProperty, FontWeights.SemiBold));
             style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
             column.ElementStyle = style;
-            column.Header = new TextBlock { Text = column.Header.ToString()!.Replace(" tok/s", "\ntokens/s") };
+            column.Header = new TextBlock { Text = $"{column.Header}\n{Loc.T("Benchmarks.TokensPerSecondUnit")}" };
             column.Width = DataGridLength.SizeToHeader;
         }
         Table.MinHeight = 140;
@@ -68,7 +68,7 @@ public sealed class BenchmarkResultsView : StackPanel
 
     public void SetResults(string title, IReadOnlyList<StoredBenchmarkResult> results)
     {
-        _title.Text = title + $" · {results.Count:N0} measurements";
+        _title.Text = Loc.T("Benchmarks.Results.TitleCount", title, results.Count);
         _rows = results.Select(row => new BenchmarkResultTableRow(row)).ToArray();
         Table.ItemsSource = _rows;
         Table.Columns[4].Visibility = _rows.Any(row => row.HasTotalRate) ? Visibility.Visible : Visibility.Collapsed;
@@ -99,17 +99,16 @@ public sealed class BenchmarkResultsView : StackPanel
         _generationSpeed.Text = row.Decode;
         _promptSpeed.Text = row.Prompt;
         _totalSpeed.Text = row.Total;
-        _totalLabel.Text = row.Stored.Result.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? "Request throughput" : "Combined speed";
+        _totalLabel.Text = row.Stored.Result.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? Loc.T("Benchmarks.Results.RequestThroughput") : Loc.T("Benchmarks.Results.CombinedSpeed");
         _totalCard.Visibility = row.HasTotalRate ? Visibility.Visible : Visibility.Collapsed;
         var r = row.Stored.Result;
         _details.Text = $"{r.ManagerModelName} · {r.ModelFilename}\n{r.ProfileName} · {row.Runtime} · {r.ExecutionMode}\n" +
-            $"Workload {r.PromptTokens:N0}/{r.GenerationTokens:N0} · context {r.ContextSize:N0} · depth {r.Depth:N0} · concurrency {r.Concurrency}\n" +
-            $"Batch {r.BatchSize:N0} · micro-batch {r.MicroBatchSize:N0} · threads {r.Threads} · GPU layers {r.GpuLayers} · " +
-            $"cache {r.CacheTypeK}/{r.CacheTypeV} · flash {r.FlashAttention}\n" +
-            $"Devices {r.Devices} · split {r.SplitMode} {r.TensorSplit} · load {r.LoadMode} · speculative {r.SpeculativeType}\n" +
-            $"Latency {row.Latency} s · GPU {row.Memory} GiB · build {r.BuildCommit} · {r.OperatingEnvironment}\n" +
+            Loc.T("Benchmarks.Results.DetailWorkload", r.PromptTokens, r.GenerationTokens, r.ContextSize, r.Depth, r.Concurrency) + "\n" +
+            Loc.T("Benchmarks.Results.DetailBatch", r.BatchSize, r.MicroBatchSize, r.Threads, r.GpuLayers, r.CacheTypeK, r.CacheTypeV, r.FlashAttention) + "\n" +
+            Loc.T("Benchmarks.Results.DetailDevices", r.Devices, r.SplitMode, r.TensorSplit, r.LoadMode, r.SpeculativeType) + "\n" +
+            Loc.T("Benchmarks.Results.DetailLatency", row.Latency, row.Memory, r.BuildCommit, r.OperatingEnvironment) + "\n" +
             BenchmarkMemoryReportService.Label(r) +
-            (row.Stored.IsPartialAttempt ? "\nPartial attempt: excluded from baseline comparisons." : "");
+            (row.Stored.IsPartialAttempt ? "\n" + Loc.T("Benchmarks.Results.PartialAttempt") : "");
         using var document = JsonDocument.Parse(r.RawJson);
         _raw.Text = JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
     }
@@ -147,7 +146,7 @@ public sealed class BenchmarkResultTableRow
 {
     public StoredBenchmarkResult Stored { get; }
     private BenchmarkParsedResult R => Stored.Result;
-    public string Name => $"{(string.IsNullOrWhiteSpace(R.ProfileName) ? R.ManagerModelName : R.ProfileName)} · {R.PromptTokens}/{R.GenerationTokens} · {R.CacheTypeK}/{R.CacheTypeV} · t{R.Threads}" + (Stored.IsPartialAttempt ? " · partial" : "");
+    public string Name => $"{(string.IsNullOrWhiteSpace(R.ProfileName) ? R.ManagerModelName : R.ProfileName)} · {R.PromptTokens}/{R.GenerationTokens} · {R.CacheTypeK}/{R.CacheTypeV} · t{R.Threads}" + (Stored.IsPartialAttempt ? $" · {Loc.T("Benchmarks.Results.Partial")}" : "");
     public string Runtime => string.IsNullOrWhiteSpace(R.ManagerRuntimeName) ? $"{R.Backends} {R.BuildCommit}" : R.ManagerRuntimeName;
     public double DecodeRate => R.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? R.AverageGenerationTokensPerSecond :
         R.Classification == BenchmarkResultClassification.TokenGeneration ? R.AverageTokensPerSecond : 0;
@@ -171,7 +170,7 @@ public sealed class BenchmarkResultTableRow
         var b = baseline.R;
         if (R.ModelFilename != b.ModelFilename || R.ExecutionMode != b.ExecutionMode || R.Classification != b.Classification
             || R.PromptTokens != b.PromptTokens || R.GenerationTokens != b.GenerationTokens || R.Depth != b.Depth || R.Concurrency != b.Concurrency) return;
-        Change = ReferenceEquals(this, baseline) ? "Baseline" : ((ComparisonRate / baseline.ComparisonRate - 1) * 100).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%";
+        Change = ReferenceEquals(this, baseline) ? Loc.T("Benchmarks.Results.Baseline") : ((ComparisonRate / baseline.ComparisonRate - 1) * 100).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%";
         if (R.EnvironmentSignature != b.EnvironmentSignature) Change += "*";
     }
     private static string Rate(double rate) => rate > 0 ? rate.ToString("N2", CultureInfo.CurrentCulture) : "—";

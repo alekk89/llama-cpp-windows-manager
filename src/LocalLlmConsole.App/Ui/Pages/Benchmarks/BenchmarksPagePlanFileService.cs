@@ -22,7 +22,7 @@ public static class BenchmarksPagePlanFileService
         if (dialog.ShowDialog() != Forms.DialogResult.OK) return null;
         await using var stream = new FileStream(dialog.FileName, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         return await JsonSerializer.DeserializeAsync<BenchmarkPlan>(stream, JsonOptions)
-            ?? throw new InvalidOperationException("The selected benchmark plan is empty.");
+            ?? throw new InvalidOperationException(Loc.T("Benchmarks.PlanEmpty"));
     }
 
     public static async Task<string?> ExportAsync(BenchmarkPlan plan)

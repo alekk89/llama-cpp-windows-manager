@@ -101,7 +101,7 @@ public partial class MainWindow
             RunAsync,
             RefreshDownloadHistoryAsync,
             SetStatus,
-            jobId => RunBackground(() => MonitorDownloadAsync(jobId), "Download monitor failed"));
+            jobId => RunBackground(() => MonitorDownloadAsync(jobId), Loc.T("Status.Failure.DownloadMonitor")));
 
     private DownloadHistoryDeleteApplicationActions DownloadHistoryDeleteActions()
         => new(

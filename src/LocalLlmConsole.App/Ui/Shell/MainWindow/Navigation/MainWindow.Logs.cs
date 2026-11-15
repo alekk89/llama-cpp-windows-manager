@@ -23,7 +23,7 @@ public partial class MainWindow
             ButtonToolTip));
         _logsPage.Apply(page.Controls);
         PageHost.Content = page.Content;
-        RunBackground(RefreshLogsAsync, "Logs refresh failed");
+        RunBackground(RefreshLogsAsync, Loc.T("Status.Failure.LogsRefresh"));
     }
 
     private async Task RefreshLogsAsync()
@@ -39,7 +39,7 @@ public partial class MainWindow
     }
 
     private void LoadSelectedLog()
-        => RunBackground(LoadSelectedLogAsync, "Log preview failed");
+        => RunBackground(LoadSelectedLogAsync, Loc.T("Status.Failure.LogPreview"));
 
     private async Task LoadSelectedLogAsync()
     {

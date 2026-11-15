@@ -45,7 +45,7 @@ public partial class MainWindow
         }
 
         if (_launchSettingsController.NeedsLeaveConfirmation(SelectedModel()?.Id ?? "", SelectedModelLaunchProfileId()))
-            RunBackground(ConfirmModelSelectionChangeAsync, "Launch settings selection failed");
+            RunBackground(ConfirmModelSelectionChangeAsync, Loc.T("Status.Failure.LaunchSettingsSelection"));
         else
             ScheduleSelectedModelLaunchSettingsRefresh();
     }

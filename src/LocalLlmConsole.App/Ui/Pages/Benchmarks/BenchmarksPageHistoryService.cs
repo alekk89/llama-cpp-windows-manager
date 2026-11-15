@@ -16,7 +16,7 @@ public static class BenchmarksPageHistoryService
     {
         var run = await benchmarks.InspectAsync(jobId);
         var results = await BenchmarkExportService.LoadAllAsync(store, jobId, includePartialAttempts: true);
-        var summary = $"{run.Job.Status} · {run.Payload.CompletedWorkItems + run.Payload.FailedWorkItems}/{run.Payload.WorkItems.Count} · {run.PersistedResultRows}";
+        var summary = $"{Loc.T($"Benchmarks.Status.{run.Job.Status}")} · {run.Payload.CompletedWorkItems + run.Payload.FailedWorkItems}/{run.Payload.WorkItems.Count} · {run.PersistedResultRows}";
         BenchmarkReportWindow.Show(
             owner,
             run.Payload.Plan.Name,
@@ -45,7 +45,7 @@ public static class BenchmarksPageHistoryService
             ? BenchmarkExportService.Json(results)
             : BenchmarkExportService.Csv(results);
         await File.WriteAllTextAsync(dialog.FileName, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        setStatus($"Exported {results.Count} benchmark result row(s) to {dialog.FileName}.");
+        setStatus(Loc.T("Benchmarks.ResultsExported", results.Count, dialog.FileName));
     }
 
     public static async Task ShowComparisonAsync(
@@ -54,18 +54,19 @@ public static class BenchmarksPageHistoryService
         Window owner,
         DialogService dialogs)
     {
-        if (jobIds.Count != 2) throw new InvalidOperationException("Select exactly two benchmark runs to compare.");
+        if (jobIds.Count != 2) throw new InvalidOperationException(Loc.T("Benchmarks.SelectTwoRuns"));
         var baseline = await BenchmarkExportService.LoadAllAsync(store, jobIds[0], includePartialAttempts: false);
         var candidate = await BenchmarkExportService.LoadAllAsync(store, jobIds[1], includePartialAttempts: false);
         var rows = BenchmarkComparisonService.Compare(baseline, candidate);
         var lines = rows.Take(50).Select(row =>
-            $"{row.Classification} {row.PromptTokens}/{row.GenerationTokens} ctx {row.ContextSize} batch {row.BatchSize} depth {row.Depth}: "
-            + $"{row.BaselineTokensPerSecond:0.00} → {row.CandidateTokensPerSecond:0.00} tok/s ({row.PercentChange:+0.00;-0.00;0.00}%)"
-            + (row.EnvironmentMatches ? "" : " · environment differs"));
+            Loc.T("Benchmarks.Comparison.Row", row.Classification, row.PromptTokens, row.GenerationTokens, row.ContextSize, row.BatchSize, row.Depth,
+                row.BaselineTokensPerSecond.ToString("0.00", Loc.FormatCulture), row.CandidateTokensPerSecond.ToString("0.00", Loc.FormatCulture),
+                row.PercentChange.ToString("+0.00;-0.00;0.00", Loc.FormatCulture))
+            + (row.EnvironmentMatches ? "" : $" · {Loc.T("Benchmarks.Comparison.EnvironmentDiffers")}"));
         var message = rows.Count == 0
-            ? "The selected runs have no completed rows with matching workload signatures."
+            ? Loc.T("Benchmarks.Comparison.None")
             : string.Join(Environment.NewLine, lines)
-              + (rows.Count > 50 ? $"\n\nShowing 50 of {rows.Count} comparable workloads." : "");
-        dialogs.Notify(owner, message, "Benchmark comparison", MessageBoxImage.Information);
+              + (rows.Count > 50 ? "\n\n" + Loc.T("Benchmarks.Comparison.Truncated", 50, rows.Count) : "");
+        dialogs.Notify(owner, message, Loc.T("Benchmarks.Comparison.Title"), MessageBoxImage.Information);
     }
 }

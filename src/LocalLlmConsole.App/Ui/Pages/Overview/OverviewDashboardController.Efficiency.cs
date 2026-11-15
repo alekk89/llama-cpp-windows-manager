@@ -20,7 +20,7 @@ public sealed partial class OverviewDashboardController
 
     private static string CacheReuseDetail(RuntimeMetricAtomicSnapshot atomic)
     {
-        var cachedTokens = atomic.PromptCachedTokens is { } cached ? $"{cached:N0} cached tokens" : "";
+        var cachedTokens = atomic.PromptCachedTokens is { } cached ? Loc.T("Dashboard.Detail.CachedTokens", cached.ToString("N0", CultureInfo.CurrentCulture)) : "";
         if (Finite(atomic.RecentPromptCacheHitPercent) is not { } hitRate) return cachedTokens;
         var recent = Loc.T("Dashboard.Detail.PromptCacheHitRate", hitRate.ToString("0.#", CultureInfo.CurrentCulture));
         return cachedTokens.Length == 0 ? recent : $"{cachedTokens} · {recent}";

@@ -25,14 +25,14 @@ public sealed partial class BenchmarkWorkspaceView
     private readonly TextBlock _inherited = Label("");
     private readonly TextBlock _counts = Label("");
     private readonly DataGrid _preview = PageSectionFactory.GridFor(
-        ("Profile", nameof(BenchmarkPlanPreviewRow.Profile), 1.3),
-        ("Runtime", nameof(BenchmarkPlanPreviewRow.Runtime), 1.3),
-        ("Context", nameof(BenchmarkPlanPreviewRow.Context), .8),
-        ("Threads", nameof(BenchmarkPlanPreviewRow.Threads), .8),
-        ("Cache K / V", nameof(BenchmarkPlanPreviewRow.Cache), 1),
-        ("Measurements", nameof(BenchmarkPlanPreviewRow.Measurements), .8));
+        (Loc.T("Benchmarks.Label.Profile"), nameof(BenchmarkPlanPreviewRow.Profile), 1.3),
+        (Loc.T("Benchmarks.Label.Runtime"), nameof(BenchmarkPlanPreviewRow.Runtime), 1.3),
+        (Loc.T("Benchmarks.Column.Context"), nameof(BenchmarkPlanPreviewRow.Context), .8),
+        (Loc.T("Benchmarks.Variable.Threads"), nameof(BenchmarkPlanPreviewRow.Threads), .8),
+        (Loc.T("Benchmarks.Column.Cache"), nameof(BenchmarkPlanPreviewRow.Cache), 1),
+        (Loc.T("Benchmarks.Column.Measurements"), nameof(BenchmarkPlanPreviewRow.Measurements), .8));
     public int SetupDepth { get => _depth.SelectedIndex; set => _depth.SelectedIndex = value; }
-    private readonly ComboBox _depth = new() { ItemsSource = new[] { "Quick test", "Compare settings", "Advanced" }, SelectedIndex = 0, Width = 174, Height = 30 };
+    private readonly ComboBox _depth = new() { ItemsSource = new[] { Loc.T("Benchmarks.Depth.Quick"), Loc.T("Benchmarks.CompareSettings"), Loc.T("Benchmarks.Advanced") }, SelectedIndex = 0, Width = 174, Height = 30 };
     private readonly Button _newTab;
     private readonly Button _resultsTab;
     private FrameworkElement? _footer;
@@ -66,19 +66,19 @@ public sealed partial class BenchmarkWorkspaceView
         var modeRow = new WrapPanel();
         _depth.Margin = new Thickness(0, 0, 8, 6);
         modeRow.Children.Add(_depth);
-        modeRow.Children.Add(Action("Import plan", controller.ImportPlan));
-        modeRow.Children.Add(Action("Export plan", controller.ExportPlan));
+        modeRow.Children.Add(Action(Loc.T("Benchmarks.Action.ImportPlan"), controller.ImportPlan));
+        modeRow.Children.Add(Action(Loc.T("Benchmarks.Action.ExportPlan"), controller.ExportPlan));
         _setup.Children.Add(modeRow);
-        AutomationProperties.SetName(_depth, "Setup depth");
+        AutomationProperties.SetName(_depth, Loc.T("Benchmarks.SetupDepth"));
 
         var selectors = new StackPanel();
-        selectors.Children.Add(Field("Model", controls.Model));
-        selectors.Children.Add(Field("Profile", controls.Profile));
-        selectors.Children.Add(Field("Runtime", controls.Runtime));
+        selectors.Children.Add(Field(Loc.T("Benchmarks.Label.Model"), controls.Model));
+        selectors.Children.Add(Field(Loc.T("Benchmarks.Label.Profile"), controls.Profile));
+        selectors.Children.Add(Field(Loc.T("Benchmarks.Label.Runtime"), controls.Runtime));
         selectors.Children.Add(_inherited);
         var scopeActions = new WrapPanel();
-        scopeActions.Children.Add(Action("Add selected profile / runtime", controller.AddProfile));
-        scopeActions.Children.Add(Action("Clear", controller.ClearProfiles));
+        scopeActions.Children.Add(Action(Loc.T("Benchmarks.Action.AddSelected"), controller.AddProfile));
+        scopeActions.Children.Add(Action(Loc.T("Common.ClearButton"), controller.ClearProfiles));
         _scopeSelection.Children.Add(scopeActions);
         controls.ScopeProfiles.MinHeight = 70;
         controls.ScopeProfiles.MaxHeight = 180;
@@ -88,18 +88,18 @@ public sealed partial class BenchmarkWorkspaceView
         _comparison.Children.Add(Label(Loc.T("Benchmarks.MatrixHelp")));
         var chips = new WrapPanel();
         foreach (var (name, picker) in new (string, BenchmarkValuePicker)[] {
-            ("K/V cache", controls.CacheTypesK), ("Flash Attention", controls.FlashAttention),
-            ("Threads", controls.Threads), ("Context size", controls.ContextSizes),
-            ("Batch size", controls.BatchSizes), ("Micro-batch", controls.MicroBatchSizes),
-            ("GPU layers", controls.GpuLayers), ("KV offload", controls.KvOffload) })
+            (Loc.T("Benchmarks.Compare.KvCache"), controls.CacheTypesK), (Loc.T("Benchmarks.Variable.FlashAttention"), controls.FlashAttention),
+            (Loc.T("Benchmarks.Variable.Threads"), controls.Threads), (Loc.T("Benchmarks.Compare.ContextSize"), controls.ContextSizes),
+            (Loc.T("Benchmarks.Variable.BatchSize"), controls.BatchSizes), (Loc.T("Benchmarks.Compare.MicroBatch"), controls.MicroBatchSizes),
+            (Loc.T("Benchmarks.Compare.GpuLayers"), controls.GpuLayers), (Loc.T("Benchmarks.Variable.KvOffload"), controls.KvOffload) })
         {
             picker.UseSharedSelectionHost(chips, name);
             _comparison.Children.Add(Field(name, picker));
         }
         controls.GpuConfigurations.UseSharedSelectionHost(chips);
         controls.SpeculativeConfigurations.UseSharedSelectionHost(chips);
-        _comparison.Children.Add(Field("Multi-GPU", controls.GpuConfigurations));
-        _comparison.Children.Add(Field("Speculative", controls.SpeculativeConfigurations));
+        _comparison.Children.Add(Field(Loc.T("Benchmarks.Compare.MultiGpu"), controls.GpuConfigurations));
+        _comparison.Children.Add(Field(Loc.T("Benchmarks.Compare.Speculative"), controls.SpeculativeConfigurations));
         _comparison.Children.Add(chips);
         _preview.MinHeight = 80;
         _preview.MaxHeight = 220;
@@ -107,18 +107,18 @@ public sealed partial class BenchmarkWorkspaceView
         _setup.Children.Add(Section(Loc.T("Benchmarks.CompareSettings"), _comparison));
 
         var workload = new StackPanel();
-        controls.Preset.ItemsSource = new[] { "Quick check", "Standard", "Short", "Medium", "Long", "Custom" };
+        controls.Preset.ItemsSource = new[] { "QuickCheck", "Standard", "Short", "Medium", "Long", "Custom" }.Select(id => new BenchmarkPresetItem(id)).ToArray();
         controls.Preset.SelectionChanged += (_, _) => ApplySimplePreset();
-        workload.Children.Add(Field("Workload", controls.Preset));
-        workload.Children.Add(Field("Prompt / generation tokens", controls.PromptGenerationPairs));
-        workload.Children.Add(Field("Repetitions", controls.Repetitions));
+        workload.Children.Add(Field(Loc.T("Benchmarks.Workload"), controls.Preset));
+        workload.Children.Add(Field(Loc.T("Benchmarks.Label.PromptGenerationTokens"), controls.PromptGenerationPairs));
+        workload.Children.Add(Field(Loc.T("Benchmarks.Label.Repetitions"), controls.Repetitions));
         workload.Children.Add(Label(Loc.T("Benchmarks.QuickHelp")));
         _setup.Children.Add(Section(Loc.T("Benchmarks.Workload"), workload));
         BuildAdvanced();
         _setup.Children.Add(_advanced);
 
         var run = new StackPanel();
-        run.Children.Add(Field("Run name", controls.Name));
+        run.Children.Add(Field(BenchmarkFieldDescriptions.Label("RunName"), controls.Name));
         run.Children.Add(_counts);
         run.Children.Add(Move(controls.Summary));
         controls.Summary.Text = "";
@@ -126,9 +126,9 @@ public sealed partial class BenchmarkWorkspaceView
         controls.Summary.Margin = new Thickness(0);
         var runActions = new WrapPanel();
         runActions.Children.Add(Move(controls.RunButton));
-        runActions.Children.Add(Action("Validate", controller.Validate));
+        runActions.Children.Add(Action(Loc.T("Benchmarks.Action.Validate"), controller.Validate));
         runActions.Children.Add(Move(controls.StopButton));
-        runActions.Children.Add(Action("Pause", controller.Pause));
+        runActions.Children.Add(Action(Loc.T("Benchmarks.Action.Pause"), controller.Pause));
         foreach (FrameworkElement button in runActions.Children)
             button.Margin = new Thickness(0, 0, 8, 6);
         run.Children.Add(runActions);
@@ -148,7 +148,7 @@ public sealed partial class BenchmarkWorkspaceView
         _depth.SelectionChanged += (_, _) => UpdateDepth();
         controls.ExecutionMode.SelectionChanged += (_, _) => UpdateEngine();
         foreach (var box in new[] { Seed, Temperature, CacheK, CacheV, LazyModes }) box.TextChanged += controller.PlanTextChanged;
-        controls.Preset.SelectedItem = "Quick check";
+        controls.Preset.SelectedItem = new BenchmarkPresetItem("QuickCheck");
         UpdateDepth();
         UpdateEngine();
         SelectTab(false);
@@ -156,8 +156,8 @@ public sealed partial class BenchmarkWorkspaceView
 
     private void ApplySimplePreset()
     {
-        if (_c.Preset.SelectedItem is not ("Quick check" or "Standard")) return;
-        var quick = _c.Preset.SelectedItem.Equals("Quick check");
+        if (_c.Preset.SelectedItem is not BenchmarkPresetItem { Id: "QuickCheck" or "Standard" } preset) return;
+        var quick = preset.Id == "QuickCheck";
         _c.PromptSizes.Text = _c.GenerationSizes.Text = "";
         _c.PromptGenerationPairs.Text = quick ? "512/128" : "2048/256";
         _c.Repetitions.Text = quick ? "3" : "5";
@@ -182,21 +182,21 @@ public sealed partial class BenchmarkWorkspaceView
     public void UpdateSelection(ModelLaunchSettings? settings, ModelRecord? model)
     {
         _inherited.Text = settings is null ? Loc.T("Benchmarks.ChooseProfile") :
-            $"{(model is null ? "" : model.Name + " · ")}context {settings.ContextSize:N0} · batch {settings.BatchSize:N0} · " +
-            $"GPU layers {settings.GpuLayers} · cache {settings.CacheTypeK}/{settings.CacheTypeV} · threads {settings.Threads}";
+            (model is null ? "" : model.Name + " · ") + Loc.T("Benchmarks.InheritedSummary", settings.ContextSize, settings.BatchSize,
+                settings.GpuLayers, settings.CacheTypeK, settings.CacheTypeV, settings.Threads);
         ProfileEditor.SetInherited(settings);
     }
 
     public void ShowPreview(BenchmarkPlanPreview preview)
     {
         _counts.Text = preview.IsValid
-            ? $"{preview.WorkItems.Count:N0} launch(es) · {preview.ExpectedResultRows:N0} measurements · {preview.TimedRepetitions:N0} timed repetitions"
+            ? Loc.T("Benchmarks.PreviewCounts", preview.WorkItems.Count, preview.ExpectedResultRows, preview.TimedRepetitions)
             : string.Join(Environment.NewLine, preview.Errors.Take(3));
         _counts.MaxHeight = 40;
         _counts.ToolTip = _counts.Text;
         _preview.ItemsSource = preview.WorkItems.Select(item => new BenchmarkPlanPreviewRow(
             string.Join(", ", item.ProfileNames), item.RuntimeName,
-            item.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? item.LaunchSettings?.ContextSize.ToString("N0") ?? "—" : "By workload",
+            item.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? item.LaunchSettings?.ContextSize.ToString("N0") ?? "—" : Loc.T("Benchmarks.ByWorkload"),
             item.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? item.LaunchSettings?.Threads.ToString() ?? "—" : string.Join(',', item.Options.Threads),
             item.ExecutionMode == BenchmarkExecutionMode.ProfileServing ? $"{item.LaunchSettings?.CacheTypeK}/{item.LaunchSettings?.CacheTypeV}" : $"{string.Join(',', item.Options.CacheTypesK)} / {string.Join(',', item.Options.CacheTypesV)}",
             item.ExpectedResultRows)).ToArray();

@@ -98,10 +98,9 @@ internal static class LaunchRuntimeOptionLayout
     public static string OptionToolTip(RuntimeLaunchOptionDefinition option)
     {
         var description = string.IsNullOrWhiteSpace(option.Description) ? option.Name : option.Description;
-        var advertisedDefault = string.IsNullOrWhiteSpace(option.DefaultValue) ? "" : $"Default: {option.DefaultValue}";
-        var inheritance = string.IsNullOrWhiteSpace(advertisedDefault)
-            ? "Leave unchanged to inherit the runtime default."
-            : $"{advertisedDefault}. Leave unchanged to inherit it.";
+        var inheritance = string.IsNullOrWhiteSpace(option.DefaultValue)
+            ? Loc.T("Launch.RuntimeOption.InheritDefault")
+            : Loc.T("Launch.RuntimeOption.InheritAdvertised", option.DefaultValue);
         var aliases = string.Join(", ", option.Aliases.Where(alias => alias.StartsWith("--", StringComparison.Ordinal)).Distinct(StringComparer.OrdinalIgnoreCase));
         return $"{LaunchSettingMetadataService.RuntimeOptionLabel(RuntimeLaunchOptionSwitchService.DisplayFlag(option))} ({aliases}){Environment.NewLine}{description}{Environment.NewLine}{inheritance}";
     }

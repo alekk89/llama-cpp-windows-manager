@@ -43,7 +43,7 @@ public partial class MainWindow
             async (file, settings) => await huggingFace.StartDownloadAsync(file, settings),
             RefreshOverviewAsync,
             ShowDownloadHistoryAsync,
-            jobId => RunBackground(() => MonitorDownloadAsync(jobId), "Download monitor failed"),
+            jobId => RunBackground(() => MonitorDownloadAsync(jobId), Loc.T("Status.Failure.DownloadMonitor")),
             SetStatus);
 
     private HuggingFaceModelCardApplicationActions HuggingFaceModelCardActions()

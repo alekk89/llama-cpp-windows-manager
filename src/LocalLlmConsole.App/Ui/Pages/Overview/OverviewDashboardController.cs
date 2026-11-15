@@ -159,9 +159,9 @@ public sealed partial class OverviewDashboardController
         SetGateway(OverviewDashboardMetricIds.GatewayRequestDuration,
             snapshot.LastRequestDurationMilliseconds, "0", "ms");
         SetGateway(OverviewDashboardMetricIds.GatewayResponseThroughput,
-            snapshot.LastResponseTokensPerSecond, "0.0", "t/s");
-        SetGateway(OverviewDashboardMetricIds.GatewayRequests, snapshot.RequestCount, "N0", "requests");
-        SetGateway(OverviewDashboardMetricIds.GatewayFailures, snapshot.FailureCount, "N0", "requests");
+            snapshot.LastResponseTokensPerSecond, "0.0", Loc.T("Dashboard.Unit.TokensPerSecond"));
+        SetGateway(OverviewDashboardMetricIds.GatewayRequests, snapshot.RequestCount, "N0", Loc.T("Dashboard.Unit.Requests"));
+        SetGateway(OverviewDashboardMetricIds.GatewayFailures, snapshot.FailureCount, "N0", Loc.T("Dashboard.Unit.Requests"));
         SetGateway(OverviewDashboardMetricIds.GatewayFailureRate,
             snapshot.FailureRatePercent, "0.#", "%");
         RequestApplyReadings(pushGraphs: true);
@@ -196,33 +196,33 @@ public sealed partial class OverviewDashboardController
             ?? (atomic.MtpAcceptedTokens is { } accepted && atomic.MtpGeneratedTokens is > 0
                 ? Math.Clamp(100 * accepted / atomic.MtpGeneratedTokens.Value, 0, 100)
                 : (double?)null);
-        SetAtomicReading(OverviewDashboardMetricIds.AverageGenerationRate, Number(atomic.AverageGenerationRate, "0.0"), atomic.AverageGenerationRate, "t/s");
-        SetAtomicReading(OverviewDashboardMetricIds.AveragePromptRate, Number(atomic.AveragePromptRate, "0.0"), atomic.AveragePromptRate, "t/s");
-        SetAtomicReading(OverviewDashboardMetricIds.RecentGenerationRate, Number(atomic.RecentGenerationRate, "0.0"), atomic.RecentGenerationRate, "t/s");
-        SetAtomicReading(OverviewDashboardMetricIds.RecentPromptRate, Number(atomic.RecentPromptRate, "0.0"), atomic.RecentPromptRate, "t/s");
+        SetAtomicReading(OverviewDashboardMetricIds.AverageGenerationRate, Number(atomic.AverageGenerationRate, "0.0"), atomic.AverageGenerationRate, Loc.T("Dashboard.Unit.TokensPerSecond"));
+        SetAtomicReading(OverviewDashboardMetricIds.AveragePromptRate, Number(atomic.AveragePromptRate, "0.0"), atomic.AveragePromptRate, Loc.T("Dashboard.Unit.TokensPerSecond"));
+        SetAtomicReading(OverviewDashboardMetricIds.RecentGenerationRate, Number(atomic.RecentGenerationRate, "0.0"), atomic.RecentGenerationRate, Loc.T("Dashboard.Unit.TokensPerSecond"));
+        SetAtomicReading(OverviewDashboardMetricIds.RecentPromptRate, Number(atomic.RecentPromptRate, "0.0"), atomic.RecentPromptRate, Loc.T("Dashboard.Unit.TokensPerSecond"));
         SetAtomicReading(OverviewDashboardMetricIds.PromptCacheReuse, Number(atomic.PromptCacheReusePercent, "0.#"),
             atomic.PromptCacheReusePercent, "%", CacheReuseDetail(atomic));
         SetAtomicReading(OverviewDashboardMetricIds.DraftAcceptance, Number(draftAcceptancePercent, "0.#"),
             draftAcceptancePercent, "%", SpeculativeSpeedupDetail(atomic.SpeculativeTokensPerStep));
         ApplyEfficiencyReadings(atomic, SetAtomicReading);
         SetAtomicReading(OverviewDashboardMetricIds.PeakContextUsed, Number(atomic.PeakContextTokens, "N0"),
-            atomic.PeakContextTokens, "tokens");
+            atomic.PeakContextTokens, Loc.T("Dashboard.Unit.Tokens"));
         SetAtomicReading(OverviewDashboardMetricIds.ContextShifts, Number(atomic.ContextShiftCount, "N0"),
             atomic.ContextShiftCount);
-        SetAtomicReading(OverviewDashboardMetricIds.GeneratedTokens, Number(atomic.GeneratedTokens, "N0"), atomic.GeneratedTokens, "tokens");
-        SetAtomicReading(OverviewDashboardMetricIds.PromptTokens, Number(atomic.PromptTokens, "N0"), atomic.PromptTokens, "tokens");
-        SetAtomicReading(OverviewDashboardMetricIds.AverageMtpGeneratedRate, Number(atomic.AverageMtpGeneratedRate, "0.0"), atomic.AverageMtpGeneratedRate, "t/s");
-        SetAtomicReading(OverviewDashboardMetricIds.AverageMtpAcceptedRate, Number(atomic.AverageMtpAcceptedRate, "0.0"), atomic.AverageMtpAcceptedRate, "t/s");
-        SetAtomicReading(OverviewDashboardMetricIds.MtpGeneratedTokens, Number(atomic.MtpGeneratedTokens, "N0"), atomic.MtpGeneratedTokens, "tokens");
-        SetAtomicReading(OverviewDashboardMetricIds.MtpAcceptedTokens, Number(atomic.MtpAcceptedTokens, "N0"), atomic.MtpAcceptedTokens, "tokens");
+        SetAtomicReading(OverviewDashboardMetricIds.GeneratedTokens, Number(atomic.GeneratedTokens, "N0"), atomic.GeneratedTokens, Loc.T("Dashboard.Unit.Tokens"));
+        SetAtomicReading(OverviewDashboardMetricIds.PromptTokens, Number(atomic.PromptTokens, "N0"), atomic.PromptTokens, Loc.T("Dashboard.Unit.Tokens"));
+        SetAtomicReading(OverviewDashboardMetricIds.AverageMtpGeneratedRate, Number(atomic.AverageMtpGeneratedRate, "0.0"), atomic.AverageMtpGeneratedRate, Loc.T("Dashboard.Unit.TokensPerSecond"));
+        SetAtomicReading(OverviewDashboardMetricIds.AverageMtpAcceptedRate, Number(atomic.AverageMtpAcceptedRate, "0.0"), atomic.AverageMtpAcceptedRate, Loc.T("Dashboard.Unit.TokensPerSecond"));
+        SetAtomicReading(OverviewDashboardMetricIds.MtpGeneratedTokens, Number(atomic.MtpGeneratedTokens, "N0"), atomic.MtpGeneratedTokens, Loc.T("Dashboard.Unit.Tokens"));
+        SetAtomicReading(OverviewDashboardMetricIds.MtpAcceptedTokens, Number(atomic.MtpAcceptedTokens, "N0"), atomic.MtpAcceptedTokens, Loc.T("Dashboard.Unit.Tokens"));
         SetAtomicReading(OverviewDashboardMetricIds.ActiveSlots,
-            $"{atomic.ActiveSlots:N0}", atomic.ActiveSlots, $"of {atomic.SlotCapacity:N0}");
+            $"{atomic.ActiveSlots:N0}", atomic.ActiveSlots, Loc.T("Dashboard.Detail.OfTotal", atomic.SlotCapacity.ToString("N0", CultureInfo.CurrentCulture)));
         SetAtomicReading(OverviewDashboardMetricIds.QueuedRequests, $"{atomic.QueuedRequests:N0}", atomic.QueuedRequests);
         SetAtomicReading(OverviewDashboardMetricIds.BusyDecodeSlots, $"{atomic.BusyDecodeSlots:0.0}", atomic.BusyDecodeSlots);
-        SetAtomicReading(OverviewDashboardMetricIds.KvCacheUsed, Number(atomic.KvCacheUsedTokens, "N0"), atomic.KvCacheUsedTokens, "tokens");
-        SetAtomicReading(OverviewDashboardMetricIds.KvCacheCapacity, Number(atomic.KvCacheCapacityTokens, "N0"), atomic.KvCacheCapacityTokens, "tokens");
+        SetAtomicReading(OverviewDashboardMetricIds.KvCacheUsed, Number(atomic.KvCacheUsedTokens, "N0"), atomic.KvCacheUsedTokens, Loc.T("Dashboard.Unit.Tokens"));
+        SetAtomicReading(OverviewDashboardMetricIds.KvCacheCapacity, Number(atomic.KvCacheCapacityTokens, "N0"), atomic.KvCacheCapacityTokens, Loc.T("Dashboard.Unit.Tokens"));
         var kvDetail = atomic.KvCacheUsedTokens is { } used && atomic.KvCacheCapacityTokens is { } capacity
-            ? $"{used:N0} of {capacity:N0} tokens"
+            ? Loc.T("Dashboard.Detail.UsedOfCapacityTokens", used.ToString("N0", CultureInfo.CurrentCulture), capacity.ToString("N0", CultureInfo.CurrentCulture))
             : "";
         SetAtomicReading(OverviewDashboardMetricIds.KvCacheUsage, Number(atomic.KvCacheUsagePercent, "0.#"),
             atomic.KvCacheUsagePercent, "%", kvDetail);

@@ -31,10 +31,10 @@ public sealed class BenchmarkProfileEditor : StackPanel
             value.Children.Add(check);
             value.Children.Add(input);
             var label = Regex.Replace(property.Name, "([a-z])([A-Z])", "$1 $2");
-            check.ToolTip = $"Override {label} for this benchmark only";
+            check.ToolTip = Loc.T("Benchmarks.Override.Tooltip", label);
             input.ToolTip = property.Name + " · " + property.PropertyType.Name;
             System.Windows.Automation.AutomationProperties.SetName(input, label);
-            System.Windows.Automation.AutomationProperties.SetName(check, "Override " + label);
+            System.Windows.Automation.AutomationProperties.SetName(check, Loc.T("Benchmarks.Override.Name", label));
             var row = BenchmarkWorkspaceView.Field(label, value);
             Children.Add(row);
             var editor = new Editor(property, check, input, row);
@@ -82,7 +82,7 @@ public sealed class BenchmarkProfileEditor : StackPanel
         var editor = _editors.Single(editor => editor.Property.Name == nameof(ModelLaunchSettings.CustomParameters));
         var tokens = CustomLaunchParameterParser.Parse(editor.Value.Text).ToList();
         if (tokens.Contains(added[0], StringComparer.OrdinalIgnoreCase))
-            throw new InvalidOperationException("This flag is already present. Edit its value in Custom parameters.");
+            throw new InvalidOperationException(Loc.T("Benchmarks.FlagPresentInCustomParameters"));
         tokens.AddRange(added);
         RuntimeLaunchOptionPolicy.ValidateCustomArguments(tokens);
         editor.Enabled.IsChecked = true;

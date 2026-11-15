@@ -68,13 +68,13 @@ public static partial class BenchmarksPageFactory
             clicked.IsSelected = true;
         };
 
-        var view = MenuAction("View report", controller.Details);
-        var compare = MenuAction("Compare selected", controller.Compare);
-        var pause = MenuAction("Pause after current test", controller.Pause);
-        var resume = MenuAction("Resume selected run", controller.Resume);
-        var export = MenuAction("Export results", controller.Export);
-        var clone = MenuAction("Clone selected plan", controller.Clone);
-        var openLog = MenuAction("Open run log", controller.OpenLog);
+        var view = MenuAction(Loc.T("Benchmarks.Menu.ViewReport"), controller.Details);
+        var compare = MenuAction(Loc.T("Benchmarks.Menu.CompareSelected"), controller.Compare);
+        var pause = MenuAction(Loc.T("Benchmarks.Menu.PauseAfterCurrent"), controller.Pause);
+        var resume = MenuAction(Loc.T("Benchmarks.Menu.ResumeSelected"), controller.Resume);
+        var export = MenuAction(Loc.T("Benchmarks.Menu.ExportResults"), controller.Export);
+        var clone = MenuAction(Loc.T("Benchmarks.Menu.CloneSelected"), controller.Clone);
+        var openLog = MenuAction(Loc.T("Benchmarks.Menu.OpenRunLog"), controller.OpenLog);
         var menu = new ContextMenu();
         menu.Items.Add(view);
         menu.Items.Add(compare);
@@ -84,10 +84,10 @@ public static partial class BenchmarksPageFactory
         menu.Items.Add(export);
         menu.Items.Add(clone);
         menu.Items.Add(new Separator());
-        menu.Items.Add(MenuAction("Import plan", controller.ImportPlan));
-        menu.Items.Add(MenuAction("Export current plan", controller.ExportPlan));
+        menu.Items.Add(MenuAction(Loc.T("Benchmarks.Action.ImportPlan"), controller.ImportPlan));
+        menu.Items.Add(MenuAction(Loc.T("Benchmarks.Menu.ExportCurrentPlan"), controller.ExportPlan));
         menu.Items.Add(openLog);
-        menu.Items.Add(MenuAction("Refresh runs", controller.Refresh));
+        menu.Items.Add(MenuAction(Loc.T("Benchmarks.Menu.RefreshRuns"), controller.Refresh));
         menu.Opened += (_, _) =>
         {
             var selected = history.SelectedItems.Count;

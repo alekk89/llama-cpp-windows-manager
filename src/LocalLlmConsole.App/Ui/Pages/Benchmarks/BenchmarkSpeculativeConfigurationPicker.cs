@@ -21,10 +21,10 @@ public sealed class BenchmarkSpeculativeConfigurationPicker : StackPanel
         _selectionHost = _selected;
         Orientation = System.Windows.Controls.Orientation.Vertical;
         Type = ChoiceBox(TypeChoices);
-        AutomationProperties.SetName(Type, "Speculative type");
+        AutomationProperties.SetName(Type, Loc.T("Benchmarks.Speculative.Type"));
 
         Head = ChoiceBox(HeadChoices);
-        AutomationProperties.SetName(Head, "Speculative head");
+        AutomationProperties.SetName(Head, Loc.T("Benchmarks.Speculative.Head"));
 
         AddButton = new Button
         {
@@ -37,7 +37,7 @@ public sealed class BenchmarkSpeculativeConfigurationPicker : StackPanel
             VerticalAlignment = VerticalAlignment.Center,
             ToolTip = Loc.T("Benchmarks.ValuePicker.AddTooltip")
         };
-        AutomationProperties.SetName(AddButton, "Add speculative configuration");
+        AutomationProperties.SetName(AddButton, Loc.T("Benchmarks.Speculative.Add"));
 
         Type.SelectionChanged += (_, _) => UpdateEditorState();
         Head.SelectionChanged += (_, _) => UpdateEditorState();
@@ -110,16 +110,16 @@ public sealed class BenchmarkSpeculativeConfigurationPicker : StackPanel
             var display = Display(configuration);
             var chip = new Button
             {
-                Content = $"Speculative: {display}  ×",
+                Content = $"{Loc.T("Benchmarks.Compare.Speculative")}: {display}  ×",
                 Tag = configuration,
                 MinHeight = 24,
                 MinWidth = 0,
                 Padding = new Thickness(7, 1, 7, 2),
                 Margin = new Thickness(0, 0, 5, 3),
-                ToolTip = $"Remove {display}"
+                ToolTip = Loc.T("Benchmarks.ValuePicker.Remove", display)
             };
             VisualRole.SetButtonRole(chip, VisualRole.Quiet);
-            AutomationProperties.SetName(chip, $"Remove {display}");
+            AutomationProperties.SetName(chip, Loc.T("Benchmarks.ValuePicker.Remove", display));
             chip.Click += (_, _) => Remove(configuration);
             _selectionHost.Children.Add(chip);
             _renderedChips.Add(chip);
@@ -163,9 +163,10 @@ public sealed class BenchmarkSpeculativeConfigurationPicker : StackPanel
             VerticalContentAlignment = VerticalAlignment.Center
         };
 
-    private static readonly Choice[] TypeChoices =
+    // Speculative type labels mirror llama.cpp --spec-type names; only "none" is a translatable word.
+    private static Choice[] TypeChoices =>
     [
-        new("none", "None"), new("atomic-mtp", "Atomic MTP"), new("draft-mtp", "Draft MTP"),
+        new("none", Loc.T("Benchmarks.Speculative.None")), new("atomic-mtp", "Atomic MTP"), new("draft-mtp", "Draft MTP"),
         new("draft-simple", "Draft simple"), new("draft-eagle3", "Draft Eagle 3"),
         new("draft-dflash", "Draft DFlash"), new("draft-dflash2", "Draft DFlash2"),
         new("draft-lilicorr", "Draft LiliCorr"), new("draft-dspark", "Draft DSpark"),
@@ -174,7 +175,7 @@ public sealed class BenchmarkSpeculativeConfigurationPicker : StackPanel
         new("ngram-cache", "N-gram cache")
     ];
 
-    private static readonly Choice[] HeadChoices = [new("profile", "Profile head"), new("auto", "Automatic")];
+    private static Choice[] HeadChoices => [new("profile", Loc.T("Benchmarks.Speculative.ProfileHead")), new("auto", Loc.T("Benchmarks.Automatic"))];
 
     private sealed record Choice(string Value, string Label)
     {

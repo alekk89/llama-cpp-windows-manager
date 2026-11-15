@@ -44,8 +44,8 @@ public partial class MainWindow
         if (_viewModel.Settings.CacheRow is { } cacheRow)
             RunBackground(
                 () => RefreshSettingsCacheSizeAsync(cacheRoot, cacheRow, pageVersion),
-                "Cache size refresh failed");
-        RunBackground(async () => page.StartupProfiles.Apply(await AppServices.StartupLaunchProfiles.GetSettingsSnapshotAsync()), "Startup profile settings refresh failed");
+                Loc.T("Status.Failure.CacheSizeRefresh"));
+        RunBackground(async () => page.StartupProfiles.Apply(await AppServices.StartupLaunchProfiles.GetSettingsSnapshotAsync()), Loc.T("Status.Failure.StartupProfileSettingsRefresh"));
     }
 
     private async Task RefreshSettingsCacheSizeAsync(

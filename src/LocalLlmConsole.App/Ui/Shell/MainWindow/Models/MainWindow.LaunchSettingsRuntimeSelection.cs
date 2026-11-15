@@ -76,7 +76,7 @@ public partial class MainWindow
         var cancellation = new CancellationTokenSource();
         _runtimeLaunchOptionDiscoveryCancellation = cancellation;
         var token = cancellation.Token;
-        RunBackground(() => RefreshRuntimeLaunchOptionsAsync(runtime, token), "Runtime launch-setting discovery failed");
+        RunBackground(() => RefreshRuntimeLaunchOptionsAsync(runtime, token), Loc.T("Status.Failure.RuntimeLaunchSettingDiscovery"));
     }
 
     private void CancelRuntimeLaunchOptionDiscovery()

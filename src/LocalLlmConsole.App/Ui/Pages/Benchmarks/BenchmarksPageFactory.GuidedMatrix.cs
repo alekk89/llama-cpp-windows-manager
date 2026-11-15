@@ -35,68 +35,68 @@ public static partial class BenchmarksPageFactory
 
     private static GuidedBenchmarkMatrix CreateGuidedBenchmarkMatrix()
     {
-        var contextSizes = Picker("context length", BenchmarkValuePicker.PositiveInteger, "4096", "8192", "16384", "32768", "65536", "131072", "262144");
-        var batches = Picker("batch size", BenchmarkValuePicker.PositiveInteger, "256", "512", "1024", "2048", "4096", "8192", "16384", "32768");
-        var microBatches = Picker("micro-batch size", BenchmarkValuePicker.PositiveInteger, "128", "256", "512", "1024", "2048", "4096", "8192");
+        var contextSizes = Picker(Loc.T("Benchmarks.Dimension.ContextLength"), BenchmarkValuePicker.PositiveInteger, "4096", "8192", "16384", "32768", "65536", "131072", "262144");
+        var batches = Picker(Loc.T("Benchmarks.Dimension.BatchSize"), BenchmarkValuePicker.PositiveInteger, "256", "512", "1024", "2048", "4096", "8192", "16384", "32768");
+        var microBatches = Picker(Loc.T("Benchmarks.Dimension.MicroBatchSize"), BenchmarkValuePicker.PositiveInteger, "128", "256", "512", "1024", "2048", "4096", "8192");
         var logicalProcessors = Environment.ProcessorCount.ToString(CultureInfo.InvariantCulture);
         var halfProcessors = Math.Max(Environment.ProcessorCount / 2, 1).ToString(CultureInfo.InvariantCulture);
-        var threads = Picker("thread count", BenchmarkValuePicker.PositiveInteger, halfProcessors, logicalProcessors);
-        var gpuLayers = Picker("GPU-layer", BenchmarkValuePicker.GpuLayerCount, "-1", "0");
-        var flashAttention = Picker("Flash Attention", BenchmarkValuePicker.OneOf("auto", "on", "off"), "auto", "on", "off");
-        var cacheKv = Picker("K/V cache type", null, [.. RuntimeDefinedChoicePolicy.CacheTypes]);
-        var kvOffload = Picker("KV offload", BenchmarkValuePicker.OneOf("on", "off"), "on", "off");
+        var threads = Picker(Loc.T("Benchmarks.Dimension.ThreadCount"), BenchmarkValuePicker.PositiveInteger, halfProcessors, logicalProcessors);
+        var gpuLayers = Picker(Loc.T("Benchmarks.Dimension.GpuLayer"), BenchmarkValuePicker.GpuLayerCount, "-1", "0");
+        var flashAttention = Picker(Loc.T("Benchmarks.Dimension.FlashAttention"), BenchmarkValuePicker.OneOf("auto", "on", "off"), "auto", "on", "off");
+        var cacheKv = Picker(Loc.T("Benchmarks.Dimension.CacheType"), null, [.. RuntimeDefinedChoicePolicy.CacheTypes]);
+        var kvOffload = Picker(Loc.T("Benchmarks.Dimension.KvOffload"), BenchmarkValuePicker.OneOf("on", "off"), "on", "off");
         var gpuConfigurations = new BenchmarkGpuConfigurationPicker();
         var speculativeConfigurations = new BenchmarkSpeculativeConfigurationPicker();
-        var compareContexts = Check("Compare custom context lengths");
-        var compareBatches = Check("Compare custom batch sizes");
-        var compareMicroBatches = Check("Compare micro-batch sizes");
-        var compareThreads = Check("Compare thread counts");
-        var compareGpuLayers = Check("Compare GPU offload");
-        var compareFlashAttention = Check("Compare Flash Attention");
-        var compareCacheKv = Check("Compare K/V cache types");
-        var compareKvOffload = Check("Compare KV offload");
-        var compareGpuConfigurations = Check("Compare multi-GPU configurations");
-        var compareSpeculativeConfigurations = Check("Compare speculative configurations");
-        var summary = Muted("1 launch configuration per profile · all launch settings inherited.");
+        var compareContexts = Check(Loc.T("Benchmarks.Variables.CompareContextLengths"));
+        var compareBatches = Check(Loc.T("Benchmarks.Variables.CompareBatchSizes"));
+        var compareMicroBatches = Check(Loc.T("Benchmarks.Variables.CompareMicroBatchSizes"));
+        var compareThreads = Check(Loc.T("Benchmarks.Variables.CompareThreadCounts"));
+        var compareGpuLayers = Check(Loc.T("Benchmarks.Variables.CompareGpuOffload"));
+        var compareFlashAttention = Check(Loc.T("Benchmarks.Variables.CompareFlashAttention"));
+        var compareCacheKv = Check(Loc.T("Benchmarks.Variables.CompareCacheTypes"));
+        var compareKvOffload = Check(Loc.T("Benchmarks.Variables.CompareKvOffload"));
+        var compareGpuConfigurations = Check(Loc.T("Benchmarks.Variables.CompareMultiGpu"));
+        var compareSpeculativeConfigurations = Check(Loc.T("Benchmarks.Variables.CompareSpeculative"));
+        var summary = Muted(Loc.T("Benchmarks.Variables.AllInherited"));
         summary.TextWrapping = TextWrapping.Wrap;
         var variables = GuidedVariablesGrid();
-        AddGuidedVariable(variables, 0, "Context length", "When empty, uses each profile's saved context.",
-            compareContexts, contextSizes, "Enter one or more values separated by commas, for example 8192, 16384.");
-        AddGuidedVariable(variables, 1, "Batch size", "When empty, uses each profile's saved batch size.",
-            compareBatches, batches, "Enter one or more values separated by commas, for example 1024, 2048.");
-        AddGuidedVariable(variables, 2, "Micro-batch size", "When empty, uses the saved micro-batch.",
-            compareMicroBatches, microBatches, "Suggested values: 128, 256, 512, 1024. Every micro-batch must be no larger than its tested batch size.");
-        AddGuidedVariable(variables, 3, "Flash Attention", "When empty, uses the saved Auto/On/Off choice.",
-            compareFlashAttention, flashAttention, "Enter auto, on, off, or a comma-separated combination.");
-        AddGuidedVariable(variables, 4, "K/V cache type", "When empty, uses the profile's saved K and V formats.",
-            compareCacheKv, cacheKv, "Each value is applied to K and V together, producing matched pairs such as q8_0/q8_0 rather than a cross-product. Availability depends on the runtime.");
-        AddGuidedVariable(variables, 5, "GPU offload layers", "When empty, uses the saved GPU-layer count.",
-            compareGpuLayers, gpuLayers, "Use 0 for CPU-only, -1 for all layers, or one or more explicit layer counts.");
-        AddGuidedVariable(variables, 6, "Threads", "When empty, uses the saved thread count.",
-            compareThreads, threads, "Most useful for CPU and hybrid profiles. Enter positive thread counts separated by commas.");
-        AddGuidedVariable(variables, 7, "KV offload", "When empty, uses the saved KV placement.",
-            compareKvOffload, kvOffload, "Enter on, off, or both.");
-        AddGuidedVariable(variables, 8, "Multi-GPU configuration", "When empty, uses the profile's saved GPU mode and split together.",
-            compareGpuConfigurations, gpuConfigurations, "Choose a mode and either Automatic or an explicit distribution. Single GPU never accepts a split. Each added mode/distribution pair is one benchmark configuration.");
-        AddGuidedVariable(variables, 9, "Speculative decoding", "When empty, uses the profile's saved speculative type and companion/head together.",
-            compareSpeculativeConfigurations, speculativeConfigurations, "Choose the speculative type and its head source, then click +. Profile head reuses the saved compatible companion; Automatic resolves a compatible companion beside the model or embedded draft-MTP tensors. Each added type/head pair is one configuration.");
+        AddGuidedVariable(variables, 0, Loc.T("Benchmarks.Variable.ContextLength"), Loc.T("Benchmarks.Variable.ContextLength.Inherited"),
+            compareContexts, contextSizes, Loc.T("Benchmarks.Variable.ContextLength.Help"));
+        AddGuidedVariable(variables, 1, Loc.T("Benchmarks.Variable.BatchSize"), Loc.T("Benchmarks.Variable.BatchSize.Inherited"),
+            compareBatches, batches, Loc.T("Benchmarks.Variable.BatchSize.Help"));
+        AddGuidedVariable(variables, 2, Loc.T("Benchmarks.Variable.MicroBatchSize"), Loc.T("Benchmarks.Variable.MicroBatchSize.Inherited"),
+            compareMicroBatches, microBatches, Loc.T("Benchmarks.Variable.MicroBatchSize.Help"));
+        AddGuidedVariable(variables, 3, Loc.T("Benchmarks.Variable.FlashAttention"), Loc.T("Benchmarks.Variable.FlashAttention.Inherited"),
+            compareFlashAttention, flashAttention, Loc.T("Benchmarks.Variable.FlashAttention.Help"));
+        AddGuidedVariable(variables, 4, Loc.T("Benchmarks.Variable.CacheType"), Loc.T("Benchmarks.Variable.CacheType.Inherited"),
+            compareCacheKv, cacheKv, Loc.T("Benchmarks.Variable.CacheType.Help"));
+        AddGuidedVariable(variables, 5, Loc.T("Benchmarks.Variable.GpuLayers"), Loc.T("Benchmarks.Variable.GpuLayers.Inherited"),
+            compareGpuLayers, gpuLayers, Loc.T("Benchmarks.Variable.GpuLayers.Help"));
+        AddGuidedVariable(variables, 6, Loc.T("Benchmarks.Variable.Threads"), Loc.T("Benchmarks.Variable.Threads.Inherited"),
+            compareThreads, threads, Loc.T("Benchmarks.Variable.Threads.Help"));
+        AddGuidedVariable(variables, 7, Loc.T("Benchmarks.Variable.KvOffload"), Loc.T("Benchmarks.Variable.KvOffload.Inherited"),
+            compareKvOffload, kvOffload, Loc.T("Benchmarks.Variable.KvOffload.Help"));
+        AddGuidedVariable(variables, 8, Loc.T("Benchmarks.Variable.MultiGpu"), Loc.T("Benchmarks.Variable.MultiGpu.Inherited"),
+            compareGpuConfigurations, gpuConfigurations, Loc.T("Benchmarks.Variable.MultiGpu.Help"));
+        AddGuidedVariable(variables, 9, Loc.T("Benchmarks.Variable.Speculative"), Loc.T("Benchmarks.Variable.Speculative.Inherited"),
+            compareSpeculativeConfigurations, speculativeConfigurations, Loc.T("Benchmarks.Variable.Speculative.Help"));
 
         var selectedValues = new WrapPanel
         {
             Margin = new Thickness(0, 2, 0, 0),
             Visibility = Visibility.Collapsed
         };
-        AutomationProperties.SetName(selectedValues, "Selected launch setting values");
+        AutomationProperties.SetName(selectedValues, Loc.T("Benchmarks.Variables.SelectedValues"));
         var pickerLabels = new (string Label, BenchmarkValuePicker Picker)[]
         {
-            ("Context length", contextSizes),
-            ("Batch size", batches),
-            ("Micro-batch size", microBatches),
-            ("Flash Attention", flashAttention),
-            ("K/V cache type", cacheKv),
-            ("GPU offload layers", gpuLayers),
-            ("Threads", threads),
-            ("KV offload", kvOffload)
+            (Loc.T("Benchmarks.Variable.ContextLength"), contextSizes),
+            (Loc.T("Benchmarks.Variable.BatchSize"), batches),
+            (Loc.T("Benchmarks.Variable.MicroBatchSize"), microBatches),
+            (Loc.T("Benchmarks.Variable.FlashAttention"), flashAttention),
+            (Loc.T("Benchmarks.Variable.CacheType"), cacheKv),
+            (Loc.T("Benchmarks.Variable.GpuLayers"), gpuLayers),
+            (Loc.T("Benchmarks.Variable.Threads"), threads),
+            (Loc.T("Benchmarks.Variable.KvOffload"), kvOffload)
         };
         void UpdateSelectedValuesVisibility()
             => selectedValues.Visibility = pickerLabels.Any(item => item.Picker.Values.Count > 0)
@@ -115,7 +115,7 @@ public static partial class BenchmarksPageFactory
         speculativeConfigurations.Changed += (_, _) => UpdateSelectedValuesVisibility();
 
         var panel = new StackPanel { Margin = new Thickness(10, 7, 10, 10) };
-        var description = Muted("Select one or more values to override a setting for this benchmark. Leave a row empty to inherit each profile's saved value. Multiple populated rows are combined automatically. Multi-GPU mode/distribution and speculative type/head are each added as exact pairs.");
+        var description = Muted(Loc.T("Benchmarks.Variables.Description"));
         description.TextWrapping = TextWrapping.Wrap;
         panel.Children.Add(description);
         panel.Children.Add(summary);
