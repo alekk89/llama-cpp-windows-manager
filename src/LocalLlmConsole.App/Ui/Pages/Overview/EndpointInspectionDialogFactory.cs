@@ -231,7 +231,7 @@ public static partial class EndpointInspectionDialogFactory
                 ElementStyle = textStyle
             });
         grid.RowHeight = double.NaN;
-        grid.ColumnHeaderHeight = 36;
+        grid.ColumnHeaderHeight = double.NaN; // the shared header style keeps a 36px minimum and grows with text
         grid.ItemsSource = new ObservableCollection<T>(rows);
         grid.IsReadOnly = true;
         grid.CanUserAddRows = false;

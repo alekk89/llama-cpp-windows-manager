@@ -25,6 +25,10 @@ public sealed class WpfEndpointReportTests : WpfUiTestBase
             try
             {
                 var content = Layout(dialog, width);
+                // Headers keep the shared 36px minimum but grow with large text scales.
+                var grids = VisualDescendants<DataGrid>(content).ToArray();
+                Assert.NotEmpty(grids);
+                Assert.All(grids, grid => Assert.True(double.IsNaN(grid.ColumnHeaderHeight)));
                 Assert.Contains(VisualDescendants<TextBlock>(content), text => text.Text == "32,768 tokens");
                 var id = Assert.Single(VisualDescendants<TextBox>(content), text =>
                     AutomationProperties.GetAutomationId(text) == "EndpointModelIdText");
