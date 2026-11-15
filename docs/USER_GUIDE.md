@@ -111,6 +111,12 @@ use 0-100%. Other charts start at zero with a stable maximum that rises at
 once and falls only after a large drop; choose **Chart > Fit scale to visible
 range** in a card's actions to zoom into small changes instead.
 
+The optional **Loaded models** card, added through **Add card**, lists every
+running session with its status, average generation rate, busy and total slots,
+KV cache usage, and port. It reuses the regular telemetry poll, shows N/A for
+values a session has not reported, and always occupies its own card. Select a
+row, or focus it and press Enter, to show that session in the other cards.
+
 Keyboard controls:
 
 - **Shift+F10** or the Menu key opens actions for a focused card.

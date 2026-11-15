@@ -151,6 +151,22 @@ public sealed class ProgressiveTelemetryTests : ManagerRegressionTestBase
         }
     }
 
+    [Fact]
+    public async Task LoadedModelsReuseTheSharedPollForEverySessionOnce()
+    {
+        using var handler = new HeldEndpointHandler(_ => false);
+        using var http = new HttpClient(handler);
+        var probe = CreateProbe(http);
+        probe.ReleaseGpu.SetResult();
+
+        await probe.RefreshAsync();
+
+        var rows = Assert.Single(probe.LoadedRows);
+        Assert.Equal([8081, 8082], rows.Select(row => row.Port).Order());
+        Assert.All(rows, row => Assert.Equal(0, row.ActiveSlots));
+        Assert.Equal(["health:2", "lifetime:2", "idle:2"], probe.Batches);
+    }
+
     private DashboardProbe CreateProbe(HttpClient http)
     {
         var root = CreateTempRoot();
@@ -172,6 +188,7 @@ public sealed class ProgressiveTelemetryTests : ManagerRegressionTestBase
         public TaskCompletionSource ReleaseGpu { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool UnloadDuringPolicy { get; set; }
         public int FinalUpdates { get; private set; }
+        public List<IReadOnlyList<LoadedSessionDashboardRow>> LoadedRows { get; } = [];
         private readonly RuntimeDashboardRefreshApplicationService _service;
 
         public DashboardProbe(HttpClient http, AppSettings settings, LoadedModelSessionSnapshot[] sessions)
@@ -206,7 +223,9 @@ public sealed class ProgressiveTelemetryTests : ManagerRegressionTestBase
                     new RuntimeDashboardMetricsApplicationActions(
                         _ => Task.FromResult<RuntimeMtpTokenSnapshot?>(null), _ => { },
                         summary => { Summaries.Add(summary); Rendered.TrySetResult(); }),
-                    () => FinalUpdates++), TestContext.Current.CancellationToken);
+                    () => FinalUpdates++,
+                    (sessions, results) => LoadedRows.Add(LoadedSessionDashboardProjection.Project(sessions, results))),
+                TestContext.Current.CancellationToken);
 
         private Task Batch(string name, IReadOnlyList<RuntimeMetricPollResult> results)
         {

@@ -68,7 +68,7 @@ public sealed partial class OverviewDashboardController
             menu.Items.Clear();
             var current = _layout.Cards.FirstOrDefault(item =>
                 string.Equals(item.Id, card.Id, StringComparison.OrdinalIgnoreCase)) ?? card;
-            menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.AddMetrics"), () => AddMetricsAsync(current)));
+            menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.AddMetrics"), () => AddMetricsAsync(current), !OverviewDashboardLayoutPolicy.IsLoadedModelsCard(current)));
             menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.CardTitle"), () => EditCardTitleAsync(current)));
             var removeMetric = Submenu(Loc.T("Dashboard.RemoveMetric"));
             foreach (var metricId in current.MetricIds)
@@ -191,7 +191,7 @@ public sealed partial class OverviewDashboardController
         var usedMetricIds = _layout.Cards.SelectMany(item => item.MetricIds).ToArray();
         var selected = OverviewDashboardMetricPicker.Show(
             Loc.T("Dashboard.AddMetricsTitle"),
-            AvailableDefinitions(usedMetricIds),
+            AvailableDefinitions(usedMetricIds).Where(item => item.Id != OverviewDashboardMetricIds.LoadedModels).ToArray(),
             usedMetricIds);
         if (selected.Count > 0)
             await MutateAsync(layout => OverviewDashboardLayoutPolicy.AddMetrics(layout, card.Id, selected));

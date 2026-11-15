@@ -30,6 +30,11 @@ public sealed class RuntimeDashboardPageState
     public void ApplyMetricSummary(RuntimeMetricSummaryPresentation summary)
         => DashboardController?.ApplyMetricSummary(summary);
 
+    public void ApplyLoadedSessions(
+        IReadOnlyList<LoadedModelSessionSnapshot> sessions,
+        IReadOnlyList<RuntimeMetricPollResult> pollResults)
+        => DashboardController?.ApplyLoadedSessions(LoadedSessionDashboardProjection.Project(sessions, pollResults));
+
     public void ApplyHardwareSummary(string summary)
         => DashboardController?.ApplyHardwareSummary(summary);
 

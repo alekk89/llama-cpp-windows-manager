@@ -3,6 +3,7 @@ namespace LocalLlmConsole.Models;
 public static class OverviewDashboardMetricIds
 {
     public const string ModelStatus = "overview.model-status";
+    public const string LoadedModels = "overview.sessions.loaded-models";
     public const string Cpu = "overview.hardware.cpu";
     public const string CpuTemperature = "overview.hardware.cpu.temperature";
     public const string CpuCoreClock = "overview.hardware.cpu.core-clock";
