@@ -172,7 +172,7 @@ public sealed class WpfIsolatedSurfaceTests : WpfUiTestBase
             Assert.Contains(groupGrid.Children.OfType<Label>(), label => ReferenceEquals(label.Target, groupName));
             Assert.Contains(groupGrid.Children.OfType<Label>(), label => ReferenceEquals(label.Target, groupPolicy));
 
-            AssertNamedCloseButton(typeof(LocalLlmConsole.OverviewDashboardCardTitleDialog), "Header", [new Window()]);
+            AssertNamedCloseButton(typeof(LocalLlmConsole.OverviewDashboardCardTitleDialog), "Header", [new Window(), "Card title"]);
             AssertNamedCloseButton(typeof(LocalLlmConsole.OverviewDashboardMetricPicker), "DialogHeader", [new Window(), "Metrics"]);
         });
 

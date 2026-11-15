@@ -67,11 +67,11 @@ internal static class OverviewDashboardCardTitleDialog
         return window.ShowDialog() == true ? result ?? "" : null;
     }
 
-    private static Window DialogWindow()
+    internal static Window DialogWindow(string? title = null)
     {
         var window = new Window
         {
-            Title = Loc.T("Dashboard.CardTitleDialogTitle"),
+            Title = title ?? Loc.T("Dashboard.CardTitleDialogTitle"),
             Width = 460,
             SizeToContent = SizeToContent.Height,
             MinWidth = 380,
@@ -92,14 +92,14 @@ internal static class OverviewDashboardCardTitleDialog
         return window;
     }
 
-    private static Grid Header(Window window)
+    internal static Grid Header(Window window, string? title = null)
     {
         var header = new Grid { Cursor = System.Windows.Input.Cursors.SizeAll };
         header.ColumnDefinitions.Add(new ColumnDefinition());
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(new TextBlock
         {
-            Text = Loc.T("Dashboard.CardTitleDialogTitle"),
+            Text = title ?? Loc.T("Dashboard.CardTitleDialogTitle"),
             FontSize = 16,
             FontWeight = FontWeights.SemiBold,
             Foreground = ResourceBrush("TextMain"),
@@ -120,7 +120,7 @@ internal static class OverviewDashboardCardTitleDialog
         return header;
     }
 
-    private static Border Frame(Grid content)
+    internal static Border Frame(Grid content)
         => new()
         {
             Background = ResourceBrush("PanelBack"),

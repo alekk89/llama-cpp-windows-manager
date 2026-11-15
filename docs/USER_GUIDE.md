@@ -153,6 +153,26 @@ cards dimmed, and the card shows when they were last updated, for example
 "Last updated 2m ago". The age keeps advancing until fresh data arrives, which
 restores the normal look.
 
+Some metrics have warning and critical states. A value past a threshold uses
+the theme's warning or critical color plus a warning or error icon, and screen
+readers announce the state, for example "Warning: above 85%". Defaults:
+
+| Metric | Warning | Critical |
+| --- | --- | --- |
+| KV cache usage | above 85% | above 95% |
+| Queued requests | above 0 | — |
+| Gateway failure rate | above 1% | above 5% |
+| CPU and GPU temperature | above 85 °C | above 95 °C |
+| GPU VRAM used (share of total) | above 90% | above 97% |
+| Context shifts | for 5 minutes after the count increases | — |
+| Draft acceptance (only while drafting) | below 40% | — |
+
+A state clears only after the value moves back about 3% past the level, so
+readings near a threshold do not flicker. To change or turn off a metric's
+thresholds, open a card's menu and choose **Thresholds**. Thresholds apply to
+the metric on every card and are saved with the dashboard layout; **Reset**
+restores the defaults.
+
 ### Models
 
 Models owns GGUF inventory and launch profiles. Use it to:
