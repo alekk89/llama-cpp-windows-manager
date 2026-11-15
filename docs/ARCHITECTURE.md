@@ -439,19 +439,22 @@ termination. The active queue alone may hold a Windows system-awake request.
   Cards remain headerless by default but may render one optional user title;
   each row still labels itself and owns its optional charts so chart identity
   does not depend on card position. The card context menu manages metric
-  membership, charts, and card removal. Windows-style geometric hit-testing maps
-  the visible outer border to four side and four corner resize directions without
-  adding overlay controls; the border supplies hover feedback and the interior
-  remains the move surface. Focusable cards expose the same actions through
-  Shift+F10/Menu, Ctrl+Arrow movement, Ctrl+Shift+Arrow resizing, and
-  Alt+Up/Down metric reordering. The
-  layout engine resolves placement after WPF measures each card's real text and
-  chart minimum, snaps nearby cards, and prevents overlap while preserving a
-  minimum visual gap. Vertically resized edges align with the corresponding edge
-  of an already adjacent card when they enter the snap threshold. Drag and resize interactions begin from those rendered
-  outer bounds rather than stale persisted coordinates, then atomically persist
-  every resolved card position so collision correction cannot leave overlapping
-  coordinates behind. Dashboard-specific
+  membership, charts, and card removal. Cards flow through a 12-column grid in
+  their saved list order (layout version 13; older layouts are read top to
+  bottom, then left to right, to keep their arrangement). The flow engine
+  places each card at the highest free slot that fits its span, treating slots
+  within a small tolerance as one row and taking the leftmost, widens spans
+  whose width would fall below the card's content minimum, gives the
+  neighbouring card any trailing sliver too narrow for a card, and sizes card
+  height from WPF's measurement of its rows and charts. Dragging a card
+  evaluates every insertion point, chooses the one whose slot lies nearest the
+  held card, and animates the other cards around a placeholder; the side
+  borders resize the span in whole columns. Focusable cards expose the same
+  actions through Shift+F10/Menu, Ctrl+Arrow reordering, Ctrl+Shift+Left/Right
+  span changes, and Alt+Up/Down metric reordering. Each change persists the
+  new order and span together with the resolved positions, so earlier
+  versions that place cards by position still read a non-overlapping layout.
+  Dashboard-specific Dashboard-specific
   telemetry styling remains entirely
   theme-keyed: raised surfaces, hairline row separators, tabular measurement
   typography, and framed microplot grids reuse the shell palette in both themes.

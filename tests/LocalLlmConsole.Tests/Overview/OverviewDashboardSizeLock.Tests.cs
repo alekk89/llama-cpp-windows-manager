@@ -60,38 +60,6 @@ public sealed class OverviewDashboardSizeLockTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public void OverviewDashboardLockedCardWidthsStayFixedAndWrapBeforeShrinking()
-    {
-        var cards = new[]
-        {
-            new OverviewDashboardCardLayout(
-                "first",
-                [OverviewDashboardMetricIds.Cpu],
-                Bounds: new OverviewDashboardCardBounds(0, 0, 4, 112)),
-            new OverviewDashboardCardLayout(
-                "second",
-                [OverviewDashboardMetricIds.Ram],
-                Bounds: new OverviewDashboardCardBounds(4, 0, 4, 112))
-        };
-
-        var atCaptureWidth = OverviewDashboardLayoutEngine.Place(cards, 900, 900);
-        var atLargerWidth = OverviewDashboardLayoutEngine.Place(cards, 1200, 900);
-        Assert.Equal(atCaptureWidth.Select(item => item.Width), atLargerWidth.Select(item => item.Width));
-        Assert.NotEqual(atCaptureWidth[1].Left, atLargerWidth[1].Left);
-
-        var desired = OverviewDashboardLayoutEngine.Place(cards, 550, 900);
-        var minimums = desired.ToDictionary(
-            placement => placement.CardId,
-            placement => new OverviewDashboardMinimumSize(placement.Width, placement.Height),
-            StringComparer.OrdinalIgnoreCase);
-        var resolved = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(desired, minimums, 550);
-
-        Assert.Equal(desired.Select(item => item.Width), resolved.Select(item => item.Width));
-        Assert.Equal(0, resolved[0].Top);
-        Assert.True(resolved[1].Top >= resolved[0].Height + OverviewDashboardLayoutPolicy.CardGap);
-    }
-
-    [Fact]
     public async Task StateStorePersistsDashboardSizeLockReference()
     {
         var root = CreateTempRoot();

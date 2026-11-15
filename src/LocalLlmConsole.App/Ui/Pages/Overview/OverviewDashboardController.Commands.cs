@@ -34,12 +34,9 @@ public sealed partial class OverviewDashboardController
     {
         var surfaceWidth = _dashboard.ActualWidth;
         if (!double.IsFinite(surfaceWidth) || surfaceWidth < 1) return;
-        var renderedBounds = _cardViews.Values
-            .Where(view => view.Root.Visibility == Visibility.Visible)
-            .ToDictionary(
-                view => view.Layout.Id,
-                view => RenderedBounds(view, surfaceWidth),
-                StringComparer.OrdinalIgnoreCase);
+        var renderedBounds = RenderedCardBounds(
+            surfaceWidth,
+            _layout.CardSizesLocked ? _layout.LockedSurfaceWidth : null);
         await MutateAsync(layout => OverviewDashboardLayoutPolicy.SetCardSizesLocked(
             layout,
             !layout.CardSizesLocked,
@@ -227,6 +224,7 @@ public sealed partial class OverviewDashboardController
             {
                 var next = OverviewDashboardLayoutPolicy.Normalize(mutation(_layout));
                 _layout = next;
+                _animateFrom = CurrentVisualPositions();
                 RebuildDashboard();
                 try
                 {

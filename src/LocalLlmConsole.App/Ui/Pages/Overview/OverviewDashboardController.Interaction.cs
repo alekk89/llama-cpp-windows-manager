@@ -1,13 +1,34 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shapes;
 using WpfButton = System.Windows.Controls.Button;
 using WpfPanel = System.Windows.Controls.Panel;
 
 namespace LocalLlmConsole;
 
+/// <summary>
+/// Pointer and placement handling for the flow dashboard. Cards keep a saved
+/// order and column span; dragging a card picks the slot nearest the pointer
+/// while the other cards reflow around a placeholder, and resizing snaps the
+/// card's width to grid columns.
+/// </summary>
 public sealed partial class OverviewDashboardController
 {
+    private const double DragStartDistance = 4;
+    private static readonly Duration MoveAnimationDuration = new(TimeSpan.FromMilliseconds(170));
+    private readonly Dictionary<string, OverviewDashboardPlacement> _placements = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, System.Windows.Point>? _animateFrom;
+    private System.Windows.Shapes.Rectangle? _dropPlaceholder;
+    private Vector _dragPointerOffset;
+    private bool _dragMoved;
+    private int _dragTargetIndex = -1;
+    private double _resizeStartWidth;
+    private int _resizeStartSpan;
+    private int _resizeSpan;
+
     private void BeginPointerInteraction(OverviewDashboardCardView view, MouseButtonEventArgs args)
     {
         if (args.ChangedButton != MouseButton.Left) return;
@@ -53,94 +74,247 @@ public sealed partial class OverviewDashboardController
 
     private void ApplyPlacement(double availableWidth)
     {
-        var visibleCards = _layout.Cards.Where(card =>
-            _cardViews[card.Id].Root.Visibility == Visibility.Visible).ToArray();
-        var desiredPlacements = OverviewDashboardLayoutEngine.Place(
-            visibleCards,
+        var placements = FlowPlacements(VisibleCards(), availableWidth);
+        var animateFrom = _animateFrom;
+        _animateFrom = null;
+        ApplyPlacements(placements, availableWidth, animate: animateFrom is not null, animateFrom);
+        _lastPlacementWidth = availableWidth;
+        _placementDirty = false;
+    }
+
+    private IReadOnlyList<OverviewDashboardCardLayout> VisibleCards()
+        => _layout.Cards.Where(card => _cardViews.TryGetValue(card.Id, out var view)
+                                       && view.Root.Visibility == Visibility.Visible).ToArray();
+
+    private IReadOnlyList<OverviewDashboardPlacement> FlowPlacements(
+        IEnumerable<OverviewDashboardCardLayout> cards,
+        double availableWidth,
+        string? spanCardId = null,
+        int span = 0)
+    {
+        var items = cards.Select(card =>
+        {
+            var view = _cardViews[card.Id];
+            return new OverviewDashboardFlowItem(
+                card.Id,
+                string.Equals(card.Id, spanCardId, StringComparison.OrdinalIgnoreCase)
+                    ? span
+                    : OverviewDashboardLayoutPolicy.CardSpan(card),
+                view.MinimumWidth,
+                view.HeightAt);
+        }).ToArray();
+        return OverviewDashboardLayoutEngine.Flow(
+            items,
             availableWidth,
             _layout.CardSizesLocked ? _layout.LockedSurfaceWidth : null);
-        var minimumSizes = new Dictionary<string, OverviewDashboardMinimumSize>(StringComparer.OrdinalIgnoreCase);
-        foreach (var placement in desiredPlacements)
-        {
-            var view = _cardViews[placement.CardId];
-            view.UpdateMinimumSize(placement.Width);
-            minimumSizes[placement.CardId] = new OverviewDashboardMinimumSize(
-                _layout.CardSizesLocked ? Math.Max(view.MinimumWidth, placement.Width) : view.MinimumWidth,
-                _layout.CardSizesLocked ? Math.Max(view.MinimumHeight, placement.Height) : view.MinimumHeight);
-        }
-        var placements = OverviewDashboardLayoutEngine.ResolveVisiblePlacements(
-            desiredPlacements,
-            minimumSizes,
-            availableWidth);
-        var surfaceHeight = 0d;
+    }
+
+    private void ApplyPlacements(
+        IReadOnlyList<OverviewDashboardPlacement> placements,
+        double availableWidth,
+        bool animate,
+        IReadOnlyDictionary<string, System.Windows.Point>? animateFrom = null,
+        string? floatingCardId = null)
+    {
+        _placements.Clear();
+        var surfaceHeight = OverviewDashboardLayoutEngine.SurfaceHeight(placements);
         for (var index = 0; index < placements.Count; index++)
         {
             var placement = placements[index];
+            _placements[placement.CardId] = placement;
+            if (string.Equals(placement.CardId, floatingCardId, StringComparison.OrdinalIgnoreCase)) continue;
             var view = _cardViews[placement.CardId];
-            var actualHeight = ApplyCardPlacement(view, placement, availableWidth);
-            surfaceHeight = Math.Max(surfaceHeight,
-                Canvas.GetTop(view.Root) + actualHeight + OverviewDashboardLayoutPolicy.CardGap);
+            var previous = animateFrom is not null && animateFrom.TryGetValue(placement.CardId, out var from)
+                ? from
+                : CurrentVisualPosition(view.Root);
+            ApplyCardPlacement(view, placement, availableWidth);
+            if (animate)
+                AnimateFrom(view.Root, previous.X - placement.Left, previous.Y - placement.Top);
             WpfPanel.SetZIndex(view.Root, index);
         }
+        if (_dragView is not null && _dragMoved)
+            surfaceHeight = Math.Max(surfaceHeight,
+                Canvas.GetTop(_dragView.Root) + _dragView.Root.Height + OverviewDashboardLayoutPolicy.CardGap);
         if (!SameLength(_surface.Height, surfaceHeight))
             _surface.Height = surfaceHeight;
         if (!SameLength(_dashboard.Height, surfaceHeight))
             _dashboard.Height = surfaceHeight;
-        _lastPlacementWidth = availableWidth;
-        _placementDirty = false;
     }
 
     private void BeginDrag(OverviewDashboardCardView view, MouseButtonEventArgs args)
     {
         if (args.ChangedButton != MouseButton.Left) return;
-        _dragView = view;
-        _dragOrigin = args.GetPosition(_surface);
-        _dragStartBounds = RenderedBounds(view, _dashboard.ActualWidth);
-        _interactionBounds = _dragStartBounds;
-        view.Root.Opacity = .82;
-        view.SetInteractionPreview(true);
-        WpfPanel.SetZIndex(view.Root, 1000);
+        BeginDragAt(view, args.GetPosition(_surface));
         view.DragSurface.CaptureMouse();
         args.Handled = true;
     }
 
+    internal void BeginDragAt(OverviewDashboardCardView view, System.Windows.Point pointer)
+    {
+        _dragView = view;
+        _dragOrigin = pointer;
+        _dragPointerOffset = pointer - new System.Windows.Point(Canvas.GetLeft(view.Root), Canvas.GetTop(view.Root));
+        _dragMoved = false;
+        _dragTargetIndex = VisibleCards().ToList().FindIndex(card =>
+            string.Equals(card.Id, view.Layout.Id, StringComparison.OrdinalIgnoreCase));
+    }
+
     private void TrackDrag(System.Windows.Input.MouseEventArgs args)
     {
-        if (_dragView is null || _dragStartBounds is null || args.LeftButton != MouseButtonState.Pressed) return;
-        var current = args.GetPosition(_surface);
-        var delta = current - _dragOrigin;
-        var candidate = OverviewDashboardLayoutPolicy.ConstrainBounds(_dragStartBounds with
+        if (_dragView is null || args.LeftButton != MouseButtonState.Pressed) return;
+        if (DragTo(args.GetPosition(_surface)))
+            args.Handled = true;
+    }
+
+    /// <summary>
+    /// Moves the held card with the pointer and reflows the other cards around
+    /// the slot it would drop into. Returns false until the pointer has moved
+    /// far enough to count as a drag.
+    /// </summary>
+    internal bool DragTo(System.Windows.Point pointer)
+    {
+        if (_dragView is null) return false;
+        if (!_dragMoved)
         {
-            X = SnapHorizontal(_dragStartBounds.X
-                + OverviewDashboardLayoutEngine.ToHorizontalUnits(delta.X, _dashboard.ActualWidth)),
-            Y = SnapVertical(_dragStartBounds.Y + delta.Y)
-        });
-        candidate = VisibleBounds(_dragView, candidate, _dashboard.ActualWidth);
-        _interactionBounds = OverviewDashboardLayoutEngine.SnapMove(
-            candidate,
-            InteractionObstacles(_dragView.Layout.Id, _dashboard.ActualWidth),
-            _dashboard.ActualWidth);
-        ApplyCardBounds(_dragView, _interactionBounds, _dashboard.ActualWidth);
-        args.Handled = true;
+            if ((pointer - _dragOrigin).Length < DragStartDistance) return false;
+            _dragMoved = true;
+            StopAnimation(_dragView.Root);
+            _dragView.Root.Opacity = .85;
+            _dragView.SetInteractionPreview(true);
+            WpfPanel.SetZIndex(_dragView.Root, 1000);
+            ShowDropPlaceholder();
+        }
+
+        var width = _dashboard.ActualWidth;
+        var left = Math.Clamp(pointer.X - _dragPointerOffset.X, 0, Math.Max(0, width - _dragView.Root.Width));
+        var top = Math.Max(0, pointer.Y - _dragPointerOffset.Y);
+        Canvas.SetLeft(_dragView.Root, left);
+        Canvas.SetTop(_dragView.Root, top);
+
+        var target = NearestDropIndex(_dragView.Layout.Id, new System.Windows.Point(left, top), width,
+            out var placements);
+        if (target != _dragTargetIndex || _dropPlaceholder!.Visibility != Visibility.Visible)
+        {
+            _dragTargetIndex = target;
+            ApplyPlacements(placements, width, animate: true, floatingCardId: _dragView.Layout.Id);
+            MoveDropPlaceholder(_placements[_dragView.Layout.Id]);
+        }
+        return true;
+    }
+
+    internal System.Windows.Shapes.Rectangle? DropPlaceholder
+        => _dropPlaceholder is { Visibility: Visibility.Visible } ? _dropPlaceholder : null;
+
+    /// <summary>
+    /// Chooses the position in the card order whose resulting slot for the
+    /// dragged card lies nearest to where the card is being held.
+    /// </summary>
+    private int NearestDropIndex(
+        string cardId,
+        System.Windows.Point held,
+        double availableWidth,
+        out IReadOnlyList<OverviewDashboardPlacement> placements)
+    {
+        var visible = VisibleCards();
+        var dragged = visible.First(card => string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase));
+        var others = visible.Where(card => !ReferenceEquals(card, dragged)).ToList();
+        var bestIndex = 0;
+        var bestDistance = double.PositiveInfinity;
+        placements = [];
+        for (var index = 0; index <= others.Count; index++)
+        {
+            var order = others.ToList();
+            order.Insert(index, dragged);
+            var candidate = FlowPlacements(order, availableWidth);
+            var slot = candidate.First(item => string.Equals(item.CardId, cardId, StringComparison.OrdinalIgnoreCase));
+            var distance = Math.Pow(slot.Left - held.X, 2) + Math.Pow(slot.Top - held.Y, 2);
+            if (distance >= bestDistance - .5) continue;
+            bestDistance = distance;
+            bestIndex = index;
+            placements = candidate;
+        }
+        return bestIndex;
     }
 
     private async Task EndDragAsync(OverviewDashboardCardView view, MouseButtonEventArgs args)
     {
         if (_dragView is null) return;
         view.DragSurface.ReleaseMouseCapture();
+        args.Handled = _dragMoved;
+        await CompleteDragAsync(view);
+    }
+
+    /// <summary>Drops the held card into the slot chosen while dragging.</summary>
+    internal async Task CompleteDragAsync(OverviewDashboardCardView view)
+    {
+        if (_dragView is null) return;
         view.Root.Opacity = 1;
         view.SetInteractionPreview(false);
         view.ResetPointer();
-        var bounds = _interactionBounds;
+        HideDropPlaceholder();
+        var moved = _dragMoved;
+        var target = _dragTargetIndex;
         _dragView = null;
-        _dragStartBounds = null;
-        _interactionBounds = null;
-        var persistedBounds = bounds is null ? null : PersistedBounds(bounds, _dashboard.ActualWidth);
-        if (persistedBounds is not null && persistedBounds != view.Layout.Bounds)
-            await MutateAsync(layout => OverviewDashboardLayoutPolicy.SetCardBounds(layout, view.Layout.Id, persistedBounds));
-        else
+        _dragMoved = false;
+        _dragTargetIndex = -1;
+        if (!moved)
+        {
             ApplyPlacement(_dashboard.ActualWidth);
-        args.Handled = true;
+            return;
+        }
+
+        var cardId = view.Layout.Id;
+        var visible = VisibleCards();
+        var currentIndex = visible.ToList().FindIndex(card =>
+            string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase));
+        if (target == currentIndex)
+        {
+            _animateFrom = CurrentVisualPositions();
+            ApplyPlacement(_dashboard.ActualWidth);
+            return;
+        }
+        await MoveCardAsync(cardId, target);
+    }
+
+    /// <summary>
+    /// Moves a card to <paramref name="visibleIndex"/> among the visible cards
+    /// and saves the new order.
+    /// </summary>
+    internal async Task MoveCardAsync(string cardId, int visibleIndex)
+    {
+        var layoutIndex = LayoutIndexForVisibleIndex(cardId, visibleIndex);
+        await MutateAsync(layout => WithFlowPositions(
+            OverviewDashboardLayoutPolicy.MoveCardToIndex(layout, cardId, layoutIndex)));
+    }
+
+    /// <summary>Sets a card's width in grid columns and saves it.</summary>
+    internal async Task SetCardSpanAsync(string cardId, int span)
+        => await MutateAsync(layout => WithFlowPositions(
+            OverviewDashboardLayoutPolicy.SetCardSpan(layout, cardId, span)));
+
+    /// <summary>
+    /// The position among visible cards where a card held with its top-left
+    /// corner at <paramref name="held"/> would be dropped.
+    /// </summary>
+    internal int DropIndexAt(string cardId, System.Windows.Point held)
+        => NearestDropIndex(cardId, held, _dashboard.ActualWidth, out _);
+
+    /// <summary>
+    /// Converts a position among visible cards to a position in the saved order,
+    /// which also holds cards that are hidden while they have nothing to show.
+    /// </summary>
+    private int LayoutIndexForVisibleIndex(string cardId, int visibleIndex)
+    {
+        var others = VisibleCards()
+            .Where(card => !string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var remaining = _layout.Cards
+            .Where(card => !string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (others.Length == 0) return remaining.Count;
+        if (visibleIndex < others.Length)
+            return remaining.FindIndex(card => string.Equals(card.Id, others[visibleIndex].Id, StringComparison.OrdinalIgnoreCase));
+        return remaining.FindIndex(card => string.Equals(card.Id, others[^1].Id, StringComparison.OrdinalIgnoreCase)) + 1;
     }
 
     private void BeginResize(
@@ -152,52 +326,29 @@ public sealed partial class OverviewDashboardController
         _resizeView = view;
         _resizeEdge = edge;
         _resizeOrigin = args.GetPosition(_surface);
-        _resizeStartBounds = RenderedBounds(view, _dashboard.ActualWidth);
-        _interactionBounds = _resizeStartBounds;
+        _resizeStartWidth = view.Root.Width;
+        _resizeStartSpan = OverviewDashboardLayoutPolicy.CardSpan(view.Layout);
+        _resizeSpan = _resizeStartSpan;
         view.SetInteractionPreview(true);
-        WpfPanel.SetZIndex(view.Root, 1000);
         view.Root.CaptureMouse();
         args.Handled = true;
     }
 
     private void TrackResize(System.Windows.Input.MouseEventArgs args)
     {
-        if (_resizeView is null || _resizeStartBounds is null || args.LeftButton != MouseButtonState.Pressed) return;
-        var current = args.GetPosition(_surface);
-        var delta = current - _resizeOrigin;
-        var horizontalDelta = OverviewDashboardLayoutEngine.ToHorizontalUnits(delta.X, _dashboard.ActualWidth);
-        var provisional = ResizeBounds(
-            _resizeStartBounds,
-            _resizeEdge,
-            horizontalDelta,
-            delta.Y,
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutPolicy.MinimumCardHeight);
-        var provisionalPlacement = OverviewDashboardLayoutEngine.Place(
-            [_resizeView.Layout with { Bounds = provisional }],
-            _dashboard.ActualWidth)[0];
-        _resizeView.UpdateMinimumSize(provisionalPlacement.Width);
-        var minimumWidthUnits = Math.Max(
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutEngine.ToHorizontalUnits(
-                _resizeView.MinimumWidth + OverviewDashboardLayoutPolicy.CardGap,
-                _dashboard.ActualWidth));
-        var resized = ResizeBounds(
-            _resizeStartBounds,
-            _resizeEdge,
-            horizontalDelta,
-            delta.Y,
-            minimumWidthUnits,
-            _resizeView.MinimumHeight);
-        _interactionBounds = OverviewDashboardLayoutEngine.SnapResize(
-            _resizeStartBounds,
-            resized,
-            _resizeEdge,
-            InteractionObstacles(_resizeView.Layout.Id, _dashboard.ActualWidth),
-            _dashboard.ActualWidth,
-            minimumWidthUnits,
-            _resizeView.MinimumHeight);
-        ApplyCardBounds(_resizeView, _interactionBounds, _dashboard.ActualWidth);
+        if (_resizeView is null || args.LeftButton != MouseButtonState.Pressed) return;
+        var delta = args.GetPosition(_surface).X - _resizeOrigin.X;
+        if (_resizeEdge.HasFlag(OverviewDashboardResizeEdge.Left)) delta = -delta;
+        var width = _dashboard.ActualWidth;
+        var pitch = OverviewDashboardLayoutEngine.ColumnPitch(width);
+        var span = Math.Max(
+            OverviewDashboardLayoutEngine.MinimumSpan(_resizeView.MinimumWidth, pitch),
+            OverviewDashboardLayoutEngine.SpanForWidth(_resizeStartWidth + delta, pitch));
+        if (span != _resizeSpan)
+        {
+            _resizeSpan = span;
+            ApplyPlacements(FlowPlacements(VisibleCards(), width, _resizeView.Layout.Id, span), width, animate: true);
+        }
         args.Handled = true;
     }
 
@@ -208,140 +359,141 @@ public sealed partial class OverviewDashboardController
         view.Root.ReleaseMouseCapture();
         view.SetInteractionPreview(false);
         view.ResetPointer();
-        var bounds = _interactionBounds;
+        var span = _resizeSpan;
         _resizeView = null;
-        _resizeStartBounds = null;
-        _interactionBounds = null;
-        if (bounds is not null && bounds != view.Layout.Bounds)
-            await MutateAsync(layout => OverviewDashboardLayoutPolicy.SetCardBounds(layout, view.Layout.Id, bounds));
+        args.Handled = true;
+        if (span != _resizeStartSpan)
+            await SetCardSpanAsync(view.Layout.Id, span);
         else
             ApplyPlacement(_dashboard.ActualWidth);
-        args.Handled = true;
     }
 
-    private static OverviewDashboardCardBounds ResizeBounds(
-        OverviewDashboardCardBounds start,
-        OverviewDashboardResizeEdge edge,
-        double deltaX,
-        double deltaY,
-        double minimumWidth,
-        double minimumHeight)
+    /// <summary>
+    /// Stores where the flow places each visible card in <paramref name="layout"/>,
+    /// so the saved positions match the saved order.
+    /// </summary>
+    private OverviewDashboardLayout WithFlowPositions(OverviewDashboardLayout layout)
     {
-        minimumWidth = Math.Clamp(minimumWidth,
-            OverviewDashboardLayoutPolicy.MinimumCardWidth,
-            OverviewDashboardLayoutPolicy.HorizontalUnits);
-        minimumHeight = Math.Clamp(minimumHeight,
-            OverviewDashboardLayoutPolicy.MinimumCardHeight,
-            OverviewDashboardLayoutPolicy.MaximumCardHeight);
-        var left = start.X;
-        var right = start.X + start.Width;
-        var top = start.Y;
-        var bottom = start.Y + start.Height;
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Left) && right < minimumWidth)
-            right = minimumWidth;
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Right) && left + minimumWidth > OverviewDashboardLayoutPolicy.HorizontalUnits)
-            left = OverviewDashboardLayoutPolicy.HorizontalUnits - minimumWidth;
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Top) && bottom < minimumHeight)
-            bottom = minimumHeight;
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Left))
-            left = Math.Clamp(SnapHorizontal(start.X + deltaX), 0, right - minimumWidth);
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Right))
-            right = Math.Clamp(SnapHorizontal(start.X + start.Width + deltaX),
-                left + minimumWidth,
-                OverviewDashboardLayoutPolicy.HorizontalUnits);
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Top))
-            top = Math.Clamp(SnapVertical(start.Y + deltaY), 0, bottom - minimumHeight);
-        if (edge.HasFlag(OverviewDashboardResizeEdge.Bottom))
-            bottom = Math.Clamp(SnapVertical(start.Y + start.Height + deltaY),
-                top + minimumHeight,
-                OverviewDashboardLayoutPolicy.MaximumCardY + OverviewDashboardLayoutPolicy.MaximumCardHeight);
-        return OverviewDashboardLayoutPolicy.ConstrainBounds(new(left, top, right - left, bottom - top));
+        var width = _dashboard.ActualWidth;
+        var visibleIds = VisibleCards().Select(card => card.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var cards = layout.Cards.Where(card => visibleIds.Contains(card.Id) && _cardViews.ContainsKey(card.Id));
+        var locked = layout.CardSizesLocked ? layout.LockedSurfaceWidth : (double?)null;
+        var bounds = FlowPlacements(cards, width).ToDictionary(
+            placement => placement.CardId,
+            placement => OverviewDashboardLayoutEngine.ToBounds(placement, width, locked),
+            StringComparer.OrdinalIgnoreCase);
+        return OverviewDashboardLayoutPolicy.SetCardBounds(layout, bounds);
     }
 
-    private static double SnapHorizontal(double value) => Math.Round(value * 8) / 8;
-    private static double SnapVertical(double value) => Math.Round(value / 2) * 2;
+    private Dictionary<string, OverviewDashboardCardBounds> RenderedCardBounds(double availableWidth, double? lockedSurfaceWidth)
+        => _placements.Values.ToDictionary(
+            placement => placement.CardId,
+            placement => OverviewDashboardLayoutEngine.ToBounds(placement, availableWidth, lockedSurfaceWidth),
+            StringComparer.OrdinalIgnoreCase);
 
-    private static double ApplyCardPlacement(
+    private Dictionary<string, System.Windows.Point> CurrentVisualPositions()
+        => _cardViews.ToDictionary(
+            pair => pair.Key,
+            pair => CurrentVisualPosition(pair.Value.Root),
+            StringComparer.OrdinalIgnoreCase);
+
+    private static System.Windows.Point CurrentVisualPosition(FrameworkElement element)
+    {
+        var left = Canvas.GetLeft(element);
+        var top = Canvas.GetTop(element);
+        if (!double.IsFinite(left) || !double.IsFinite(top)) return new(double.NaN, double.NaN);
+        var offset = element.RenderTransform as TranslateTransform;
+        return new(left + (offset?.X ?? 0), top + (offset?.Y ?? 0));
+    }
+
+    private static void ApplyCardPlacement(
         OverviewDashboardCardView view,
         OverviewDashboardPlacement placement,
         double availableWidth)
     {
-        var width = Math.Max(placement.Width, view.MinimumWidth);
-        view.UpdateMinimumSize(width);
-        var height = Math.Max(placement.Height, view.MinimumHeight);
+        var width = placement.Width;
+        var height = placement.Height;
         var left = Math.Clamp(placement.Left, 0, Math.Max(0, availableWidth - width));
         if (!SameLength(view.Root.Width, width)) view.Root.Width = width;
         if (!SameLength(view.Root.Height, height)) view.Root.Height = height;
         if (!SameLength(Canvas.GetLeft(view.Root), left)) Canvas.SetLeft(view.Root, left);
         if (!SameLength(Canvas.GetTop(view.Root), placement.Top)) Canvas.SetTop(view.Root, placement.Top);
-        return height;
     }
 
-    private static void ApplyCardBounds(
-        OverviewDashboardCardView view,
-        OverviewDashboardCardBounds bounds,
-        double availableWidth)
+    /// <summary>
+    /// Slides a card from where it was drawn to its new slot. Skipped when
+    /// Windows animations are turned off.
+    /// </summary>
+    private static void AnimateFrom(FrameworkElement element, double dx, double dy)
     {
-        var placement = OverviewDashboardLayoutEngine.Place(
-            [view.Layout with { Bounds = bounds }],
-            availableWidth)[0];
-        ApplyCardPlacement(view, placement, availableWidth);
-    }
-
-    private IReadOnlyList<OverviewDashboardCardBounds> InteractionObstacles(string cardId, double availableWidth)
-        => _layout.Cards
-            .Where(card => !string.Equals(card.Id, cardId, StringComparison.OrdinalIgnoreCase))
-            .Where(card => !_cardViews.TryGetValue(card.Id, out var view)
-                           || view.Root.Visibility == Visibility.Visible)
-            .Select(card => _cardViews.TryGetValue(card.Id, out var view)
-                ? RenderedBounds(view, availableWidth)
-                : card.Bounds!)
-            .ToArray();
-
-    private static OverviewDashboardCardBounds RenderedBounds(
-        OverviewDashboardCardView view,
-        double availableWidth)
-    {
-        var left = Canvas.GetLeft(view.Root);
-        var reachesRightEdge = left + view.Root.Width >= availableWidth - .5;
-        return OverviewDashboardLayoutPolicy.ConstrainBounds(new OverviewDashboardCardBounds(
-            OverviewDashboardLayoutEngine.ToHorizontalUnits(left, availableWidth),
-            Canvas.GetTop(view.Root),
-            OverviewDashboardLayoutEngine.ToHorizontalUnits(
-                view.Root.Width + (reachesRightEdge ? 0 : OverviewDashboardLayoutPolicy.CardGap),
-                availableWidth),
-            view.Root.Height));
-    }
-
-    private OverviewDashboardCardBounds PersistedBounds(
-        OverviewDashboardCardBounds renderedBounds,
-        double availableWidth)
-    {
-        if (!_layout.CardSizesLocked || _layout.LockedSurfaceWidth < 1)
-            return renderedBounds;
-        var renderedPixelSpan = renderedBounds.Width / OverviewDashboardLayoutPolicy.HorizontalUnits * availableWidth;
-        var lockedWidth = OverviewDashboardLayoutEngine.ToHorizontalUnits(
-            renderedPixelSpan,
-            _layout.LockedSurfaceWidth);
-        return OverviewDashboardLayoutPolicy.ConstrainBounds(renderedBounds with
+        if (!double.IsFinite(dx) || !double.IsFinite(dy)
+            || (Math.Abs(dx) < .5 && Math.Abs(dy) < .5)
+            || !SystemParameters.ClientAreaAnimation)
         {
-            Width = lockedWidth,
-            X = Math.Min(renderedBounds.X, OverviewDashboardLayoutPolicy.HorizontalUnits - lockedWidth)
-        });
+            StopAnimation(element);
+            return;
+        }
+        if (element.RenderTransform is not TranslateTransform offset || offset.IsFrozen)
+        {
+            offset = new TranslateTransform();
+            element.RenderTransform = offset;
+        }
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        offset.BeginAnimation(TranslateTransform.XProperty,
+            new DoubleAnimation(dx, 0, MoveAnimationDuration) { EasingFunction = ease });
+        offset.BeginAnimation(TranslateTransform.YProperty,
+            new DoubleAnimation(dy, 0, MoveAnimationDuration) { EasingFunction = ease });
     }
 
-    private static OverviewDashboardCardBounds VisibleBounds(
-        OverviewDashboardCardView view,
-        OverviewDashboardCardBounds bounds,
-        double availableWidth)
+    private static void StopAnimation(FrameworkElement element)
     {
-        var minimumWidth = OverviewDashboardLayoutEngine.ToHorizontalUnits(
-            view.MinimumWidth + OverviewDashboardLayoutPolicy.CardGap,
-            availableWidth);
-        return OverviewDashboardLayoutPolicy.ConstrainBounds(bounds with
+        if (element.RenderTransform is not TranslateTransform offset || offset.IsFrozen) return;
+        offset.BeginAnimation(TranslateTransform.XProperty, null);
+        offset.BeginAnimation(TranslateTransform.YProperty, null);
+        offset.X = 0;
+        offset.Y = 0;
+    }
+
+    private void ShowDropPlaceholder()
+    {
+        if (_dropPlaceholder is null)
         {
-            Width = Math.Max(bounds.Width, minimumWidth),
-            Height = Math.Max(bounds.Height, view.MinimumHeight)
-        });
+            _dropPlaceholder = new System.Windows.Shapes.Rectangle
+            {
+                RadiusX = 6,
+                RadiusY = 6,
+                StrokeThickness = 1.5,
+                StrokeDashArray = [4, 3],
+                IsHitTestVisible = false,
+                Opacity = .9
+            };
+            _dropPlaceholder.SetResourceReference(Shape.StrokeProperty, "AccentBlue");
+            _dropPlaceholder.SetResourceReference(Shape.FillProperty, "InfoSoft");
+        }
+        if (!_surface.Children.Contains(_dropPlaceholder))
+            _surface.Children.Add(_dropPlaceholder);
+        WpfPanel.SetZIndex(_dropPlaceholder, -1);
+        _dropPlaceholder.Visibility = Visibility.Collapsed;
+    }
+
+    private void MoveDropPlaceholder(OverviewDashboardPlacement slot)
+    {
+        if (_dropPlaceholder is null) return;
+        var previous = _dropPlaceholder.Visibility == Visibility.Visible
+            ? CurrentVisualPosition(_dropPlaceholder)
+            : new System.Windows.Point(double.NaN, double.NaN);
+        _dropPlaceholder.Width = slot.Width;
+        _dropPlaceholder.Height = slot.Height;
+        Canvas.SetLeft(_dropPlaceholder, slot.Left);
+        Canvas.SetTop(_dropPlaceholder, slot.Top);
+        _dropPlaceholder.Visibility = Visibility.Visible;
+        AnimateFrom(_dropPlaceholder, previous.X - slot.Left, previous.Y - slot.Top);
+    }
+
+    private void HideDropPlaceholder()
+    {
+        if (_dropPlaceholder is null) return;
+        _dropPlaceholder.Visibility = Visibility.Collapsed;
+        _surface.Children.Remove(_dropPlaceholder);
     }
 }

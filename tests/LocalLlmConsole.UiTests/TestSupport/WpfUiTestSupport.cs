@@ -199,7 +199,8 @@ public abstract partial class WpfUiTestBase
         var hidden = dashboard.Cards.Single(card => card.Layout.Id == "default-gpu-2");
         Assert.Equal(Visibility.Collapsed, hidden.Root.Visibility);
         var visible = dashboard.Cards.Where(card => card.Root.Visibility == Visibility.Visible).ToArray();
-        Assert.Equal([0, 300, 600], visible.Select(card => Canvas.GetLeft(card.Root)));
+        var pitch = OverviewDashboardLayoutEngine.ColumnPitch(900);
+        Assert.Equal([0, 4 * pitch, 8 * pitch], visible.Select(card => Canvas.GetLeft(card.Root)));
         Assert.All(visible, card => Assert.Equal(0, Canvas.GetTop(card.Root)));
     }
 
