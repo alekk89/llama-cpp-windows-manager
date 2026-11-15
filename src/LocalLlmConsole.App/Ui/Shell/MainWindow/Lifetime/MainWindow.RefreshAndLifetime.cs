@@ -23,7 +23,7 @@ public partial class MainWindow
             _pageControllers.Lifetime.Build())), () => _stateStore, SetStatus);
         _lifetimePage.Apply(page.Controls);
         PageHost.Content = page.Content;
-        RunBackground(RefreshLifetimeMetricsAsync, "Metrics refresh failed");
+        RunBackground(RefreshLifetimeMetricsAsync, Loc.T("Status.Failure.MetricsRefresh"));
     }
 
     private async Task RefreshModelsAsync()

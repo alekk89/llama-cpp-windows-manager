@@ -83,7 +83,7 @@ public partial class MainWindow
         {
             _minimizedUiRefreshPolicy.Reset();
             if (_viewModel.CurrentPage == "Overview")
-                RunBackground(RefreshRuntimeMetricsAsync, "Runtime metrics refresh failed");
+                RunBackground(RefreshRuntimeMetricsAsync, Loc.T("Status.Failure.RuntimeMetricsRefresh"));
         }
     }
 

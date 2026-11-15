@@ -31,7 +31,7 @@ public static class BenchmarkWorkspaceHistoryService
     public static async Task CompareAsync(BenchmarkApplicationService benchmarks, StateStore store, BenchmarksPageState? page, Func<BenchmarksPageState?> currentPage)
     {
         var ids = page?.SelectedRunIds ?? [];
-        if (ids.Count != 2) throw new InvalidOperationException("Select exactly two runs to compare.");
+        if (ids.Count != 2) throw new InvalidOperationException(Loc.T("Benchmarks.SelectTwoRuns"));
         var rows = new List<StoredBenchmarkResult>();
         var names = new List<string>();
         foreach (var id in ids)

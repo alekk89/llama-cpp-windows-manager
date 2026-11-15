@@ -43,10 +43,10 @@ public partial class MainWindow
         var controls = SelectorFavoriteBinding.ConfigureBenchmarks(BenchmarksPageFactory.Create(_benchmarksController), () => _stateStore, SetStatus);
         _benchmarksPage.Apply(controls);
         if (controls.Workspace is { } workspace)
-            workspace.RuntimeOptions.DiscoverRequested += () => RunBackground(() => BenchmarkWorkspaceDiscoveryService.DiscoverAsync(_benchmarksPage, () => _benchmarksPage, AppServices.Benchmarks.Value, _runtimeLaunchOptionDiscovery, _settings.WslDistro), "Benchmark option discovery failed");
+            workspace.RuntimeOptions.DiscoverRequested += () => RunBackground(() => BenchmarkWorkspaceDiscoveryService.DiscoverAsync(_benchmarksPage, () => _benchmarksPage, AppServices.Benchmarks.Value, _runtimeLaunchOptionDiscovery, _settings.WslDistro), Loc.T("Benchmarks.Failure.Discovery"));
         PageHost.Content = controls.Workspace?.Root ?? (object)controls.Root;
         SubscribeBenchmarkProgress();
-        RunBackground(RefreshBenchmarksAsync, "Benchmark refresh failed");
+        RunBackground(RefreshBenchmarksAsync, Loc.T("Benchmarks.Failure.Refresh"));
     }
 
     private async Task RefreshBenchmarksAsync()
@@ -110,7 +110,7 @@ public partial class MainWindow
     private async Task CancelBenchmarkAsync()
     {
         var id = RequiredActiveBenchmarkRunId();
-        if (!_coreServices.App.Dialogs.Confirm(this, "Stop the active benchmark run and its current benchmark process? Completed results will be kept.", "Stop benchmark", MessageBoxImage.Warning)) return;
+        if (!_coreServices.App.Dialogs.Confirm(this, Loc.T("Benchmarks.Stop.Confirm"), Loc.T("Benchmarks.Stop.Title"), MessageBoxImage.Warning)) return;
         await AppServices.Benchmarks.Value.CancelAsync(id);
     }
 
@@ -149,7 +149,7 @@ public partial class MainWindow
     }
 
     private BenchmarkPlan BuildBenchmarkPlan() => BenchmarksPagePlanService.Build(
-            _benchmarksPage ?? throw new InvalidOperationException("The Benchmarks page is not open."),
+            _benchmarksPage ?? throw new InvalidOperationException(Loc.T("Benchmarks.PageNotOpen")),
             _settings.WslDistro);
 
     private void SubscribeBenchmarkProgress()
@@ -161,7 +161,7 @@ public partial class MainWindow
             _benchmarksPage.ActiveRunId = snapshot.Job.Id;
             ApplyBenchmarkProgress(snapshot);
             if (snapshot.Job.Status is JobStatus.Paused or JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled or JobStatus.Interrupted)
-                RunBackground(RefreshBenchmarksAsync, "Benchmark history refresh failed");
+                RunBackground(RefreshBenchmarksAsync, Loc.T("Benchmarks.Failure.HistoryRefresh"));
         });
         service.ProgressChanged += _benchmarkProgressHandler;
     }
@@ -191,9 +191,9 @@ public partial class MainWindow
     }
 
     private string RequiredBenchmarkRunId()
-        => _benchmarksPage?.SelectedRunId is { Length: > 0 } id ? id : throw new InvalidOperationException("Select a benchmark run first.");
+        => _benchmarksPage?.SelectedRunId is { Length: > 0 } id ? id : throw new InvalidOperationException(Loc.T("Benchmarks.SelectRunFirst"));
 
-    private string RequiredActiveBenchmarkRunId() => _benchmarksPage?.ActiveRunId is { Length: > 0 } id ? id : throw new InvalidOperationException("There is no active benchmark run to stop.");
+    private string RequiredActiveBenchmarkRunId() => _benchmarksPage?.ActiveRunId is { Length: > 0 } id ? id : throw new InvalidOperationException(Loc.T("Benchmarks.NoActiveRunToStop"));
 
     private void OpenBenchmarkPlan(BenchmarkPlan plan)
     {

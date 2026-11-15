@@ -46,7 +46,7 @@ public partial class MainWindow
         AttachLaunchSettingsChangeHandlers();
         _coreServices.App.ShutdownApplication.ConfirmUnsavedWorkAsync = () => _launchSettingsController.ConfirmLeavingEditsAsync();
         ApplyLaunchSettingsToControls();
-        RunBackground(() => RenderSelectedModelLaunchSettingsAsync(), "Launch settings refresh failed");
+        RunBackground(() => RenderSelectedModelLaunchSettingsAsync(), Loc.T("Status.Failure.LaunchSettingsRefresh"));
         return panel.Root;
     }
 

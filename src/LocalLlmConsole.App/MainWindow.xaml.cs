@@ -115,19 +115,19 @@ public partial class MainWindow : Window
                     service => _service = service,
                     SetStatus));
             await AppServices.UiLayouts.AttachShellAsync(this, PageHost, () => _viewModel.CurrentPage);
-            RunBackground(SeedSuggestedLaunchProfilesInBackgroundAsync, "Launch profile seeding follow-up failed");
+            RunBackground(SeedSuggestedLaunchProfilesInBackgroundAsync, Loc.T("Status.Failure.LaunchProfileSeeding"));
             ShowOverview(refresh: false);
             await RefreshAllAsync();
             await RecoverActiveRuntimeSessionAsync();
             await StartModelGatewaySafelyAsync();
             StartGpuEnergyTrackingTimer();
-            RunBackground(AutoSelectDetectedWslDistroAsync, "WSL distro auto-select failed");
+            RunBackground(AutoSelectDetectedWslDistroAsync, Loc.T("Status.Failure.WslDistroAutoSelect"));
             RunBackground(() => StartupLoadsPanel.RunAsync(AppServices.StartupLaunchProfiles.LoadConfiguredAsync, new(
                 (model, profile, token) => EnsureGatewayModelLoadedAsync(new(model, profile), ModelGatewaySwapPolicy.KeepLoaded, token),
-                (model, profile) => _sessions.SessionForProfile(model.Id, profile.Id) is { IsRunning: true }, SetStatus)), "Startup profile loading failed");
+                (model, profile) => _sessions.SessionForProfile(model.Id, profile.Id) is { IsRunning: true }, SetStatus)), Loc.T("Status.Failure.StartupProfileLoading"));
         });
         await ShowCompletedAppUpdateNoticeAsync();
-        RunBackground(CheckForAppUpdatesOnStartupAsync, "App update check failed");
+        RunBackground(CheckForAppUpdatesOnStartupAsync, Loc.T("Status.Failure.AppUpdateCheck"));
     }
 
     private void ApplyLoadedServices(MainWindowLoadedServices services)
@@ -201,9 +201,9 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             IsEnabled = true;
-            SetStatus($"Shutdown failed: {ex.Message}");
+            SetStatus($"{Loc.T("Shell.ShutdownFailed")}: {ex.Message}");
             await WriteAppLogAsync(ex);
-            _coreServices.App.Dialogs.Notify(this, ex.Message, "Shutdown failed", MessageBoxImage.Error);
+            _coreServices.App.Dialogs.Notify(this, ex.Message, Loc.T("Shell.ShutdownFailed"), MessageBoxImage.Error);
         }
     }
 

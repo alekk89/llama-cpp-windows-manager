@@ -22,9 +22,9 @@ public sealed record BenchmarkScopeRow(
     string Runtime,
     string Environment)
 {
-    public string RemoveAction => "Remove";
+    public string RemoveAction => Loc.T("Benchmarks.Action.Remove");
     public bool CanRemove => true;
-    public string RemoveToolTip => $"Remove {Profile} with {Runtime}";
+    public string RemoveToolTip => Loc.T("Benchmarks.RemoveScopeTooltip", Profile, Runtime);
 }
 
 public sealed record BenchmarkRunRow(
@@ -36,9 +36,11 @@ public sealed record BenchmarkRunRow(
     string Message)
 {
     public string Name { get; init; } = "";
-    public string RemoveAction => "Delete";
-    public bool CanRemove => Status is not ("Queued" or "Running" or "Paused");
-    public string RemoveToolTip => CanRemove ? "Delete this benchmark run and its results" : "Stop this run before deleting it";
+    /// <summary>The run's job state; <see cref="Status"/> holds its localized display text.</summary>
+    public JobStatus JobStatus { get; init; } = JobStatus.Completed;
+    public string RemoveAction => Loc.T("Common.DeleteButton");
+    public bool CanRemove => JobStatus is not (JobStatus.Queued or JobStatus.Running or JobStatus.Paused);
+    public string RemoveToolTip => Loc.T(CanRemove ? "Benchmarks.DeleteRunTooltip" : "Benchmarks.DeleteRunBlockedTooltip");
 }
 
 public sealed partial class BenchmarksPageState
@@ -216,7 +218,7 @@ public sealed partial class BenchmarksPageState
         _profiles = profiles;
         _runtimes = runtimes;
         SetItems(Model, models.Select(model => new BenchmarkSelectionItem(model.Id, model.Name)).ToArray());
-        SetItems(Runtime, [new BenchmarkSelectionItem("", "Profile runtime"), .. runtimes.Select(runtime => new BenchmarkSelectionItem(runtime.Id, $"{runtime.Name} · {runtime.Mode}/{runtime.Backend}"))]);
+        SetItems(Runtime, [new BenchmarkSelectionItem("", Loc.T("Benchmarks.ProfileRuntime")), .. runtimes.Select(runtime => new BenchmarkSelectionItem(runtime.Id, $"{runtime.Name} · {runtime.Mode}/{runtime.Backend}"))]);
         SetProfileItems(profiles);
         RefreshScopeRows();
     }

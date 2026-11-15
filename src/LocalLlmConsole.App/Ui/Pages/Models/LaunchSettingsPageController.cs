@@ -69,7 +69,7 @@ public sealed class LaunchSettingsPageController
     public void ScheduleSelectedModelRefresh()
         => _ui.LaunchSettingsRefresh.Schedule(
             RenderSelectedAsync,
-            action => _actions.RunBackground(action, "Launch settings refresh failed"));
+            action => _actions.RunBackground(action, Loc.T("Status.Failure.LaunchSettingsRefresh")));
 
     public void CancelRefresh()
     {
@@ -279,15 +279,15 @@ public sealed class LaunchSettingsPageController
                 _actions.UpdateRuntimeCommandPreview();
                 return Task.CompletedTask;
             },
-            action => _actions.RunBackground(action, "Launch settings input refresh failed"));
+            action => _actions.RunBackground(action, Loc.T("Status.Failure.LaunchSettingsInputRefresh")));
 
     public void UpdateSaveButtonState()
     {
         var state = BuildSaveState();
         var hasNamedProfile = !string.IsNullOrWhiteSpace(_actions.SelectedProfileId());
         var content = string.Equals(state.SaveForModelContent, LaunchSettingsSaveStateService.SavedText, StringComparison.Ordinal)
-            ? LaunchSettingsSaveStateService.SavedText
-            : "Save Profile";
+            ? Loc.T("Launch.SavedButton")
+            : Loc.T("Launch.SaveForModelButton");
         _panel.SetSaveForModelState(content, hasNamedProfile && state.CanSaveForModel, hasNamedProfile);
         _panel.SetSaveAsNewEnabled(state.CanSaveAsNewVariant);
         _panel.SetUnsavedChangesVisible(hasNamedProfile && state.HasUnsavedChanges && ReferenceEquals(_editorControls, _panel.FormControls));
@@ -358,7 +358,7 @@ public sealed class LaunchSettingsPageController
         _savingBeforeLeave = true;
         try
         {
-            await _actions.RunBusyAsync("Saving model launch profile...", async () =>
+            await _actions.RunBusyAsync(Loc.T("Launch.Busy.SavingProfile"), async () =>
             {
                 var result = await SaveProfileAsync(model, ReadFromControls(), profileId);
                 editor.MarkSaved(model.Id, profileId, result.SavedSettings);
@@ -371,7 +371,7 @@ public sealed class LaunchSettingsPageController
         {
             _savingBeforeLeave = false;
         }
-        if (saved) _actions.RunBackground(_actions.RefreshModelsAsync, "Models refresh failed");
+        if (saved) _actions.RunBackground(_actions.RefreshModelsAsync, Loc.T("Status.Failure.ModelsRefresh"));
         return saved;
     }
 
@@ -388,22 +388,22 @@ public sealed class LaunchSettingsPageController
     }
 
     public Task FitSelectedProfileToAvailableVramAsync()
-        => _actions.RunBusyAsync("Fitting profile to available VRAM...", FitSelectedProfileCoreAsync);
+        => _actions.RunBusyAsync(Loc.T("Launch.Busy.FittingProfile"), FitSelectedProfileCoreAsync);
 
     public void ScheduleProfileFitCapabilityProbe()
     {
         var runtime = _actions.SelectedRuntime();
-        if (runtime is null) { _panel.SetProfileFitCapability(false, "Select a runtime first."); return; }
-        if (runtime.Backend == RuntimeBackend.Cpu) { _panel.SetProfileFitCapability(false, "The selected runtime has no GPU backend to fit to VRAM."); return; }
+        if (runtime is null) { _panel.SetProfileFitCapability(false, Loc.T("Launch.SelectRuntimeFirst")); return; }
+        if (runtime.Backend == RuntimeBackend.Cpu) { _panel.SetProfileFitCapability(false, Loc.T("ProfileFit.Capability.NoGpu")); return; }
         var record = CreateRuntimeRecord(runtime);
         var executable = ProfileFitCapabilityService.ResolveExecutable(record);
         if (runtime.Mode == RuntimeMode.Native && !File.Exists(executable))
         {
-            _panel.SetProfileFitCapability(false, "The selected runtime does not provide llama-fit-params beside llama-server.");
+            _panel.SetProfileFitCapability(false, Loc.T("ProfileFit.Capability.Missing"));
             return;
         }
-        _panel.SetProfileFitCapability(false, "Checking llama-fit-params support in the selected runtime...");
-        _actions.RunBackground(() => ProbeProfileFitCapabilityAsync(record), "Profile fitting capability probe failed");
+        _panel.SetProfileFitCapability(false, Loc.T("ProfileFit.Capability.Checking"));
+        _actions.RunBackground(() => ProbeProfileFitCapabilityAsync(record), Loc.T("Status.Failure.ProfileFitProbe"));
     }
 
     public async Task OfferOutOfMemoryRecoveryAsync(LoadedModelSessionSnapshot session)
@@ -419,14 +419,14 @@ public sealed class LaunchSettingsPageController
         _actions.SelectModelAfterRefresh(session.ModelId, session.LaunchProfileId);
         await RenderSelectedAsync();
         if (action == OutOfMemoryRecoveryAction.CreateFittedProfile) await FitSelectedProfileCoreAsync();
-        else _actions.SetStatus("Review context, GPU layers, tensor split, and tensor buffer overrides before retrying the model.");
+        else _actions.SetStatus(Loc.T("ProfileFit.ReviewBeforeRetry"));
     }
 
     private async Task FitSelectedProfileCoreAsync()
     {
-        var model = _actions.SelectedModel() ?? throw new InvalidOperationException("Select a model first.");
-        var runtime = _actions.SelectedRuntime() ?? throw new InvalidOperationException("Select a runtime first.");
-        if (runtime.Backend == RuntimeBackend.Cpu) throw new InvalidOperationException("VRAM fitting requires a GPU runtime.");
+        var model = _actions.SelectedModel() ?? throw new InvalidOperationException(Loc.T("Launch.SelectModelFirst"));
+        var runtime = _actions.SelectedRuntime() ?? throw new InvalidOperationException(Loc.T("Launch.SelectRuntimeFirst"));
+        if (runtime.Backend == RuntimeBackend.Cpu) throw new InvalidOperationException(Loc.T("ProfileFit.RequiresGpu"));
         var settings = ReadFromControls();
         var input = ProfileFitDialog.ShowInput(System.Windows.Application.Current.MainWindow, settings.ContextSize);
         if (input is null) return;
@@ -449,7 +449,7 @@ public sealed class LaunchSettingsPageController
         if (action == ProfileFitPreviewAction.ApplyTemporarily)
         {
             ApplyToControls(fittedSettings);
-            _actions.SetStatus("Applied fitted settings temporarily. Save the profile when you are satisfied.");
+            _actions.SetStatus(Loc.T("ProfileFit.AppliedTemporarily"));
             return;
         }
         var originalProfileId = _actions.SelectedProfileId();
@@ -467,7 +467,7 @@ public sealed class LaunchSettingsPageController
 
     private async Task<string> UniqueFittedProfileNameAsync(ModelRecord model, int gpuCount)
     {
-        var stem = $"{model.Name} — fitted {gpuCount}×GPU";
+        var stem = Loc.T("ProfileFit.FittedProfileName", model.Name, gpuCount);
         var names = (await _actions.ModelServices().LaunchProfiles.ListNamedAsync(model)).Select(profile => profile.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (!names.Contains(stem)) return stem;
         for (var suffix = 2; suffix < 1000; suffix++) if (!names.Contains($"{stem} ({suffix})")) return $"{stem} ({suffix})";

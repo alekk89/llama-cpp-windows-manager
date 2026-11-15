@@ -126,8 +126,8 @@ public sealed partial class BenchmarksPageState
                                   && EffectiveRuntimeId(row).Equals(effectiveRuntimeId, StringComparison.OrdinalIgnoreCase))) return;
         var runtime = _runtimes.FirstOrDefault(item => item.Id.Equals(effectiveRuntimeId, StringComparison.OrdinalIgnoreCase));
         var runtimeName = runtime is null
-            ? string.IsNullOrWhiteSpace(effectiveRuntimeId) ? "Profile runtime (not set)" : "Runtime not found"
-            : string.IsNullOrWhiteSpace(runtimeId) ? $"{runtime.Name} (profile)" : runtime.Name;
+            ? Loc.T(string.IsNullOrWhiteSpace(effectiveRuntimeId) ? "Benchmarks.ProfileRuntimeNotSet" : "Benchmarks.RuntimeNotFound")
+            : string.IsNullOrWhiteSpace(runtimeId) ? Loc.T("Benchmarks.RuntimeFromProfile", runtime.Name) : runtime.Name;
         var environment = runtime is null ? "" : $"{runtime.Mode}/{runtime.Backend}";
         _scopeRows.Add(new BenchmarkScopeRow(model.Id, model.Name, profile.Id, profile.Name, runtimeId, runtimeName, environment));
         if (refresh) RefreshScopeRows();

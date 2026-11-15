@@ -53,16 +53,43 @@ production Manager data, signing certificates, or release credentials. If a
 contributor cannot push to the canonical repository, use their fork and a pull
 request only after that GitHub mutation has been requested.
 
-Localization packs may omit untranslated keys. The runtime deliberately falls
-back to the English pack, and the localization contract tests verify placeholder
-compatibility for every translated value. Do not copy English text into another
-pack merely to satisfy key parity; leave the key absent until it is translated.
+Localization packs may omit a key only where the missing-translation baseline
+already lists it. The runtime deliberately falls back to the English pack, and
+the localization contract tests verify placeholder compatibility for every
+translated value. Do not copy English text into another pack merely to satisfy
+key parity.
 
 Keep localization at the App presentation boundary. Core emits domain values
 and stable identifiers and must not reference `Loc`; App view models, catalog
 presenters, dialogs, tray notifications, and page factories resolve user-facing
-text with `Loc.T`. Add new English keys first and let incomplete language packs
-use the deliberate English fallback until a real translation is available.
+text with `Loc.T`.
+
+### Translation workflow
+
+1. Resolve every user-visible string with `Loc.T("Area.Name")` or
+   `Loc.T("Area.Name", args)`. Use `{0}` placeholders (with format specifiers
+   such as `{0:N0}` where numbers need grouping) instead of concatenating words.
+   Leave log text, developer-facing exceptions, llama.cpp flags, and universal
+   units such as `GB` or `%` untranslated.
+2. Add the key to `src/LocalLlmConsole.App/Localization/Strings.en.json` next to
+   related keys, then add a real translation with the same placeholders to every
+   other `Strings.*.json` pack.
+3. `LocalizationParityTests` fails when a non-English pack lacks an English key
+   that `tests/LocalLlmConsole.Tests/App/missing-translation-baseline.json`
+   does not list, when a pack has a key English lacks, and when a listed key has
+   since been translated. The baseline records historical gaps and may only shrink.
+4. After translating baseline keys, regenerate the baseline and review the diff;
+   new keys must be translated rather than added to it:
+
+   ```powershell
+   $env:LLWM_UPDATE_TRANSLATION_BASELINE = "1"
+   dotnet test tests/LocalLlmConsole.Tests -c Release -- --filter-class "LocalLlmConsole.Tests.LocalizationParityTests"
+   Remove-Item Env:LLWM_UPDATE_TRANSLATION_BASELINE
+   ```
+
+5. `BenchmarksUiDoesNotIntroduceHardCodedEnglish` scans the Benchmarks UI
+   sources for prose literals and literal UI labels; move any reported string to
+   a key.
 
 ## Contribution and release process
 

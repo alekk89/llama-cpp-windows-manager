@@ -8,9 +8,9 @@ public static class BenchmarkWorkspaceDiscoveryService
     {
         if (page?.Workspace is not { } workspace) return;
         var runtime = page.SelectedRuntime;
-        if (runtime is null) { workspace.RuntimeOptions.SetStatus("Choose a runtime first."); return; }
+        if (runtime is null) { workspace.RuntimeOptions.SetStatus(Loc.T("Benchmarks.RuntimeOptions.ChooseRuntime")); return; }
         var direct = page.ExecutionMode?.SelectedItem is BenchmarkModeItem { Mode: BenchmarkExecutionMode.LlamaBench };
-        workspace.RuntimeOptions.SetStatus($"Reading {runtime.Name} options…");
+        workspace.RuntimeOptions.SetStatus(Loc.T("Benchmarks.RuntimeOptions.Reading", runtime.Name));
         try
         {
             IReadOnlyList<RuntimeLaunchOptionDefinition> options;

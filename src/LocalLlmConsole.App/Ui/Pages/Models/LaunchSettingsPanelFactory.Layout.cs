@@ -104,8 +104,8 @@ public static partial class LaunchSettingsPanelFactory
         if (string.Equals(t, Loc.T("Launch.SaveAsDefaultButton"))) return Loc.T("Tooltip.SaveAsDefault");
         if (string.Equals(t, Loc.T("Launch.ResetDefaultsButton"))) return Loc.T("Tooltip.ResetDefaults");
         if (string.Equals(t, Loc.T("Launch.SaveAsNewButton"))) return Loc.T("Tooltip.SaveAsNewButton");
-        if (string.Equals(t, "Choose")) return "Choose a GGUF file.";
-        return string.IsNullOrWhiteSpace(t) ? "" : $"Run {t}.";
+        if (string.Equals(t, "Choose")) return Loc.T("Launch.ChooseGgufTooltip");
+        return string.IsNullOrWhiteSpace(t) ? "" : Loc.T("Launch.RunActionTooltip", t);
     }
 
     private static ScrollViewer Scroll(UIElement child, Thickness? padding = null)

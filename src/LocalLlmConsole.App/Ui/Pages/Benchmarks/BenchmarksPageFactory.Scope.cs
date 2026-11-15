@@ -24,31 +24,31 @@ public static partial class BenchmarksPageFactory
 
     private static BenchmarkScopeControls CreateScopeControls(BenchmarksPageController controller)
     {
-        var model = OverviewSizedCombo("Model", 240);
-        var profile = OverviewSizedCombo("Profile", 220);
-        var runtime = OverviewSizedCombo("Runtime", 220);
-        var executionMode = Combo("Benchmark type");
+        var model = OverviewSizedCombo(Loc.T("Benchmarks.Label.Model"), 240, isModel: true);
+        var profile = OverviewSizedCombo(Loc.T("Benchmarks.Label.Profile"), 220);
+        var runtime = OverviewSizedCombo(Loc.T("Benchmarks.Label.Runtime"), 220);
+        var executionMode = Combo(BenchmarkFieldDescriptions.Label("BenchmarkType"));
         executionMode.ItemsSource = new[]
         {
-            new BenchmarkModeItem(BenchmarkExecutionMode.ProfileServing, "Saved-profile server benchmark (recommended)"),
-            new BenchmarkModeItem(BenchmarkExecutionMode.LlamaBench, "Direct llama-bench microbenchmark")
+            new BenchmarkModeItem(BenchmarkExecutionMode.ProfileServing, Loc.T("Benchmarks.Mode.ProfileServing")),
+            new BenchmarkModeItem(BenchmarkExecutionMode.LlamaBench, Loc.T("Benchmarks.Mode.LlamaBench"))
         };
         executionMode.SelectedIndex = 0;
         model.SelectionChanged += controller.SelectionChanged;
 
-        var addProfile = Button("Add", controller.AddProfile);
+        var addProfile = Button(Loc.T("Benchmarks.Action.Add"), controller.AddProfile);
         VisualRole.SetButtonRole(addProfile, VisualRole.Primary);
         OverviewPageResponsiveCoordinator.ConfigureLoadButton(addProfile);
-        var clear = Button("Clear", controller.ClearProfiles);
+        var clear = Button(Loc.T("Common.ClearButton"), controller.ClearProfiles);
         VisualRole.SetButtonRole(clear, VisualRole.Quiet);
         OverviewPageResponsiveCoordinator.ConfigureLoadButton(clear);
         var (profileSelector, resizeSelector) = OverviewStyleSelector(model, profile, runtime, addProfile, clear);
 
         var scopeProfiles = PageSectionFactory.GridFor(
-            ("Model", nameof(BenchmarkScopeRow.Model), 1.15),
-            ("Profile", nameof(BenchmarkScopeRow.Profile), 1.25),
-            ("Runtime", nameof(BenchmarkScopeRow.Runtime), 1.25),
-            ("Environment", nameof(BenchmarkScopeRow.Environment), .75));
+            (Loc.T("Benchmarks.Label.Model"), nameof(BenchmarkScopeRow.Model), 1.15),
+            (Loc.T("Benchmarks.Label.Profile"), nameof(BenchmarkScopeRow.Profile), 1.25),
+            (Loc.T("Benchmarks.Label.Runtime"), nameof(BenchmarkScopeRow.Runtime), 1.25),
+            (Loc.T("Benchmarks.Label.Environment"), nameof(BenchmarkScopeRow.Environment), .75));
         PageSectionFactory.AddButtonColumn(scopeProfiles, "", nameof(BenchmarkScopeRow.RemoveAction), nameof(BenchmarkScopeRow.CanRemove),
             controller.RemoveProfile, .65, tooltipBinding: nameof(BenchmarkScopeRow.RemoveToolTip), visualRole: VisualRole.Danger, compactContent: "×");
         scopeProfiles.Columns[^1].Width = DataGridLength.SizeToCells;
@@ -58,7 +58,7 @@ public static partial class BenchmarksPageFactory
 
         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
         panel.Children.Add(profileSelector);
-        panel.Children.Add(PageSectionFactory.GridSection("Selected profiles", scopeProfiles));
+        panel.Children.Add(PageSectionFactory.GridSection(Loc.T("Benchmarks.SelectedProfiles"), scopeProfiles));
         return new BenchmarkScopeControls(panel, model, profile, runtime, executionMode, scopeProfiles, resizeSelector);
     }
 
@@ -86,7 +86,7 @@ public static partial class BenchmarksPageFactory
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var modelLabel = SelectorLabel(Loc.T("Overview.ModelLabel"));
         var profileLabel = SelectorLabel(Loc.T("ModelGroups.Column.LaunchProfile"));
-        var runtimeLabel = SelectorLabel("Runtime");
+        var runtimeLabel = SelectorLabel(Loc.T("Benchmarks.Label.Runtime"));
         Grid.SetColumn(model, 1);
         Grid.SetColumn(profileLabel, 3);
         Grid.SetColumn(profile, 4);
@@ -224,7 +224,7 @@ public static partial class BenchmarksPageFactory
             Margin = new Thickness(0, 0, 8, 0)
         };
 
-    private static ComboBox OverviewSizedCombo(string name, double width)
+    private static ComboBox OverviewSizedCombo(string name, double width, bool isModel = false)
     {
         var combo = new SearchableComboBox
         {
@@ -236,7 +236,7 @@ public static partial class BenchmarksPageFactory
         combo.Height = double.NaN;
         combo.Margin = new Thickness(0);
         combo.HorizontalAlignment = WpfHorizontalAlignment.Stretch;
-        combo.ToolTip = name == "Model" ? Loc.T("Tooltip.OverviewModelCombo") : Loc.T("Overview.LaunchProfileTooltip");
+        combo.ToolTip = isModel ? Loc.T("Tooltip.OverviewModelCombo") : Loc.T("Overview.LaunchProfileTooltip");
         return combo;
     }
 

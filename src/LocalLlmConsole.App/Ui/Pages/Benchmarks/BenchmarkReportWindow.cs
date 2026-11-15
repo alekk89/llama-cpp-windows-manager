@@ -155,7 +155,7 @@ public static class BenchmarkReportWindow
         Grid.SetColumn(track, 1);
         row.Children.Add(track);
 
-        var value = Text($"{bar.TokensPerSecond:0.00} tok/s", "TextMain");
+        var value = Text(Loc.T("Benchmarks.Report.Rate", bar.TokensPerSecond.ToString("0.00", Loc.FormatCulture)), "TextMain");
         value.FontWeight = FontWeights.SemiBold;
         value.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
         value.VerticalAlignment = VerticalAlignment.Center;
@@ -165,7 +165,7 @@ public static class BenchmarkReportWindow
         var accessibleLabel = string.IsNullOrWhiteSpace(bar.ConfigurationLabel)
             ? bar.Label
             : $"{bar.ConfigurationLabel}, {bar.Label}";
-        AutomationProperties.SetName(row, $"{accessibleLabel}: {bar.TokensPerSecond:0.00} tokens per second");
+        AutomationProperties.SetName(row, Loc.T("Benchmarks.Report.RateAccessible", accessibleLabel, bar.TokensPerSecond.ToString("0.00", Loc.FormatCulture)));
         return row;
     }
 

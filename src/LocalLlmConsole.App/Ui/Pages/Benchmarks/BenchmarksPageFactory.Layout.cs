@@ -142,9 +142,9 @@ public static partial class BenchmarksPageFactory
         values.ToolTip = help;
         item.ToolTip = help;
         ToolTipService.SetShowDuration(item, 30000);
-        AutomationProperties.SetName(values, $"{name} values to compare");
+        AutomationProperties.SetName(values, Loc.T("Benchmarks.Variables.ValuesToCompare", name));
         AutomationProperties.SetHelpText(values, help);
-        AutomationProperties.SetName(enabled, $"Compare {name}");
+        AutomationProperties.SetName(enabled, Loc.T("Benchmarks.Variables.Compare", name));
         Grid.SetColumn(values, 1);
         item.Children.Add(label);
         item.Children.Add(values);
@@ -156,11 +156,11 @@ public static partial class BenchmarksPageFactory
     private static void AddGuidedField(
         Grid grid,
         int index,
-        string name,
-        FrameworkElement field,
-        string? help = null)
+        string fieldId,
+        FrameworkElement field)
     {
-        help = BenchmarkFieldDescriptions.Get(name, help);
+        var name = BenchmarkFieldDescriptions.Label(fieldId);
+        var help = BenchmarkFieldDescriptions.Get(fieldId);
         var gridRow = index / 2;
         var gridColumn = index % 2 == 0 ? 0 : 2;
         while (grid.RowDefinitions.Count <= gridRow)
@@ -203,11 +203,11 @@ public static partial class BenchmarksPageFactory
 
     private static void AddGuidedWideField(
         System.Windows.Controls.Panel panel,
-        string name,
-        FrameworkElement field,
-        string? help = null)
+        string fieldId,
+        FrameworkElement field)
     {
-        help = BenchmarkFieldDescriptions.Get(name, help);
+        var name = BenchmarkFieldDescriptions.Label(fieldId);
+        var help = BenchmarkFieldDescriptions.Get(fieldId);
         var item = new StackPanel { Margin = new Thickness(0, 3, 0, 6), ToolTip = help };
         ToolTipService.SetShowDuration(item, 30000);
         var label = new TextBlock
@@ -237,26 +237,26 @@ public static partial class BenchmarksPageFactory
         bool compareBatches,
         string? batches)
         => VariableCombinationSummary(
-            (compareContexts, contexts, "context length", "context lengths"),
-            (compareBatches, batches, "batch size", "batch sizes"));
+            (compareContexts, contexts, "ContextLength"),
+            (compareBatches, batches, "BatchSize"));
 
     private static string VariableCombinationSummary(
-        params (bool Enabled, string? Values, string Singular, string Plural)[] dimensions)
+        params (bool Enabled, string? Values, string Dimension)[] dimensions)
     {
         var enabled = dimensions.Where(dimension => dimension.Enabled).ToArray();
         if (enabled.Any(dimension => CountValues(dimension.Values) == 0))
-            return "Enter at least one value in every enabled row. Separate multiple values with commas.";
+            return Loc.T("Benchmarks.Variables.MissingValues");
         if (enabled.Length == 0)
-            return "1 launch configuration per profile · all launch settings inherited.";
+            return Loc.T("Benchmarks.Variables.AllInherited");
         long total = 1;
         var factors = new List<string>(enabled.Length);
         foreach (var dimension in enabled)
         {
             var count = CountValues(dimension.Values);
             total *= count;
-            factors.Add($"{count} {(count == 1 ? dimension.Singular : dimension.Plural)}");
+            factors.Add(Loc.T(count == 1 ? $"Benchmarks.Dimension.{dimension.Dimension}.One" : $"Benchmarks.Dimension.{dimension.Dimension}.Other", count));
         }
-        return $"{string.Join(" × ", factors)} = {total} temporary launch configuration{(total == 1 ? "" : "s")} per profile.";
+        return Loc.T(total == 1 ? "Benchmarks.Variables.Total.One" : "Benchmarks.Variables.Total.Other", string.Join(" × ", factors), total);
     }
 
     private static int CountValues(string? value)

@@ -145,7 +145,7 @@ public partial class MainWindow
                     _viewModel.CurrentPage == "Overview",
                     cts),
                 RuntimeReadinessMonitorActions(session, selectLoadedOverviewModel)),
-            "Runtime readiness monitor failed");
+            Loc.T("Status.Failure.RuntimeReadinessMonitor"));
     }
 
     private void StopRuntimeReadinessMonitor()

@@ -41,9 +41,9 @@ public partial class MainWindow
         StartRuntimeDashboardRefreshTimer();
         if (refresh)
         {
-            RunBackground(RefreshOverviewAsync, "Overview refresh failed");
-            RunBackground(RefreshOverviewModelSelectorAsync, "Overview model refresh failed");
-            RunBackground(RefreshRuntimeMetricsAsync, "Runtime metrics refresh failed");
+            RunBackground(RefreshOverviewAsync, Loc.T("Status.Failure.OverviewRefresh"));
+            RunBackground(RefreshOverviewModelSelectorAsync, Loc.T("Status.Failure.OverviewModelRefresh"));
+            RunBackground(RefreshRuntimeMetricsAsync, Loc.T("Status.Failure.RuntimeMetricsRefresh"));
         }
     }
 
@@ -61,7 +61,7 @@ public partial class MainWindow
         _modelsPage.ApplyUiPreferences(_settings);
         ConfigureHfSearchGrid();
         PageHost.Content = modelsPage.Root;
-        RunBackground(RefreshModelsAsync, "Models refresh failed");
+        RunBackground(RefreshModelsAsync, Loc.T("Status.Failure.ModelsRefresh"));
     }
 
     private void ShowRuntimes()
@@ -75,7 +75,7 @@ public partial class MainWindow
 
         _runtimesPage.Apply(runtimesPage);
         PageHost.Content = runtimesPage.Root;
-        RunBackground(DetectAndRefreshRuntimesAsync, "Runtime refresh failed");
+        RunBackground(DetectAndRefreshRuntimesAsync, Loc.T("Status.Failure.RuntimeRefresh"));
     }
 
     private async Task ScanModelsFolderAsync()

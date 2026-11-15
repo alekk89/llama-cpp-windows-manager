@@ -29,7 +29,7 @@ public partial class MainWindow
         ApplyPendingHelpFocus();
         if (_environmentPageSnapshots.TryStartWindowsAutoRefresh())
             RunBackground(RefreshWindowsAsync,
-                $"[{DiagnosticErrorCodes.WindowsProbe}] Windows tool refresh failed. Create a diagnostics bundle from Logs if this repeats");
+                $"[{DiagnosticErrorCodes.WindowsProbe}] {Loc.T("Status.Failure.WindowsToolRefresh")}");
     }
 
     private async Task RefreshWindowsAsync()

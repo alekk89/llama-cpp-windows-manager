@@ -24,11 +24,11 @@ public sealed class BenchmarkRuntimeOptionPicker : StackPanel
     public BenchmarkRuntimeOptionPicker(Action<IReadOnlyList<string>> add)
     {
         _add = add;
-        Children.Add(BenchmarkWorkspaceView.Action("Discover runtime options", (_, _) => DiscoverRequested?.Invoke()));
-        Children.Add(BenchmarkWorkspaceView.Field("Runtime option", _options));
+        Children.Add(BenchmarkWorkspaceView.Action(Loc.T("Benchmarks.RuntimeOptions.Discover"), (_, _) => DiscoverRequested?.Invoke()));
+        Children.Add(BenchmarkWorkspaceView.Field(Loc.T("Benchmarks.RuntimeOptions.Option"), _options));
         Children.Add(_description);
         Children.Add(_editorHost);
-        Children.Add(BenchmarkWorkspaceView.Action("Add override", (_, _) => Add()));
+        Children.Add(BenchmarkWorkspaceView.Action(Loc.T("Benchmarks.RuntimeOptions.AddOverride"), (_, _) => Add()));
         _options.SelectionChanged += (_, _) =>
         {
             if (_options.SelectedItem is not Choice choice) return;
@@ -37,7 +37,7 @@ public sealed class BenchmarkRuntimeOptionPicker : StackPanel
             _editor = new LaunchRuntimeOptionEditorFactory(ChooseFile, ChooseDirectory, () => { }).Create(option);
             _editorHost.Content = _editor.Control;
         };
-        SetStatus("Discover settings from the selected runtime, then choose a flag. Added values remain visible in the argument field and are saved with the plan.");
+        SetStatus(Loc.T("Benchmarks.RuntimeOptions.Intro"));
     }
 
     public void SetOptions(IReadOnlyList<RuntimeLaunchOptionDefinition> definitions)
@@ -45,7 +45,7 @@ public sealed class BenchmarkRuntimeOptionPicker : StackPanel
         _definitions = definitions;
         _options.ItemsSource = definitions.Select(option => new Choice(option)).ToArray();
         _options.SelectedIndex = 0;
-        if (definitions.Count == 0) SetStatus("No additional options were recognized. You can still enter arguments directly.");
+        if (definitions.Count == 0) SetStatus(Loc.T("Benchmarks.RuntimeOptions.NoneRecognized"));
     }
 
     public void Filter(string query)
@@ -56,8 +56,8 @@ public sealed class BenchmarkRuntimeOptionPicker : StackPanel
         if (_editor is null) return;
         var tokens = new List<string>();
         _editor.AppendTokens(tokens);
-        if (tokens.Count == 0) { SetStatus("Choose an explicit value first."); return; }
-        try { _add(tokens); SetStatus("Override added to the argument field."); }
+        if (tokens.Count == 0) { SetStatus(Loc.T("Benchmarks.RuntimeOptions.ChooseValue")); return; }
+        try { _add(tokens); SetStatus(Loc.T("Benchmarks.RuntimeOptions.Added")); }
         catch (InvalidOperationException error) { SetStatus(error.Message); }
     }
 

@@ -61,7 +61,7 @@ public partial class MainWindow
                 session => ResetLifetimeCounters(session),
                 ControlRunBusyAsync,
                 SetStatus,
-                update => RunBackground(() => InstallAppUpdateAsync(update, confirm: false), "Controlled app update failed")));
+                update => RunBackground(() => InstallAppUpdateAsync(update, confirm: false), Loc.T("Status.Failure.ControlledAppUpdate"))));
 
     private async Task<object> ControlRefreshAsync(CancellationToken cancellationToken)
     {

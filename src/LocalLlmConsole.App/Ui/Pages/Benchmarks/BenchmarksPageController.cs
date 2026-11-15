@@ -56,7 +56,7 @@ public sealed class BenchmarksPageController
         {
             1 => _actions.DetailsAsync,
             2 => _actions.CompareAsync,
-            _ => () => Task.FromException(new InvalidOperationException("Select one run to view its report or exactly two runs to compare."))
+            _ => () => Task.FromException(new InvalidOperationException(Loc.T("Benchmarks.SelectOneOrTwoRuns")))
         };
         await _actions.RunEventAsync(action);
     }

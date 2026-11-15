@@ -97,7 +97,7 @@ public sealed class LaunchRuntimeOptionsPanel
         additionalSettings.Children.Add(_status);
         additionalSettings.Children.Add(_rows);
         AdditionalSettingsRoot = additionalSettings;
-        CommandRoot = LaunchRuntimeOptionLayout.CreateGroup("Runtime Command", commandContent);
+        CommandRoot = LaunchRuntimeOptionLayout.CreateGroup(Loc.T("Launch.Command.GroupTitle"), commandContent);
         var content = new StackPanel();
         content.Children.Add(AdditionalSettingsRoot);
         content.Children.Add(CommandRoot);
@@ -136,21 +136,21 @@ public sealed class LaunchRuntimeOptionsPanel
     public void SetLoading(string runtimeName)
     {
         ResetDiscoveredOptions();
-        SetDiscoveryStatus($"Reading supported settings from {runtimeName}...");
+        SetDiscoveryStatus(Loc.T("Launch.Discovery.Reading", runtimeName));
         ApplyFilter(_searchQuery);
     }
 
     public void SetNoRuntime()
     {
         ResetDiscoveredOptions();
-        SetDiscoveryStatus("Select a runtime to discover its additional launch settings.");
+        SetDiscoveryStatus(Loc.T("Launch.Discovery.SelectRuntime"));
         ApplyFilter(_searchQuery);
     }
 
     public void SetError(string message)
     {
         ResetDiscoveredOptions();
-        SetDiscoveryStatus($"Runtime settings could not be discovered: {message}");
+        SetDiscoveryStatus(Loc.T("Launch.Discovery.Failed", message));
         ApplyFilter(_searchQuery);
     }
 
@@ -249,19 +249,19 @@ public sealed class LaunchRuntimeOptionsPanel
             if (!edited.StartsWith(baseline, StringComparison.Ordinal)
                 || (edited.Length > baseline.Length && !char.IsWhiteSpace(edited[baseline.Length])))
             {
-                throw new InvalidOperationException("Keep the generated command unchanged and append new flags at the end.");
+                throw new InvalidOperationException(Loc.T("Launch.Command.KeepGenerated"));
             }
 
             var addition = edited[baseline.Length..].Trim();
             if (addition.Length == 0)
-                throw new InvalidOperationException("Append one or more flags to the command first.");
+                throw new InvalidOperationException(Loc.T("Launch.Command.AppendFirst"));
 
             var addedTokens = CustomLaunchParameterParser.Parse(addition);
             RuntimeLaunchOptionPolicy.ValidateCustomArguments(addedTokens);
             var combined = CustomLaunchParameterParser.Parse(_rawParameters.Text).Concat(addedTokens).ToArray();
             _rawParameters.Text = LaunchArgumentText.Format(combined);
             ImportRawParameters();
-            ShowCommandStatus("Added flags were applied to matching settings.", error: false);
+            ShowCommandStatus(Loc.T("Launch.Command.Applied"), error: false);
         }
         catch (Exception ex)
         {
@@ -278,7 +278,7 @@ public sealed class LaunchRuntimeOptionsPanel
         }
         catch (Exception ex)
         {
-            _status.Text = $"Raw parameters could not be imported: {ex.Message}";
+            _status.Text = Loc.T("Launch.Command.ImportFailed", ex.Message);
             return;
         }
 

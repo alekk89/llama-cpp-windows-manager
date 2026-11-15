@@ -140,7 +140,7 @@ public sealed partial class OverviewDashboardMetricRegistry
                     Primary: ram.Used,
                     Secondary: ram.Total,
                     Unit: "GiB",
-                    Detail: $"of {ram.Total:0.0} GiB"));
+                    Detail: Loc.T("Dashboard.Detail.OfTotal", $"{ram.Total:0.0} GiB")));
             AddSensorReading(readings, OverviewDashboardMetricIds.RamClock,
                 FirstNumber(raw, @"(\d+(?:\.\d+)?)\s*MHz"), "0", "MHz");
         }
@@ -178,7 +178,7 @@ public sealed partial class OverviewDashboardMetricRegistry
             if (memory is { } vram)
                 AddGpuReading(readings, GpuSensorDefinition(
                         OverviewDashboardMetricIds.GpuVram(index), index, "Dashboard.Metric.VramUsed"),
-                    vram.Used, "0.0", "GiB", vram.Total, $"of {vram.Total:0.0} GiB · {gpuName}");
+                    vram.Used, "0.0", "GiB", vram.Total, $"{Loc.T("Dashboard.Detail.OfTotal", $"{vram.Total:0.0} GiB")} · {gpuName}");
             var powerWatts = FirstNumber(raw, @"(\d+(?:\.\d+)?)\s*W(?=\s*(?:/|\||$))");
             AddGpuReading(readings, GpuSensorDefinition(
                     OverviewDashboardMetricIds.GpuPower(index), index, "Dashboard.Metric.PowerDraw"),

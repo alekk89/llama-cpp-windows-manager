@@ -18,7 +18,7 @@ public static class BenchmarksPagePlanService
         ArgumentNullException.ThrowIfNull(plan);
         page.OriginalPlan = plan;
         page.SetRunPolicies(plan.StopActiveSessions, plan.PreventSystemSleep);
-        if (page.Preset is not null) page.Preset.SelectedItem = "Custom";
+        if (page.Preset is not null) page.Preset.SelectedItem = new BenchmarkPresetItem("Custom");
         if (page.Name is not null) page.Name.Text = plan.Name;
         SelectMode(page.ExecutionMode, plan.ExecutionMode);
         SetBoolean(page.Warmup, plan.Warmup);
@@ -41,7 +41,7 @@ public static class BenchmarksPagePlanService
         Text(page.RequestTimeoutSeconds, plan.Serving.RequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture));
         SetBoolean(page.RequireSpeculativeMetrics, plan.Serving.RequireSpeculativeMetrics);
         Text(page.CooldownSeconds, plan.CooldownSeconds.ToString(CultureInfo.InvariantCulture));
-        if (page.FailurePolicy is not null) page.FailurePolicy.SelectedItem = plan.FailurePolicy;
+        if (page.FailurePolicy is not null) page.FailurePolicy.SelectedItem = new BenchmarkFailurePolicyItem(plan.FailurePolicy);
         Set(page.CompareThreads, plan.Options.Threads.Count > 0);
         PickerText(page.Threads, Join(plan.Options.Threads));
         Set(page.CompareBatchSizes, plan.Options.BatchSizes.Count > 0);
@@ -90,10 +90,10 @@ public static class BenchmarksPagePlanService
     {
         ArgumentNullException.ThrowIfNull(page);
         var scope = page.ScopeRows.Count > 0 ? page.ScopeRows : page.SelectedScopeRows;
-        if (scope.Count == 0) throw new InvalidOperationException("Add at least one model profile to the benchmark scope.");
+        if (scope.Count == 0) throw new InvalidOperationException(Loc.T("Benchmarks.Plan.NoScope"));
         return page.OriginalPlan with
         {
-            Name = page.Name?.Text.Trim() is { Length: > 0 } name ? name : "Benchmark run",
+            Name = page.Name?.Text.Trim() is { Length: > 0 } name ? name : Loc.T("Benchmarks.DefaultRunName"),
             ExecutionMode = page.ExecutionMode?.SelectedItem is BenchmarkModeItem mode ? mode.Mode : BenchmarkExecutionMode.ProfileServing,
             AllModels = false,
             ModelIds = scope.Select(row => row.ModelId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -104,22 +104,22 @@ public static class BenchmarksPagePlanService
             UseProfileRuntime = scope.Any(row => string.IsNullOrWhiteSpace(row.RuntimeId)),
             ScopeSelections = scope.Select(row => new BenchmarkScopeSelection(row.ModelId, row.ProfileId, row.RuntimeId)).ToArray(),
             WslDistro = wslDistro,
-            PromptSizes = ParseIntegerList(page.PromptSizes?.Text, "PP sizes", allowEmpty: true),
-            GenerationSizes = ParseIntegerList(page.GenerationSizes?.Text, "TG sizes", allowEmpty: true),
+            PromptSizes = ParseIntegerList(page.PromptSizes?.Text, Loc.T("Benchmarks.Label.PromptOnlyTokens"), allowEmpty: true),
+            GenerationSizes = ParseIntegerList(page.GenerationSizes?.Text, Loc.T("Benchmarks.Label.GenerationOnlyTokens"), allowEmpty: true),
             PromptGenerationPairs = ParsePairs(page.PromptGenerationPairs?.Text),
-            Depths = ParseIntegerList(page.Depths?.Text, "depths", allowEmpty: false),
-            Repetitions = ParseInteger(page.Repetitions?.Text, "repetitions"),
+            Depths = ParseIntegerList(page.Depths?.Text, BenchmarkFieldDescriptions.Label("ContextDepths"), allowEmpty: false),
+            Repetitions = ParseInteger(page.Repetitions?.Text, Loc.T("Benchmarks.Label.Repetitions")),
             Warmup = BooleanValue(page.Warmup, true),
-            DelaySeconds = ParseInteger(page.DelaySeconds?.Text, "delay"),
-            CooldownSeconds = ParseInteger(page.CooldownSeconds?.Text, "cooldown"),
-            FailurePolicy = page.FailurePolicy?.SelectedItem is BenchmarkFailurePolicy policy ? policy : BenchmarkFailurePolicy.Stop,
+            DelaySeconds = ParseInteger(page.DelaySeconds?.Text, Loc.T("Benchmarks.Label.DelaySeconds")),
+            CooldownSeconds = ParseInteger(page.CooldownSeconds?.Text, Loc.T("Benchmarks.Label.CooldownSeconds")),
+            FailurePolicy = page.FailurePolicy?.SelectedItem is BenchmarkFailurePolicyItem policy ? policy.Policy : BenchmarkFailurePolicy.Stop,
             RepeatEquivalentProfiles = page.RepeatEquivalentProfiles?.IsChecked == true,
             StopActiveSessions = page.StopActiveSessions,
             PreventSystemSleep = page.PreventSystemSleep,
             Serving = page.OriginalPlan.Serving with
             {
                 ContextSizes = page.CompareContextSizes?.IsChecked == true
-                    ? ParseIntegerList(page.ContextSizes?.Text, "context sizes", false)
+                    ? ParseIntegerList(page.ContextSizes?.Text, Loc.T("Benchmarks.Compare.ContextSize"), false)
                     : [],
                 SpeculativeConfigurations = page.CompareSpeculativeConfigurations?.IsChecked == true
                     ? page.SpeculativeConfigurations?.Values.ToArray() ?? []
@@ -127,29 +127,29 @@ public static class BenchmarksPagePlanService
                 SpeculativeTypes = [],
                 SpeculativeCompanionModes = page.CompareSpeculativeConfigurations?.IsChecked != true && page.OriginalPlan.Serving.SpeculativeTypes.Count == 0
                     ? page.OriginalPlan.Serving.SpeculativeCompanionModes : [],
-                Concurrencies = ParseIntegerList(page.Concurrencies?.Text, "concurrencies", false),
-                ReadyTimeoutSeconds = ParseInteger(page.ReadyTimeoutSeconds?.Text, "ready timeout"),
-                RequestTimeoutSeconds = ParseInteger(page.RequestTimeoutSeconds?.Text, "request timeout"),
+                Concurrencies = ParseIntegerList(page.Concurrencies?.Text, Loc.T("Benchmarks.Label.Concurrency"), false),
+                ReadyTimeoutSeconds = ParseInteger(page.ReadyTimeoutSeconds?.Text, Loc.T("Benchmarks.Label.ReadyTimeoutSeconds")),
+                RequestTimeoutSeconds = ParseInteger(page.RequestTimeoutSeconds?.Text, Loc.T("Benchmarks.Label.RequestTimeoutSeconds")),
                 RequireSpeculativeMetrics = BooleanValue(page.RequireSpeculativeMetrics, true),
-                Seed = page.Workspace is { } workspace ? ParseInteger(workspace.Seed.Text, "seed") : page.OriginalPlan.Serving.Seed,
+                Seed = page.Workspace is { } workspace ? ParseInteger(workspace.Seed.Text, Loc.T("Launch.Field.Seed")) : page.OriginalPlan.Serving.Seed,
                 Temperature = page.Workspace is { } view ? ParseTemperature(view.Temperature.Text) : page.OriginalPlan.Serving.Temperature,
                 ProfileOverrides = page.Workspace?.ProfileEditor.Build() ?? page.OriginalPlan.Serving.ProfileOverrides
             },
             Options = page.OriginalPlan.Options with
             {
                 Threads = page.CompareThreads?.IsChecked == true
-                    ? ParseIntegerList(page.Threads?.Text, "threads", false)
+                    ? ParseIntegerList(page.Threads?.Text, Loc.T("Benchmarks.Variable.Threads"), false)
                     : [],
                 BatchSizes = page.CompareBatchSizes?.IsChecked == true
-                    ? ParseIntegerList(page.BatchSizes?.Text, "batch sizes", false)
+                    ? ParseIntegerList(page.BatchSizes?.Text, Loc.T("Benchmarks.Variable.BatchSize"), false)
                     : [],
                 MicroBatchSizes = page.CompareMicroBatchSizes?.IsChecked == true
-                    ? ParseIntegerList(page.MicroBatchSizes?.Text, "micro-batch sizes", false)
+                    ? ParseIntegerList(page.MicroBatchSizes?.Text, Loc.T("Benchmarks.Variable.MicroBatchSize"), false)
                     : [],
                 GpuLayers = page.CompareGpuLayers?.IsChecked == true
-                    ? ParseIntegerList(page.GpuLayers?.Text, "GPU layers", false)
+                    ? ParseIntegerList(page.GpuLayers?.Text, Loc.T("Benchmarks.Compare.GpuLayers"), false)
                     : [],
-                CpuMoeLayers = ParseIntegerList(page.CpuMoeLayers?.Text, "CPU MoE layers", true),
+                CpuMoeLayers = ParseIntegerList(page.CpuMoeLayers?.Text, BenchmarkFieldDescriptions.Label("CpuMoeLayers"), true),
                 FlashAttention = page.CompareFlashAttention?.IsChecked == true ? ParseStringList(PickerText(page.FlashAttention)) : [],
                 CacheTypesK = page.Workspace is { } cacheView ? ParseStringList(cacheView.CacheK.Text) : page.OriginalPlan.Options.CacheTypesK,
                 CacheTypesV = page.Workspace is { } cacheViewV ? ParseStringList(cacheViewV.CacheV.Text) : page.OriginalPlan.Options.CacheTypesV,
@@ -159,19 +159,19 @@ public static class BenchmarksPagePlanService
                     ? page.GpuConfigurations?.Values.ToArray() ?? []
                     : [],
                 SplitModes = [],
-                MainGpus = ParseIntegerList(page.MainGpus?.Text, "main GPUs", true),
+                MainGpus = ParseIntegerList(page.MainGpus?.Text, BenchmarkFieldDescriptions.Label("MainGpus"), true),
                 Devices = ParseStringList(page.Devices?.Text),
                 TensorSplits = page.CompareGpuConfigurations?.IsChecked != true && page.OriginalPlan.Options.SplitModes.Count == 0
                     ? page.OriginalPlan.Options.TensorSplits : [],
                 LoadModes = ParseStringList(ComboText(page.LoadModes)),
                 LazyModes = page.Workspace is { } lazyView ? ParseStringList(lazyView.LazyModes.Text) : page.OriginalPlan.Options.LazyModes,
-                FitTargetsMiB = ParseIntegerList(page.FitTargetsMiB?.Text, "fit targets", true),
-                FitContexts = ParseIntegerList(page.FitContexts?.Text, "fit contexts", true),
+                FitTargetsMiB = ParseIntegerList(page.FitTargetsMiB?.Text, BenchmarkFieldDescriptions.Label("FitTargetMib"), true),
+                FitContexts = ParseIntegerList(page.FitContexts?.Text, Loc.T("Benchmarks.Label.FitContext"), true),
                 NumaModes = ParseStringList(ComboText(page.NumaModes)),
-                Priorities = ParseIntegerList(ComboText(page.Priorities), "priorities", true),
+                Priorities = ParseIntegerList(ComboText(page.Priorities), BenchmarkFieldDescriptions.Label("Priority"), true),
                 CpuMasks = ParseStringList(page.CpuMasks?.Text),
                 CpuStrict = ParseStringList(ComboText(page.CpuStrict)),
-                PollValues = ParseIntegerList(page.PollValues?.Text, "poll values", true),
+                PollValues = ParseIntegerList(page.PollValues?.Text, BenchmarkFieldDescriptions.Label("Poll"), true),
                 Embeddings = ParseStringList(ComboText(page.Embeddings)),
                 NoOpOffload = ParseStringList(ComboText(page.NoOpOffload)),
                 NoHost = ParseStringList(ComboText(page.NoHost)),
@@ -183,7 +183,7 @@ public static class BenchmarksPagePlanService
 
     private static double ParseTemperature(string value)
         => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) && double.IsFinite(result)
-            ? result : throw new InvalidOperationException("Enter a valid temperature.");
+            ? result : throw new InvalidOperationException(Loc.T("Benchmarks.Plan.InvalidValue", Loc.T("Launch.Field.Temperature")));
 
     private static void SelectMode(ComboBox? combo, BenchmarkExecutionMode mode)
     {
@@ -195,12 +195,12 @@ public static class BenchmarksPagePlanService
     {
         var parts = (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 0 && allowEmpty) return [];
-        if (parts.Length == 0) throw new InvalidOperationException($"Enter at least one {name} value.");
+        if (parts.Length == 0) throw new InvalidOperationException(Loc.T("Benchmarks.Plan.MissingValue", name));
         var result = new List<int>(parts.Length);
         foreach (var part in parts)
         {
             if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
-                throw new InvalidOperationException($"'{part}' is not a valid {name} value.");
+                throw new InvalidOperationException(Loc.T("Benchmarks.Plan.InvalidListValue", part, name));
             result.Add(parsed);
         }
         return result;
@@ -209,7 +209,7 @@ public static class BenchmarksPagePlanService
     private static int ParseInteger(string? value, string name)
         => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? parsed
-            : throw new InvalidOperationException($"Enter a valid {name} value.");
+            : throw new InvalidOperationException(Loc.T("Benchmarks.Plan.InvalidValue", name));
 
     private static IReadOnlyList<BenchmarkPromptGenerationPair> ParsePairs(string? value)
     {
@@ -220,7 +220,7 @@ public static class BenchmarksPagePlanService
             if (parts.Length != 2
                 || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var prompt)
                 || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var generation))
-                throw new InvalidOperationException($"PG pair '{pair}' must use prompt/generation format, for example 4096/128.");
+                throw new InvalidOperationException(Loc.T("Benchmarks.Plan.InvalidPair", pair));
             result.Add(new BenchmarkPromptGenerationPair(prompt, generation));
         }
         return result;

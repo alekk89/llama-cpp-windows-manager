@@ -61,7 +61,7 @@ public partial class MainWindow
         if (!renderOverview || selectedOverviewModel is null) return Task.CompletedTask;
 
         _runtimeDashboardPage.SetMetricValue(OverviewDashboardMetricIds.ModelStatus, $"Stopped: {selectedOverviewModel.Name}");
-        _runtimeDashboardPage.SetRuntimeLogText("No runtime is loaded for the selected model.", followTail: false);
+        _runtimeDashboardPage.SetRuntimeLogText(Loc.T("RuntimeDashboard.NoRuntimeLoaded"), followTail: false);
         ApplyRuntimeMetricRows(new RuntimeMetricRowsRenderPlan([], null));
         ApplyRuntimeMetricSummary(RuntimeMetricSummaryPresentation.NoRuntime);
         ApplyObservedGpuEnergy();

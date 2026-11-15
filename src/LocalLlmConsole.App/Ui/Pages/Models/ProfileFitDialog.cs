@@ -23,16 +23,16 @@ public static class ProfileFitDialog
         var maximum = Box(currentContext.ToString(CultureInfo.InvariantCulture));
         var minimum = Box(Math.Min(currentContext, 32_768).ToString(CultureInfo.InvariantCulture));
         var reserve = Box("1536");
-        var window = Window(owner, "Fit to available VRAM", 500, 330);
+        var window = Window(owner, Loc.T("ProfileFit.FitTitle"), 500, 330);
         var panel = Panel();
-        panel.Children.Add(Description("Choose the context floor and the VRAM to leave free on each selected GPU. The original profile will not be changed."));
-        panel.Children.Add(Field("Desired maximum context", maximum));
-        panel.Children.Add(Field("Minimum acceptable context", minimum));
-        panel.Children.Add(Field("VRAM reserve per GPU (MiB)", reserve));
+        panel.Children.Add(Description(Loc.T("ProfileFit.FitDescription")));
+        panel.Children.Add(Field(Loc.T("ProfileFit.MaximumContext"), maximum));
+        panel.Children.Add(Field(Loc.T("ProfileFit.MinimumContext"), minimum));
+        panel.Children.Add(Field(Loc.T("ProfileFit.VramReserve"), reserve));
         var buttons = Buttons();
         var accepted = false;
-        buttons.Children.Add(ActionButton("Fit and review", true, () => { accepted = true; window.DialogResult = true; }));
-        buttons.Children.Add(ActionButton("Cancel", false, () => window.DialogResult = false));
+        buttons.Children.Add(ActionButton(Loc.T("ProfileFit.FitAndReview"), true, () => { accepted = true; window.DialogResult = true; }));
+        buttons.Children.Add(ActionButton(Loc.T("Common.Cancel"), false, () => window.DialogResult = false));
         panel.Children.Add(buttons);
         window.Content = panel;
         if (window.ShowDialog() != true || !accepted) return null;
@@ -40,7 +40,7 @@ public static class ProfileFitDialog
             || !int.TryParse(minimum.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var min) || min < 1
             || !int.TryParse(reserve.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var reserveMiB) || reserveMiB < 0
             || max < min)
-            throw new InvalidOperationException("Enter valid context values, with maximum context at least the minimum, and a non-negative VRAM reserve.");
+            throw new InvalidOperationException(Loc.T("ProfileFit.InvalidInput"));
         return new ProfileFitDialogInput(max, min, reserveMiB);
     }
 
@@ -51,36 +51,36 @@ public static class ProfileFitDialog
     {
         if (!result.Success || result.Proposal is null) throw new InvalidOperationException(result.Error);
         var proposed = result.Proposal;
-        var window = Window(owner, "Review fitted profile", 720, 610);
+        var window = Window(owner, Loc.T("ProfileFit.ReviewTitle"), 720, 610);
         var root = Panel();
-        root.Children.Add(Description("llama-fit-params proposed these deterministic profile values for the VRAM currently available."));
+        root.Children.Add(Description(Loc.T("ProfileFit.ReviewDescription")));
         var table = new Grid { Margin = new Thickness(0, 10, 0, 8) };
         table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
         table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
         table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.6, GridUnitType.Star) });
-        AddRow(table, 0, "Setting", "Current", "Proposed", true);
-        AddRow(table, 1, "Context", current.ContextSize.ToString("N0"), proposed.ContextSize.ToString("N0"));
-        AddRow(table, 2, "GPU layers", current.GpuLayers.ToString(CultureInfo.InvariantCulture), proposed.GpuLayers.ToString(CultureInfo.InvariantCulture));
-        AddRow(table, 3, "Tensor split", Empty(current.GpuSplit), Empty(proposed.GpuSplit));
-        AddRow(table, 4, "Tensor buffer overrides", Empty(current.TensorBufferOverrides), Empty(proposed.TensorBufferOverrides));
+        AddRow(table, 0, Loc.T("ProfileFit.Column.Setting"), Loc.T("ProfileFit.Column.Current"), Loc.T("ProfileFit.Column.Proposed"), true);
+        AddRow(table, 1, Loc.T("ProfileFit.Row.Context"), current.ContextSize.ToString("N0"), proposed.ContextSize.ToString("N0"));
+        AddRow(table, 2, Loc.T("ProfileFit.Row.GpuLayers"), current.GpuLayers.ToString(CultureInfo.InvariantCulture), proposed.GpuLayers.ToString(CultureInfo.InvariantCulture));
+        AddRow(table, 3, Loc.T("ProfileFit.Row.TensorSplit"), Empty(current.GpuSplit), Empty(proposed.GpuSplit));
+        AddRow(table, 4, Loc.T("ProfileFit.Row.TensorBufferOverrides"), Empty(current.TensorBufferOverrides), Empty(proposed.TensorBufferOverrides));
         root.Children.Add(table);
         if (result.DeviceEstimates.Count > 0)
         {
-            root.Children.Add(Heading("Estimated fitted memory"));
+            root.Children.Add(Heading(Loc.T("ProfileFit.EstimatedMemory")));
             foreach (var device in result.DeviceEstimates)
-                root.Children.Add(Description($"{device.Device}: {device.UsedMiB:N0} MiB used · {device.FreeMiB:N0} MiB expected free"));
+                root.Children.Add(Description(Loc.T("ProfileFit.DeviceEstimate", device.Device, device.UsedMiB, device.FreeMiB)));
         }
         if (result.Warnings.Count > 0)
         {
-            root.Children.Add(Heading("Notes"));
+            root.Children.Add(Heading(Loc.T("ProfileFit.Notes")));
             foreach (var warning in result.Warnings) root.Children.Add(Description($"• {warning}"));
         }
         var action = ProfileFitPreviewAction.Cancel;
         var buttons = Buttons();
-        buttons.Children.Add(ActionButton("Save as new profile", true, () => Close(ProfileFitPreviewAction.SaveAsNewProfile)));
-        buttons.Children.Add(ActionButton("Apply temporarily", false, () => Close(ProfileFitPreviewAction.ApplyTemporarily)));
-        buttons.Children.Add(ActionButton("Save and benchmark", false, () => Close(ProfileFitPreviewAction.SaveAndBenchmark)));
-        buttons.Children.Add(ActionButton("Cancel", false, () => Close(ProfileFitPreviewAction.Cancel)));
+        buttons.Children.Add(ActionButton(Loc.T("ProfileFit.SaveAsNewProfile"), true, () => Close(ProfileFitPreviewAction.SaveAsNewProfile)));
+        buttons.Children.Add(ActionButton(Loc.T("ProfileFit.ApplyTemporarily"), false, () => Close(ProfileFitPreviewAction.ApplyTemporarily)));
+        buttons.Children.Add(ActionButton(Loc.T("ProfileFit.SaveAndBenchmark"), false, () => Close(ProfileFitPreviewAction.SaveAndBenchmark)));
+        buttons.Children.Add(ActionButton(Loc.T("Common.Cancel"), false, () => Close(ProfileFitPreviewAction.Cancel)));
         root.Children.Add(buttons);
         window.Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         window.ShowDialog();
@@ -150,5 +150,5 @@ public static class ProfileFitDialog
         }
     }
 
-    private static string Empty(string? value) => string.IsNullOrWhiteSpace(value) ? "None" : value;
+    private static string Empty(string? value) => string.IsNullOrWhiteSpace(value) ? Loc.T("ProfileFit.None") : value;
 }

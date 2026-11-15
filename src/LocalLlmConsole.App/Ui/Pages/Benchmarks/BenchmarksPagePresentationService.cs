@@ -11,12 +11,12 @@ public static class BenchmarksPagePresentationService
         page.SetHistory(runs.Select(run => new BenchmarkRunRow(
             run.Job.Id,
             run.Job.CreatedAt.ToLocalTime().ToString("g", culture),
-            run.Job.Status.ToString(),
-            $"{run.Payload.WorkItems.Count} item(s)",
+            Loc.T($"Benchmarks.Status.{run.Job.Status}"),
+            Loc.T("Benchmarks.ItemCount", run.Payload.WorkItems.Count),
             $"{run.Payload.CompletedWorkItems + run.Payload.FailedWorkItems}/{run.Payload.WorkItems.Count}",
             run.Payload.Message)
-        { Name = run.Payload.Plan.Name }).ToArray());
-        if (page.HistoryPage is not null) page.HistoryPage.Text = $"Page {(page.HistoryOffset / page.HistoryPageSize) + 1}";
+        { Name = run.Payload.Plan.Name, JobStatus = run.Job.Status }).ToArray());
+        if (page.HistoryPage is not null) page.HistoryPage.Text = Loc.T("Benchmarks.HistoryPage", (page.HistoryOffset / page.HistoryPageSize) + 1);
         if (page.HistoryPrevious is not null) page.HistoryPrevious.IsEnabled = page.HistoryOffset > 0;
         if (page.HistoryNext is not null) page.HistoryNext.IsEnabled = runs.Count == page.HistoryPageSize;
         var active = runs.FirstOrDefault(run => run.Job.Status is JobStatus.Queued or JobStatus.Running or JobStatus.Paused);
@@ -53,8 +53,8 @@ public static class BenchmarksPagePresentationService
             ? ((run.Payload.CompletedAt ?? DateTimeOffset.UtcNow) - started).ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture)
             : "00:00:00";
         var target = item is null ? "" : $" · {item.ModelName} · {item.RuntimeName} · {string.Join(", ", item.ProfileNames)}";
-        page.ActiveStatus.Text = $"{run.Payload.Plan.Name} · {run.Job.Status} · item {index + 1} of {total}{target}"
-            + $" · rows {run.Payload.ResultRows}/{expectedRows} · elapsed {elapsed}{Environment.NewLine}{run.Payload.Message}";
+        page.ActiveStatus.Text = Loc.T("Benchmarks.ActiveStatus", run.Payload.Plan.Name, Loc.T($"Benchmarks.Status.{run.Job.Status}"),
+            index + 1, total, target, run.Payload.ResultRows, expectedRows, elapsed) + Environment.NewLine + run.Payload.Message;
         page.Progress.Maximum = total;
         page.Progress.Value = Math.Min(finished, total);
     }

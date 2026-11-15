@@ -23,8 +23,8 @@ public sealed partial class OverviewDashboardMetricRegistry
         var topology = cpu.PhysicalCores is { } cores && cpu.LogicalProcessors is { } threads
             ? $"{cores}C/{threads}T"
             : cpu.PhysicalCores is { } physical
-                ? $"{physical} cores"
-                : cpu.LogicalProcessors is { } logical ? $"{logical} threads" : "";
+                ? Loc.T("Dashboard.Detail.Cores", physical)
+                : cpu.LogicalProcessors is { } logical ? Loc.T("Dashboard.Detail.Threads", logical) : "";
         var identity = JoinDetails(cpu.Name, topology);
         readings.Add(new OverviewDashboardMetricReading(
             OverviewDashboardMetricIds.Cpu,
@@ -59,7 +59,7 @@ public sealed partial class OverviewDashboardMetricRegistry
                 Primary: usedGib,
                 Secondary: totalGib,
                 Unit: "GiB",
-                Detail: $"of {totalGib:0.0} GiB"));
+                Detail: Loc.T("Dashboard.Detail.OfTotal", $"{totalGib:0.0} GiB")));
         AddSensorReading(readings, OverviewDashboardMetricIds.RamClock,
             memory.ClockMhz, "0", "MHz");
     }
@@ -91,7 +91,7 @@ public sealed partial class OverviewDashboardMetricRegistry
         AddGpuReading(readings, GpuSensorDefinition(
                 OverviewDashboardMetricIds.GpuVram(gpu.Index), gpu.Index, "Dashboard.Metric.VramUsed"),
             gpu.VramUsedGibibytes, "0.0", "GiB", gpu.VramTotalGibibytes,
-            gpu.VramTotalGibibytes is { } total ? $"of {total:0.0} GiB · {gpu.Name}" : gpu.Name);
+            gpu.VramTotalGibibytes is { } total ? $"{Loc.T("Dashboard.Detail.OfTotal", $"{total:0.0} GiB")} · {gpu.Name}" : gpu.Name);
         AddGpuReading(readings, GpuSensorDefinition(
                 OverviewDashboardMetricIds.GpuPower(gpu.Index), gpu.Index, "Dashboard.Metric.PowerDraw"),
             gpu.PowerWatts, "0.#", "W", detail: gpu.Name);
