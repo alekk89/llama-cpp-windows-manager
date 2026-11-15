@@ -1,7 +1,7 @@
 #define AppName "llama.cpp Windows Manager"
 #define AppExeName "LlamaCppWindowsManager.exe"
 #ifndef AppVersion
-#define AppVersion "2.9.0"
+#define AppVersion "3.0.0"
 #endif
 #ifndef SourceDir
 #define SourceDir "..\dist\LlamaCppWindowsManager-win-x64"

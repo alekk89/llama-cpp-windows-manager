@@ -4,7 +4,7 @@ param(
   [string] $SignaturePath = "",
   [string] $ManifestPublicKeySpki = "",
   [string] $ExpectedPublisher = "",
-  [string] $BaselinePath = "tests/release-baselines/v2.8.0.json",
+  [string] $BaselinePath = "tests/release-baselines/v2.9.0.json",
   [switch] $RequireSigned
 )
 
