@@ -129,15 +129,31 @@ $publishRestores = @(
 )
 # `dotnet list package` does not report those implicit packs, so rely on
 # NuGet's restore-time audit and promote every advisory severity to an error.
-foreach ($publishRestore in $publishRestores) {
-  $project = $publishRestore.Project
-  & $dotnet restore $project -r win-x64 --locked-mode --force-evaluate @($publishRestore.Arguments) `
-    "-p:NuGetAudit=true" "-p:NuGetAuditMode=all" "-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904"
-  if ($LASTEXITCODE -ne 0) {
-    $totalVulnerabilities++
-    Write-Host "Locked publish restore or its vulnerability audit failed for $project" -ForegroundColor Red
-  } else {
-    Write-Host "No vulnerable packages found in the publish graph of $project" -ForegroundColor Green
+# --force-evaluate rewrites lock files even in locked mode (with platform line
+# endings), which would leave a release checkout dirty before publishing. Put
+# every lock file back byte for byte afterwards.
+$lockFiles = @(Get-ChildItem -LiteralPath (Join-Path $appDir "src"), (Join-Path $appDir "tests") -Recurse -File -Filter "packages*.lock.json" |
+  Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })
+$lockSnapshots = @{}
+foreach ($lockFile in $lockFiles) { $lockSnapshots[$lockFile.FullName] = [IO.File]::ReadAllBytes($lockFile.FullName) }
+try {
+  foreach ($publishRestore in $publishRestores) {
+    $project = $publishRestore.Project
+    & $dotnet restore $project -r win-x64 --locked-mode --force-evaluate @($publishRestore.Arguments) `
+      "-p:NuGetAudit=true" "-p:NuGetAuditMode=all" "-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904"
+    if ($LASTEXITCODE -ne 0) {
+      $totalVulnerabilities++
+      Write-Host "Locked publish restore or its vulnerability audit failed for $project" -ForegroundColor Red
+    } else {
+      Write-Host "No vulnerable packages found in the publish graph of $project" -ForegroundColor Green
+    }
+  }
+} finally {
+  foreach ($path in $lockSnapshots.Keys) {
+    $original = $lockSnapshots[$path]
+    if (-not (Test-Path -LiteralPath $path) -or -not [Linq.Enumerable]::SequenceEqual([byte[]] [IO.File]::ReadAllBytes($path), [byte[]] $original)) {
+      [IO.File]::WriteAllBytes($path, $original)
+    }
   }
 }
 
