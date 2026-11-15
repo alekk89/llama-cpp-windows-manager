@@ -17,7 +17,7 @@ public sealed class SettingsPageState
     private WpfComboBox? ThemeCombo { get; set; }
 
     public string SelectedThemeValue
-        => ThemeCombo?.SelectedItem?.ToString() ?? ThemeCombo?.Text ?? "";
+        => ThemeCombo?.SelectedValue?.ToString() ?? "";
 
     public void Apply(
         SettingsPageControls controls,
