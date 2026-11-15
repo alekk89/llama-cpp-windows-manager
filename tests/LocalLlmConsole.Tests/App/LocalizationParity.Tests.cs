@@ -121,6 +121,62 @@ public sealed class LocalizationParityTests : ManagerRegressionTestBase
         Assert.DoesNotContain(expected, key => !english.Contains(key));
     }
 
+    /// <summary>
+    /// A value identical to English is untranslated unless it is legitimately the same in that
+    /// language (product names, units, flags, shared technical terms). Those reviewed values live in
+    /// identical-to-english-allowlist.json, which may only shrink; anything else must be translated.
+    /// </summary>
+    [Fact]
+    public void ValuesRepeatEnglishOnlyWhereReviewed()
+    {
+        var localizationRoot = LocalizationRoot();
+        var english = ReadValues(Path.Combine(localizationRoot, "Strings.en.json"));
+        var actual = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json").Order(StringComparer.Ordinal))
+        {
+            var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
+            if (code == "en") continue;
+            var pack = ReadValues(path);
+            actual[code] = pack.Where(pair => english.TryGetValue(pair.Key, out var value) && value == pair.Value)
+                .Select(pair => pair.Key).Order(StringComparer.Ordinal).ToArray();
+        }
+
+        var allowlistPath = IdenticalAllowlistPath();
+        if (Environment.GetEnvironmentVariable(UpdateBaselineVariable) == "1")
+        {
+            File.WriteAllText(allowlistPath, JsonSerializer.Serialize(actual, new JsonSerializerOptions { WriteIndented = true, NewLine = "\n" }) + "\n");
+            return;
+        }
+
+        var allowlist = JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(allowlistPath))
+                        ?? throw new InvalidOperationException("The identical-to-English allowlist is empty.");
+        var untranslated = new List<string>();
+        var nowTranslated = new List<string>();
+        foreach (var (code, identical) in actual)
+        {
+            var allowed = allowlist.TryGetValue(code, out var keys) ? keys.ToHashSet(StringComparer.Ordinal) : [];
+            untranslated.AddRange(identical.Where(key => !allowed.Contains(key)).Select(key => $"{code}: {key} = \"{english[key]}\""));
+            nowTranslated.AddRange(allowed.Where(key => !identical.Contains(key, StringComparer.Ordinal)).Select(key => $"{code}: {key}"));
+        }
+
+        Assert.True(untranslated.Count == 0,
+            "These values are copied from English; translate them (or, only if the text is genuinely the same in that language, regenerate the allowlist as described in docs/DEVELOPMENT.md):\n"
+            + string.Join("\n", untranslated));
+        Assert.True(nowTranslated.Count == 0,
+            $"These values are no longer identical to English; remove them from the allowlist (set {UpdateBaselineVariable}=1 and rerun):\n"
+            + string.Join("\n", nowTranslated));
+    }
+
+    private static string IdenticalAllowlistPath()
+        => Path.Combine(RepositoryRoot.Value, "tests", "LocalLlmConsole.Tests", "App", "identical-to-english-allowlist.json");
+
+    private static Dictionary<string, string> ReadValues(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        return document.RootElement.EnumerateObject()
+            .ToDictionary(property => property.Name, property => property.Value.GetString() ?? "", StringComparer.Ordinal);
+    }
+
     private static string LocalizationRoot()
         => Path.GetDirectoryName(FindRepositoryFile("src", "LocalLlmConsole.App", "Localization", "Strings.en.json"))!;
 

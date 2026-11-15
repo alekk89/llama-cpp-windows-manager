@@ -33,45 +33,6 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
     }
 
     [Fact]
-    public void ProductionLocalizationPacksMeetCoverageFloorAndPartialPacksAreDisclosed()
-    {
-        var localizationRoot = Path.GetDirectoryName(FindRepositoryFile(
-            "src",
-            "LocalLlmConsole.App",
-            "Localization",
-            "Strings.en.json"))!;
-        var english = ReadLocalizationPack(Path.Combine(localizationRoot, "Strings.en.json"));
-        var previewCodes = new[] { "ar", "hi" };
-        var helpFallbackCodes = new[] { "ko", "nl", "pl", "pt", "ru", "sv", "tr", "vi", "zh" };
-        const double productionFallbackCeiling = .28;
-        const double helpFallbackCeiling = .37;
-
-        foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
-        {
-            var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
-            if (code == "en") continue;
-            var pack = ReadLocalizationPack(path);
-            var fallbackCount = english.Count(pair => !pack.TryGetValue(pair.Key, out var value) || value == pair.Value);
-            var identicalRatio = fallbackCount / (double)english.Count;
-
-            if (previewCodes.Contains(code, StringComparer.Ordinal))
-            {
-                Assert.True(Loc.IsPreviewLanguage(code));
-            }
-            else if (helpFallbackCodes.Contains(code, StringComparer.Ordinal))
-            {
-                Assert.False(Loc.IsPreviewLanguage(code));
-                Assert.True(identicalRatio <= helpFallbackCeiling, $"Production pack '{code}' repeats {identicalRatio:P1} of English values.");
-            }
-            else
-            {
-                Assert.False(Loc.IsPreviewLanguage(code));
-                Assert.True(identicalRatio <= productionFallbackCeiling, $"Production pack '{code}' repeats {identicalRatio:P1} of English values.");
-            }
-        }
-    }
-
-    [Fact]
     public void MissingLocalizedValuesUseTheDocumentedEnglishFallback()
     {
         // Every shipped pack is complete, so exercise the lookup chain with its own packs.
@@ -91,8 +52,10 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
             Assert.True(Loc.IsRightToLeft("ar"));
             Assert.True(Loc.IsRightToLeft("fa"));
             Assert.False(Loc.IsRightToLeft("hi"));
-            Assert.Contains("جزئية", Loc.LanguageDisplayName("ar"), StringComparison.Ordinal);
-            Assert.Contains("आंशिक", Loc.LanguageDisplayName("hi"), StringComparison.Ordinal);
+            // Every shipped pack is complete, so none is labelled as a partial preview.
+            Assert.All(Loc.AvailableLanguages(), code => Assert.False(Loc.IsPreviewLanguage(code), code));
+            Assert.Equal("العربية", Loc.LanguageDisplayName("ar"));
+            Assert.Equal("हिन्दी", Loc.LanguageDisplayName("hi"));
 
             Loc.LoadLanguage("AR");
             Assert.Equal("ar", Loc.CurrentLanguage);
@@ -231,7 +194,6 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
             "Settings.ApiKeyAuthDisabledMessage", "Settings.AutoApplyHint",
             "Pref.Enable", "Pref.Disable", "Help.Article.network-and-key.Detail.1"
         };
-        var translatedHelpCodes = new[] { "ar", "bg", "cs", "de", "es", "fa", "fr", "hi", "id", "it", "ja" };
 
         Assert.NotEmpty(articleKeys);
         foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
@@ -243,16 +205,8 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
             Assert.DoesNotContain(pack, pair => pair.Value.Contains("[[[LLWM", StringComparison.Ordinal));
             if (code == "en") continue;
             Assert.DoesNotContain(currentSettingsKeys, key => pack[key] == english[key]);
-            if (translatedHelpCodes.Contains(code, StringComparer.Ordinal))
-            {
-                Assert.NotEqual(english["Help.Article.quick-start.Title"], pack["Help.Article.quick-start.Title"]);
-                Assert.NotEqual(english["Help.Search.Placeholder"], pack["Help.Search.Placeholder"]);
-            }
-            else
-            {
-                var englishFallbacks = requiredKeys.Count(key => pack[key] == english[key]);
-                Assert.InRange(englishFallbacks, 1, requiredKeys.Length - 1);
-            }
+            Assert.NotEqual(english["Help.Article.quick-start.Title"], pack["Help.Article.quick-start.Title"]);
+            Assert.NotEqual(english["Help.Search.Placeholder"], pack["Help.Search.Placeholder"]);
         }
     }
 
@@ -303,12 +257,10 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
             "/health", "/v1/models", "/props", "/slots", "/running", "--model-draft", "--mmproj",
             "llama-server.exe", "llama-server"
         };
-        var translatedHelpCodes = new[] { "ar", "bg", "cs", "de", "es", "fa", "fr", "hi", "id", "it", "ja" };
 
         foreach (var path in Directory.GetFiles(localizationRoot, "Strings.*.json"))
         {
             var code = Path.GetFileNameWithoutExtension(path).Split('.')[1];
-            if (!translatedHelpCodes.Contains(code, StringComparer.Ordinal)) continue;
             var pack = ReadLocalizationPack(path);
             foreach (var key in helpKeys)
             {
