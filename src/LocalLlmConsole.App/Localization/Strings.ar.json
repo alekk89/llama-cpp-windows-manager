@@ -160,6 +160,8 @@
   "Overview.ModelStatusLabel": "Model Status",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Choose a local model to load with its saved launch profile.",
+  "Overview.SelectionFallback": "لم يعد “{0}” متاحًا. تعرض النظرة العامة الآن “{1}”.",
+  "Overview.SelectionRemoved": "لم يعد “{0}” متاحًا.",
   "Overview.LoadButton": "Load",
   "Overview.LoadedButton": "تم التحميل",
   "Overview.MissingModelLoadTooltip": "ملف النموذج مفقود. استعده أو أزل إدخال الفهرس قبل التحميل.",

@@ -193,6 +193,8 @@
   "Overview.ModelStatusLabel": "Status do Modelo",
   "Overview.ModelLabel": "Modelo",
   "Tooltip.OverviewModelCombo": "Escolha um modelo local para carregar com seu perfil de inicialização salvo.",
+  "Overview.SelectionFallback": "“{0}” não está mais disponível. A visão geral agora mostra “{1}”.",
+  "Overview.SelectionRemoved": "“{0}” não está mais disponível.",
   "Overview.LoadButton": "Carregar",
   "Overview.LoadedButton": "Carregado",
   "Overview.MissingModelLoadTooltip": "O ficheiro do modelo está em falta. Restaure-o ou remova a entrada do catálogo antes de carregar.",

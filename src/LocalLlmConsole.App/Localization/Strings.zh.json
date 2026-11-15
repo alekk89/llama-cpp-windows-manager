@@ -219,6 +219,8 @@
   "Overview.ModelStatusLabel": "模型状态",
   "Overview.ModelLabel": "模型",
   "Tooltip.OverviewModelCombo": "选择一个本地模型，使用其保存的启动配置文件进行加载。",
+  "Overview.SelectionFallback": "“{0}”已不可用。概览现在显示“{1}”。",
+  "Overview.SelectionRemoved": "“{0}”已不可用。",
   "Overview.LoadButton": "加载",
   "Overview.LoadedButton": "已加载",
   "Overview.MissingModelLoadTooltip": "模型文件缺失。请先恢复文件或删除目录记录，然后再加载。",

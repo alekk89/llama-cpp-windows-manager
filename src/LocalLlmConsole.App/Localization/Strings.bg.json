@@ -249,6 +249,8 @@
   "Overview.ModelStatusLabel": "Състояние на модела",
   "Overview.ModelLabel": "Модел",
   "Tooltip.OverviewModelCombo": "Изберете локален модел за зареждане с запазения му профил.",
+  "Overview.SelectionFallback": "„{0}“ вече не е наличен. Общият преглед сега показва „{1}“.",
+  "Overview.SelectionRemoved": "„{0}“ вече не е наличен.",
   "Overview.LoadButton": "Зареди",
   "Overview.LoadedButton": "Зареден",
   "Overview.MissingModelLoadTooltip": "Файлът на модела липсва. Възстановете го или премахнете записа от каталога преди зареждане.",

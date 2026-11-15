@@ -231,6 +231,8 @@
   "Overview.ModelStatusLabel": "Status modelu",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Wybierz lokalny model do załadowania z zapisanym profilem uruchomieniowym.",
+  "Overview.SelectionFallback": "„{0}” nie jest już dostępny. Przegląd pokazuje teraz „{1}”.",
+  "Overview.SelectionRemoved": "„{0}” nie jest już dostępny.",
   "Overview.LoadButton": "Załaduj",
   "Overview.LoadedButton": "Załadowano",
   "Overview.MissingModelLoadTooltip": "Brakuje pliku modelu. Przywróć go lub usuń wpis z katalogu przed wczytaniem.",

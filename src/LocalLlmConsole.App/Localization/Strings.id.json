@@ -193,6 +193,8 @@
   "Overview.ModelStatusLabel": "Status Model",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Pilih model lokal untuk dimuat dengan profil peluncuran yang disimpan.",
+  "Overview.SelectionFallback": "“{0}” tidak lagi tersedia. Ikhtisar kini menampilkan “{1}”.",
+  "Overview.SelectionRemoved": "“{0}” tidak lagi tersedia.",
   "Overview.LoadButton": "Muat",
   "Overview.LoadedButton": "Dimuat",
   "Overview.MissingModelLoadTooltip": "File model tidak ditemukan. Pulihkan file atau hapus entri katalog sebelum memuat.",

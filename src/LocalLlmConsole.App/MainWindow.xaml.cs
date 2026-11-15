@@ -81,7 +81,7 @@ public partial class MainWindow : Window
                 ModelRuntimeUnloadActions,
                 SaveActiveRuntimeSessionsAsync,
                 RefreshRuntimeMetricsAsync,
-                SetStatus,
+                SetStatus, ShellNotice.Show,
                 this,
                 _coreServices.App.Clipboard.SetText));
         _pageControllers = CreatePageControllers();

@@ -62,12 +62,7 @@ public partial class MainWindow
     }
     private bool TryBeginUiBusy(string message)
     {
-        if (!_viewModel.TryBeginBusy(out var busyMessage))
-        {
-            SetStatus(busyMessage);
-            return false;
-        }
-
+        if (!TryBeginBusyOrNotify()) return false;
         _coreServices.Ui.UiBusyState.Begin(PageHost.IsEnabled, SetPageHostEnabled, SetWaitCursor);
         SetStatus(message);
         return true;
@@ -81,13 +76,16 @@ public partial class MainWindow
 
     private bool TryBeginResponsiveActivity(string message)
     {
-        if (_viewModel.TryBeginBusy(out var busyMessage))
-        {
-            SetStatus(message);
-            return true;
-        }
+        if (!TryBeginBusyOrNotify()) return false;
+        SetStatus(message);
+        return true;
+    }
 
+    private bool TryBeginBusyOrNotify()
+    {
+        if (_viewModel.TryBeginBusy(out var busyMessage)) return true;
         SetStatus(busyMessage);
+        ShellNotice.Show(busyMessage);
         return false;
     }
 

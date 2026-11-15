@@ -169,6 +169,8 @@
   "Overview.ModelStatusLabel": "وضعیت مدل",
   "Overview.ModelLabel": "مدل",
   "Tooltip.OverviewModelCombo": "یک مدل محلی را برای بارگذاری با پروفایل راه‌اندازی ذخیره‌شده آن انتخاب کنید.",
+  "Overview.SelectionFallback": "«{0}» دیگر در دسترس نیست. نمای کلی اکنون «{1}» را نشان می‌دهد.",
+  "Overview.SelectionRemoved": "«{0}» دیگر در دسترس نیست.",
   "Overview.LoadButton": "بارگذاری",
   "Overview.LoadedButton": "بارگذاری‌شده",
   "Overview.MissingModelLoadTooltip": "فایل مدل وجود ندارد. پیش از بارگذاری آن را بازیابی کنید یا ورودی کاتالوگ را حذف کنید.",

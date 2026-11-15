@@ -174,6 +174,8 @@
   "Overview.ModelStatusLabel": "Stav modelu",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Vyberte místní model k načtení s jeho uloženým profilem spuštění.",
+  "Overview.SelectionFallback": "„{0}“ již není k dispozici. Přehled nyní zobrazuje „{1}“.",
+  "Overview.SelectionRemoved": "„{0}“ již není k dispozici.",
   "Overview.LoadButton": "Načíst",
   "Overview.LoadedButton": "Načteno",
   "Overview.MissingModelLoadTooltip": "Soubor modelu chybí. Před načtením jej obnovte nebo odeberte záznam z katalogu.",

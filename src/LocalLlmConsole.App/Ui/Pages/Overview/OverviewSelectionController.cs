@@ -11,6 +11,7 @@ public sealed record OverviewSelectionControllerActions(
     Func<Task> SaveActiveRuntimeSessionsAsync,
     Func<Task> RefreshRuntimeMetricsAsync,
     Action<string> SetStatus,
+    Action<string> ShowNotice,
     Window Owner,
     Action<string> CopyToClipboard);
 
@@ -23,6 +24,7 @@ public sealed class OverviewSelectionController
     private readonly MainWindowCoreModelServices _models;
     private readonly SelectionReentrancyCoordinator _selection;
     private readonly OverviewSelectionControllerActions _actions;
+    private readonly OverviewModelChoiceRefresher _modelChoices;
 
     public OverviewSelectionController(
         MainWindowViewModel viewModel,
@@ -40,6 +42,7 @@ public sealed class OverviewSelectionController
         _models = models;
         _selection = selection;
         _actions = actions;
+        _modelChoices = new OverviewModelChoiceRefresher(viewModel.Overview, page);
     }
 
     public async Task RefreshModelsAsync()
@@ -49,16 +52,20 @@ public sealed class OverviewSelectionController
         IReadOnlyList<ModelRecord> models,
         IReadOnlyDictionary<string, string>? modelSizeLabels = null)
     {
-        var selectedId = SelectedChoice()?.Id;
-        if (string.IsNullOrWhiteSpace(selectedId))
-            selectedId = _sessions.SelectedSnapshot()?.ModelId;
-
         var modelServices = _actions.ModelServices();
-        modelSizeLabels ??= await modelServices.ModelCatalogRefreshApplication.ReadModelSizeLabelsAsync(models);
-        var groupSnapshot = await modelServices.ModelGroups.SnapshotAsync();
-        var profiles = await _actions.AppServices().StateStore.ListNamedModelLaunchProfilesAsync();
-        _viewModel.Overview.ReplaceModels(models, groupSnapshot.Groups, groupSnapshot.Assignments, profiles, modelSizeLabels);
-        _page.SelectModelChoice(selectedId, _viewModel.Overview.ModelChoices);
+        var fallback = await _modelChoices.RefreshAsync(
+            async () => new OverviewModelChoiceData(
+                models,
+                await modelServices.ModelGroups.SnapshotAsync(),
+                await _actions.AppServices().StateStore.ListNamedModelLaunchProfilesAsync(),
+                modelSizeLabels ?? await modelServices.ModelCatalogRefreshApplication.ReadModelSizeLabelsAsync(models)),
+            () => _sessions.SelectedSnapshot()?.ModelId);
+        if (fallback is not null)
+        {
+            _actions.SetStatus(fallback.Message);
+            _actions.ShowNotice(fallback.Message);
+        }
+
         await RefreshLaunchProfilesAsync();
         UpdateActions();
     }
@@ -77,7 +84,6 @@ public sealed class OverviewSelectionController
         }
 
         _page.SetLaunchProfileEnabled(true);
-        var selectedProfileId = _page.SelectedLaunchProfileId;
         var launchProfiles = _actions.ModelServices().LaunchProfiles;
         IReadOnlyList<NamedModelLaunchProfile> profiles = model is null
             ? []
@@ -87,6 +93,8 @@ public sealed class OverviewSelectionController
             profiles = [await launchProfiles.EnsureDefaultAsync(model, _actions.Settings())];
         cancellationToken.ThrowIfCancellationRequested();
         if (!SameModel(model, SelectedModel())) return;
+        // Read after the awaits so a profile the user picked during the refresh wins.
+        var selectedProfileId = _page.SelectedLaunchProfileId;
         _viewModel.Overview.ReplaceLaunchProfiles(profiles);
         _page.SelectLaunchProfile(selectedProfileId);
     }

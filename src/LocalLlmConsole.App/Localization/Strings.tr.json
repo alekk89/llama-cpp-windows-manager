@@ -226,6 +226,8 @@
   "Overview.ModelStatusLabel": "Model Durumu",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Kaydedilmiş başlatma profiliyle yüklemek için yerel bir model seçin.",
+  "Overview.SelectionFallback": "“{0}” artık kullanılamıyor. Genel bakış artık “{1}” öğesini gösteriyor.",
+  "Overview.SelectionRemoved": "“{0}” artık kullanılamıyor.",
   "Overview.LoadButton": "Yükle",
   "Overview.LoadedButton": "Yüklendi",
   "Overview.MissingModelLoadTooltip": "Model dosyası eksik. Yüklemeden önce dosyayı geri yükleyin veya katalog kaydını kaldırın.",
