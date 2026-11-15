@@ -50,6 +50,20 @@ public static class OverviewDashboardLayoutEngine
     public static int MinimumSpan(double minimumWidth, double pitch)
         => Math.Clamp((int)Math.Ceiling((minimumWidth + Gap) / pitch - .001), 1, Columns);
 
+    /// <summary>
+    /// Keeps the saved span when the card's content fits it. Otherwise widens it
+    /// to the next span that divides the grid evenly (a quarter, third, half or
+    /// the full row), so narrow windows show equal columns.
+    /// </summary>
+    public static int ResponsiveSpan(int span, int minimumSpan)
+    {
+        span = Math.Clamp(span, 1, Columns);
+        if (span >= minimumSpan) return span;
+        return EvenSpans.First(candidate => candidate >= minimumSpan);
+    }
+
+    private static readonly int[] EvenSpans = [1, 2, 3, 4, 6, Columns];
+
     public static IReadOnlyList<OverviewDashboardPlacement> Flow(
         IReadOnlyList<OverviewDashboardFlowItem> items,
         double availableWidth,
@@ -65,7 +79,7 @@ public static class OverviewDashboardLayoutEngine
             var span = Math.Clamp(item.Span, 1, Columns);
             var minimum = Math.Min(surface, Math.Max(0, item.MinimumWidth));
             if (!locked)
-                span = Math.Max(span, MinimumSpan(minimum, pitch));
+                span = ResponsiveSpan(span, MinimumSpan(minimum, pitch));
             var width = Math.Min(surface, Math.Max(SpanWidth(span, pitch), minimum));
             var height = CardHeight(item, width);
             var (left, top) = BestSlot(placed, width, surface);

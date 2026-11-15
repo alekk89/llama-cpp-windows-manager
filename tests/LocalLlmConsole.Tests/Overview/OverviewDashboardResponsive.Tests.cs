@@ -77,6 +77,23 @@ public sealed class OverviewDashboardResponsiveTests : ManagerRegressionTestBase
     }
 
     [Fact]
+    public void FlowWidensToEvenColumnsSoNarrowRowsShareTheWidthEqually()
+    {
+        // At 528 px a 4-column card is under 180 px; five columns would leave an
+        // unusable remainder, so cards take half the row each.
+        var placements = OverviewDashboardLayoutEngine.Flow(
+            [Item("a", 3, 100), Item("b", 3, 100), Item("c", 3, 100)],
+            528);
+
+        Assert.Equal(placements[0].Width, placements[1].Width, precision: 3);
+        Assert.Equal(528, placements[1].Left + placements[1].Width, precision: 3);
+        Assert.Equal(0, placements[2].Left);
+        Assert.Equal(6, OverviewDashboardLayoutEngine.ResponsiveSpan(3, 5));
+        Assert.Equal(7, OverviewDashboardLayoutEngine.ResponsiveSpan(7, 5));
+        Assert.Equal(12, OverviewDashboardLayoutEngine.ResponsiveSpan(4, 7));
+    }
+
+    [Fact]
     public void FlowStacksEveryCardWhenOnlyOneFitsPerRow()
     {
         var placements = OverviewDashboardLayoutEngine.Flow(
