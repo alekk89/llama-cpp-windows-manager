@@ -451,7 +451,7 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             largeTextFactory.SetValue(TextBlock.FontSizeProperty, 18.0);
             searchGrid.Columns.Add(new DataGridTemplateColumn
             {
-                Header = "Large text",
+                Header = LargeHeaderText,
                 CellTemplate = new DataTemplate { VisualTree = largeTextFactory }
             });
             var search = LocalLlmConsole.DataGridSearch.Create(searchGrid, item => item.ToString() ?? "", "Search");
@@ -480,6 +480,12 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             Assert.Equal(33, searchGrid.MinRowHeight);
             var normalThemedRow = VisualDescendants<DataGridRow>(searchGrid).First().ActualHeight;
             Assert.Equal(33, normalThemedRow, tolerance: 0.5);
+            Assert.True(double.IsNaN(searchGrid.ColumnHeaderHeight));
+            System.Windows.Controls.Primitives.DataGridColumnHeader LargeHeader() => VisualDescendants<System.Windows.Controls.Primitives.DataGridColumnHeader>(searchGrid)
+                .Single(header => Equals(header.Content, LargeHeaderText));
+            var normalHeader = LargeHeader().ActualHeight;
+            Assert.Equal(36, LargeHeader().MinHeight);
+            Assert.Equal(36, normalHeader, tolerance: 0.5);
             Assert.Equal(28, normalEditor, precision: 1);
             Assert.Equal(28, normalSearch, precision: 1);
             try
@@ -488,6 +494,8 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
                 var scaledEditor = EditorHeight();
                 Assert.True(scaledEditor > normalEditor, $"Editor height {scaledEditor} did not grow beyond {normalEditor}.");
                 Assert.True(search.Input.ActualHeight > normalSearch, $"Search height {search.Input.ActualHeight} did not grow.");
+                var scaledHeader = LargeHeader().ActualHeight;
+                Assert.True(scaledHeader > normalHeader, $"Themed grid header height {scaledHeader} did not grow beyond {normalHeader}.");
                 var scaledThemedRow = VisualDescendants<DataGridRow>(searchGrid).First();
                 var scaledRowEditor = VisualDescendants<TextBlock>(scaledThemedRow).Single(text => text.FontSize > 18);
                 Assert.True(scaledThemedRow.ActualHeight > normalThemedRow, $"Themed grid row height {scaledThemedRow.ActualHeight} did not grow beyond {normalThemedRow}.");
@@ -506,6 +514,8 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
     }
 
     private sealed record ScaledGridItem(string Name);
+
+    private const string LargeHeaderText = "Large" + "\n" + "header";
 
     [Fact]
     public async Task UiScaleAppliesWithoutStackingTransforms()
