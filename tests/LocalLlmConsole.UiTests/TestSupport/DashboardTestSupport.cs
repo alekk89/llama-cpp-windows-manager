@@ -27,7 +27,7 @@ public abstract partial class WpfUiTestBase
             [new OverviewDashboardCardLayout(cardId, metricIds, Bounds: new OverviewDashboardCardBounds(0, 0, 6, 240))]);
         var dashboard = new OverviewDashboardController(
             layout,
-            new OverviewDashboardControllerActions(_ => Task.CompletedTask, action => action()),
+            new OverviewDashboardControllerActions(_ => Task.CompletedTask, action => action(), action => action()),
             clock);
         dashboard.DashboardGrid.Measure(new Size(900, 800));
         dashboard.DashboardGrid.Arrange(new Rect(0, 0, 900, 800));

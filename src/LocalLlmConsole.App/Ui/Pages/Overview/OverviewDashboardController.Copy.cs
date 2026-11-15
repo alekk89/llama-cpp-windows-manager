@@ -9,7 +9,7 @@ public sealed partial class OverviewDashboardController
     {
         ArgumentNullException.ThrowIfNull(view);
         var rows = view.CurrentMetricOrder
-            .Where(metricId => view.MetricRows.TryGetValue(metricId, out var row) && row.IsAvailable)
+            .Where(metricId => view.MetricRows.TryGetValue(metricId, out var row) && row.IsShown)
             .Select(metricId => (_registry.Definition(metricId).DisplayName,
                 _readings.TryGetValue(metricId, out var reading) ? reading : null))
             .ToArray();

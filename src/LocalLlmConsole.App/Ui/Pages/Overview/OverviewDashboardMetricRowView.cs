@@ -35,6 +35,9 @@ public sealed class OverviewDashboardMetricRowView
     private readonly RowDefinition _separatorRow;
     private readonly double _valueFontSize;
     private readonly bool _requiresObservedValue;
+    private readonly bool _hideWhenUnreported;
+    private readonly OverviewDashboardMetricSource _source;
+    private string _freshnessStatus = "";
     private bool _reordering;
     private bool _alternateSurface;
     private bool _hovered;
@@ -47,10 +50,13 @@ public sealed class OverviewDashboardMetricRowView
         OverviewDashboardMetricDefinition definition,
         MetricSparkline? graph,
         bool showSeparator,
-        bool alternateSurface = false)
+        bool alternateSurface = false,
+        bool hideWhenUnreported = false)
     {
         MetricId = definition.Id;
         _requiresObservedValue = definition.RequiresObservedValue;
+        _hideWhenUnreported = hideWhenUnreported;
+        _source = OverviewDashboardLayoutPolicy.MetricSource(definition.Id);
         Graph = graph;
         _alternateSurface = alternateSurface;
         Root = new Grid
@@ -190,6 +196,12 @@ public sealed class OverviewDashboardMetricRowView
     public Grid Root { get; }
     public MetricSparkline? Graph { get; }
     public bool IsAvailable { get; private set; } = true;
+    /// <summary>
+    /// True when the row takes space on the card: either it has a value or it
+    /// explains that its metric is not reported.
+    /// </summary>
+    public bool IsShown { get; private set; } = true;
+    public bool IsUnreported => IsShown && !IsAvailable;
     public DateTimeOffset? LastKnownCapturedAt { get; private set; }
     public bool IsStale => LastKnownCapturedAt is not null;
 
@@ -202,8 +214,7 @@ public sealed class OverviewDashboardMetricRowView
         _detail.Visibility = active || string.IsNullOrWhiteSpace(_detail.Text)
             ? Visibility.Collapsed
             : Visibility.Visible;
-        if (Graph is not null)
-            Graph.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
+        UpdateGraphVisibility();
         Root.Cursor = active ? System.Windows.Input.Cursors.SizeNS : null;
     }
 
@@ -250,15 +261,27 @@ public sealed class OverviewDashboardMetricRowView
 
         _lastPresentation = presentation;
         IsAvailable = available;
+        IsShown = available || !_hideWhenUnreported;
         LastKnownCapturedAt = available ? presentation.LastKnownCapturedAt : null;
-        Root.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+        Root.Visibility = IsShown ? Visibility.Visible : Visibility.Collapsed;
         ApplyFreshness();
-        if (!available) return true;
+        UpdateGraphVisibility();
+        if (!IsShown)
+        {
+            UpdateItemStatus();
+            return true;
+        }
+        if (!available)
+        {
+            ApplyUnreported();
+            return true;
+        }
 
         _value.Text = presentation.Value;
         _value.FontSize = unavailable ? UnavailableValueFontSize : _valueFontSize;
         _value.FontWeight = unavailable ? FontWeights.Medium : FontWeights.SemiBold;
-        _value.Foreground = ResourceBrush(unavailable ? "TextMuted" : "TextMain");
+        _value.SetResourceReference(TextBlock.ForegroundProperty, unavailable ? "TextMuted" : "TextMain");
+        _detail.FontStyle = FontStyles.Normal;
         _unit.Text = presentation.Unit;
         _unit.Visibility = string.IsNullOrWhiteSpace(presentation.Unit) ? Visibility.Collapsed : Visibility.Visible;
         _unitColumn.Width = _unit.Visibility == Visibility.Visible
@@ -268,7 +291,46 @@ public sealed class OverviewDashboardMetricRowView
         _detail.Visibility = _reordering || string.IsNullOrWhiteSpace(presentation.Detail)
             ? Visibility.Collapsed
             : Visibility.Visible;
+        UpdateItemStatus();
         return true;
+    }
+
+    public string UnreportedReason => _source switch
+    {
+        OverviewDashboardMetricSource.Hardware => Loc.T("Dashboard.NotReported.Hardware"),
+        OverviewDashboardMetricSource.Gateway => Loc.T("Dashboard.NotReported.Gateway"),
+        _ => Loc.T("Dashboard.NotReported.Runtime")
+    };
+
+    /// <summary>
+    /// Keeps a configured metric visible, muted, with the reason it has no
+    /// value, so it does not vanish from the card without explanation.
+    /// </summary>
+    private void ApplyUnreported()
+    {
+        _value.Text = Loc.T("Dashboard.ValueUnavailable");
+        _value.FontSize = UnavailableValueFontSize;
+        _value.FontWeight = FontWeights.Medium;
+        _value.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        _unit.Text = "";
+        _unit.Visibility = Visibility.Collapsed;
+        _unitColumn.Width = new GridLength(0);
+        _detail.Text = UnreportedReason;
+        _detail.FontStyle = FontStyles.Italic;
+        _detail.Visibility = _reordering ? Visibility.Collapsed : Visibility.Visible;
+        UpdateItemStatus();
+    }
+
+    private void UpdateGraphVisibility()
+    {
+        if (Graph is not null)
+            Graph.Visibility = _reordering || !IsAvailable ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void UpdateItemStatus()
+    {
+        var status = IsUnreported ? UnreportedReason : IsStale ? _freshnessStatus : "";
+        System.Windows.Automation.AutomationProperties.SetItemStatus(Root, status);
     }
 
     /// <summary>
@@ -276,7 +338,10 @@ public sealed class OverviewDashboardMetricRowView
     /// every stale row in it reports the same age.
     /// </summary>
     public void SetFreshnessStatus(string status)
-        => System.Windows.Automation.AutomationProperties.SetItemStatus(Root, IsStale ? status : "");
+    {
+        _freshnessStatus = status;
+        UpdateItemStatus();
+    }
 
     private void ApplyFreshness()
     {
@@ -285,8 +350,6 @@ public sealed class OverviewDashboardMetricRowView
         _detail.Opacity = opacity;
         if (Graph is not null)
             Graph.Opacity = opacity;
-        if (!IsStale)
-            System.Windows.Automation.AutomationProperties.SetItemStatus(Root, "");
     }
 
     private void RefreshSurface()
