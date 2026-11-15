@@ -24,6 +24,7 @@ public sealed partial class OverviewDashboardMetricRegistry
             Metric(OverviewDashboardMetricIds.AveragePromptRate, "AveragePromptRate", "Core", true, "Accent", presentation: OverviewDashboardMetricPresentation.Rate),
             Metric(OverviewDashboardMetricIds.PromptCacheReuse, "PromptCacheReuse", "Core", true, FixedMaximum: 100, presentation: OverviewDashboardMetricPresentation.Percentage),
             Metric(OverviewDashboardMetricIds.DraftAcceptance, "DraftAcceptance", "Core", true, "Accent", FixedMaximum: 100, presentation: OverviewDashboardMetricPresentation.Percentage),
+            .. EfficiencyDefinitions(),
             Metric(OverviewDashboardMetricIds.PeakContextUsed, "PeakContextUsed", "Core", true, presentation: OverviewDashboardMetricPresentation.TokenCount),
             Metric(OverviewDashboardMetricIds.ContextShifts, "ContextShifts", "Advanced", false, presentation: OverviewDashboardMetricPresentation.Count, requiresObservedValue: true),
             Metric(OverviewDashboardMetricIds.GeneratedTokens, "GeneratedTokens", "Advanced", false, presentation: OverviewDashboardMetricPresentation.TokenCount),

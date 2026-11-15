@@ -31,6 +31,13 @@ public sealed partial class OverviewDashboardController
             return;
         }
 
+        if (key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            CopyCardReadings(view);
+            args.Handled = true;
+            return;
+        }
+
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
             || key is not (Key.Left or Key.Right or Key.Up or Key.Down))
             return;

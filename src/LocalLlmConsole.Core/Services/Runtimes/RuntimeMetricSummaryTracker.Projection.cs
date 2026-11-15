@@ -57,7 +57,11 @@ public sealed partial class RuntimeMetricSummaryTracker
             observation.PromptCacheReusePercent,
             observation.DraftAcceptancePercent,
             observation.PeakContextTokens,
-            observation.ContextShiftCount);
+            observation.ContextShiftCount,
+            observation.SpeculativeTokensPerStep,
+            observation.PromptCacheWindow?.HitPercent,
+            observation.PromptCacheWindow?.CachedTokens,
+            observation.PromptCacheWindow?.PromptTokens);
         var update = new RuntimeMetricDisplayUpdate
         {
             TokensText = tokensText,

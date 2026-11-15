@@ -55,7 +55,7 @@ public sealed partial class OverviewDashboardCardView
         System.Windows.Automation.AutomationProperties.SetName(Root, cardName);
         System.Windows.Automation.AutomationProperties.SetHelpText(
             Root,
-            Loc.T("Dashboard.CardKeyboardHelp"));
+            $"{Loc.T("Dashboard.CardKeyboardHelp")} {Loc.T("Dashboard.CopyKeyboardHelp")}");
 
         _content = new Grid();
         _values = new StackPanel();

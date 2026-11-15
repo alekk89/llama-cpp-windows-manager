@@ -123,6 +123,21 @@ Keyboard controls:
 - **Ctrl+Arrow** moves a focused card.
 - **Ctrl+Shift+Arrow** resizes an unlocked card.
 - **Alt+Up/Down** reorders a focused metric row.
+- **Ctrl+C** copies a focused card's readings.
+
+Each card has a **Copy readings** action, shown while the pointer or keyboard
+focus is in the card and also available from its context menu. It copies the
+card name, capture time, and every visible reading with its unit and detail as
+plain text for bug reports, then briefly confirms the copy.
+
+**Speculative speed-up** is the average number of tokens produced per
+target-model verification step: (accepted draft tokens + steps) ÷ steps. Plain
+decoding produces one token per step, so the value is an upper bound that
+excludes drafting time. It appears, and is also shown beside **Draft
+acceptance**, only when the runtime reports its verification-step counter.
+**Prompt cache hit rate** is the cached share of prompt tokens during the most
+recent prompt activity, while **Prompt cache reuse** covers the whole session;
+both need the runtime's cached prompt token counter and otherwise show N/A.
 
 Optional sensors appear only after the host reports a finite value. Cumulative
 counters and raw samples remain useful as values but are not charted when they
