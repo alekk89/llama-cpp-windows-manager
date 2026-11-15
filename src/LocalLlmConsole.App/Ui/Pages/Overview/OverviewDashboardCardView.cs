@@ -128,6 +128,25 @@ public sealed partial class OverviewDashboardCardView
             InvalidateMinimumSize();
             ContentGeometryChanged?.Invoke();
         };
+        // Fonts, display scale and styles can still re-measure text after that,
+        // without any reading changing. Content rows keep their full height, so
+        // a row that outgrows the card shows up here.
+        foreach (var child in _content.Children.OfType<FrameworkElement>())
+            child.SizeChanged += (_, args) =>
+            {
+                if (args.HeightChanged)
+                    RemeasureWhenContentOverflows();
+            };
+    }
+
+    private void RemeasureWhenContentOverflows()
+    {
+        var needed = _content.RowDefinitions.Sum(row => row.ActualHeight)
+                     + Root.Padding.Top + Root.Padding.Bottom
+                     + Root.BorderThickness.Top + Root.BorderThickness.Bottom;
+        if (double.IsNaN(Root.Height) || needed <= Root.Height + .5) return;
+        InvalidateMinimumSize();
+        ContentGeometryChanged?.Invoke();
     }
 
     /// <summary>Raised when the card's content needs to be measured and placed again.</summary>
