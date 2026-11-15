@@ -15,19 +15,24 @@ namespace LocalLlmConsole;
 
 public static class ApplicationThemeService
 {
-    private static string _lastMode = "system";
+    private static volatile string _lastMode = "system";
     private static int _systemPreferenceHooked;
+    private static SystemThemeChangeMonitor? _systemThemeMonitor;
+    private static System.ComponentModel.PropertyChangedEventHandler? _highContrastHandler;
 
     public static void Apply(string mode)
     {
         _lastMode = mode;
         EnsureSystemPreferenceHook();
-        var dark = AppPreferenceService.ThemeMode(mode) switch
+        var themeMode = AppPreferenceService.ThemeMode(mode);
+        var dark = themeMode switch
         {
             "light" => false,
             "dark" => true,
             _ => IsSystemDarkTheme()
         };
+        if (themeMode == "system")
+            _systemThemeMonitor?.Observe(dark);
 
         var colors = SystemParameters.HighContrast
             ? HighContrastThemeColors()
@@ -57,13 +62,35 @@ public static class ApplicationThemeService
     private static void EnsureSystemPreferenceHook()
     {
         if (Interlocked.Exchange(ref _systemPreferenceHooked, 1) != 0) return;
-        SystemParameters.StaticPropertyChanged += (_, args) =>
+        var dispatcher = WpfApplication.Current?.Dispatcher;
+        if (dispatcher is null) return;
+
+        _highContrastHandler = (_, args) =>
         {
-            if (!string.Equals(args.PropertyName, nameof(SystemParameters.HighContrast), StringComparison.Ordinal)) return;
-            var dispatcher = WpfApplication.Current?.Dispatcher;
-            if (dispatcher is null || dispatcher.HasShutdownStarted) return;
-            _ = dispatcher.BeginInvoke(() => Apply(_lastMode));
+            if (string.Equals(args.PropertyName, nameof(SystemParameters.HighContrast), StringComparison.Ordinal))
+                ReapplyOnUiThread(dispatcher);
         };
+        SystemParameters.StaticPropertyChanged += _highContrastHandler;
+        _systemThemeMonitor = SystemThemeChangeMonitor.ForWindows(
+            () => _lastMode,
+            IsSystemDarkTheme,
+            () => ReapplyOnUiThread(dispatcher));
+        dispatcher.ShutdownStarted += (_, _) => Shutdown();
+    }
+
+    /// <summary>Stops following Windows theme changes; called when the UI dispatcher shuts down.</summary>
+    internal static void Shutdown()
+    {
+        if (Interlocked.Exchange(ref _systemThemeMonitor, null) is { } monitor)
+            monitor.Dispose();
+        if (Interlocked.Exchange(ref _highContrastHandler, null) is { } handler)
+            SystemParameters.StaticPropertyChanged -= handler;
+    }
+
+    private static void ReapplyOnUiThread(System.Windows.Threading.Dispatcher dispatcher)
+    {
+        if (dispatcher.HasShutdownStarted) return;
+        _ = dispatcher.BeginInvoke(() => Apply(_lastMode));
     }
 
     private static (string Key, System.Windows.Media.Color Color)[] HighContrastThemeColors()

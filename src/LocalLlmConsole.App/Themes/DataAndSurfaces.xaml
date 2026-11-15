@@ -212,6 +212,132 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="ExpanderHeaderToggle" TargetType="ToggleButton">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Expander}}}"/>
+      <Setter Property="Padding" Value="4,5"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="HeaderChrome"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    Padding="{TemplateBinding Padding}"
+                    CornerRadius="5"
+                    SnapsToDevicePixels="True">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Path x:Name="ExpanderArrow"
+                      Width="10"
+                      Height="10"
+                      Margin="2,0,8,0"
+                      VerticalAlignment="Center"
+                      Data="M 3,1 L 7,5 L 3,9"
+                      Stroke="{DynamicResource TextSoft}"
+                      StrokeThickness="1.6"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round"
+                      RenderTransformOrigin="0.5,0.5">
+                  <Path.RenderTransform>
+                    <RotateTransform x:Name="ExpanderArrowRotation" Angle="0"/>
+                  </Path.RenderTransform>
+                </Path>
+                <ContentPresenter Grid.Column="1"
+                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalAlignment="Center"
+                                  RecognizesAccessKey="True">
+                  <ContentPresenter.Resources>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                      <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ToggleButton}}}"/>
+                    </Style>
+                  </ContentPresenter.Resources>
+                </ContentPresenter>
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="ExpanderArrow" Property="RenderTransform">
+                  <Setter.Value>
+                    <RotateTransform Angle="90"/>
+                  </Setter.Value>
+                </Setter>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="HeaderChrome" Property="Background" Value="{DynamicResource ControlHover}"/>
+                <Setter TargetName="HeaderChrome" Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
+                <Setter TargetName="ExpanderArrow" Property="Stroke" Value="{DynamicResource TextMain}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="HeaderChrome" Property="Background" Value="{DynamicResource ControlPressed}"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter TargetName="ExpanderArrow" Property="Stroke" Value="{DynamicResource DisabledControlForeground}"/>
+                <Setter TargetName="HeaderChrome" Property="Background" Value="Transparent"/>
+                <Setter TargetName="HeaderChrome" Property="BorderBrush" Value="Transparent"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="Expander">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource KeyboardFocusVisual}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Expander">
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    Padding="{TemplateBinding Padding}"
+                    CornerRadius="5"
+                    SnapsToDevicePixels="True">
+              <DockPanel>
+                <ToggleButton x:Name="HeaderSite"
+                              DockPanel.Dock="Top"
+                              Style="{StaticResource ExpanderHeaderToggle}"
+                              IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                              Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                              ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"
+                              ContentStringFormat="{TemplateBinding HeaderStringFormat}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              FontWeight="SemiBold"
+                              AutomationProperties.Name="{Binding (AutomationProperties.Name), RelativeSource={RelativeSource TemplatedParent}}"/>
+                <ContentPresenter x:Name="ExpandSite"
+                                  Visibility="Collapsed"
+                                  Focusable="False"
+                                  Margin="0,4,0,0"
+                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+              </DockPanel>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsExpanded" Value="True">
+                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style x:Key="GridCellText" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
       <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
       <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
