@@ -8,7 +8,9 @@ public static class Loc
         IReadOnlyDictionary<string, string> Strings,
         IReadOnlyDictionary<string, string> Fallback);
 
-    private static readonly HashSet<string> PreviewLanguages = new(["ar", "hi"], StringComparer.OrdinalIgnoreCase);
+    // Languages shipped with a partial translation are labelled as previews. Every pack is
+    // currently complete; add a code here (and to LanguageDisplayName) for a new partial pack.
+    private static readonly HashSet<string> PreviewLanguages = new(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> RightToLeftLanguages = new(["ar", "fa"], StringComparer.OrdinalIgnoreCase);
     private static LocalizationSnapshot _snapshot = new(
         "en",
@@ -160,9 +162,9 @@ public static class Loc
         "nl" => "Nederlands",
         "vi" => "Tiếng Việt",
         "ko" => "한국어",
-        "ar" => "العربية — ترجمة جزئية",
+        "ar" => "العربية",
         "id" => "Bahasa Indonesia",
-        "hi" => "हिन्दी — आंशिक अनुवाद",
+        "hi" => "हिन्दी",
         "cs" => "Čeština",
         "sv" => "Svenska",
         _ => code

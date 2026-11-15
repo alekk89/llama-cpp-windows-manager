@@ -54,7 +54,7 @@ contributor cannot push to the canonical repository, use their fork and a pull
 request only after that GitHub mutation has been requested.
 
 Localization packs may omit a key only where the missing-translation baseline
-already lists it. The runtime deliberately falls back to the English pack, and
+already lists it (it is currently empty). The runtime deliberately falls back to the English pack, and
 the localization contract tests verify placeholder compatibility for every
 translated value. Do not copy English text into another pack merely to satisfy
 key parity.
@@ -87,7 +87,12 @@ text with `Loc.T`.
    Remove-Item Env:LLWM_UPDATE_TRANSLATION_BASELINE
    ```
 
-5. `BenchmarksUiDoesNotIntroduceHardCodedEnglish` scans the Benchmarks UI
+5. `ValuesRepeatEnglishOnlyWhereReviewed` fails when a pack value is identical to
+   English unless `tests/LocalLlmConsole.Tests/App/identical-to-english-allowlist.json`
+   lists it. That allowlist holds only reviewed values that are genuinely the same in
+   that language (product names, units, flags, shared technical terms) and may only
+   shrink. The same environment variable regenerates it; review its diff carefully.
+6. `BenchmarksUiDoesNotIntroduceHardCodedEnglish` scans the Benchmarks UI
    sources for prose literals and literal UI labels; move any reported string to
    a key.
 
