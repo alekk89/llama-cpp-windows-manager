@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using LocalLlmConsole.Models;
 using LocalLlmConsole.Services;
 
@@ -67,7 +68,7 @@ public sealed class WpfOverviewDashboardExtrasTests : WpfUiTestBase
             }));
             var card = Assert.Single(dashboard.Cards);
             var copy = Assert.IsType<Button>(card.CopyButton);
-            Assert.Equal(Visibility.Collapsed, copy.Visibility);
+            Assert.Equal(Visibility.Hidden, copy.Visibility);
             Assert.Equal(LocalLlmConsole.Localization.Loc.T("Dashboard.CopyReadings"), AutomationProperties.GetName(copy));
             Assert.Contains("Ctrl+C", AutomationProperties.GetHelpText(card.Root), StringComparison.Ordinal);
 
@@ -82,6 +83,7 @@ public sealed class WpfOverviewDashboardExtrasTests : WpfUiTestBase
             Assert.True(card.IsCopyConfirmationVisible);
             Assert.Equal(Visibility.Visible, copy.Visibility);
             Assert.Equal(LocalLlmConsole.Localization.Loc.T("EndpointInspection.Copied"), AutomationProperties.GetName(copy));
+            AssertCopyButtonDoesNotCoverValues(card, copy);
 
             failClipboard = true;
             var menu = OpenContextMenu(card.Root);
@@ -93,6 +95,43 @@ public sealed class WpfOverviewDashboardExtrasTests : WpfUiTestBase
             menu.IsOpen = false;
         });
     }
+
+    [Fact]
+    public async Task CopyButtonKeepsItsOwnSpaceBesideTitledAndUntitledContent()
+    {
+        await RunStaAsync(() =>
+        {
+            var dashboard = Dashboard([OverviewDashboardMetricIds.AverageGenerationRate], _ => { });
+            dashboard.ApplyLayout(OverviewDashboardLayoutPolicy.SetCardTitle(dashboard.Layout, "card", "Throughput"));
+            dashboard.ApplyMetricSummary(Summary(RuntimeMetricAtomicSnapshot.Empty with { AverageGenerationRate = 1234.5 }));
+            var card = Assert.Single(dashboard.Cards);
+            var copy = card.CopyButton!;
+            card.ShowCopyResult(true);
+            AssertCopyButtonDoesNotCoverValues(card, copy);
+            var title = VisualDescendants<TextBlock>(card.Root).Single(text => text.Text == "Throughput");
+            Assert.False(Bounds(title, card.Root).IntersectsWith(Bounds(copy, card.Root)));
+        });
+    }
+
+    private static void AssertCopyButtonDoesNotCoverValues(OverviewDashboardCardView card, Button copy)
+    {
+        card.Root.Measure(new Size(card.Root.Width, card.Root.Height));
+        card.Root.Arrange(new Rect(0, 0, card.Root.Width, card.Root.Height));
+        card.Root.UpdateLayout();
+        Assert.Equal(Visibility.Visible, copy.Visibility);
+        var copyBounds = Bounds(copy, card.Root);
+        Assert.True(copyBounds.Width > 0 && copyBounds.Height > 0);
+        var firstRow = card.MetricRows[card.CurrentMetricOrder[0]].Root;
+        var rowTexts = VisualDescendants<TextBlock>(firstRow)
+            .Where(text => text.Visibility == Visibility.Visible && !string.IsNullOrWhiteSpace(text.Text))
+            .ToArray();
+        Assert.NotEmpty(rowTexts);
+        Assert.All(rowTexts, text => Assert.False(Bounds(text, card.Root).IntersectsWith(copyBounds),
+            $"Copy button overlaps '{text.Text}'."));
+    }
+
+    private static Rect Bounds(FrameworkElement element, Visual ancestor)
+        => element.TransformToAncestor(ancestor).TransformBounds(new Rect(element.RenderSize));
 
     private static OverviewDashboardController Dashboard(IReadOnlyList<string> metricIds, Action<string> copy)
     {

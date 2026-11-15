@@ -18,8 +18,9 @@ public sealed partial class OverviewDashboardCardView
     public bool IsCopyConfirmationVisible => _copyConfirmation?.IsEnabled == true;
 
     /// <summary>
-    /// Adds the card's copy action. It appears while the pointer or keyboard
-    /// focus is in the card, so idle cards stay uncluttered.
+    /// Adds the card's copy action in a reserved header column beside the title
+    /// and readings, so it never covers a value. It is drawn only while the
+    /// pointer or keyboard focus is in the card; its space stays reserved.
     /// </summary>
     public void ConfigureCopy(Action copy)
     {
@@ -31,17 +32,20 @@ public sealed partial class OverviewDashboardCardView
             FontSize = 11,
             MinHeight = 0,
             MinWidth = 0,
-            Padding = new Thickness(5, 3, 5, 3),
-            Margin = new Thickness(0, -4, -6, 0),
+            Padding = new Thickness(4, 2, 4, 2),
+            Margin = new Thickness(4, 0, -4, 0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
-            Visibility = Visibility.Collapsed
+            Visibility = Visibility.Hidden
         };
         ToolTipService.SetShowOnDisabled(CopyButton, true);
         AutomationProperties.SetLiveSetting(CopyButton, AutomationLiveSetting.Polite);
         ResetCopyButton();
+        _content.ColumnDefinitions.Add(new ColumnDefinition());
+        _content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(CopyButton, 1);
         Grid.SetRowSpan(CopyButton, Math.Max(1, _content.RowDefinitions.Count));
-        System.Windows.Controls.Panel.SetZIndex(CopyButton, 10);
+        InvalidateMinimumSize();
         _content.Children.Add(CopyButton);
         CopyButton.Click += (_, args) =>
         {
@@ -92,6 +96,6 @@ public sealed partial class OverviewDashboardCardView
         if (CopyButton is null) return;
         CopyButton.Visibility = Root.IsMouseOver || Root.IsKeyboardFocusWithin || IsCopyConfirmationVisible
             ? Visibility.Visible
-            : Visibility.Collapsed;
+            : Visibility.Hidden;
     }
 }
