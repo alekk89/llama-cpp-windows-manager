@@ -41,11 +41,13 @@ llwmctl self --model qwen3-30b-q4-k-m
 llwmctl self --session model:qwen3-30b-q4-k-m
 ```
 
-The CLI automatically forwards `LLWM_SESSION_ID`, `LLWM_MODEL_ID`, `LLWM_ENDPOINT`, `OPENCODE_MODEL`, `OPENAI_MODEL`, `LLM_MODEL`, `OPENAI_BASE_URL`, or `OPENAI_API_BASE` when present. The API matches a session ID, registered model alias/ID/name/filename, endpoint port, or process ID. With exactly one running model it can make a clearly labelled single-session inference. With multiple unmatched sessions it returns all candidates instead of guessing.
+The CLI automatically forwards `LLWM_SESSION_ID`, `LLWM_MODEL_ID`, and `LLWM_ENDPOINT` when present. It then uses the calling agent's own model endpoint when the agent marks the commands it runs: under Claude Code (`CLAUDECODE=1`) that is `ANTHROPIC_BASE_URL`, or Anthropic's API (or Bedrock/Vertex) when unset, so an `OPENAI_BASE_URL` set for other tools is not mistaken for it. Otherwise it forwards `OPENCODE_MODEL`, `OPENAI_MODEL`, `LLM_MODEL`, `OPENAI_BASE_URL`, or `OPENAI_API_BASE`.
+
+The API first applies hints that name a session (`sessionId`, `processId`, `port`). It then checks whether the agent's endpoint is served by this Manager: a running session's port on this machine identifies that session; this Manager's gateway port means any running session may serve the agent (`confidence: gateway`); any other endpoint, such as a cloud API, another host, or an unused local port, returns `servedByManager: false` and `confidence: not-managed`, because no managed session serves that client. A model alias/ID/name/filename hint is checked next. With exactly one running model and no other evidence it makes a clearly labelled single-session inference. With multiple unmatched sessions it returns all candidates instead of guessing.
 
 An agent should identify itself before unloading, restarting, or using `--unload-others`. Stopping its own model may terminate the response that initiated the command.
 
-For destructive lifecycle commands, `llwmctl` performs this identity check automatically. It refuses to stop the identified current model, or to stop or restart the gateway while the current session may be served through it, unless `--allow-self-stop` is supplied. Agents should add that override only after an explicit user request and warning.
+For destructive lifecycle commands, `llwmctl` performs this identity check automatically. When the Manager reports `servedByManager: false`, no stop can end the agent's own model, so the command proceeds. Otherwise it refuses to stop the identified current model, or to stop or restart the gateway while the current session may be served through it, unless `--allow-self-stop` is supplied. Agents should add that override only after an explicit user request and warning.
 
 ## Model lifecycle
 

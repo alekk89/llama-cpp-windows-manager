@@ -99,28 +99,67 @@ internal sealed class ControlSessionEndpoints : ControlEndpointHandler
         await Task.CompletedTask;
         cancellationToken.ThrowIfCancellationRequested();
         var sessions = _deps.Sessions.Snapshots().Where(session => session.IsRunning).ToArray();
+        // Hints that name a Manager session directly win over the agent's endpoint and model name.
         var hints = new List<(string Source, Func<LoadedModelSessionSnapshot, bool> Match)>();
         if (request.Query.TryGetValue("sessionId", out var sessionId) && !string.IsNullOrWhiteSpace(sessionId))
             hints.Add(("sessionId", session => session.SessionId.Equals(sessionId, StringComparison.OrdinalIgnoreCase)));
-        if (request.Query.TryGetValue("model", out var model) && !string.IsNullOrWhiteSpace(model))
-        {
-            var models = await _deps.StateStore.ListModelsAsync();
-            var profiles = await _deps.StateStore.ListNamedModelLaunchProfilesAsync();
-            hints.Add(("model", session => ControlSelfIdentification.MatchesModelHint(session, models, profiles, model)));
-        }
-        if (TryQueryInt(request.Query, "port", out var port))
-            hints.Add(("port", session => session.LaunchSettings.Port == port));
         if (TryQueryInt(request.Query, "processId", out var processId))
             hints.Add(("processId", session => session.ProcessId == processId));
-        if (request.Query.TryGetValue("endpoint", out var endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
-            hints.Add(("endpoint", session => session.LaunchSettings.Port == endpointUri.Port));
-
+        if (TryQueryInt(request.Query, "port", out var port))
+            hints.Add(("port", session => session.LaunchSettings.Port == port));
         foreach (var hint in hints)
         {
             var matches = sessions.Where(hint.Match).ToArray();
             if (matches.Length == 1)
-                return Ok(new { ok = true, identified = true, confidence = "exact", matchedBy = hint.Source, session = SessionView(matches[0]) });
+                return Ok(new { ok = true, identified = true, confidence = "exact", matchedBy = hint.Source, servedByManager = true, session = SessionView(matches[0]) });
         }
+
+        // First establish whether the agent's model is served by this Manager at all. An endpoint
+        // that is neither a running session on this machine nor the gateway (for example a cloud
+        // API) means no Manager model serves this client, so there is no current session to protect.
+        var viaGateway = false;
+        if (request.Query.TryGetValue("endpoint", out var endpoint) && Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
+        {
+            switch (ControlSelfIdentification.ClassifyEndpoint(endpointUri, sessions, _deps.Actions.GetSettings().AutoLoadGatewayPort, ControlSelfIdentification.IsThisMachine, out var direct))
+            {
+                case AgentEndpointKind.Session:
+                    return Ok(new { ok = true, identified = true, confidence = "exact", matchedBy = "endpoint", servedByManager = true, session = SessionView(direct!) });
+                case AgentEndpointKind.NotManaged:
+                    return Ok(new
+                    {
+                        ok = true,
+                        identified = false,
+                        confidence = "not-managed",
+                        servedByManager = false,
+                        matchedBy = "endpoint",
+                        message = $"The agent's model endpoint {endpointUri.GetLeftPart(UriPartial.Authority)} is not served by this Manager, so no managed session serves this client.",
+                        candidates = Array.Empty<object>()
+                    });
+                default:
+                    viaGateway = true;
+                    break;
+            }
+        }
+
+        if (request.Query.TryGetValue("model", out var model) && !string.IsNullOrWhiteSpace(model))
+        {
+            var models = await _deps.StateStore.ListModelsAsync();
+            var profiles = await _deps.StateStore.ListNamedModelLaunchProfilesAsync();
+            var matches = sessions.Where(session => ControlSelfIdentification.MatchesModelHint(session, models, profiles, model)).ToArray();
+            if (matches.Length == 1)
+                return Ok(new { ok = true, identified = true, confidence = "exact", matchedBy = "model", servedByManager = true, session = SessionView(matches[0]) });
+        }
+
+        if (viaGateway && sessions.Length > 0)
+            return Ok(new
+            {
+                ok = true,
+                identified = false,
+                confidence = "gateway",
+                servedByManager = true,
+                message = "The agent uses this Manager's model gateway, which may route it to any running session. Supply the model id the agent requests, or sessionId.",
+                candidates = sessions.Select(SessionView).ToArray()
+            });
 
         if (sessions.Length == 1)
             return Ok(new

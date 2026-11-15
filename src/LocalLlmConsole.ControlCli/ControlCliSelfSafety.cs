@@ -51,6 +51,10 @@ internal static class ControlCliSelfSafety
                 "Retry after the Manager is responsive, or use --allow-self-stop only when the user explicitly requested that consequence.");
         using var selfJson = JsonDocument.Parse(await selfResponse.Content.ReadAsStringAsync());
         var root = selfJson.RootElement;
+        // The Manager found that the agent's model endpoint is not one it serves, so no stop can end
+        // the agent's own session. Older Managers omit the field and keep the checks below.
+        if (root.TryGetProperty("servedByManager", out var served) && served.ValueKind == JsonValueKind.False)
+            return;
         var hasCandidates = root.TryGetProperty("candidates", out var candidates)
             && candidates.ValueKind == JsonValueKind.Array
             && candidates.GetArrayLength() > 0;

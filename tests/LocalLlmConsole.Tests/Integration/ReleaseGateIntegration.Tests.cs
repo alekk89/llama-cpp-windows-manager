@@ -250,6 +250,23 @@ public sealed class ReleaseGateIntegrationTests : ManagerRegressionTestBase
         Assert.False(inferredSelf["identified"]!.GetValue<bool>());
         Assert.Equal("inferred-single-running-session", inferredSelf["confidence"]!.GetValue<string>());
         Assert.Single(inferredSelf["candidates"]!.AsArray());
+        async Task<JsonObject> SelfFor(string endpoint) => JsonSerializer.SerializeToNode((await api.HandleAsync(Request(
+            "GET", "/api/v1/self", query: new Dictionary<string, string> { ["endpoint"] = endpoint }))).Body)!.AsObject();
+        // A cloud API, or the session's port on another host, is not served by this Manager.
+        foreach (var external in new[] { "https://api.anthropic.com", "http://192.0.2.10:8099/v1" })
+        {
+            var notManaged = await SelfFor(external);
+            Assert.False(notManaged["servedByManager"]!.GetValue<bool>());
+            Assert.Equal("not-managed", notManaged["confidence"]!.GetValue<string>());
+            Assert.Empty(notManaged["candidates"]!.AsArray());
+        }
+        var direct = await SelfFor("http://127.0.0.1:8099/v1");
+        Assert.Equal("endpoint", direct["matchedBy"]!.GetValue<string>());
+        Assert.Equal("session-api-model", direct["session"]!["sessionId"]!.GetValue<string>());
+        var gateway = await SelfFor($"http://localhost:{settings.AutoLoadGatewayPort}/v1");
+        Assert.True(gateway["servedByManager"]!.GetValue<bool>());
+        Assert.Equal("gateway", gateway["confidence"]!.GetValue<string>());
+        Assert.Single(gateway["candidates"]!.AsArray());
         var exactSelf = JsonSerializer.SerializeToNode((await api.HandleAsync(Request(
             "GET",
             "/api/v1/self",
