@@ -57,6 +57,8 @@ public static class OverviewDashboardMetricIds
     public const string RecentPromptRate = "overview.runtime.tokens.prompt-recent";
     public const string PromptCacheReuse = "overview.runtime.prompt-cache.reuse";
     public const string DraftAcceptance = "overview.runtime.mtp.acceptance";
+    public const string SpeculativeSpeedup = "overview.runtime.mtp.speed-up";
+    public const string PromptCacheHitRate = "overview.runtime.prompt-cache.hit-rate";
     public const string PeakContextUsed = "overview.runtime.context.peak";
     public const string ContextShifts = "overview.runtime.context.shifts";
     public const string GatewayTimeToFirstData = "overview.gateway.time-to-first-data";

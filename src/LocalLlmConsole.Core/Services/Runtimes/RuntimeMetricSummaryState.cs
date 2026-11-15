@@ -22,6 +22,9 @@ internal sealed class RuntimeMetricSummaryState
     public double? CumulativeSlotMtpAcceptedTokens;
     public Dictionary<string, RuntimeSlotCounterState> LastSlotCounters { get; } = new(StringComparer.Ordinal);
     public RuntimeMetricDisplaySnapshot? LastDisplay;
+    public double? LastCacheWindowProcessedCounter;
+    public double? LastCacheWindowCachedCounter;
+    public RuntimePromptCacheWindow? LastPromptCacheWindow;
 }
 
 internal sealed record RuntimeSlotCounterState(

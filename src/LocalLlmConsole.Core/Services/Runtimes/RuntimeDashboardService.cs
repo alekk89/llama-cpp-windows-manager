@@ -233,6 +233,9 @@ public static class RuntimeDashboardService
            ?? RuntimeMetrics.Sum(samples, ["draft", "acc", "tokens", "total"], ["seconds", "duration"])
            ?? RuntimeMetrics.Sum(samples, ["speculative", "acc", "tokens", "total"], ["seconds", "duration"]);
 
+    public static double? SpeculativeVerificationStepCounter(IReadOnlyList<PrometheusSample> samples)
+        => RuntimeMetrics.Sum(samples, ["drafts", "total"], ["tokens", "seconds", "accepted"]);
+
     public static double? MtpGeneratedSecondsCounter(IReadOnlyList<PrometheusSample> samples)
         => RuntimeMetrics.Sum(samples, ["mtp", "tokens", "generated", "seconds", "total"], ["accepted", "acc", "rejected"])
            ?? RuntimeMetrics.Sum(samples, ["draft", "tokens", "generated", "seconds", "total"], ["accepted", "acc", "rejected"])

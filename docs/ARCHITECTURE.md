@@ -430,6 +430,12 @@ termination. The active queue alone may hold a Windows system-awake request.
   hands the existing all-session telemetry poll to the stateless
   `LoadedSessionDashboardProjection`, which issues no extra requests; selecting
   a row selects the matching loaded-session grid row and reuses its flow.
+  `RuntimeMetricSummaryTracker` derives speculative tokens per verification
+  step only from a reported step counter and keeps the latest prompt-cache
+  counter window per runtime; neither value is estimated when counters are
+  missing. Every card can copy its visible readings through
+  `OverviewDashboardCardTextFormatter`; the clipboard is an injectable
+  controller action.
   Cards remain headerless by default but may render one optional user title;
   each row still labels itself and owns its optional charts so chart identity
   does not depend on card position. The card context menu manages metric

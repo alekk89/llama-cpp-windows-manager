@@ -104,6 +104,8 @@ public sealed partial class RuntimeMetricSummaryTracker
                 : null,
             PeakContextTokens = RuntimeDashboardService.PeakContextTokenCounter(samples),
             ContextShiftCount = RuntimeDashboardService.ContextShiftCounter(samples),
+            SpeculativeTokensPerStep = SpeculativeTokensPerStep(samples),
+            PromptCacheWindow = ObservePromptCacheWindow(state, promptTokensProcessed, promptTokensCached),
             Capacity = ObserveCapacity(samples, slotSnapshot, metricsSettings)
         };
     }
@@ -127,6 +129,8 @@ public sealed partial class RuntimeMetricSummaryTracker
         public double? DraftAcceptancePercent { get; init; }
         public double? PeakContextTokens { get; init; }
         public double? ContextShiftCount { get; init; }
+        public double? SpeculativeTokensPerStep { get; init; }
+        public RuntimePromptCacheWindow? PromptCacheWindow { get; init; }
         public required RuntimeCapacityObservation Capacity { get; init; }
     }
 }

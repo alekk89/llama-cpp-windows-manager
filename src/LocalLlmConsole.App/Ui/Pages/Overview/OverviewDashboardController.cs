@@ -11,7 +11,8 @@ public sealed record OverviewDashboardControllerActions(
     Func<OverviewDashboardLayout, Task> PersistLayoutAsync,
     Func<Func<Task>, Task> RunEventAsync,
     Func<Func<Task>, Task>? DispatchMenuActionAsync = null,
-    Action<string>? SelectLoadedSession = null);
+    Action<string>? SelectLoadedSession = null,
+    Action<string>? CopyToClipboard = null);
 
 public sealed partial class OverviewDashboardController
 {
@@ -197,9 +198,10 @@ public sealed partial class OverviewDashboardController
         SetAtomicReading(OverviewDashboardMetricIds.RecentGenerationRate, Number(atomic.RecentGenerationRate, "0.0"), atomic.RecentGenerationRate, "t/s");
         SetAtomicReading(OverviewDashboardMetricIds.RecentPromptRate, Number(atomic.RecentPromptRate, "0.0"), atomic.RecentPromptRate, "t/s");
         SetAtomicReading(OverviewDashboardMetricIds.PromptCacheReuse, Number(atomic.PromptCacheReusePercent, "0.#"),
-            atomic.PromptCacheReusePercent, "%", atomic.PromptCachedTokens is { } cached ? $"{cached:N0} cached tokens" : "");
+            atomic.PromptCacheReusePercent, "%", CacheReuseDetail(atomic));
         SetAtomicReading(OverviewDashboardMetricIds.DraftAcceptance, Number(draftAcceptancePercent, "0.#"),
-            draftAcceptancePercent, "%");
+            draftAcceptancePercent, "%", SpeculativeSpeedupDetail(atomic.SpeculativeTokensPerStep));
+        ApplyEfficiencyReadings(atomic, SetAtomicReading);
         SetAtomicReading(OverviewDashboardMetricIds.PeakContextUsed, Number(atomic.PeakContextTokens, "N0"),
             atomic.PeakContextTokens, "tokens");
         SetAtomicReading(OverviewDashboardMetricIds.ContextShifts, Number(atomic.ContextShiftCount, "N0"),
@@ -283,6 +285,7 @@ public sealed partial class OverviewDashboardController
         {
             var view = new OverviewDashboardCardView(card, definitions, _actions.SelectLoadedSession);
             view.ApplyLoadedSessions(_loadedSessions);
+            view.ConfigureCopy(() => CopyCardReadings(view));
             view.SetResizeEnabled(!_layout.CardSizesLocked);
             view.Root.ContextMenu = CardContextMenu(card);
             view.DragSurface.PreviewMouseLeftButtonDown += (_, args) => BeginPointerInteraction(view, args);

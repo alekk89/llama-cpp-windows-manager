@@ -70,6 +70,7 @@ public sealed partial class OverviewDashboardController
                 string.Equals(item.Id, card.Id, StringComparison.OrdinalIgnoreCase)) ?? card;
             menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.AddMetrics"), () => AddMetricsAsync(current), !OverviewDashboardLayoutPolicy.IsLoadedModelsCard(current)));
             menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.CardTitle"), () => EditCardTitleAsync(current)));
+            menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.CopyReadings"), () => CopyCardReadingsAsync(current.Id)));
             var removeMetric = Submenu(Loc.T("Dashboard.RemoveMetric"));
             foreach (var metricId in current.MetricIds)
             {

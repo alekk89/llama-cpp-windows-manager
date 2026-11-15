@@ -27,7 +27,11 @@ public sealed record RuntimeMetricAtomicSnapshot(
     double? PromptCacheReusePercent = null,
     double? DraftAcceptancePercent = null,
     double? PeakContextTokens = null,
-    double? ContextShiftCount = null)
+    double? ContextShiftCount = null,
+    double? SpeculativeTokensPerStep = null,
+    double? RecentPromptCacheHitPercent = null,
+    double? RecentPromptCachedTokens = null,
+    double? RecentPromptTokens = null)
 {
     public static RuntimeMetricAtomicSnapshot Empty { get; } = new(
         null, null, null, null, null, null, null, null, null, null, null, null,
