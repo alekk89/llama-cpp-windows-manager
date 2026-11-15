@@ -197,6 +197,8 @@
   "Dashboard.Done": "Готово",
   "Dashboard.Customize": "Персонализиране",
   "Dashboard.AddCard": "Добавяне на карта",
+  "Dashboard.AutoArrange": "Автоматично подреждане",
+  "Dashboard.AutoArrangeTooltip": "Групира свързаните карти и им дава еднаква ширина, съобразена с прозореца.",
   "Dashboard.CardTitle": "Заглавие на картата…",
   "Dashboard.CopyReadings": "Копиране на показанията",
   "Dashboard.CopyReadingsTooltip": "Копира текущите показания на тази карта като обикновен текст (Ctrl+C).",

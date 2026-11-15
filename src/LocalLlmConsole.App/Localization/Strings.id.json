@@ -197,6 +197,8 @@
   "Dashboard.Done": "Selesai",
   "Dashboard.Customize": "Sesuaikan",
   "Dashboard.AddCard": "Tambah kartu",
+  "Dashboard.AutoArrange": "Atur otomatis",
+  "Dashboard.AutoArrangeTooltip": "Mengelompokkan kartu terkait dan memberinya lebar yang sama sesuai jendela.",
   "Dashboard.CardTitle": "Judul kartu…",
   "Dashboard.CopyReadings": "Salin pembacaan",
   "Dashboard.CopyReadingsTooltip": "Salin pembacaan kartu ini saat ini sebagai teks biasa (Ctrl+C).",

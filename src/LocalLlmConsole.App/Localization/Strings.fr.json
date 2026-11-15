@@ -165,6 +165,8 @@
   "Dashboard.Done": "Terminé",
   "Dashboard.Customize": "Personnaliser",
   "Dashboard.AddCard": "Ajouter une carte",
+  "Dashboard.AutoArrange": "Organiser automatiquement",
+  "Dashboard.AutoArrangeTooltip": "Regroupe les cartes associées et leur donne une largeur égale adaptée à la fenêtre.",
   "Dashboard.Metric.LoadedModels": "Modèles chargés",
   "Dashboard.Metric.SpeculativeSpeedup": "Accélération spéculative",
   "Dashboard.Tooltip.SpeculativeSpeedup": "Nombre moyen de jetons produits par étape de vérification du modèle cible : (jetons de brouillon acceptés + étapes de vérification) ÷ étapes de vérification. Le décodage sans spéculation produit un jeton par étape ; il s’agit donc de la borne supérieure de l’accélération, hors temps de brouillon. Affiché uniquement si le runtime publie son compteur d’étapes de vérification.",

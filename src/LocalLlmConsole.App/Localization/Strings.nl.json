@@ -197,6 +197,8 @@
   "Dashboard.Done": "Gereed",
   "Dashboard.Customize": "Aanpassen",
   "Dashboard.AddCard": "Kaart toevoegen",
+  "Dashboard.AutoArrange": "Automatisch schikken",
+  "Dashboard.AutoArrangeTooltip": "Groepeert verwante kaarten en geeft ze een gelijke breedte die bij het venster past.",
   "Dashboard.CardTitle": "Kaarttitel…",
   "Dashboard.CopyReadings": "Meetwaarden kopiëren",
   "Dashboard.CopyReadingsTooltip": "De huidige meetwaarden van deze kaart als platte tekst kopiëren (Ctrl+C).",

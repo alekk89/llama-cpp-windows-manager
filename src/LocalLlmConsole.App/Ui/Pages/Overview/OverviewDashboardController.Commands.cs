@@ -13,9 +13,13 @@ public sealed partial class OverviewDashboardController
         add.Click += async (_, _) => await AddCardAsync();
         _sizeLockButton = QuietButton(Loc.T("Dashboard.Lock"));
         _sizeLockButton.Click += async (_, _) => await ToggleCardSizeLockAsync();
+        var arrange = QuietButton(Loc.T("Dashboard.AutoArrange"));
+        arrange.ToolTip = Loc.T("Dashboard.AutoArrangeTooltip");
+        arrange.Click += async (_, _) => await AutoArrangeAsync();
         var reset = QuietButton(Loc.T("Dashboard.Reset"));
         reset.Click += async (_, _) => await ResetLayoutAsync();
         _dashboardActions.Children.Add(add);
+        _dashboardActions.Children.Add(arrange);
         _dashboardActions.Children.Add(_sizeLockButton);
         _dashboardActions.Children.Add(reset);
     }
@@ -44,11 +48,35 @@ public sealed partial class OverviewDashboardController
             renderedBounds));
     }
 
+    /// <summary>
+    /// Groups related cards and gives them equal widths, as many per row as fit
+    /// comfortably at the current window width.
+    /// </summary>
+    internal async Task AutoArrangeAsync()
+    {
+        var width = _layout.CardSizesLocked && _layout.LockedSurfaceWidth > 0
+            ? _layout.LockedSurfaceWidth
+            : _dashboard.ActualWidth;
+        await MutateAsync(layout => WithFlowPositions(
+            OverviewDashboardLayoutPolicy.AutoArrange(layout, CardsPerRow(width))));
+    }
+
+    /// <summary>How many equal cards fit a row while each stays at least 320 px wide.</summary>
+    internal static int CardsPerRow(double width)
+    {
+        const double comfortableWidth = 320;
+        if (!double.IsFinite(width) || width <= 0) return 3;
+        var count = (int)Math.Floor((width + OverviewDashboardLayoutPolicy.CardGap)
+                                    / (comfortableWidth + OverviewDashboardLayoutPolicy.CardGap));
+        return Math.Clamp(count, 1, 4);
+    }
+
     private ContextMenu DashboardContextMenu()
     {
         var menu = new ContextMenu();
         menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.AddCard"), AddCardAsync));
         menu.Items.Add(new Separator());
+        menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.AutoArrange"), AutoArrangeAsync));
         menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.Reset"), ResetLayoutAsync));
         return menu;
     }

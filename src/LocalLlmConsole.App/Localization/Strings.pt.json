@@ -197,6 +197,8 @@
   "Dashboard.Done": "Concluir",
   "Dashboard.Customize": "Personalizar",
   "Dashboard.AddCard": "Adicionar cartão",
+  "Dashboard.AutoArrange": "Organizar automaticamente",
+  "Dashboard.AutoArrangeTooltip": "Agrupa os cartões relacionados e dá a eles a mesma largura ajustada à janela.",
   "Dashboard.CardTitle": "Título do cartão…",
   "Dashboard.CopyReadings": "Copiar leituras",
   "Dashboard.CopyReadingsTooltip": "Copia as leituras atuais deste cartão como texto simples (Ctrl+C).",

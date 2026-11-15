@@ -165,6 +165,8 @@
   "Dashboard.Done": "تم",
   "Dashboard.Customize": "تخصيص",
   "Dashboard.AddCard": "إضافة بطاقة",
+  "Dashboard.AutoArrange": "ترتيب تلقائي",
+  "Dashboard.AutoArrangeTooltip": "تجميع البطاقات المرتبطة ومنحها عرضًا متساويًا يناسب النافذة.",
   "Dashboard.Metric.LoadedModels": "النماذج المحمّلة",
   "Dashboard.Metric.SpeculativeSpeedup": "تسريع فك الترميز التخميني",
   "Dashboard.Tooltip.SpeculativeSpeedup": "متوسط الرموز الناتجة لكل خطوة تحقق في النموذج الهدف: (رموز المسودة المقبولة + خطوات التحقق) ÷ خطوات التحقق. فك الترميز دون تخمين ينتج رمزًا واحدًا لكل خطوة، لذا تمثل هذه القيمة الحد الأعلى للتسريع، ولا يُحتسب وقت إنشاء المسودة. تظهر فقط عندما يُبلغ وقت التشغيل عن عداد خطوات التحقق.",

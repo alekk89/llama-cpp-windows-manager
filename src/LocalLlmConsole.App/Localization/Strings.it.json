@@ -166,6 +166,8 @@
   "Dashboard.Done": "Fatto",
   "Dashboard.Customize": "Personalizza",
   "Dashboard.AddCard": "Aggiungi scheda",
+  "Dashboard.AutoArrange": "Disponi automaticamente",
+  "Dashboard.AutoArrangeTooltip": "Raggruppa le schede correlate e assegna loro la stessa larghezza adatta alla finestra.",
   "Dashboard.Metric.LoadedModels": "Modelli caricati",
   "Dashboard.Metric.SpeculativeSpeedup": "Accelerazione speculativa",
   "Dashboard.Tooltip.SpeculativeSpeedup": "Token medi prodotti per passo di verifica del modello di destinazione: (token di bozza accettati + passi di verifica) ÷ passi di verifica. La decodifica senza speculazione produce un token per passo, quindi questo è il limite superiore dell’accelerazione; il tempo di bozza non è incluso. Mostrato solo se il runtime riporta il contatore dei passi di verifica.",

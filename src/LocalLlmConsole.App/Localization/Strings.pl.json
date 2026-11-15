@@ -197,6 +197,8 @@
   "Dashboard.Done": "Gotowe",
   "Dashboard.Customize": "Dostosuj",
   "Dashboard.AddCard": "Dodaj kartę",
+  "Dashboard.AutoArrange": "Rozmieść automatycznie",
+  "Dashboard.AutoArrangeTooltip": "Grupuje powiązane karty i nadaje im jednakową szerokość dopasowaną do okna.",
   "Dashboard.CardTitle": "Tytuł karty…",
   "Dashboard.CopyReadings": "Kopiuj odczyty",
   "Dashboard.CopyReadingsTooltip": "Kopiuje bieżące odczyty tej karty jako zwykły tekst (Ctrl+C).",

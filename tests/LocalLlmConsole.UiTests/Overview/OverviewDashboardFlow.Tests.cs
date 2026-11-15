@@ -138,6 +138,30 @@ public sealed class WpfOverviewDashboardFlowTests : WpfUiTestBase
     }
 
     [Fact]
+    public async Task AutoArrangeGroupsCardsIntoEqualColumnsAndSavesTheLayout()
+    {
+        await RunStaAsync(async () =>
+        {
+            OverviewDashboardLayout? persisted = null;
+            var dashboard = Dashboard(1000, layout => persisted = layout);
+            await dashboard.SetCardSpanAsync("gpu-0", 7);
+            Arrange(dashboard, 1000);
+
+            Assert.Contains(VisualDescendants<Button>(dashboard.Root),
+                button => Equals(button.Content, LocalLlmConsole.Localization.Loc.T("Dashboard.AutoArrange")));
+            await dashboard.AutoArrangeAsync();
+            Arrange(dashboard, 1000);
+
+            Assert.Equal(["status", "gpu-0", "cpu"], VisibleIds(dashboard));
+            var pitch = OverviewDashboardLayoutEngine.ColumnPitch(1000);
+            Assert.All(VisibleIds(dashboard), id =>
+                Assert.Equal(OverviewDashboardLayoutEngine.SpanWidth(4, pitch), Card(dashboard, id).Root.Width, precision: 3));
+            Assert.All(VisibleIds(dashboard), id => Assert.Equal(0, Canvas.GetTop(Card(dashboard, id).Root)));
+            Assert.Equal(dashboard.Layout.Cards.Select(card => card.Id), persisted!.Cards.Select(card => card.Id));
+        });
+    }
+
+    [Fact]
     public async Task WideningACardSnapsToColumnsAndWrapsTheCardsAfterIt()
     {
         await RunStaAsync(async () =>

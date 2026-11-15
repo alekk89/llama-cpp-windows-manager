@@ -197,6 +197,8 @@
   "Dashboard.Done": "Fertig",
   "Dashboard.Customize": "Anpassen",
   "Dashboard.AddCard": "Karte hinzufügen",
+  "Dashboard.AutoArrange": "Automatisch anordnen",
+  "Dashboard.AutoArrangeTooltip": "Gruppiert zusammengehörige Karten und gibt ihnen gleiche, an das Fenster angepasste Breiten.",
   "Dashboard.CardTitle": "Kartentitel…",
   "Dashboard.CopyReadings": "Messwerte kopieren",
   "Dashboard.CopyReadingsTooltip": "Die aktuellen Messwerte dieser Karte als Text kopieren (Strg+C).",

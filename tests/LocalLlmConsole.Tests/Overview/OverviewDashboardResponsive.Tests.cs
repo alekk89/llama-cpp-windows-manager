@@ -192,4 +192,35 @@ public sealed class OverviewDashboardResponsiveTests : ManagerRegressionTestBase
         Assert.Equal(layout.Cards.Select(card => card.Id), positioned.Cards.Select(card => card.Id));
         Assert.Equal(new OverviewDashboardCardBounds(0, 0, 7, 150), positioned.Cards[0].Bounds);
     }
+
+    [Fact]
+    public void AutoArrangeGroupsCardsAndGivesThemEqualWidths()
+    {
+        var layout = new OverviewDashboardLayout(
+            OverviewDashboardLayoutPolicy.CurrentVersion,
+            [
+                new("host", [OverviewDashboardMetricIds.Cpu, OverviewDashboardMetricIds.RamUsed], Bounds: new(0, 0, 5, 112)),
+                new("gpu-1", [OverviewDashboardMetricIds.Gpu(1)], Bounds: new(5, 0, 2, 112)),
+                new("tokens", [OverviewDashboardMetricIds.AverageGenerationRate], Bounds: new(7, 0, 5, 112)),
+                new("gpu-0", [OverviewDashboardMetricIds.Gpu(0), OverviewDashboardMetricIds.GpuTemperature(0)], Bounds: new(0, 200, 8, 112)),
+                new("status", [OverviewDashboardMetricIds.ModelStatus], Bounds: new(8, 200, 4, 112))
+            ]);
+
+        var arranged = OverviewDashboardLayoutPolicy.AutoArrange(layout, 3);
+
+        Assert.Equal(["tokens", "status", "gpu-0", "gpu-1", "host"], arranged.Cards.Select(card => card.Id));
+        Assert.All(arranged.Cards, card => Assert.Equal(4, OverviewDashboardLayoutPolicy.CardSpan(card)));
+        Assert.Equal(6, OverviewDashboardLayoutPolicy.CardSpan(OverviewDashboardLayoutPolicy.AutoArrange(layout, 2).Cards[0]));
+        Assert.Equal(12, OverviewDashboardLayoutPolicy.EvenSpan(1));
+        Assert.Equal(3, OverviewDashboardLayoutPolicy.EvenSpan(9));
+    }
+
+    [Theory]
+    [InlineData(300, 1)]
+    [InlineData(700, 2)]
+    [InlineData(1000, 3)]
+    [InlineData(1400, 4)]
+    [InlineData(3000, 4)]
+    public void AutoArrangeFitsCardsAtLeast320PixelsWide(double width, int expected)
+        => Assert.Equal(expected, OverviewDashboardController.CardsPerRow(width));
 }

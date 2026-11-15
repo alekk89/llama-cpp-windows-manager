@@ -197,6 +197,8 @@
   "Dashboard.Done": "완료",
   "Dashboard.Customize": "사용자 지정",
   "Dashboard.AddCard": "카드 추가",
+  "Dashboard.AutoArrange": "자동 정렬",
+  "Dashboard.AutoArrangeTooltip": "관련 카드를 묶고 창에 맞게 같은 너비로 맞춥니다.",
   "Dashboard.CardTitle": "카드 제목…",
   "Dashboard.CopyReadings": "측정값 복사",
   "Dashboard.CopyReadingsTooltip": "이 카드의 현재 측정값을 일반 텍스트로 복사합니다(Ctrl+C).",

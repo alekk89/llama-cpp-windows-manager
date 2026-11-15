@@ -197,6 +197,8 @@
   "Dashboard.Done": "Bitti",
   "Dashboard.Customize": "Özelleştir",
   "Dashboard.AddCard": "Kart ekle",
+  "Dashboard.AutoArrange": "Otomatik düzenle",
+  "Dashboard.AutoArrangeTooltip": "İlgili kartları gruplar ve pencereye uyan eşit genişlikler verir.",
   "Dashboard.CardTitle": "Kart başlığı…",
   "Dashboard.CopyReadings": "Değerleri kopyala",
   "Dashboard.CopyReadingsTooltip": "Bu kartın geçerli değerlerini düz metin olarak kopyalar (Ctrl+C).",
