@@ -88,8 +88,10 @@ public sealed class WpfTrayProfileMenuTests : WpfUiTestBase
             var stopIcon = Assert.IsType<Border>(favoriteButton.Content);
             Assert.Equal(8, stopIcon.Width);
             Assert.Equal(8, stopIcon.Height);
-            Assert.Equal(28, favoriteButton.Width);
-            Assert.Equal(26, favoriteButton.Height);
+            Assert.True(double.IsNaN(favoriteButton.Width));
+            Assert.True(double.IsNaN(favoriteButton.Height));
+            Assert.Equal(28, favoriteButton.MinWidth);
+            Assert.Equal(26, favoriteButton.MinHeight);
             Assert.Equal(LocalLlmConsole.VisualRole.Danger, LocalLlmConsole.VisualRole.GetButtonRole(favoriteButton));
 
             Assert.DoesNotContain(menu.Items.OfType<MenuItem>(), item => Equals(item.Header, "Models"));

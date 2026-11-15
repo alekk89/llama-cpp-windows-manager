@@ -186,8 +186,7 @@ public static class TrayProfileMenuFactory
         {
             Content = ActionIcon(entry.Action),
             ContentTemplate = null,
-            Width = 28,
-            Height = 26,
+            MinWidth = 28,
             MinHeight = 26,
             Padding = new Thickness(0),
             Margin = new Thickness(8, 0, 0, 0),

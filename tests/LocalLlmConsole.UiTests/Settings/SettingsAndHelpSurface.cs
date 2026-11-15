@@ -441,12 +441,26 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
                 viewModel.Rows,
                 settings.ThemeMode,
                 new LocalLlmConsole.SettingsPageActions((_, _) => { }, (_, _) => { }, (_, _) => { }, (_, _) => { }, () => { })));
-            var searchGrid = new DataGrid { ItemsSource = new[] { "alpha", "beta" } };
+            var searchGrid = new DataGrid
+            {
+                ItemsSource = new[] { new ScaledGridItem("alpha"), new ScaledGridItem("beta") },
+                Height = 200
+            };
+            var largeTextFactory = new FrameworkElementFactory(typeof(TextBlock));
+            largeTextFactory.SetBinding(TextBlock.TextProperty, new Binding(nameof(ScaledGridItem.Name)));
+            largeTextFactory.SetValue(TextBlock.FontSizeProperty, 18.0);
+            searchGrid.Columns.Add(new DataGridTemplateColumn
+            {
+                Header = "Large text",
+                CellTemplate = new DataTemplate { VisualTree = largeTextFactory }
+            });
             var search = LocalLlmConsole.DataGridSearch.Create(searchGrid, item => item.ToString() ?? "", "Search");
             search.Input.Visibility = Visibility.Visible;
             var content = new DockPanel();
             DockPanel.SetDock(search.Root, Dock.Top);
             content.Children.Add(search.Root);
+            DockPanel.SetDock(searchGrid, Dock.Top);
+            content.Children.Add(searchGrid);
             content.Children.Add(controls.Root);
             var window = new Window { Content = content };
 
@@ -462,6 +476,10 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
 
             var normalEditor = EditorHeight();
             var normalSearch = search.Input.ActualHeight;
+            Assert.True(double.IsNaN(searchGrid.RowHeight));
+            Assert.Equal(33, searchGrid.MinRowHeight);
+            var normalThemedRow = VisualDescendants<DataGridRow>(searchGrid).First().ActualHeight;
+            Assert.Equal(33, normalThemedRow, tolerance: 0.5);
             Assert.Equal(28, normalEditor, precision: 1);
             Assert.Equal(28, normalSearch, precision: 1);
             try
@@ -470,6 +488,12 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
                 var scaledEditor = EditorHeight();
                 Assert.True(scaledEditor > normalEditor, $"Editor height {scaledEditor} did not grow beyond {normalEditor}.");
                 Assert.True(search.Input.ActualHeight > normalSearch, $"Search height {search.Input.ActualHeight} did not grow.");
+                var scaledThemedRow = VisualDescendants<DataGridRow>(searchGrid).First();
+                var scaledRowEditor = VisualDescendants<TextBlock>(scaledThemedRow).Single(text => text.FontSize > 18);
+                Assert.True(scaledThemedRow.ActualHeight > normalThemedRow, $"Themed grid row height {scaledThemedRow.ActualHeight} did not grow beyond {normalThemedRow}.");
+                Assert.True(
+                    scaledThemedRow.ActualHeight >= scaledRowEditor.ActualHeight,
+                    $"Themed grid row height {scaledThemedRow.ActualHeight} clips its text height {scaledRowEditor.ActualHeight}.");
                 var textRow = VisualDescendants<DataGridRow>(controls.Root)
                     .First(row => row.DataContext is EditableSettingRow { Type: "text" });
                 Assert.True(textRow.ActualHeight >= scaledEditor, $"Row height {textRow.ActualHeight} clips editor height {scaledEditor}.");
@@ -480,6 +504,8 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             }
         });
     }
+
+    private sealed record ScaledGridItem(string Name);
 
     [Fact]
     public async Task UiScaleAppliesWithoutStackingTransforms()

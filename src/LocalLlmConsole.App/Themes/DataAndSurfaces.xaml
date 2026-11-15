@@ -122,7 +122,8 @@
       <Setter Property="AlternatingRowBackground" Value="{DynamicResource GridRowAlt}"/>
       <Setter Property="HeadersVisibility" Value="Column"/>
       <Setter Property="ColumnHeaderHeight" Value="36"/>
-      <Setter Property="RowHeight" Value="33"/>
+      <Setter Property="RowHeight" Value="NaN"/>
+      <Setter Property="MinRowHeight" Value="33"/>
       <Setter Property="Margin" Value="0"/>
       <Setter Property="SelectionMode" Value="Single"/>
       <Setter Property="SelectionUnit" Value="FullRow"/>
