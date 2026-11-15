@@ -358,10 +358,51 @@ public sealed class LaunchSettingsApplicationsTests : ManagerRegressionTestBase
         Assert.Equal(LaunchSettingsSaveStateService.SaveForModelText, dirtyProfile.SaveForModelContent);
         Assert.True(dirtyProfile.CanSaveForModel);
         Assert.True(dirtyProfile.CanSaveAsNewVariant);
+        Assert.False(noSelection.HasUnsavedChanges);
+        Assert.False(newProfile.HasUnsavedChanges);
+        Assert.True(unreadableCurrentProfile.HasUnsavedChanges);
+        Assert.False(cleanProfile.HasUnsavedChanges);
+        Assert.True(dirtyProfile.HasUnsavedChanges);
         Assert.Contains("LaunchSettingsSaveStateService.Evaluate", source, StringComparison.Ordinal);
         Assert.DoesNotContain("_saveModelLaunchSettingsButton.Content = \"Saved\"", source, StringComparison.Ordinal);
     }
 
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LaunchSettingsRenderKeepsUnsavedEditsOfTheSameProfile(bool hasUnsavedEdits)
+    {
+        var settings = AppSettings.CreateDefault(CreateTempRoot());
+        var model = new ModelRecord("model-1", "Qwen", "qwen.gguf", OwnershipKind.External, "{}", DateTimeOffset.UtcNow);
+        var viewState = new ModelLaunchSettingsViewState(
+            model.Id, ModelLaunchSettings.FromAppSettings(settings, "cpu"), true, "cpu", settings, "profile-1", "Fast");
+        var loaded = 0;
+        var applied = 0;
+        var runtimeRequests = new List<string?>();
+        var saveStateUpdates = 0;
+        (string ModelId, string ProfileId)? askedFor = null;
+
+        await new LaunchSettingsRenderApplicationService().RenderSelectedAsync(model, settings, new LaunchSettingsRenderActions(
+            () => model,
+            () => "profile-1",
+            () => throw new InvalidOperationException("The editor must not be cleared."),
+            _ => { },
+            (_, _, _, _) => Task.FromResult(viewState),
+            _ => loaded++,
+            runtimeId => { runtimeRequests.Add(runtimeId); return Task.CompletedTask; },
+            _ => applied++,
+            (_, _) => Task.CompletedTask,
+            () => saveStateUpdates++,
+            (modelId, profileId) => { askedFor = (modelId, profileId); return hasUnsavedEdits; }),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal((model.Id, "profile-1"), askedFor);
+        Assert.Equal(hasUnsavedEdits ? 0 : 1, loaded);
+        Assert.Equal(hasUnsavedEdits ? 0 : 1, applied);
+        Assert.Equal([hasUnsavedEdits ? null : "cpu"], runtimeRequests);
+        Assert.Equal(1, saveStateUpdates);
+    }
 
     [Fact]
     public void LaunchSettingsEditorSessionOwnsSelectedProfileSnapshot()
@@ -404,7 +445,7 @@ public sealed class LaunchSettingsApplicationsTests : ManagerRegressionTestBase
         Assert.False(session.IsLoadedFor(model.Id));
         Assert.False(session.HasSavedProfile);
         Assert.Null(session.SavedProfile);
-        Assert.Contains("_ui.LaunchSettingsEditor.Load,", source, StringComparison.Ordinal);
+        Assert.Contains("_ui.LaunchSettingsEditor.Load(viewState);", source, StringComparison.Ordinal);
         Assert.Contains("LaunchSettingsRenderActions(", source, StringComparison.Ordinal);
         Assert.Contains("_models.ModelLaunchSettingsSaveApplication.SaveSelectedProfileAsync(", source, StringComparison.Ordinal);
         Assert.Contains("_ui.LaunchSettingsEditor.MarkSaved,", source, StringComparison.Ordinal);

@@ -27,6 +27,8 @@ public sealed class LaunchSettingsPanelState
     public List<FrameworkElement> AdvancedLaunchSections { get; } = [];
 
     private WpfButton? SaveModelLaunchSettingsButton { get; set; }
+
+    public TextBlock? UnsavedChangesText { get; private set; }
     private WpfButton? FitToAvailableVramButton { get; set; }
 
     private WpfTextBox? SaveAsNewModelNameBox { get; set; }
@@ -55,6 +57,7 @@ public sealed class LaunchSettingsPanelState
 
         RuntimeCombo = controls.RuntimeCombo;
         ModelCapabilityText = controls.ModelCapabilityText;
+        UnsavedChangesText = controls.UnsavedChangesText;
         LaunchSettingsSearchBox = controls.LaunchSettingsSearchBox;
         AdvancedLaunchSettingsButton = controls.AdvancedLaunchSettingsButton;
         SaveModelLaunchSettingsButton = controls.SaveModelLaunchSettingsButton;
@@ -72,6 +75,12 @@ public sealed class LaunchSettingsPanelState
         SaveModelLaunchSettingsButton.IsEnabled = enabled;
         SaveModelLaunchSettingsButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         SaveModelLaunchSettingsButton.ToolTip = Loc.T("Launch.SaveProfileTooltip");
+    }
+
+    public void SetUnsavedChangesVisible(bool visible)
+    {
+        if (UnsavedChangesText is not null)
+            UnsavedChangesText.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void SetSaveAsNewModelName(string name)

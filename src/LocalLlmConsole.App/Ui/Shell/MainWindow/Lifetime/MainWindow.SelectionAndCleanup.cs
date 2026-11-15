@@ -1,15 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-using Forms = System.Windows.Forms;
-using WpfApplication = System.Windows.Application;
-using WpfBinding = System.Windows.Data.Binding;
-using WpfButton = System.Windows.Controls.Button;
-using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
-using WpfProgressBar = System.Windows.Controls.ProgressBar;
-using WpfTextBox = System.Windows.Controls.TextBox;
 namespace LocalLlmConsole;
 
 public partial class MainWindow
@@ -52,6 +42,17 @@ public partial class MainWindow
         {
             _viewModel.Models.ShowLaunchProfilesForModel(row.Model.Id);
             _modelsPage.SelectDefaultLaunchProfile(_viewModel.Models.VariantRows);
+        }
+
+        if (!_launchSettingsController.ConfirmLeavingEdits(SelectedModel()?.Id ?? "", SelectedModelLaunchProfileId()))
+        {
+            var editor = _coreServices.Ui.LaunchSettingsEditor;
+            Dispatcher.BeginInvoke(() =>
+            {
+                _viewModel.Models.ShowLaunchProfilesForModel(editor.ModelId);
+                SelectModelAfterRefresh(editor.ModelId, editor.ProfileId);
+            });
+            return;
         }
 
         ScheduleSelectedModelLaunchSettingsRefresh();

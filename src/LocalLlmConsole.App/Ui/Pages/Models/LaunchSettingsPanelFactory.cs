@@ -33,6 +33,7 @@ public sealed class LaunchSettingsPanelControls
     public required UIElement Root { get; init; }
     public required WpfComboBox RuntimeCombo { get; init; }
     public required TextBlock ModelCapabilityText { get; init; }
+    public required TextBlock UnsavedChangesText { get; init; }
     public required WpfTextBox LaunchSettingsSearchBox { get; init; }
     public required WpfButton AdvancedLaunchSettingsButton { get; init; }
     public required WpfButton SaveModelLaunchSettingsButton { get; init; }
@@ -74,6 +75,13 @@ public static partial class LaunchSettingsPanelFactory
         modelCapabilityText.Margin = new Thickness(0, 0, 0, 4);
         panel.Children.Add(modelCapabilityText);
 
+        var unsavedChangesText = Text(Loc.T("Launch.UnsavedChanges"), 12, true);
+        unsavedChangesText.SetResourceReference(TextBlock.ForegroundProperty, "Warning");
+        unsavedChangesText.Margin = new Thickness(0, 0, 0, 4);
+        unsavedChangesText.Visibility = Visibility.Collapsed;
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(unsavedChangesText, System.Windows.Automation.AutomationLiveSetting.Polite);
+        panel.Children.Add(unsavedChangesText);
+
         panel.Children.Add(LaunchSettingsToolbar(
             request,
             out var launchSettingsSearchBox,
@@ -106,6 +114,7 @@ public static partial class LaunchSettingsPanelFactory
             Root = root,
             RuntimeCombo = runtimeCombo,
             ModelCapabilityText = modelCapabilityText,
+            UnsavedChangesText = unsavedChangesText,
             LaunchSettingsSearchBox = launchSettingsSearchBox,
             AdvancedLaunchSettingsButton = advancedLaunchSettingsButton,
             SaveModelLaunchSettingsButton = saveForModelButton,

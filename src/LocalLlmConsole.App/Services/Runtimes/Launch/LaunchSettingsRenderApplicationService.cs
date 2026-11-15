@@ -7,10 +7,11 @@ public sealed record LaunchSettingsRenderActions(
     Action<ModelRecord?> UpdateSaveAsNewName,
     Func<ModelRecord, AppSettings, string, CancellationToken, Task<ModelLaunchSettingsViewState>> BuildViewStateAsync,
     Action<ModelLaunchSettingsViewState> LoadEditor,
-    Func<string, Task> RefreshRuntimeSelectorAsync,
+    Func<string?, Task> RefreshRuntimeSelectorAsync,
     Action<AppSettings> ApplyLaunchSettingsToControls,
     Func<ModelRecord?, CancellationToken, Task> ApplyModelCapabilitiesAsync,
-    Action UpdateLaunchSaveButtonState);
+    Action UpdateLaunchSaveButtonState,
+    Func<string, string, bool>? HasUnsavedEditsFor = null);
 
 public sealed class LaunchSettingsRenderApplicationService
 {
@@ -45,10 +46,21 @@ public sealed class LaunchSettingsRenderApplicationService
         if (!string.Equals(actions.SelectedProfileId(), selectedProfileId, StringComparison.OrdinalIgnoreCase))
             return;
 
-        actions.LoadEditor(viewState);
-        await actions.RefreshRuntimeSelectorAsync(viewState.RuntimeId);
-        cancellationToken.ThrowIfCancellationRequested();
-        actions.ApplyLaunchSettingsToControls(viewState.LaunchSettings);
+        // A refresh of the same model and profile keeps the user's unsaved edits; only the
+        // surrounding data (runtime list, capabilities, button state) is refreshed.
+        var keepEdits = actions.HasUnsavedEditsFor?.Invoke(selectedId, selectedProfileId ?? "") == true;
+        if (keepEdits)
+        {
+            await actions.RefreshRuntimeSelectorAsync(null);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        else
+        {
+            actions.LoadEditor(viewState);
+            await actions.RefreshRuntimeSelectorAsync(viewState.RuntimeId);
+            cancellationToken.ThrowIfCancellationRequested();
+            actions.ApplyLaunchSettingsToControls(viewState.LaunchSettings);
+        }
         await actions.ApplyModelCapabilitiesAsync(model, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         actions.UpdateLaunchSaveButtonState();
