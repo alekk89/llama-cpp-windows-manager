@@ -27,16 +27,24 @@ public static class Loc
     }
 
     private static string Translate(LocalizationSnapshot snapshot, string key)
+        => Translate(snapshot.CurrentLanguage, snapshot.Strings, snapshot.Fallback, key);
+
+    /// <summary>The lookup chain: the selected pack, then English, then the key itself.</summary>
+    internal static string Translate(
+        string currentLanguage,
+        IReadOnlyDictionary<string, string> strings,
+        IReadOnlyDictionary<string, string> fallback,
+        string key)
     {
-        if (snapshot.Strings.TryGetValue(key, out var value))
+        if (strings.TryGetValue(key, out var value))
             return value;
-        if (snapshot.Fallback.TryGetValue(key, out var fallback))
+        if (fallback.TryGetValue(key, out var english))
         {
 #if DEBUG
-            if (ShowMissingKeys && !string.Equals(snapshot.CurrentLanguage, "en", StringComparison.OrdinalIgnoreCase))
+            if (ShowMissingKeys && !string.Equals(currentLanguage, "en", StringComparison.OrdinalIgnoreCase))
                 return $"«{key}»"; // Visual indicator that key is missing from translation
 #endif
-            return fallback;
+            return english;
         }
 #if DEBUG
         if (ShowMissingKeys)

@@ -74,15 +74,13 @@ public sealed class LocalizationTests : ManagerRegressionTestBase
     [Fact]
     public void MissingLocalizedValuesUseTheDocumentedEnglishFallback()
     {
-        try
-        {
-            Loc.LoadLanguage("fr");
-            Assert.Equal("Add card", Loc.T("Dashboard.AddCard"));
-        }
-        finally
-        {
-            Loc.LoadLanguage("en");
-        }
+        // Every shipped pack is complete, so exercise the lookup chain with its own packs.
+        var french = new Dictionary<string, string> { ["Dashboard.Title"] = "Tableau de bord" };
+        var english = new Dictionary<string, string> { ["Dashboard.Title"] = "Dashboard", ["Dashboard.AddCard"] = "Add card" };
+
+        Assert.Equal("Tableau de bord", Loc.Translate("fr", french, english, "Dashboard.Title"));
+        Assert.Equal("Add card", Loc.Translate("fr", french, english, "Dashboard.AddCard"));
+        Assert.Equal("Dashboard.Unknown", Loc.Translate("fr", french, english, "Dashboard.Unknown"));
     }
 
     [Fact]
