@@ -32,7 +32,6 @@ public static class DataGridSearch
         var input = new WpfTextBox
         {
             Width = 168,
-            Height = 28,
             MinHeight = 28,
             Margin = new Thickness(0),
             Padding = new Thickness(8, 2, 8, 2),
@@ -48,7 +47,6 @@ public static class DataGridSearch
             FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),
             FontSize = 13,
             Width = 28,
-            Height = 28,
             MinWidth = 28,
             MinHeight = 28,
             Margin = new Thickness(6, 0, 0, 0),

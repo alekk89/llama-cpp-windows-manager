@@ -52,9 +52,11 @@ public sealed class WpfBenchmarksSurfaceTests : WpfUiTestBase
             Assert.False(controls.StopButton.IsEnabled);
             Assert.All(VisualDescendants<TextBox>(controls.Root), box =>
                 Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(box))));
-            Assert.Equal(28, controls.Name.Height);
-            Assert.Equal(controls.Name.Height, controls.PromptSizes.Height);
-            Assert.Equal(controls.Name.Height, controls.Preset.Height);
+            Assert.All(new FrameworkElement[] { controls.Name, controls.PromptSizes, controls.Preset }, field =>
+            {
+                Assert.True(double.IsNaN(field.Height));
+                Assert.Equal(28, field.MinHeight);
+            });
             Assert.False(string.IsNullOrWhiteSpace(controls.Model.ToolTip?.ToString()));
             Assert.All(new[] { controls.Model, controls.Profile, controls.Runtime }, combo =>
             {
