@@ -55,18 +55,30 @@ public sealed class WpfEditableComboBoxTests : WpfUiTestBase
         Assert.Equal(Visibility.Visible, selection.Visibility);
         Assert.Same(Application.Current.Resources["TextMain"], TextElement.GetForeground(selection));
 
-        foreach (var theme in new[] { "light", "dark" })
+        var originalAccent = Application.Current.Resources["Accent"];
+        var originalAccentColor = ((SolidColorBrush)originalAccent).Color;
+        var restoreTheme = SnapshotThemeResources();
+        try
         {
-            LocalLlmConsole.ApplicationThemeService.Apply(theme);
-            var caret = Assert.IsType<SolidColorBrush>(editor.CaretBrush);
-            var background = Assert.IsType<SolidColorBrush>(editable.Background);
-            Assert.Equal(((SolidColorBrush)Application.Current.Resources["Accent"]).Color, caret.Color);
-            Assert.Equal(((SolidColorBrush)Application.Current.Resources["AccentSoft"]).Color,
-                Assert.IsType<SolidColorBrush>(editor.SelectionBrush).Color);
-            Assert.NotEqual(background.Color, caret.Color);
-            Assert.Equal(((SolidColorBrush)Application.Current.Resources["TextMain"]).Color,
-                Assert.IsType<SolidColorBrush>(editor.Foreground).Color);
+            foreach (var theme in new[] { "light", "dark" })
+            {
+                LocalLlmConsole.ApplicationThemeService.Apply(theme);
+                var caret = Assert.IsType<SolidColorBrush>(editor.CaretBrush);
+                var background = Assert.IsType<SolidColorBrush>(editable.Background);
+                Assert.Equal(((SolidColorBrush)Application.Current.Resources["Accent"]).Color, caret.Color);
+                Assert.Equal(((SolidColorBrush)Application.Current.Resources["AccentSoft"]).Color,
+                    Assert.IsType<SolidColorBrush>(editor.SelectionBrush).Color);
+                Assert.NotEqual(background.Color, caret.Color);
+                Assert.Equal(((SolidColorBrush)Application.Current.Resources["TextMain"]).Color,
+                    Assert.IsType<SolidColorBrush>(editor.Foreground).Color);
+            }
         }
+        finally
+        {
+            restoreTheme();
+        }
+        Assert.Same(originalAccent, Application.Current.Resources["Accent"]);
+        Assert.Equal(originalAccentColor, ((SolidColorBrush)Application.Current.Resources["Accent"]).Color);
 
         editable.IsEnabled = false;
         Assert.Same(Application.Current.Resources["DisabledControlForeground"], editor.Foreground);
@@ -202,6 +214,32 @@ public sealed class WpfEditableComboBoxTests : WpfUiTestBase
     {
         combo.ApplyTemplate();
         return Assert.IsType<ContentPresenter>(combo.Template.FindName("SelectionPresenter", combo));
+    }
+
+    // Restores every application brush the theme service may recolour or replace, so this
+    // test leaves the shared test Application exactly as it found it.
+    private static Action SnapshotThemeResources()
+    {
+        var resources = Application.Current.Resources;
+        var topLevelKeys = resources.Keys.Cast<object>().ToHashSet();
+        var brushes = resources.MergedDictionaries.SelectMany(dictionary => dictionary.Keys.Cast<object>())
+            .Concat(topLevelKeys)
+            .Distinct()
+            .Select(key => (Key: key, Brush: resources[key] as SolidColorBrush))
+            .Where(item => item.Brush is not null)
+            .Select(item => (item.Key, Brush: item.Brush!, item.Brush!.Color))
+            .ToArray();
+        return () =>
+        {
+            foreach (var key in resources.Keys.Cast<object>().Where(key => !topLevelKeys.Contains(key)).ToArray())
+                resources.Remove(key);
+            foreach (var (key, brush, color) in brushes)
+            {
+                if (!brush.IsFrozen) brush.Color = color;
+                if (topLevelKeys.Contains(key) && !ReferenceEquals(resources[key], brush))
+                    resources[key] = brush;
+            }
+        };
     }
 
     private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
