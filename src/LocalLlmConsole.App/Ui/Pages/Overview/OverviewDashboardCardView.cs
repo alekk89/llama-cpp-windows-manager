@@ -25,6 +25,8 @@ public sealed partial class OverviewDashboardCardView
     private readonly Dictionary<string, MetricSparkline> _graphs = new(StringComparer.Ordinal);
     private readonly Grid _content;
     private readonly StackPanel _values;
+    private readonly StackPanel _freshness;
+    private readonly TextBlock _freshnessText;
     private bool _interactionPreview;
     private bool _resizeHover;
     private bool _resizeEnabled = true;
@@ -108,6 +110,10 @@ public sealed partial class OverviewDashboardCardView
         }
         Grid.SetRow(_values, string.IsNullOrWhiteSpace(layout.Title) ? 0 : 1);
         _content.Children.Add(_values);
+        _freshness = FreshnessIndicator(out _freshnessText);
+        _content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(_freshness, _content.RowDefinitions.Count - 1);
+        _content.Children.Add(_freshness);
         ConfigureMetricReorderDrag();
 
         Root.Child = _content;
@@ -125,6 +131,7 @@ public sealed partial class OverviewDashboardCardView
         .OfType<Grid>()
         .Select(root => ((OverviewDashboardMetricRowView)root.Tag).MetricId)
         .ToArray();
+    public string FreshnessText => _freshness.Visibility == Visibility.Visible ? _freshnessText.Text : "";
     public double MinimumWidth { get; private set; } = ContentMinimumWidth;
     public double MinimumHeight { get; private set; } = OverviewDashboardLayoutPolicy.MinimumCardHeight;
 
@@ -209,7 +216,10 @@ public sealed partial class OverviewDashboardCardView
         SetResizeHover(false);
     }
 
-    public bool Apply(IReadOnlyDictionary<string, OverviewDashboardMetricReading> readings, bool pushGraph)
+    public bool Apply(
+        IReadOnlyDictionary<string, OverviewDashboardMetricReading> readings,
+        bool pushGraph,
+        DateTimeOffset now)
     {
         var geometryChanged = false;
         foreach (var metricId in Layout.MetricIds.Where(_rows.ContainsKey))
@@ -230,6 +240,7 @@ public sealed partial class OverviewDashboardCardView
             geometryChanged = true;
         }
 
+        geometryChanged |= ApplyFreshness(visibleRows, now);
         if (geometryChanged)
             InvalidateMinimumSize();
 
@@ -243,6 +254,59 @@ public sealed partial class OverviewDashboardCardView
             }
         }
         return geometryChanged;
+    }
+
+    private bool ApplyFreshness(IReadOnlyList<OverviewDashboardMetricRowView> visibleRows, DateTimeOffset now)
+    {
+        var oldest = OverviewDashboardFreshnessPolicy.OldestLastKnown(
+            visibleRows.Select(row => row.LastKnownCapturedAt));
+        var status = "";
+        if (oldest is { } capturedAt)
+        {
+            var age = OverviewDashboardFreshnessPolicy.RelativeAge(capturedAt, now);
+            status = string.IsNullOrEmpty(age)
+                ? Loc.T("Dashboard.LastUpdatedJustNow")
+                : Loc.T("Dashboard.LastUpdatedAgo", age);
+        }
+        _freshnessText.Text = status;
+        foreach (var row in visibleRows)
+            row.SetFreshnessStatus(status);
+        System.Windows.Automation.AutomationProperties.SetItemStatus(Root, status);
+        var visibility = oldest is null ? Visibility.Collapsed : Visibility.Visible;
+        if (_freshness.Visibility == visibility) return false;
+        _freshness.Visibility = visibility;
+        return true;
+    }
+
+    private static StackPanel FreshnessIndicator(out TextBlock text)
+    {
+        var panel = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            Margin = new Thickness(4, 6, 4, 0),
+            ToolTip = Loc.T("Dashboard.StaleTooltip"),
+            Visibility = Visibility.Collapsed
+        };
+        var icon = new TextBlock
+        {
+            Text = "",
+            FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
+            FontSize = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 5, 0)
+        };
+        icon.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        text = new TextBlock
+        {
+            FontSize = 9.5,
+            FontStyle = FontStyles.Italic,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        text.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        panel.Children.Add(icon);
+        panel.Children.Add(text);
+        return panel;
     }
 
     public void UpdateMinimumSize(double proposedWidth)

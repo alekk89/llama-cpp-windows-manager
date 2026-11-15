@@ -18,6 +18,7 @@ public sealed partial class OverviewDashboardController
 {
     private const string HardwareRuntimeKey = "host-hardware";
     private readonly OverviewDashboardControllerActions _actions;
+    private readonly TimeProvider _clock;
     private readonly OverviewDashboardMetricRegistry _registry = new();
     private readonly Dictionary<string, OverviewDashboardMetricReading> _readings = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DashboardMetricHistory> _histories = new(StringComparer.Ordinal);
@@ -46,9 +47,11 @@ public sealed partial class OverviewDashboardController
 
     public OverviewDashboardController(
         OverviewDashboardLayout? layout,
-        OverviewDashboardControllerActions actions)
+        OverviewDashboardControllerActions actions,
+        TimeProvider? clock = null)
     {
         _actions = actions ?? throw new ArgumentNullException(nameof(actions));
+        _clock = clock ?? TimeProvider.System;
         _layout = OverviewDashboardLayoutPolicy.Normalize(layout);
         var header = DashboardHeader(out _dashboardActions);
         _root.Children.Add(header);
@@ -323,8 +326,9 @@ public sealed partial class OverviewDashboardController
     private void ApplyReadings(bool pushGraphs)
     {
         var geometryChanged = false;
+        var now = _clock.GetUtcNow();
         foreach (var view in _cardViews.Values)
-            geometryChanged |= view.Apply(_readings, pushGraphs);
+            geometryChanged |= view.Apply(_readings, pushGraphs, now);
         _placementDirty |= geometryChanged;
         var width = _dashboard.ActualWidth;
         if (_dragView is null && _resizeView is null

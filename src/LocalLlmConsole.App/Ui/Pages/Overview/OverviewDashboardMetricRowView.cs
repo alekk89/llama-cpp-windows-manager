@@ -23,6 +23,7 @@ public sealed class OverviewDashboardMetricRowView
     private const double UnitFontSize = 9;
     private const double DetailFontSize = 9.5;
     private const double UnavailableValueFontSize = 11.75;
+    private const double StaleOpacity = .5;
     private static readonly WpfFontFamily MeasurementFont = new("Cascadia Mono, Consolas, Segoe UI");
     private readonly TextBlock _value;
     private readonly TextBlock _unit;
@@ -189,6 +190,8 @@ public sealed class OverviewDashboardMetricRowView
     public Grid Root { get; }
     public MetricSparkline? Graph { get; }
     public bool IsAvailable { get; private set; } = true;
+    public DateTimeOffset? LastKnownCapturedAt { get; private set; }
+    public bool IsStale => LastKnownCapturedAt is not null;
 
     public void SetReorderMode(bool active)
     {
@@ -241,12 +244,15 @@ public sealed class OverviewDashboardMetricRowView
             unavailable,
             unavailable ? Loc.T("Dashboard.ValueUnavailable") : reading!.Value,
             reading?.Unit ?? "",
-            reading?.Detail ?? "");
+            reading?.Detail ?? "",
+            unavailable ? null : reading!.LastKnownCapturedAt);
         if (presentation == _lastPresentation) return false;
 
         _lastPresentation = presentation;
         IsAvailable = available;
+        LastKnownCapturedAt = available ? presentation.LastKnownCapturedAt : null;
         Root.Visibility = available ? Visibility.Visible : Visibility.Collapsed;
+        ApplyFreshness();
         if (!available) return true;
 
         _value.Text = presentation.Value;
@@ -263,6 +269,24 @@ public sealed class OverviewDashboardMetricRowView
             ? Visibility.Collapsed
             : Visibility.Visible;
         return true;
+    }
+
+    /// <summary>
+    /// Announces how old a last-known value is. The card computes the text so
+    /// every stale row in it reports the same age.
+    /// </summary>
+    public void SetFreshnessStatus(string status)
+        => System.Windows.Automation.AutomationProperties.SetItemStatus(Root, IsStale ? status : "");
+
+    private void ApplyFreshness()
+    {
+        var opacity = IsStale ? StaleOpacity : 1;
+        _valueLine.Opacity = opacity;
+        _detail.Opacity = opacity;
+        if (Graph is not null)
+            Graph.Opacity = opacity;
+        if (!IsStale)
+            System.Windows.Automation.AutomationProperties.SetItemStatus(Root, "");
     }
 
     private void RefreshSurface()
@@ -289,5 +313,6 @@ public sealed class OverviewDashboardMetricRowView
         bool Unavailable,
         string Value,
         string Unit,
-        string Detail);
+        string Detail,
+        DateTimeOffset? LastKnownCapturedAt);
 }
