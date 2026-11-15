@@ -143,6 +143,11 @@ Optional sensors appear only after the host reports a finite value. Cumulative
 counters and raw samples remain useful as values but are not charted when they
 do not represent a suitable time-varying series.
 
+When a session's metrics endpoint stops answering, its readings stay on the
+cards dimmed, and the card shows when they were last updated, for example
+"Last updated 2m ago". The age keeps advancing until fresh data arrives, which
+restores the normal look.
+
 ### Models
 
 Models owns GGUF inventory and launch profiles. Use it to:
