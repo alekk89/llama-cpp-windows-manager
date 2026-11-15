@@ -11,7 +11,8 @@ public sealed record LaunchSettingsSaveStateRequest(
 public sealed record LaunchSettingsSaveState(
     string SaveForModelContent,
     bool CanSaveForModel,
-    bool CanSaveAsNewVariant);
+    bool CanSaveAsNewVariant,
+    bool HasUnsavedChanges = false);
 
 public static class LaunchSettingsSaveStateService
 {
@@ -29,14 +30,17 @@ public static class LaunchSettingsSaveStateService
         if (!request.HasSavedProfile || request.SavedProfile is null)
             return new LaunchSettingsSaveState(SaveForModelText, true, canSaveAsNewVariant);
 
+        // A saved profile whose form no longer parses has been edited (for example a half-typed
+        // number), so it counts as an unsaved change.
         if (!request.CurrentProfileReadable || request.CurrentProfile is null)
-            return new LaunchSettingsSaveState(SaveForModelText, true, canSaveAsNewVariant);
+            return new LaunchSettingsSaveState(SaveForModelText, true, canSaveAsNewVariant, HasUnsavedChanges: true);
 
         var currentMatchesSavedProfile = Equals(request.CurrentProfile, request.SavedProfile);
         return new LaunchSettingsSaveState(
             currentMatchesSavedProfile ? SavedText : SaveForModelText,
             !currentMatchesSavedProfile,
-            canSaveAsNewVariant);
+            canSaveAsNewVariant,
+            HasUnsavedChanges: !currentMatchesSavedProfile);
     }
 
     public static bool CanSaveAsNewVariant(ModelRecord? selectedModel, string requestedVariantName)

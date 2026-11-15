@@ -338,14 +338,32 @@ public static class LaunchSettingsFormBinder
         var combo = controls.RuntimeDefinedCombo(setting);
         if (combo is null) return;
         combo.ItemsSource = RuntimeDefinedChoicePolicy.Choices(setting, controls.RuntimeAdvertisedOptions, value).ToArray();
-        SetCombo(combo, value);
+        SelectComboValue(combo, value);
     }
 
+    // The fixed choices each combo was built with, so an unknown value listed for one profile is
+    // dropped again when another profile with a known value is shown.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<WpfComboBox, string[]> BaseChoices = new();
+
+    // Fixed choice combos keep an unknown saved value (for example one set through llwmctl or a
+    // newer release) listed and selected, so saving does not silently replace it.
     private static void SetCombo(WpfComboBox? combo, string value)
     {
         if (combo is null) return;
+        var baseChoices = BaseChoices.GetValue(combo, static item => item.Items.Cast<object>().Select(choice => choice.ToString() ?? "").ToArray());
+        var normalized = (value ?? "").Trim();
+        var known = normalized.Length == 0 || baseChoices.Contains(normalized, StringComparer.OrdinalIgnoreCase);
+        var choices = known ? baseChoices : [.. baseChoices, normalized];
+        var usesItemsSource = combo.ItemsSource is not null || combo.Items.Count == 0;
+        if (usesItemsSource && !combo.Items.Cast<object>().Select(item => item.ToString() ?? "").SequenceEqual(choices, StringComparer.Ordinal))
+            combo.ItemsSource = choices;
+        SelectComboValue(combo, normalized);
+    }
+
+    private static void SelectComboValue(WpfComboBox combo, string value)
+    {
         var match = combo.Items.Cast<object>().Select(item => item.ToString() ?? "").FirstOrDefault(item => string.Equals(item, value, StringComparison.OrdinalIgnoreCase));
-        combo.SelectedItem = string.IsNullOrWhiteSpace(match) ? combo.Items[0] : match;
+        combo.SelectedItem = !string.IsNullOrWhiteSpace(match) ? match : combo.Items.Count > 0 ? combo.Items[0] : null;
     }
 
     private static string ComboValue(WpfComboBox? combo)

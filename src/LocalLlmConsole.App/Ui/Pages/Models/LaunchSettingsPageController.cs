@@ -26,7 +26,16 @@ public sealed record LaunchSettingsPageControllerActions(
     Action<BenchmarkPlan> OpenBenchmarkPlan,
     Action ShowModels,
     Action<string> OpenLog,
-    Action<string> SetStatus);
+    Action<string> SetStatus,
+    Func<LaunchSettingsUnsavedChoice>? ConfirmUnsavedEdits = null,
+    Func<ModelRecord, AppSettings, string, string, Task<ModelLaunchSettingsSaveResult>>? SaveProfileAsync = null);
+
+public enum LaunchSettingsUnsavedChoice
+{
+    Save,
+    Discard,
+    Cancel
+}
 
 public sealed class LaunchSettingsPageController
 {
@@ -36,6 +45,10 @@ public sealed class LaunchSettingsPageController
     private readonly MainWindowCoreModelServices _models;
     private readonly MainWindowCoreRuntimeServices _runtimes;
     private readonly LaunchSettingsPageControllerActions _actions;
+    private ModelRecord? _editorModel;
+    private LaunchSettingsFormControls? _editorControls;
+    private int _leavePromptSuppression;
+    private bool _savingBeforeLeave;
 
     public LaunchSettingsPageController(
         string workspaceRoot,
@@ -82,12 +95,21 @@ public sealed class LaunchSettingsPageController
                     defaults,
                     token,
                     profileId),
-                _ui.LaunchSettingsEditor.Load,
+                viewState => LoadEditor(model, viewState),
                 runtimeId => _actions.RefreshRuntimeSelectorAsync(runtimeId),
                 ApplyToControls,
                 _actions.ApplyModelCapabilitiesAsync,
-                UpdateSaveButtonState),
+                UpdateSaveButtonState,
+                HasUnsavedEditsFor),
             cancellationToken);
+    }
+
+    /// <summary>Records which model, profile and form the editor now shows.</summary>
+    internal void LoadEditor(ModelRecord? model, ModelLaunchSettingsViewState viewState)
+    {
+        _ui.LaunchSettingsEditor.Load(viewState);
+        _editorModel = model;
+        _editorControls = _panel.FormControls;
     }
 
     public async Task SaveSelectedProfileAsync()
@@ -170,11 +192,13 @@ public sealed class LaunchSettingsPageController
         ModelRecord model,
         AppSettings launchSettings,
         string profileId)
-        => await _actions.ModelServices().ModelLaunchSettingsWorkflow.SaveProfileAsync(
-            model,
-            launchSettings,
-            _actions.SelectedRuntimeId(),
-            profileId: profileId);
+        => _actions.SaveProfileAsync is { } save
+            ? await save(model, launchSettings, _actions.SelectedRuntimeId(), profileId)
+            : await _actions.ModelServices().ModelLaunchSettingsWorkflow.SaveProfileAsync(
+                model,
+                launchSettings,
+                _actions.SelectedRuntimeId(),
+                profileId: profileId);
 
     public void ResetToDefaults()
     {
@@ -266,6 +290,101 @@ public sealed class LaunchSettingsPageController
             : "Save Profile";
         _panel.SetSaveForModelState(content, hasNamedProfile && state.CanSaveForModel, hasNamedProfile);
         _panel.SetSaveAsNewEnabled(state.CanSaveAsNewVariant);
+        _panel.SetUnsavedChangesVisible(hasNamedProfile && state.HasUnsavedChanges && ReferenceEquals(_editorControls, _panel.FormControls));
+    }
+
+    /// <summary>
+    /// True when the form still shows the profile it was loaded for and differs from its saved
+    /// state. A recreated panel no longer holds the edits, so it never counts as changed.
+    /// </summary>
+    public bool HasUnsavedEdits()
+    {
+        var editor = _ui.LaunchSettingsEditor;
+        if (string.IsNullOrEmpty(editor.ModelId) || string.IsNullOrWhiteSpace(editor.ProfileId)
+            || !editor.HasSavedProfile || editor.SavedProfile is null) return false;
+        if (!ReferenceEquals(_editorControls, _panel.FormControls)) return false;
+        return BuildSaveState(model: _editorModel ?? _actions.SelectedModel()).HasUnsavedChanges;
+    }
+
+    public bool HasUnsavedEditsFor(string modelId, string profileId)
+        => (_savingBeforeLeave || _ui.LaunchSettingsEditor.IsLoadedFor(modelId, profileId)) && HasUnsavedEdits();
+
+    /// <summary>Suppresses the unsaved-changes prompt while the app itself restores a selection.</summary>
+    public IDisposable SuppressLeavePrompt()
+    {
+        _leavePromptSuppression++;
+        return new LeavePromptSuppression(this);
+    }
+
+    /// <summary>
+    /// True when moving to the next model and profile (or, with nulls, away from the page) would
+    /// drop unsaved edits, so <see cref="ConfirmLeavingEditsAsync"/> must ask first.
+    /// </summary>
+    public bool NeedsLeaveConfirmation(string? nextModelId = null, string? nextProfileId = null)
+    {
+        if (_leavePromptSuppression > 0) return false;
+        if (nextModelId is not null && _ui.LaunchSettingsEditor.IsLoadedFor(nextModelId, nextProfileId ?? "")) return false;
+        return HasUnsavedEdits();
+    }
+
+    /// <summary>
+    /// Asks Save, Discard or Cancel before the editor leaves its profile with unsaved edits. Save
+    /// completes before this returns; a failed save is reported like the Save button's and
+    /// returns false with the edits kept, as does Cancel, so the caller stays where it is.
+    /// </summary>
+    public async Task<bool> ConfirmLeavingEditsAsync(string? nextModelId = null, string? nextProfileId = null)
+    {
+        if (!NeedsLeaveConfirmation(nextModelId, nextProfileId)) return true;
+        var choice = (_actions.ConfirmUnsavedEdits ?? LaunchSettingsUnsavedChangesDialog.Show)();
+        if (choice == LaunchSettingsUnsavedChoice.Cancel) return false;
+        if (choice == LaunchSettingsUnsavedChoice.Discard)
+        {
+            _editorControls = null;
+            _panel.SetUnsavedChangesVisible(false);
+            _actions.SetStatus(Loc.T("Launch.UnsavedChanges.Discarded"));
+            return true;
+        }
+        return await SaveEditsBeforeLeavingAsync();
+    }
+
+    private async Task<bool> SaveEditsBeforeLeavingAsync()
+    {
+        var model = _editorModel;
+        var editor = _ui.LaunchSettingsEditor;
+        if (model is null || !string.Equals(model.Id, editor.ModelId, StringComparison.OrdinalIgnoreCase)) return false;
+        var profileId = editor.ProfileId;
+        var saved = false;
+        // While the write runs, a background refresh keeps the edited form even though another row is selected.
+        _savingBeforeLeave = true;
+        try
+        {
+            await _actions.RunBusyAsync("Saving model launch profile...", async () =>
+            {
+                var result = await SaveProfileAsync(model, ReadFromControls(), profileId);
+                editor.MarkSaved(model.Id, profileId, result.SavedSettings);
+                UpdateSaveButtonState();
+                _actions.SetStatus(result.StatusMessage);
+                saved = true;
+            });
+        }
+        finally
+        {
+            _savingBeforeLeave = false;
+        }
+        if (saved) _actions.RunBackground(_actions.RefreshModelsAsync, "Models refresh failed");
+        return saved;
+    }
+
+    private sealed class LeavePromptSuppression(LaunchSettingsPageController owner) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            owner._leavePromptSuppression--;
+        }
     }
 
     public Task FitSelectedProfileToAvailableVramAsync()
@@ -375,9 +494,9 @@ public sealed class LaunchSettingsPageController
         _panel.SetSaveAsNewEnabled(BuildSaveState(readCurrentProfile: false).CanSaveAsNewVariant);
     }
 
-    private LaunchSettingsSaveState BuildSaveState(bool readCurrentProfile = true)
+    private LaunchSettingsSaveState BuildSaveState(bool readCurrentProfile = true, ModelRecord? model = null)
     {
-        var model = _actions.SelectedModel();
+        model ??= _actions.SelectedModel();
         var currentProfileReadable = false;
         ModelLaunchSettings? currentProfile = null;
         if (readCurrentProfile && model is not null && _ui.LaunchSettingsEditor.HasSavedProfile && _ui.LaunchSettingsEditor.SavedProfile is not null)

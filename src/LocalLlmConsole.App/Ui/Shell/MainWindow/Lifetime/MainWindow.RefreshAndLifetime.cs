@@ -29,8 +29,6 @@ public partial class MainWindow
     private async Task RefreshModelsAsync()
     {
         var modelRefresh = ModelServices.ModelCatalogRefreshApplication;
-        var selectedId = SelectedModel()?.Id;
-        var selectedProfileId = SelectedModelLaunchProfileId();
         var result = await modelRefresh.RefreshAsync(ModelCatalogRefreshActions());
         var groupSnapshot = await ModelServices.ModelGroups.SnapshotAsync();
         var groupsByProfile = groupSnapshot.Assignments.Values
@@ -40,17 +38,23 @@ public partial class MainWindow
             .ToDictionary(pair => pair.LaunchProfileId, pair => pair.Group!, StringComparer.OrdinalIgnoreCase);
         var favoriteFlags = await Task.WhenAll(ModelServices.TrayProfiles.FavoriteProfileIdsAsync(), AppServices.StartupLaunchProfiles.ConfiguredProfileIdsAsync(), AppServices.StateStore.ListSelectorFavoriteIdsAsync(SelectorFavoriteKind.Model));
 
-        _viewModel.Models.ReplaceModels(
-            result.Models,
-            IsModelLoaded,
-            result.NamedLaunchProfiles,
-            result.ModelSizeLabels,
-            groupsByProfile,
-            favoriteFlags[0], favoriteFlags[1], favoriteFlags[2]);
-        var profileModelId = _viewModel.Models.ModelIdForLaunchProfile(selectedProfileId);
-        _viewModel.Models.ShowLaunchProfilesForModel(
-            profileModelId ?? selectedId ?? _viewModel.Models.Rows.FirstOrDefault()?.Model.Id);
-        SelectModelAfterRefresh(selectedId, selectedProfileId);
+        // Read the selection after the awaits, so a row the user picked meanwhile is kept.
+        var selectedId = SelectedModel()?.Id;
+        var selectedProfileId = SelectedModelLaunchProfileId();
+        using (_launchSettingsController.SuppressLeavePrompt())
+        {
+            _viewModel.Models.ReplaceModels(
+                result.Models,
+                IsModelLoaded,
+                result.NamedLaunchProfiles,
+                result.ModelSizeLabels,
+                groupsByProfile,
+                favoriteFlags[0], favoriteFlags[1], favoriteFlags[2]);
+            var profileModelId = _viewModel.Models.ModelIdForLaunchProfile(selectedProfileId);
+            _viewModel.Models.ShowLaunchProfilesForModel(
+                profileModelId ?? selectedId ?? _viewModel.Models.Rows.FirstOrDefault()?.Model.Id);
+            SelectModelAfterRefresh(selectedId, selectedProfileId);
+        }
         await RenderSelectedModelLaunchSettingsAsync();
         await RefreshOverviewModelChoicesAsync(result.Models, result.ModelSizeLabels);
     }
@@ -60,6 +64,7 @@ public partial class MainWindow
 
     private void SelectModelAfterRefresh(string? selectedId, string? selectedProfileId = null)
     {
+        using var restoring = _launchSettingsController.SuppressLeavePrompt();
         _modelsPage.SelectModelAfterRefresh(selectedId, selectedProfileId, _viewModel.Models.Rows, _viewModel.Models.VariantRows);
     }
 
