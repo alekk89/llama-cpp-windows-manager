@@ -17,6 +17,7 @@ namespace LocalLlmConsole;
 public static class SettingsGridColumnFactory
 {
     public const int TextInputCommitDelayMilliseconds = 1000;
+    private const string ScaleSliderName = "ScaleSlider";
 
     public static DataGridTemplateColumn ValueColumn(
         RoutedEventHandler revealClick,
@@ -89,7 +90,6 @@ public static class SettingsGridColumnFactory
         textBox.SetValue(System.Windows.Controls.Control.VerticalContentAlignmentProperty, VerticalAlignment.Center);
         textBox.SetValue(System.Windows.Controls.Control.PaddingProperty, new Thickness(8, 2, 8, 2));
         textBox.SetValue(FrameworkElement.MinHeightProperty, 28.0);
-        textBox.SetValue(FrameworkElement.HeightProperty, 28.0);
         textBox.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0));
         var textBoxStyle = new Style(typeof(WpfTextBox), (Style)WpfApplication.Current.Resources[typeof(WpfTextBox)]);
         foreach (var hiddenType in new[] { "choice", "readonly", "secret", "slider" })
@@ -112,7 +112,6 @@ public static class SettingsGridColumnFactory
         combo.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
         combo.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
         combo.SetValue(FrameworkElement.MinHeightProperty, 28.0);
-        combo.SetValue(FrameworkElement.HeightProperty, 28.0);
         combo.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0));
         var comboStyle = new Style(typeof(WpfComboBox), (Style)WpfApplication.Current.Resources[typeof(WpfComboBox)]);
         comboStyle.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
@@ -124,7 +123,7 @@ public static class SettingsGridColumnFactory
 
         var sliderPanel = new FrameworkElementFactory(typeof(DockPanel));
         sliderPanel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        sliderPanel.SetValue(FrameworkElement.HeightProperty, 28.0);
+        sliderPanel.SetValue(FrameworkElement.MinHeightProperty, 28.0);
         sliderPanel.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 3, 0));
         var sliderPanelStyle = new Style(typeof(DockPanel));
         sliderPanelStyle.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
@@ -133,24 +132,27 @@ public static class SettingsGridColumnFactory
         sliderPanelStyle.Triggers.Add(showSlider);
         sliderPanel.SetValue(FrameworkElement.StyleProperty, sliderPanelStyle);
 
+        sliderPanel.AppendChild(ScaleResetButton(sliderCommitted));
+
         var sliderValue = new FrameworkElementFactory(typeof(TextBlock));
         sliderValue.SetValue(DockPanel.DockProperty, Dock.Right);
-        sliderValue.SetValue(FrameworkElement.WidthProperty, 50.0);
+        sliderValue.SetValue(FrameworkElement.MinWidthProperty, 50.0);
         sliderValue.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Right);
         sliderValue.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         sliderValue.SetValue(TextBlock.ForegroundProperty, WpfApplication.Current.Resources["TextSoft"]);
-        sliderValue.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(EditableSettingRow.Value))
+        sliderValue.SetBinding(TextBlock.TextProperty, new WpfBinding(nameof(WpfSlider.Value))
         {
-            StringFormat = "{0}%"
+            ElementName = ScaleSliderName,
+            StringFormat = "{0:0}%"
         });
         sliderPanel.AppendChild(sliderValue);
 
-        var slider = new FrameworkElementFactory(typeof(WpfSlider));
+        var slider = new FrameworkElementFactory(typeof(WpfSlider), ScaleSliderName);
         slider.SetBinding(AutomationProperties.NameProperty, new WpfBinding(nameof(EditableSettingRow.Label)));
         slider.SetBinding(WpfSlider.ValueProperty, new WpfBinding(nameof(EditableSettingRow.Value))
         {
             Mode = BindingMode.TwoWay,
-            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+            UpdateSourceTrigger = UpdateSourceTrigger.Explicit,
             Converter = new ScaleSliderValueConverter()
         });
         slider.SetValue(WpfSlider.MinimumProperty, (double)AppPreferenceService.ScaleMinimumPercent);
@@ -165,14 +167,19 @@ public static class SettingsGridColumnFactory
         slider.SetValue(WpfSlider.AutoToolTipPrecisionProperty, 0);
         slider.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Stretch);
         slider.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        slider.SetValue(FrameworkElement.MinWidthProperty, 120.0);
-        slider.SetValue(FrameworkElement.HeightProperty, 28.0);
+        slider.SetValue(FrameworkElement.MinWidthProperty, 80.0);
+        slider.SetValue(FrameworkElement.MinHeightProperty, 28.0);
+        // The bound value (and therefore the application-wide UI or text scale) changes only
+        // when the drag or key press completes, so dragging does not relayout every window.
         slider.AddHandler(
             UIElement.PreviewMouseLeftButtonUpEvent,
-            new MouseButtonEventHandler((_, _) => sliderCommitted()));
+            new MouseButtonEventHandler((sender, _) => CommitSlider(sender, sliderCommitted, always: true)));
         slider.AddHandler(
             UIElement.PreviewKeyUpEvent,
-            new System.Windows.Input.KeyEventHandler((_, _) => sliderCommitted()));
+            new System.Windows.Input.KeyEventHandler((sender, _) => CommitSlider(sender, sliderCommitted, always: true)));
+        slider.AddHandler(
+            UIElement.LostKeyboardFocusEvent,
+            new KeyboardFocusChangedEventHandler((sender, _) => CommitSlider(sender, sliderCommitted, always: false)));
         sliderPanel.AppendChild(slider);
         editor.AppendChild(sliderPanel);
 
@@ -244,6 +251,42 @@ public static class SettingsGridColumnFactory
         emptyTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
         style.Triggers.Add(emptyTrigger);
         button.SetValue(FrameworkElement.StyleProperty, style);
+        return button;
+    }
+
+    private static void CommitSlider(object sender, Action sliderCommitted, bool always)
+    {
+        if (sender is not WpfSlider { DataContext: EditableSettingRow row } slider) return;
+        var previous = row.Value;
+        BindingOperations.GetBindingExpression(slider, WpfSlider.ValueProperty)?.UpdateSource();
+        if (always || !string.Equals(previous, row.Value, StringComparison.Ordinal))
+            sliderCommitted();
+    }
+
+    private static FrameworkElementFactory ScaleResetButton(Action sliderCommitted)
+    {
+        var defaultValue = AppSettings.DefaultUiScalePercent.ToString(CultureInfo.InvariantCulture);
+        var button = new FrameworkElementFactory(typeof(WpfButton));
+        button.SetValue(DockPanel.DockProperty, Dock.Right);
+        button.SetValue(ContentControl.ContentProperty, Loc.T("Settings.Scale.Reset"));
+        button.SetValue(FrameworkElement.ToolTipProperty, Loc.T("Settings.Scale.ResetToolTip"));
+        button.SetValue(AutomationProperties.NameProperty, Loc.T("Settings.Scale.ResetToolTip"));
+        button.SetValue(ToolTipService.ShowOnDisabledProperty, true);
+        button.SetValue(FrameworkElement.MinHeightProperty, 24.0);
+        button.SetValue(System.Windows.Controls.Control.PaddingProperty, new Thickness(6, 1, 6, 2));
+        button.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 0, 0, 0));
+        button.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        var style = new Style(typeof(WpfButton), (Style)WpfApplication.Current.Resources[typeof(WpfButton)]);
+        var atDefault = new DataTrigger { Binding = new WpfBinding(nameof(EditableSettingRow.Value)), Value = defaultValue };
+        atDefault.Setters.Add(new Setter(UIElement.IsEnabledProperty, false));
+        style.Triggers.Add(atDefault);
+        button.SetValue(FrameworkElement.StyleProperty, style);
+        button.AddHandler(WpfButton.ClickEvent, new RoutedEventHandler((sender, _) =>
+        {
+            if (sender is not FrameworkElement { DataContext: EditableSettingRow row } || row.Value == defaultValue) return;
+            row.Value = defaultValue;
+            sliderCommitted();
+        }));
         return button;
     }
 

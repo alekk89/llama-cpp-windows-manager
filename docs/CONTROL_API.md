@@ -396,9 +396,9 @@ sessions; `autoLoadGatewayPolicy` applies only while auto-loading is enabled.
 Explicit lifecycle commands and idle-unload policies remain independent.
 
 `uiScalePercent` accepts a bounded percentage from `75` through `175`; the UI
-offers a slider in 1% steps and displays its current percentage. Slider changes
-apply synchronously as the slider moves and persist once on pointer or key
-release. The value is an additional application-only multiplier on top of
+offers a slider in 1% steps, previews its current percentage while dragging,
+and applies and persists the value once on pointer or key release. A Reset
+button returns it to 100%. The value is an additional application-only multiplier on top of
 Windows Per-Monitor-V2 DPI scaling and applies to current and newly opened
 Manager windows.
 

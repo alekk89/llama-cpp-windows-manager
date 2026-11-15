@@ -121,8 +121,9 @@
       <Setter Property="RowBackground" Value="{DynamicResource GridRowBack}"/>
       <Setter Property="AlternatingRowBackground" Value="{DynamicResource GridRowAlt}"/>
       <Setter Property="HeadersVisibility" Value="Column"/>
-      <Setter Property="ColumnHeaderHeight" Value="36"/>
-      <Setter Property="RowHeight" Value="33"/>
+      <Setter Property="ColumnHeaderHeight" Value="NaN"/>
+      <Setter Property="RowHeight" Value="NaN"/>
+      <Setter Property="MinRowHeight" Value="33"/>
       <Setter Property="Margin" Value="0"/>
       <Setter Property="SelectionMode" Value="Single"/>
       <Setter Property="SelectionUnit" Value="FullRow"/>
@@ -136,6 +137,7 @@
       <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="FontSize" Value="11.5"/>
       <Setter Property="Padding" Value="12,0"/>
+      <Setter Property="MinHeight" Value="36"/>
       <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderStrong}"/>
       <Setter Property="BorderThickness" Value="0,0,0,1"/>
       <Setter Property="HorizontalContentAlignment" Value="Left"/>

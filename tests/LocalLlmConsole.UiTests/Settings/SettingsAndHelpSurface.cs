@@ -36,7 +36,8 @@ public abstract partial class WpfUiTestBase
             () => authenticationDisabledNotices++,
             liveUiScales.Add,
             liveFontScales.Add);
-        Assert.Equal(36, settingsControls.SettingsGrid.RowHeight);
+        Assert.True(double.IsNaN(settingsControls.SettingsGrid.RowHeight));
+        Assert.Equal(36, settingsControls.SettingsGrid.MinRowHeight);
         Assert.Equal(
             ["uiScalePercent", "fontScalePercent", "showOverviewModelSection", "showOverviewLiveRuntimeLog", "showModelsHuggingFace"],
             settingsViewModel.Rows.Where(row => row.Group == "UI").Select(row => row.Key));
@@ -132,7 +133,7 @@ public abstract partial class WpfUiTestBase
             && combo.DataContext is EditableSettingRow), combo =>
         {
             Assert.True(double.IsNaN(combo.Width));
-            Assert.Equal(28, combo.Height);
+            Assert.True(double.IsNaN(combo.Height));
             Assert.Equal(28, combo.MinHeight);
             Assert.Equal(HorizontalAlignment.Stretch, combo.HorizontalAlignment);
             Assert.Equal(new Thickness(0, 0, 3, 0), combo.Margin);
@@ -166,38 +167,74 @@ public abstract partial class WpfUiTestBase
         Assert.True(scaleSlider.IsSnapToTickEnabled);
         Assert.Equal(100, scaleSlider.Value);
         Assert.Equal(
-            UpdateSourceTrigger.PropertyChanged,
+            UpdateSourceTrigger.Explicit,
             BindingOperations.GetBinding(scaleSlider, Slider.ValueProperty)?.UpdateSourceTrigger);
         Assert.Contains(
             VisualDescendants<TextBlock>(settingsControls.Root),
             text => text.DataContext == uiScale && text.Text == "100%");
         scaleSlider.Value = 150;
         settingsControls.Root.UpdateLayout();
-        Assert.Equal("150", uiScale.Value);
+        Assert.Equal("100", uiScale.Value);
+        Assert.Empty(liveUiScales);
         Assert.Equal(0, applyRequests);
-        Assert.Equal([150], liveUiScales);
         Assert.Contains(
             VisualDescendants<TextBlock>(settingsControls.Root),
             text => text.DataContext == uiScale && text.Text == "150%");
         scaleSlider.Value = 126;
         scaleSlider.Value = 175;
         scaleSlider.Value = 125;
-        Assert.Equal("125", uiScale.Value);
-        Assert.Equal([150, 126, 175, 125], liveUiScales);
-        Assert.Equal(0, applyRequests);
-        var fontScaleSlider = Assert.Single(
-            VisualDescendants<Slider>(settingsControls.Root),
-            slider => slider.DataContext is EditableSettingRow { Key: "fontScalePercent" });
-        fontScaleSlider.Value = 130;
-        Assert.Equal("130", fontScale.Value);
-        Assert.Equal([130], liveFontScales);
-        Assert.Equal(0, applyRequests);
+        Assert.Equal("100", uiScale.Value);
+        Assert.Empty(liveUiScales);
         scaleSlider.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
         {
             RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent,
             Source = scaleSlider
         });
+        Assert.Equal("125", uiScale.Value);
+        Assert.Equal([125], liveUiScales);
         Assert.Equal(1, applyRequests);
+        var fontScaleSlider = Assert.Single(
+            VisualDescendants<Slider>(settingsControls.Root),
+            slider => slider.DataContext is EditableSettingRow { Key: "fontScalePercent" });
+        fontScaleSlider.Value = 130;
+        Assert.Equal("100", fontScale.Value);
+        Assert.Empty(liveFontScales);
+        fontScaleSlider.RaiseEvent(new KeyEventArgs(
+            Keyboard.PrimaryDevice,
+            new FakePresentationSource(),
+            0,
+            Key.Right)
+        {
+            RoutedEvent = UIElement.PreviewKeyUpEvent,
+            Source = fontScaleSlider
+        });
+        Assert.Equal("130", fontScale.Value);
+        Assert.Equal([130], liveFontScales);
+        Assert.Equal(2, applyRequests);
+        var resetButtons = VisualDescendants<Button>(settingsControls.Root)
+            .Where(button => button.DataContext is EditableSettingRow { Type: "slider" }
+                && Equals(AutomationProperties.GetName(button), LocalLlmConsole.Localization.Loc.T("Settings.Scale.ResetToolTip")))
+            .ToArray();
+        Assert.Equal(2, resetButtons.Length);
+        var uiScaleReset = Assert.Single(resetButtons, button => button.DataContext == uiScale);
+        Assert.Equal(LocalLlmConsole.Localization.Loc.T("Settings.Scale.Reset"), uiScaleReset.Content);
+        Assert.True(uiScaleReset.IsEnabled);
+        uiScaleReset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        settingsControls.Root.UpdateLayout();
+        Assert.Equal("100", uiScale.Value);
+        Assert.Equal(100, scaleSlider.Value);
+        Assert.Equal([125, 100], liveUiScales);
+        Assert.Equal(3, applyRequests);
+        Assert.False(uiScaleReset.IsEnabled);
+        Assert.Contains(
+            VisualDescendants<TextBlock>(settingsControls.Root),
+            text => text.DataContext == uiScale && text.Text == "100%");
+        scaleSlider.RaiseEvent(new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, scaleSlider, null)
+        {
+            RoutedEvent = UIElement.LostKeyboardFocusEvent,
+            Source = scaleSlider
+        });
+        Assert.Equal(3, applyRequests);
         applyRequests = 0;
         var gatewayAutoLoad = Assert.Single(networkSettingsGrid.ItemsSource.Cast<EditableSettingRow>(),
             row => row.Key == "gatewayAutoLoadModels");
@@ -212,7 +249,7 @@ public abstract partial class WpfUiTestBase
         gatewayAutoLoadCombo.SelectedItem = "Yes";
         applyRequests = 0;
         Assert.Contains(VisualDescendants<TextBox>(settingsControls.Root), textBox =>
-            textBox.Height == 28
+            double.IsNaN(textBox.Height)
             && textBox.MinHeight == 28
             && textBox.Padding == new Thickness(8, 2, 8, 2)
             && textBox.VerticalContentAlignment == VerticalAlignment.Center);
@@ -294,6 +331,13 @@ public abstract partial class WpfUiTestBase
             "Local only",
             settingsViewModel.Rows.Single(row => row.Key == "modelAccessMode").Value);
         Assert.Equal("", settingsViewModel.Rows.Single(row => row.Key == "modelApiKey").Value);
+    }
+
+    private sealed class FakePresentationSource : PresentationSource
+    {
+        public override System.Windows.Media.Visual? RootVisual { get; set; }
+        public override bool IsDisposed => false;
+        protected override System.Windows.Media.CompositionTarget? GetCompositionTargetCore() => null;
     }
 }
 
@@ -384,6 +428,94 @@ public sealed class WpfSettingsAndHelpTests : WpfUiTestBase
             Assert.Equal([selected.ProfileId], removed);
         });
     }
+
+    [Fact]
+    public async Task SettingsEditorsAndGridSearchGrowWithLargestTextScale()
+    {
+        await RunStaAsync(() =>
+        {
+            var settings = AppSettings.CreateDefault(Path.Combine(Path.GetTempPath(), "wpf-settings-text-scale"));
+            var viewModel = new SettingsPageViewModel();
+            viewModel.ReplaceRows(new SettingsPageDefinitionService().BuildRows(settings));
+            var controls = LocalLlmConsole.SettingsPageFactory.Create(new LocalLlmConsole.SettingsPageRequest(
+                viewModel.Rows,
+                settings.ThemeMode,
+                new LocalLlmConsole.SettingsPageActions((_, _) => { }, (_, _) => { }, (_, _) => { }, (_, _) => { }, () => { })));
+            var searchGrid = new DataGrid
+            {
+                ItemsSource = new[] { new ScaledGridItem("alpha"), new ScaledGridItem("beta") },
+                Height = 200
+            };
+            var largeTextFactory = new FrameworkElementFactory(typeof(TextBlock));
+            largeTextFactory.SetBinding(TextBlock.TextProperty, new Binding(nameof(ScaledGridItem.Name)));
+            largeTextFactory.SetValue(TextBlock.FontSizeProperty, 18.0);
+            searchGrid.Columns.Add(new DataGridTemplateColumn
+            {
+                Header = LargeHeaderText,
+                CellTemplate = new DataTemplate { VisualTree = largeTextFactory }
+            });
+            var search = LocalLlmConsole.DataGridSearch.Create(searchGrid, item => item.ToString() ?? "", "Search");
+            search.Input.Visibility = Visibility.Visible;
+            var content = new DockPanel();
+            DockPanel.SetDock(search.Root, Dock.Top);
+            content.Children.Add(search.Root);
+            DockPanel.SetDock(searchGrid, Dock.Top);
+            content.Children.Add(searchGrid);
+            content.Children.Add(controls.Root);
+            var window = new Window { Content = content };
+
+            double EditorHeight()
+            {
+                content.Measure(new Size(1000, 4000));
+                content.Arrange(new Rect(0, 0, 1000, 4000));
+                content.UpdateLayout();
+                return VisualDescendants<TextBox>(controls.Root)
+                    .Where(box => box.DataContext is EditableSettingRow { Type: "text" })
+                    .Max(box => box.ActualHeight);
+            }
+
+            var normalEditor = EditorHeight();
+            var normalSearch = search.Input.ActualHeight;
+            Assert.True(double.IsNaN(searchGrid.RowHeight));
+            Assert.Equal(33, searchGrid.MinRowHeight);
+            var normalThemedRow = VisualDescendants<DataGridRow>(searchGrid).First().ActualHeight;
+            Assert.Equal(33, normalThemedRow, tolerance: 0.5);
+            Assert.True(double.IsNaN(searchGrid.ColumnHeaderHeight));
+            System.Windows.Controls.Primitives.DataGridColumnHeader LargeHeader() => VisualDescendants<System.Windows.Controls.Primitives.DataGridColumnHeader>(searchGrid)
+                .Single(header => Equals(header.Content, LargeHeaderText));
+            var normalHeader = LargeHeader().ActualHeight;
+            Assert.Equal(36, LargeHeader().MinHeight);
+            Assert.Equal(36, normalHeader, tolerance: 0.5);
+            Assert.Equal(28, normalEditor, precision: 1);
+            Assert.Equal(28, normalSearch, precision: 1);
+            try
+            {
+                ApplicationFontScaleService.ApplyToWindow(window, AppPreferenceService.ScaleMaximumPercent);
+                var scaledEditor = EditorHeight();
+                Assert.True(scaledEditor > normalEditor, $"Editor height {scaledEditor} did not grow beyond {normalEditor}.");
+                Assert.True(search.Input.ActualHeight > normalSearch, $"Search height {search.Input.ActualHeight} did not grow.");
+                var scaledHeader = LargeHeader().ActualHeight;
+                Assert.True(scaledHeader > normalHeader, $"Themed grid header height {scaledHeader} did not grow beyond {normalHeader}.");
+                var scaledThemedRow = VisualDescendants<DataGridRow>(searchGrid).First();
+                var scaledRowEditor = VisualDescendants<TextBlock>(scaledThemedRow).Single(text => text.FontSize > 18);
+                Assert.True(scaledThemedRow.ActualHeight > normalThemedRow, $"Themed grid row height {scaledThemedRow.ActualHeight} did not grow beyond {normalThemedRow}.");
+                Assert.True(
+                    scaledThemedRow.ActualHeight >= scaledRowEditor.ActualHeight,
+                    $"Themed grid row height {scaledThemedRow.ActualHeight} clips its text height {scaledRowEditor.ActualHeight}.");
+                var textRow = VisualDescendants<DataGridRow>(controls.Root)
+                    .First(row => row.DataContext is EditableSettingRow { Type: "text" });
+                Assert.True(textRow.ActualHeight >= scaledEditor, $"Row height {textRow.ActualHeight} clips editor height {scaledEditor}.");
+            }
+            finally
+            {
+                ApplicationFontScaleService.ApplyToWindow(window, 100);
+            }
+        });
+    }
+
+    private sealed record ScaledGridItem(string Name);
+
+    private const string LargeHeaderText = "Large" + "\n" + "header";
 
     [Fact]
     public async Task UiScaleAppliesWithoutStackingTransforms()

@@ -223,7 +223,6 @@ public static class SettingsPageFactory
             DisplayMemberPath = nameof(StartupLaunchProfileChoice.DisplayName),
             SearchTextSelector = item => (item as StartupLaunchProfileChoice)?.DisplayName ?? "",
             FavoriteKeySelector = item => (item as StartupLaunchProfileChoice)?.ProfileId ?? "",
-            Height = 28,
             MinHeight = 28,
             Margin = new Thickness(0),
             VerticalAlignment = VerticalAlignment.Center,
@@ -237,7 +236,6 @@ public static class SettingsPageFactory
         {
             Content = Loc.T("Runtimes.CustomRepo.AddButton"),
             IsEnabled = false,
-            Height = 28,
             MinHeight = 28,
             Padding = new Thickness(8, 1, 8, 2),
             Margin = new Thickness(7, 0, 0, 0)
@@ -325,7 +323,8 @@ public static class SettingsPageFactory
         {
             IsReadOnly = false,
             ItemsSource = rowList,
-            RowHeight = 36
+            RowHeight = double.NaN,
+            MinRowHeight = 36
         };
         PageSectionFactory.PolishGrid(grid);
         var textStyle = (Style)WpfApplication.Current.Resources["GridCellText"];

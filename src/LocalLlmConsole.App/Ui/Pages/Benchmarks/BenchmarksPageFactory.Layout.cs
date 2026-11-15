@@ -37,7 +37,6 @@ public static partial class BenchmarksPageFactory
     {
         var combo = new ComboBox
         {
-            Height = 28,
             MinHeight = 28,
             MinWidth = 76,
             Margin = new Thickness(0, 0, 4, 1),
@@ -53,7 +52,6 @@ public static partial class BenchmarksPageFactory
         => new()
         {
             Text = value,
-            Height = 28,
             MinHeight = 28,
             MinWidth = Math.Max(72, minWidth),
             Margin = new Thickness(0, 0, 4, 1),
@@ -68,7 +66,6 @@ public static partial class BenchmarksPageFactory
         {
             Content = text,
             IsChecked = value,
-            Height = 28,
             MinHeight = 28,
             Margin = new Thickness(4, 0, 10, 1),
             VerticalAlignment = VerticalAlignment.Center,
@@ -185,7 +182,6 @@ public static partial class BenchmarksPageFactory
         };
         AutomationProperties.SetHelpText(label, help);
 
-        field.Height = 28;
         field.MinHeight = 28;
         field.MinWidth = Math.Max(field.MinWidth, 72);
         field.Margin = new Thickness(0, 0, 4, 0);

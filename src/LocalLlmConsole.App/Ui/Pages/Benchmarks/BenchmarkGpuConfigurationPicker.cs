@@ -35,7 +35,6 @@ public sealed class BenchmarkGpuConfigurationPicker : StackPanel
             DisplayMemberPath = nameof(GpuModeChoice.Label),
             SelectedValuePath = nameof(GpuModeChoice.Value),
             MinWidth = 100,
-            Height = 28,
             MinHeight = 28,
             Margin = new Thickness(0),
             Padding = new Thickness(8, 2, 8, 2),
@@ -48,7 +47,6 @@ public sealed class BenchmarkGpuConfigurationPicker : StackPanel
         {
             Text = Automatic,
             MinWidth = 100,
-            Height = 28,
             MinHeight = 28,
             Margin = new Thickness(0),
             Padding = new Thickness(8, 2, 8, 2),
@@ -64,7 +62,6 @@ public sealed class BenchmarkGpuConfigurationPicker : StackPanel
             IsEnabled = false,
             MinWidth = 36,
             MinHeight = 28,
-            Height = 28,
             Margin = new Thickness(0),
             Padding = new Thickness(8, 2, 8, 2),
             VerticalAlignment = VerticalAlignment.Center,

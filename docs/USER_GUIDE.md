@@ -496,11 +496,11 @@ its launch form or actions.
 If text or controls are too small after using Windows display scaling, choose
 **Settings → UI → UI scale**. The 75% to 175% slider moves in 1% steps, shows
 the current percentage, and adds an application-only multiplier on top of
-Windows per-monitor DPI scaling. The selected value applies to the main window
-and owned dialogs immediately as the slider moves, with no debounce or pause
-required, and persists once when the pointer or adjustment key is released.
-Use **Settings → UI → Text scale** for the same 75% to 175% live adjustment when
-only text should change size; controls, spacing, and window chrome retain their
+Windows per-monitor DPI scaling. The percentage label previews the value while
+you drag; the value applies to the main window and owned dialogs and persists
+once when the pointer or adjustment key is released. **Reset** returns the
+slider to 100%. Use **Settings → UI → Text scale** for the same 75% to 175%
+adjustment when only text should change size; controls, spacing, and window chrome retain their
 normal dimensions. At
 narrower window widths, Settings collapses its sections into one
 ordered column and returns to two columns when widened. Collapse the navigation
