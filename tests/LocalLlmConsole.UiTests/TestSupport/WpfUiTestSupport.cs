@@ -126,7 +126,10 @@ public abstract partial class WpfUiTestBase
         var unavailableTemperatureRow = VisualDescendants<Grid>(cpuCard.Root)
             .Single(grid => grid.Tag is OverviewDashboardMetricRowView row
                             && row.MetricId == OverviewDashboardMetricIds.CpuTemperature);
-        Assert.Equal(Visibility.Collapsed, unavailableTemperatureRow.Visibility);
+        // The user added this sensor, so it stays visible with a reason.
+        Assert.Equal(Visibility.Visible, unavailableTemperatureRow.Visibility);
+        Assert.Contains(VisualDescendants<TextBlock>(unavailableTemperatureRow),
+            text => text.Text == LocalLlmConsole.Localization.Loc.T("Dashboard.NotReported.Hardware"));
         AssertDashboardDefersGraphPushesToOnePerFrame();
     }
 
@@ -178,7 +181,7 @@ public abstract partial class WpfUiTestBase
                 Bounds: new OverviewDashboardCardBounds(0, 0, 4, 112)),
             new("gpu-0", [OverviewDashboardMetricIds.Gpu(0)],
                 Bounds: new OverviewDashboardCardBounds(4, 0, 4, 112)),
-            new("unavailable-gpu", [OverviewDashboardMetricIds.Gpu(2)],
+            new("default-gpu-2", [OverviewDashboardMetricIds.Gpu(2)],
                 Bounds: new OverviewDashboardCardBounds(8, 0, 4, 112)),
             new("status", [OverviewDashboardMetricIds.ModelStatus],
                 Bounds: new OverviewDashboardCardBounds(8, 0, 4, 112))
@@ -193,7 +196,7 @@ public abstract partial class WpfUiTestBase
         dashboard.DashboardGrid.Arrange(new Rect(0, 0, 900, 1000));
         dashboard.DashboardGrid.UpdateLayout();
 
-        var hidden = dashboard.Cards.Single(card => card.Layout.Id == "unavailable-gpu");
+        var hidden = dashboard.Cards.Single(card => card.Layout.Id == "default-gpu-2");
         Assert.Equal(Visibility.Collapsed, hidden.Root.Visibility);
         var visible = dashboard.Cards.Where(card => card.Root.Visibility == Visibility.Visible).ToArray();
         Assert.Equal([0, 300, 600], visible.Select(card => Canvas.GetLeft(card.Root)));

@@ -104,7 +104,8 @@ public sealed partial class OverviewDashboardCardView
                 definition,
                 graph,
                 showSeparator: metricIndex < layout.MetricIds.Count - 1,
-                alternateSurface: metricIndex % 2 == 1);
+                alternateSurface: metricIndex % 2 == 1,
+                hideWhenUnreported: OverviewDashboardLayoutPolicy.HidesUnreportedMetric(layout.Id, metricId));
             _rows[definition.Id] = row;
             _values.Children.Add(row.Root);
         }
@@ -229,7 +230,7 @@ public sealed partial class OverviewDashboardCardView
         }
 
         var visibleRows = Layout.MetricIds.Where(_rows.ContainsKey).Select(metricId => _rows[metricId])
-            .Where(row => row.IsAvailable)
+            .Where(row => row.IsShown)
             .ToArray();
         for (var index = 0; index < visibleRows.Length; index++)
             geometryChanged |= visibleRows[index].SetVisualPosition(index, index < visibleRows.Length - 1);

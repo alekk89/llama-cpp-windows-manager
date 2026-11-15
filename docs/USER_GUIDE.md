@@ -139,7 +139,12 @@ acceptance**, only when the runtime reports its verification-step counter.
 recent prompt activity, while **Prompt cache reuse** covers the whole session;
 both need the runtime's cached prompt token counter and otherwise show N/A.
 
-Optional sensors appear only after the host reports a finite value. Cumulative
+A metric you added to a card stays visible even when the runtime, hardware, or
+gateway does not report it: the row is muted and says why, for example "Not
+reported by this runtime". Remove it with **Remove metric** when it is not
+useful. The optional sensors on the app's generated default cards are the
+exception: they appear only after the host reports a finite value, so default
+cards do not fill with empty rows. Cumulative
 counters and raw samples remain useful as values but are not charted when they
 do not represent a suitable time-varying series.
 
