@@ -180,7 +180,7 @@ public sealed partial class ModelCatalogService
         {
             "draft-mtp" or LaunchSettingMetadataService.AtomicMtpSpeculativeType => kind == SpeculativeCompanionKind.Mtp,
             "draft-dspark" => kind == SpeculativeCompanionKind.DSpark,
-            "draft-dflash" => kind == SpeculativeCompanionKind.DFlash,
+            _ when SpeculativeTypePolicy.IsDFlashFamily(speculativeType) => kind == SpeculativeCompanionKind.DFlash,
             "draft-eagle3" => kind == SpeculativeCompanionKind.Eagle3,
             "draft-simple" => kind == SpeculativeCompanionKind.DraftModel,
             "" or "none" => kind != SpeculativeCompanionKind.Unknown,

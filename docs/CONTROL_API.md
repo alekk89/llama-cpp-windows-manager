@@ -221,7 +221,8 @@ positive `*.nextn_predict_layers` metadata value. When present, the Manager uses
 the embedded MTP tensors and deliberately omits `--model-draft`. Otherwise it
 searches the exact model folder for an MTP sidecar. Every other `draft-*` mode
 searches only its own sidecar type, so DSpark, DFlash, Eagle3, MTP, and ordinary
-draft models are never substituted for one another. Recognizable conflicting
+draft models are never substituted for one another. `draft-dflash2` and
+`draft-lilicorr` are DFlash variants and use the DFlash sidecar. Recognizable conflicting
 family/version or target-size candidates are rejected; `draft-simple` permits a
 smaller draft size. Explicit paths still take precedence and may be outside the
 model folder.

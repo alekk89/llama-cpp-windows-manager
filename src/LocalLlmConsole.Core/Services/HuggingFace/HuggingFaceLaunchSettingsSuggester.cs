@@ -245,7 +245,6 @@ public static partial class HuggingFaceLaunchSettingsSuggester
     private static string NormalizeSpeculativeType(string value)
     {
         var normalized = SpeculativeTypePolicy.Normalize(value);
-        var allowed = new[] { "none", "atomic-mtp", "draft-mtp", "draft-simple", "draft-eagle3", "draft-dflash", "draft-dspark", "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-mod", "ngram-cache" };
-        return allowed.Contains(normalized, StringComparer.OrdinalIgnoreCase) ? normalized : "none";
+        return SpeculativeTypePolicy.SupportedTypes.Contains(normalized, StringComparer.OrdinalIgnoreCase) ? normalized : "none";
     }
 }

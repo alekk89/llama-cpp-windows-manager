@@ -5,9 +5,17 @@ public static class SpeculativeTypePolicy
     public const string AtomicMtp = "atomic-mtp";
     public static readonly IReadOnlyList<string> SupportedTypes =
     [
-        "none", AtomicMtp, "draft-mtp", "draft-simple", "draft-eagle3", "draft-dflash", "draft-dspark",
-        "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-mod", "ngram-cache"
+        "none", AtomicMtp, "draft-mtp", "draft-simple", "draft-eagle3", "draft-dflash", "draft-dflash2", "draft-lilicorr",
+        "draft-dspark", "ngram-simple", "ngram-map-k", "ngram-map-k4v", "ngram-mod", "ngram-cache"
     ];
+
+    // DFlash2 and LiliCorr are DFlash variants upstream: they load the same DFlash draft model.
+    private static readonly HashSet<string> DFlashFamily = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "draft-dflash", "draft-dflash2", "draft-lilicorr"
+    };
+
+    public static bool IsDFlashFamily(string? value) => DFlashFamily.Contains(Normalize(value));
 
     public static string Normalize(string? value)
     {
