@@ -4,7 +4,7 @@ namespace LocalLlmConsole.Services;
 
 public sealed partial class RuntimeMetricSummaryTracker
 {
-    private static RuntimeCapacityObservation ObserveCapacity(
+    internal static RuntimeCapacityObservation ObserveCapacity(
         IReadOnlyList<PrometheusSample> samples,
         RuntimeSlotSnapshot? slotSnapshot,
         AppSettings metricsSettings)
@@ -50,7 +50,7 @@ public sealed partial class RuntimeMetricSummaryTracker
                 metricsSettings.KvUnified));
     }
 
-    private sealed record RuntimeCapacityObservation(
+    internal sealed record RuntimeCapacityObservation(
         double? KvTokens,
         double? ContextCapacityTokens,
         double? KvUsagePercent,

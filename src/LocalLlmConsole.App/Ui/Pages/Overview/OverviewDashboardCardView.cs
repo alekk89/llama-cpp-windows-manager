@@ -34,7 +34,8 @@ public sealed partial class OverviewDashboardCardView
 
     public OverviewDashboardCardView(
         OverviewDashboardCardLayout layout,
-        IReadOnlyList<OverviewDashboardMetricDefinition> definitions)
+        IReadOnlyList<OverviewDashboardMetricDefinition> definitions,
+        Action<string>? selectLoadedSession = null)
     {
         Layout = layout;
         var byId = definitions.ToDictionary(item => item.Id, StringComparer.Ordinal);
@@ -77,6 +78,7 @@ public sealed partial class OverviewDashboardCardView
         {
             var metricId = layout.MetricIds[metricIndex];
             var definition = byId[metricId];
+            if (TryAddLoadedModels(definition, selectLoadedSession)) continue;
             MetricSparkline? graph = null;
             if ((layout.ChartMetricIds ?? (string.IsNullOrWhiteSpace(layout.ChartMetricId)
                     ? []
@@ -210,18 +212,18 @@ public sealed partial class OverviewDashboardCardView
     public bool Apply(IReadOnlyDictionary<string, OverviewDashboardMetricReading> readings, bool pushGraph)
     {
         var geometryChanged = false;
-        foreach (var metricId in Layout.MetricIds)
+        foreach (var metricId in Layout.MetricIds.Where(_rows.ContainsKey))
         {
             readings.TryGetValue(metricId, out var reading);
             geometryChanged |= _rows[metricId].Apply(reading);
         }
 
-        var visibleRows = Layout.MetricIds.Select(metricId => _rows[metricId])
+        var visibleRows = Layout.MetricIds.Where(_rows.ContainsKey).Select(metricId => _rows[metricId])
             .Where(row => row.IsAvailable)
             .ToArray();
         for (var index = 0; index < visibleRows.Length; index++)
             geometryChanged |= visibleRows[index].SetVisualPosition(index, index < visibleRows.Length - 1);
-        var visibility = visibleRows.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        var visibility = visibleRows.Length > 0 || LoadedModels is not null ? Visibility.Visible : Visibility.Collapsed;
         if (Root.Visibility != visibility)
         {
             Root.Visibility = visibility;

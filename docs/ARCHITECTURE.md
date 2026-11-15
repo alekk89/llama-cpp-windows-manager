@@ -425,6 +425,11 @@ termination. The active queue alone may hold a Windows system-awake request.
   is limited to one frame every five seconds and refreshed immediately on restore.
   Runtime output uses a bounded writer that flushes after one second, 64 KiB, or
   session shutdown instead of forcing a disk flush for every line.
+  The optional loaded-models metric is a session list rather than a reading, so
+  layout normalization always isolates it in its own card. The refresh service
+  hands the existing all-session telemetry poll to the stateless
+  `LoadedSessionDashboardProjection`, which issues no extra requests; selecting
+  a row selects the matching loaded-session grid row and reuses its flow.
   Cards remain headerless by default but may render one optional user title;
   each row still labels itself and owns its optional charts so chart identity
   does not depend on card position. The card context menu manages metric

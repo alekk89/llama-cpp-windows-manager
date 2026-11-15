@@ -100,7 +100,7 @@ public partial class MainWindow
             _runtimeDashboardPage.ApplyHardwareSummaryAsync,
             RenderStoppedSelectedOverviewModelAsync,
             RuntimeDashboardMetricsActions(),
-            renderOverview ? UpdateOverviewModelActions : () => { });
+            renderOverview ? UpdateOverviewModelActions : () => { }, _runtimeDashboardPage.ApplyLoadedSessions);
 
     private async Task ApplyRuntimeEndpointHealthAsync(IReadOnlyList<RuntimeMetricPollResult> pollResults)
     {

@@ -6,6 +6,7 @@ public sealed partial class OverviewDashboardMetricRegistry
         =>
         [
             Definition(OverviewDashboardMetricIds.ModelStatus, Loc.T("Overview.Metric.ModelStatus"), Loc.T("Dashboard.Category.Core"), false, presentation: OverviewDashboardMetricPresentation.Status),
+            Metric(OverviewDashboardMetricIds.LoadedModels, "LoadedModels", "Core", false),
             Metric(OverviewDashboardMetricIds.Cpu, "Cpu", "Hardware", true, FixedMaximum: 100, presentation: OverviewDashboardMetricPresentation.Hardware, displayName: Loc.T("Dashboard.Metric.CpuUsage")),
             HardwareDefinition(OverviewDashboardMetricIds.CpuTemperature, $"{Loc.T("Dashboard.Metric.Cpu")} · {Loc.T("EndpointInspection.Temperature")}", 125),
             HardwareDefinition(OverviewDashboardMetricIds.CpuCoreClock, $"{Loc.T("Dashboard.Metric.Cpu")} · {Loc.T("Dashboard.Metric.CoreClock")}"),

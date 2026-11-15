@@ -4,6 +4,7 @@ public static partial class OverviewDashboardLayoutPolicy
 {
     private static bool IsChartableMetricId(string metricId)
         => !string.Equals(metricId, OverviewDashboardMetricIds.ModelStatus, StringComparison.Ordinal)
+           && !string.Equals(metricId, OverviewDashboardMetricIds.LoadedModels, StringComparison.Ordinal)
            && !string.Equals(metricId, OverviewDashboardMetricIds.KvCacheAllocation, StringComparison.Ordinal)
            && !string.Equals(metricId, OverviewDashboardMetricIds.KvCacheCapacity, StringComparison.Ordinal)
            && !string.Equals(metricId, OverviewDashboardMetricIds.RamClock, StringComparison.Ordinal)

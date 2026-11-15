@@ -10,7 +10,8 @@ namespace LocalLlmConsole;
 public sealed record OverviewDashboardControllerActions(
     Func<OverviewDashboardLayout, Task> PersistLayoutAsync,
     Func<Func<Task>, Task> RunEventAsync,
-    Func<Func<Task>, Task>? DispatchMenuActionAsync = null);
+    Func<Func<Task>, Task>? DispatchMenuActionAsync = null,
+    Action<string>? SelectLoadedSession = null);
 
 public sealed partial class OverviewDashboardController
 {
@@ -280,7 +281,8 @@ public sealed partial class OverviewDashboardController
         var definitions = _registry.Definitions(configuredIds);
         foreach (var card in _layout.Cards)
         {
-            var view = new OverviewDashboardCardView(card, definitions);
+            var view = new OverviewDashboardCardView(card, definitions, _actions.SelectLoadedSession);
+            view.ApplyLoadedSessions(_loadedSessions);
             view.SetResizeEnabled(!_layout.CardSizesLocked);
             view.Root.ContextMenu = CardContextMenu(card);
             view.DragSurface.PreviewMouseLeftButtonDown += (_, args) => BeginPointerInteraction(view, args);

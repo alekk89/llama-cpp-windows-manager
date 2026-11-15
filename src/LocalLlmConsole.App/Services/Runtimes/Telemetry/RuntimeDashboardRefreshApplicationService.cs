@@ -39,7 +39,8 @@ public sealed record RuntimeDashboardRefreshApplicationActions(
     Func<HostHardwareSnapshot, Task> SetGpuMetricAsync,
     Func<ModelRecord?, bool, Task> RenderStoppedSelectedOverviewModelAsync,
     RuntimeDashboardMetricsApplicationActions MetricsActions,
-    Action UpdateOverviewModelActions);
+    Action UpdateOverviewModelActions,
+    Action<IReadOnlyList<LoadedModelSessionSnapshot>, IReadOnlyList<RuntimeMetricPollResult>>? ApplyLoadedSessions = null);
 
 public sealed class RuntimeDashboardRefreshApplicationService
 {
@@ -84,6 +85,8 @@ public sealed class RuntimeDashboardRefreshApplicationService
                     (_, rendered) = await RenderSelectionAsync(request, actions, [completed], rendered, completedOnly: true);
             }, cancellationToken);
             await actions.ApplyEndpointHealthAsync(pollResults);
+            if (request.RenderOverview)
+                actions.ApplyLoadedSessions?.Invoke(actions.SessionSnapshots(), pollResults);
             await actions.TrackLifetimeTokenDeltasAsync(pollResults);
             await actions.ApplyIdleUnloadPoliciesAsync(pollResults);
 

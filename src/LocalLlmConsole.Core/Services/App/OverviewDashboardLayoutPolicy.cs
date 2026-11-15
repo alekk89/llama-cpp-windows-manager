@@ -60,6 +60,7 @@ public static partial class OverviewDashboardLayoutPolicy
     private static readonly string[] BuiltInMetricIds =
     [
         OverviewDashboardMetricIds.ModelStatus,
+        OverviewDashboardMetricIds.LoadedModels,
         OverviewDashboardMetricIds.Cpu,
         OverviewDashboardMetricIds.CpuTemperature,
         OverviewDashboardMetricIds.CpuCoreClock,
@@ -154,6 +155,7 @@ public static partial class OverviewDashboardLayoutPolicy
             && layout.Cards is { Count: > 0 })
             return Default;
 
+        IsolateLoadedModelsCards(cards, cardIds);
         AssignMissingBounds(cards);
 
         var cardSizesLocked = layout.Version >= FixedCardSizeLayoutVersion

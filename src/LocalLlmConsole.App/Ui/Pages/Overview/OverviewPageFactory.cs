@@ -107,7 +107,8 @@ public static class OverviewPageFactory
             new OverviewDashboardControllerActions(
                 request.Actions.PersistDashboardLayoutAsync,
                 request.Actions.RunEventAsync,
-                request.Actions.DispatchDashboardMenuActionAsync));
+                request.Actions.DispatchDashboardMenuActionAsync,
+                sessionId => SelectLoadedSessionRow(loadedSessionsGrid, request.ViewModel.Overview.SessionRows, sessionId)));
         Grid.SetRow(dashboardController.Root, 1);
         root.Children.Add(dashboardController.Root);
 
@@ -145,6 +146,17 @@ public static class OverviewPageFactory
             runtimeLogBox,
             metricsSection,
             runtimeMetricsGrid);
+    }
+
+    // Selecting the row reuses the loaded-sessions grid's selection flow, so the
+    // detailed cards follow exactly as if the user had clicked the grid row.
+    private static void SelectLoadedSessionRow(DataGrid grid, IEnumerable<OverviewSessionRow> rows, string sessionId)
+    {
+        var row = rows.FirstOrDefault(item => item.Kind == OverviewEndpointKind.Session
+            && string.Equals(item.SessionId, sessionId, StringComparison.OrdinalIgnoreCase));
+        if (row is null || ReferenceEquals(grid.SelectedItem, row)) return;
+        grid.SelectedItem = row;
+        grid.ScrollIntoView(row);
     }
 
     private static Grid ModelBar(
