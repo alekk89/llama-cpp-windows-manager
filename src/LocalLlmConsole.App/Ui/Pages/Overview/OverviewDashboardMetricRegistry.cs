@@ -33,7 +33,8 @@ public sealed record OverviewDashboardMetricReading(
     double? Secondary = null,
     DateTimeOffset? LastKnownCapturedAt = null,
     string Unit = "",
-    string Detail = "");
+    string Detail = "",
+    DateTimeOffset? SampledAt = null);
 
 public sealed partial class OverviewDashboardMetricRegistry
 {

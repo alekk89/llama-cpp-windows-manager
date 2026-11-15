@@ -60,6 +60,7 @@ public static partial class OverviewDashboardLayoutPolicy
             ? card with
             {
                 Title = existing.Title,
+                ChartScale = resetDefaultPresentation ? card.ChartScale : existing.ChartScale,
                 ChartMetricId = resetDefaultPresentation ? card.ChartMetricId : existing.ChartMetricId,
                 ChartMetricIds = resetDefaultPresentation ? card.ChartMetricIds : existing.ChartMetricIds
             }

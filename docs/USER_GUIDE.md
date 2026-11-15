@@ -104,6 +104,13 @@ outer card. **Lock** preserves card dimensions while the window changes size.
 Saved layouts are versioned and migrated without discarding unrelated
 customization.
 
+Each chart names the time span its latest 60 samples cover, such as *Last
+2 min*. Hover over a chart, or focus its metric row with the keyboard, to show
+the minimum, maximum, and latest value with its unit. Percentage charts always
+use 0-100%. Other charts start at zero with a stable maximum that rises at
+once and falls only after a large drop; choose **Chart > Fit scale to visible
+range** in a card's actions to zoom into small changes instead.
+
 Keyboard controls:
 
 - **Shift+F10** or the Menu key opens actions for a focused card.

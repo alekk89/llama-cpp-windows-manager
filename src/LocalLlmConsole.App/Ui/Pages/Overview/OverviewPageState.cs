@@ -88,6 +88,7 @@ public sealed class OverviewPageState
            && first.Height == second.Height
            && first.Bounds == second.Bounds
            && string.Equals(first.Title, second.Title, StringComparison.Ordinal)
+           && first.ChartScale == second.ChartScale
            && first.MetricIds.SequenceEqual(second.MetricIds, StringComparer.Ordinal)
            && (first.ChartMetricIds ?? []).SequenceEqual(second.ChartMetricIds ?? [], StringComparer.Ordinal);
 
