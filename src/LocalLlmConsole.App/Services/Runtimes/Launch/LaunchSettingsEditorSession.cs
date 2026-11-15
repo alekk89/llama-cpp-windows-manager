@@ -39,6 +39,18 @@ public sealed class LaunchSettingsEditorSession
         HasSavedProfile = true;
     }
 
+    /// <summary>
+    /// Compares later edits with the form as it was rendered for the saved profile. A profile
+    /// saved by an earlier version reads back with newer defaults and normalized values, which
+    /// are not edits; they are saved the next time the user saves the profile.
+    /// </summary>
+    public void UseRenderedFormAsBaseline(ModelLaunchSettings renderedProfile)
+    {
+        ArgumentNullException.ThrowIfNull(renderedProfile);
+        if (!HasSavedProfile) return;
+        SavedProfile = renderedProfile;
+    }
+
     public bool IsLoadedFor(string modelId, string profileId = "")
         => string.Equals(ModelId, modelId, StringComparison.OrdinalIgnoreCase)
            && string.Equals(ProfileId, profileId ?? "", StringComparison.OrdinalIgnoreCase);
