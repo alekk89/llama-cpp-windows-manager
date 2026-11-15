@@ -62,9 +62,11 @@ internal sealed class DataGridColumnResizeBehavior : IDisposable
         var next = _grid.Columns.Where(column => column.Visibility == Visibility.Visible && column.DisplayIndex > headerColumn.DisplayIndex)
             .OrderBy(column => column.DisplayIndex).FirstOrDefault();
         var fromLeft = thumb.Name == "PART_LeftHeaderGripper" || next is not null;
+        // The dragged edge is the left edge of this column. The last column's right
+        // edge resizes the last column, as if its left edge moved the other way.
         var target = thumb.Name == "PART_LeftHeaderGripper" ? headerColumn : next ?? headerColumn;
         var stretch = DataGridColumnSizing.StretchColumn(_grid);
-        if (stretch is null || target == stretch || !target.CanUserResize || target.MaxWidth <= target.MinWidth) return;
+        if (stretch is null || !target.CanUserResize) return;
 
         Finish(canceled: true);
         var widths = _grid.Columns.Where(column => column.Visibility == Visibility.Visible && double.IsFinite(column.ActualWidth) && column.ActualWidth > 0)
@@ -84,18 +86,22 @@ internal sealed class DataGridColumnResizeBehavior : IDisposable
         else if (args is DragCompletedEventArgs completed) owner.Finish(completed.Canceled);
     }
 
+    /// <summary>
+    /// Moves the dragged edge. The side that grows gives the space to the stretch
+    /// column when it is on that side, otherwise to the column beside the edge.
+    /// The side that shrinks gives up the stretch column's space first, then each
+    /// other column's, nearest the edge first, so the edge only stops once every
+    /// column on that side is at its minimum width.
+    /// </summary>
     private void Move(double horizontalChange)
     {
         if (_drag is not { } drag || !double.IsFinite(horizontalChange)) return;
         drag.Delta += drag.Direction * horizontalChange;
-        var targetWidth = drag.Widths[drag.Target];
-        var stretchWidth = drag.Widths[drag.Stretch];
-        var minimum = Math.Max(drag.Target.MinWidth, targetWidth - (drag.Stretch.MaxWidth - stretchWidth));
-        var maximum = Math.Min(drag.Target.MaxWidth, targetWidth + stretchWidth - drag.Stretch.MinWidth);
-        var width = Math.Clamp(targetWidth + drag.Delta, minimum, maximum);
-        drag.Delta = width - targetWidth;
-        drag.Target.Width = new DataGridLength(width);
-        drag.Stretch.Width = new DataGridLength(stretchWidth - (width - targetWidth));
+        var plan = DataGridColumnSizing.PlanEdgeMove(
+            drag.Widths.Keys.OrderBy(column => column.DisplayIndex).ToArray(),
+            drag.Widths, drag.Target, drag.Stretch, drag.Delta);
+        drag.Delta = plan.Applied;
+        foreach (var (column, width) in plan.Widths) column.Width = new DataGridLength(width);
     }
 
     private void Finish(bool canceled)

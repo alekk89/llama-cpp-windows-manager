@@ -63,6 +63,88 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
         });
     }
 
+    [Theory]
+    [InlineData("Models")]
+    [InlineData("Runtimes")]
+    [InlineData("Packages")]
+    public async Task ColumnsKeepGrowingAfterNameReachesItsMinimum(string page)
+    {
+        await RunStaAsync(async () =>
+        {
+            await using var store = new StateStore(Path.Combine(TestWorkspace, $"cascade-grow-{Guid.NewGuid():N}.db"));
+            await store.InitializeAsync();
+            var (root, grid) = BuildPage(page);
+            var host = new ContentControl { Content = root };
+            var window = CreateResizeWindow(host, 1200);
+            window.Show();
+            try
+            {
+                await new UiLayoutPersistenceService(store).AttachShellAsync(window, host, () => page);
+                await SettleAsync(window);
+                var name = grid.Columns.OfType<DataGridTextColumn>().First();
+                var delete = grid.Columns[^1];
+                var preceding = grid.Columns[^2];
+                // Name gives up all its spare space first.
+                DragColumn(grid, delete, name.ActualWidth - name.MinWidth);
+                await SettleAsync(window);
+                Assert.Equal(name.MinWidth, name.ActualWidth, precision: 1);
+
+                var before = grid.Columns.ToDictionary(column => column, column => column.ActualWidth);
+                var spare = grid.Columns.Where(column => column != name && column != delete && column.CanUserResize)
+                    .Sum(column => before[column] - column.MinWidth);
+                Assert.True(spare >= 30, $"{page}: only {spare} px spare beside the column.");
+                DragColumn(grid, delete, 30);
+                await SettleAsync(window);
+
+                Assert.Equal(before[delete] + 30, delete.ActualWidth, precision: 1);
+                Assert.Equal(name.MinWidth, name.ActualWidth, precision: 1);
+                // The nearest column that still has room gives way.
+                var donor = grid.Columns.Where(column => column != name && column != delete && column.CanUserResize
+                                                         && before[column] - column.MinWidth > 0)
+                    .OrderByDescending(column => column.DisplayIndex).First();
+                Assert.True(donor.ActualWidth < before[donor] - .5, $"{page}: {donor.Header} did not give way.");
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Theory]
+    [InlineData("Models")]
+    [InlineData("Runtimes")]
+    [InlineData("Packages")]
+    public async Task NameKeepsGrowingPastANeighbourAtItsMinimum(string page)
+    {
+        await RunStaAsync(async () =>
+        {
+            await using var store = new StateStore(Path.Combine(TestWorkspace, $"cascade-name-{Guid.NewGuid():N}.db"));
+            await store.InitializeAsync();
+            var (root, grid) = BuildPage(page);
+            var host = new ContentControl { Content = root };
+            var window = CreateResizeWindow(host, 1200);
+            window.Show();
+            try
+            {
+                await new UiLayoutPersistenceService(store).AttachShellAsync(window, host, () => page);
+                await SettleAsync(window);
+                var name = grid.Columns.OfType<DataGridTextColumn>().First();
+                var next = grid.Columns.Where(column => column.DisplayIndex > name.DisplayIndex)
+                    .OrderBy(column => column.DisplayIndex).First();
+                // Drag Name's right edge until the column beside it is at its minimum...
+                DragBoundary(grid, name, false, next.ActualWidth - next.MinWidth);
+                await SettleAsync(window);
+                Assert.Equal(next.MinWidth, next.ActualWidth, precision: 1);
+
+                // ...then keep dragging: the columns further right give way.
+                var before = name.ActualWidth;
+                DragBoundary(grid, name, false, 40);
+                await SettleAsync(window);
+                Assert.Equal(before + 40, name.ActualWidth, precision: 1);
+                Assert.Equal(next.MinWidth, next.ActualWidth, precision: 1);
+            }
+            finally { window.Close(); }
+        });
+    }
+
     private static double ColumnLeft(DataGrid grid, DataGridColumn column)
         => grid.Columns.Where(item => item.Visibility == Visibility.Visible && item.DisplayIndex < column.DisplayIndex)
             .Sum(item => item.ActualWidth);
@@ -92,15 +174,25 @@ public sealed class WpfColumnResizeTests : WpfUiTestBase
                 await SettleAsync(window);
                 foreach (var column in grid.Columns)
                     Assert.Equal(widths[column], column.ActualWidth, precision: 1);
+                // Once Name reaches its minimum the other columns give way too, so the
+                // edge stops only when every column beside it is at its minimum.
+                // Stepping back returns the space in reverse order.
+                var others = grid.Columns.Where(column => column != name && column != delete).ToArray();
+                var floor = name.MinWidth + others.Sum(column => column.CanUserResize ? column.MinWidth : widths[column]);
+                DragBoundarySteps(grid, delete, true, [-10000]);
+                await SettleAsync(window);
+                Assert.Equal(name.MinWidth, name.ActualWidth, precision: 1);
+                Assert.Equal(widths.Values.Sum() - floor, delete.ActualWidth, precision: 1);
                 DragBoundarySteps(grid, delete, true, [-10000, 20]);
                 await SettleAsync(window);
-                Assert.Equal(name.MinWidth + 20, name.ActualWidth, precision: 1);
-                Assert.Equal(widths[delete] + widths[name] - name.MinWidth - 20, delete.ActualWidth, precision: 1);
+                Assert.Equal(widths.Values.Sum() - floor - 20, delete.ActualWidth, precision: 1);
+                Assert.Equal(widths.Values.Sum(), grid.Columns.Sum(column => column.ActualWidth), precision: 1);
+                var squeezed = others.ToDictionary(column => column, column => column.ActualWidth);
                 DragBoundary(grid, delete, true, 10000);
                 await SettleAsync(window);
                 Assert.Equal(delete.MinWidth, delete.ActualWidth, precision: 1);
-                foreach (var column in grid.Columns.Where(column => column != name && column != delete))
-                    Assert.Equal(widths[column], column.ActualWidth, precision: 1);
+                foreach (var column in others)
+                    Assert.Equal(squeezed[column], column.ActualWidth, precision: 1);
                 Assert.True(name.Width.IsAbsolute);
             }
             finally { window.Close(); }
