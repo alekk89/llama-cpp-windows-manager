@@ -11,6 +11,7 @@ public sealed partial class OverviewDashboardCardView
     private const string CopyGlyph = "";
     private const string CopiedGlyph = "";
     private const string CopyFailedGlyph = "";
+    private const double CopyChipHeight = 17;
     private static readonly TimeSpan CopyConfirmationDuration = TimeSpan.FromSeconds(1.6);
     private DispatcherTimer? _copyConfirmation;
 
@@ -18,9 +19,10 @@ public sealed partial class OverviewDashboardCardView
     public bool IsCopyConfirmationVisible => _copyConfirmation?.IsEnabled == true;
 
     /// <summary>
-    /// Adds the card's copy action in a reserved header column beside the title
-    /// and readings, so it never covers a value. It is drawn only while the
-    /// pointer or keyboard focus is in the card; its space stays reserved.
+    /// Adds the card's copy action as a small chip on the card's top edge, above
+    /// the title and readings, so it never covers a value and reserves no column
+    /// beside them. It is drawn only while the pointer or keyboard focus is in
+    /// the card.
     /// </summary>
     public void ConfigureCopy(Action copy)
     {
@@ -29,11 +31,14 @@ public sealed partial class OverviewDashboardCardView
         {
             Content = CopyGlyph,
             FontFamily = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets"),
-            FontSize = 11,
+            FontSize = 10,
             MinHeight = 0,
             MinWidth = 0,
-            Padding = new Thickness(4, 2, 4, 2),
-            Margin = new Thickness(4, 0, -4, 0),
+            Height = CopyChipHeight,
+            Padding = new Thickness(4, 0, 4, 0),
+            // The chip ends just above the content; the rest sits in
+            // the card padding and the gap above the card.
+            Margin = new Thickness(0, -CopyChipHeight - 1, -4, 0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top,
             Visibility = Visibility.Hidden
@@ -41,10 +46,8 @@ public sealed partial class OverviewDashboardCardView
         ToolTipService.SetShowOnDisabled(CopyButton, true);
         AutomationProperties.SetLiveSetting(CopyButton, AutomationLiveSetting.Polite);
         ResetCopyButton();
-        _content.ColumnDefinitions.Add(new ColumnDefinition());
-        _content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(CopyButton, 1);
-        Grid.SetRowSpan(CopyButton, Math.Max(1, _content.RowDefinitions.Count));
+        Root.ClipToBounds = false;
+        System.Windows.Controls.Panel.SetZIndex(CopyButton, 1);
         InvalidateMinimumSize();
         _content.Children.Add(CopyButton);
         CopyButton.Click += (_, args) =>

@@ -97,7 +97,7 @@ public sealed class WpfOverviewDashboardExtrasTests : WpfUiTestBase
     }
 
     [Fact]
-    public async Task CopyButtonKeepsItsOwnSpaceBesideTitledAndUntitledContent()
+    public async Task CopyButtonSitsAboveTitledAndUntitledContentWithoutReservingAColumn()
     {
         await RunStaAsync(() =>
         {
@@ -128,6 +128,11 @@ public sealed class WpfOverviewDashboardExtrasTests : WpfUiTestBase
         Assert.NotEmpty(rowTexts);
         Assert.All(rowTexts, text => Assert.False(Bounds(text, card.Root).IntersectsWith(copyBounds),
             $"Copy button overlaps '{text.Text}'."));
+        // No column is reserved for the button: readings reach the card's right padding.
+        var rowBounds = Bounds(firstRow, card.Root);
+        Assert.True(rowBounds.Right >= card.Root.Width - card.Root.Padding.Right - card.Root.BorderThickness.Right,
+            $"Row ends at {rowBounds.Right} in a {card.Root.Width} wide card.");
+        Assert.True(copyBounds.Bottom <= rowBounds.Top + .5, "Copy button must sit above the readings.");
     }
 
     private static Rect Bounds(FrameworkElement element, Visual ancestor)
