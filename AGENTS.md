@@ -69,7 +69,10 @@ llwmctl sessions list
 
 Use `profiles list --model <model>` for saved variants. When `self` is
 ambiguous, retry with `--endpoint`, `--model`, `--session`, `--port`, or process
-hints; never guess from the UI selection.
+hints; never guess from the UI selection. Pass `--endpoint` with the URL your
+own model is served from. When the Manager does not serve that endpoint (for
+example a cloud API), `self` reports `servedByManager: false` and lifecycle
+commands do not need `--allow-self-stop`.
 
 When a registered GGUF has moved and is shown as missing, preserve its stable
 model and profile IDs with `llwmctl models reattach <model> --file <path.gguf>`.

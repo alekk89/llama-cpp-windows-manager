@@ -119,6 +119,50 @@ public sealed class ControlSelfSafetyTests : ManagerRegressionTestBase
         await admission.EnsureAllowedAsync(request, ControlAdmissionContext.Visual(identity, allowSelfStop: true), TestContext.Current.CancellationToken);
     }
 
+    private const string NotManaged =
+        "{\"ok\":true,\"identified\":false,\"confidence\":\"not-managed\",\"servedByManager\":false,\"matchedBy\":\"endpoint\",\"candidates\":[]}";
+
+    [Theory]
+    [InlineData("unload", "self-model")]
+    [InlineData("restart", "self-model")]
+    public async Task StopsProceedWhenTheManagerDoesNotServeTheAgent(string command, string model)
+    {
+        var result = await RunControlCliAsync([command, model], Respond(NotManaged));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("GET /api/v1/self", result.Requests[0]);
+        Assert.Contains(result.Requests, request => request.StartsWith("POST /api/v1/models/self-model/", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GatewayStopProceedsWhenTheManagerDoesNotServeTheAgent()
+    {
+        var result = await RunControlCliAsync(["operations", "run", "gateway.stop", "--confirm"], Respond(NotManaged));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(["GET /api/v1/self", "POST /api/v1/operations/gateway.stop"], result.Requests);
+    }
+
+    [Theory]
+    // Claude Code reports its own endpoint; a global OPENAI_BASE_URL meant for other tools is ignored.
+    [InlineData("CLAUDECODE=1;OPENAI_BASE_URL=http://localhost:8081/v1;OPENAI_MODEL=local", "", "endpoint=https%3A%2F%2Fapi.anthropic.com")]
+    [InlineData("CLAUDECODE=1;ANTHROPIC_BASE_URL=http://localhost:8082/v1", "", "endpoint=http%3A%2F%2Flocalhost%3A8082%2Fv1")]
+    [InlineData("CLAUDECODE=1;CLAUDE_CODE_USE_BEDROCK=1", "", "endpoint=https%3A%2F%2Fbedrock-runtime.amazonaws.com")]
+    [InlineData("OPENAI_BASE_URL=http://localhost:8081/v1;OPENAI_MODEL=local", "", "model=local&endpoint=http%3A%2F%2Flocalhost%3A8081%2Fv1")]
+    [InlineData("CLAUDECODE=1;LLWM_ENDPOINT=http://127.0.0.1:8088/v1", "", "endpoint=http%3A%2F%2F127.0.0.1%3A8088%2Fv1")]
+    [InlineData("CLAUDECODE=1", "--endpoint http://127.0.0.1:9000/v1", "endpoint=http%3A%2F%2F127.0.0.1%3A9000%2Fv1")]
+    public void SelfHintsUseTheCallingAgentsOwnEndpoint(string environment, string flags, string expectedQuery)
+    {
+        var env = environment.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(pair => pair.Split('=', 2))
+            .ToDictionary(pair => pair[0], pair => pair[1]);
+        var args = new LocalLlmConsole.ControlCli.Arguments(["self", .. flags.Split(' ', StringSplitOptions.RemoveEmptyEntries)]);
+
+        var query = LocalLlmConsole.ControlCli.ControlCliArgumentValues.SelfQuery(args, name => env.GetValueOrDefault(name));
+
+        Assert.Equal("?" + expectedQuery, query);
+    }
+
     private static Func<string, string> Respond(string self)
         => path => path == "/api/v1/self"
             ? self

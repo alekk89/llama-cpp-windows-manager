@@ -40,19 +40,23 @@ internal static class ControlCliArgumentValues
         return JsonValue.Create(value);
     }
 
-    public static string SelfQuery(Arguments args)
+    public static string SelfQuery(Arguments args) => SelfQuery(args, Environment.GetEnvironmentVariable);
+
+    internal static string SelfQuery(Arguments args, Func<string, string?> env)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        Add("sessionId", args.Value("session") ?? Environment.GetEnvironmentVariable("LLWM_SESSION_ID"));
+        var agent = CallingAgent(env);
+        Add("sessionId", args.Value("session") ?? env("LLWM_SESSION_ID"));
         Add("model", args.Value("model")
-            ?? Environment.GetEnvironmentVariable("LLWM_MODEL_ID")
-            ?? Environment.GetEnvironmentVariable("OPENCODE_MODEL")
-            ?? Environment.GetEnvironmentVariable("OPENAI_MODEL")
-            ?? Environment.GetEnvironmentVariable("LLM_MODEL"));
+            ?? env("LLWM_MODEL_ID")
+            ?? (agent is null
+                ? env("OPENCODE_MODEL") ?? env("OPENAI_MODEL") ?? env("LLM_MODEL")
+                : agent.Value.Model));
         Add("endpoint", args.Value("endpoint")
-            ?? Environment.GetEnvironmentVariable("LLWM_ENDPOINT")
-            ?? Environment.GetEnvironmentVariable("OPENAI_BASE_URL")
-            ?? Environment.GetEnvironmentVariable("OPENAI_API_BASE"));
+            ?? env("LLWM_ENDPOINT")
+            ?? agent?.Endpoint
+            ?? env("OPENAI_BASE_URL")
+            ?? env("OPENAI_API_BASE"));
         Add("port", args.Value("port"));
         Add("processId", args.Value("process-id"));
         return values.Count == 0 ? "" : "?" + string.Join("&", values.Select(pair => $"{pair.Key}={Uri.EscapeDataString(pair.Value)}"));
@@ -61,6 +65,21 @@ internal static class ControlCliArgumentValues
         {
             if (!string.IsNullOrWhiteSpace(value)) values[key] = value.Trim();
         }
+    }
+
+    // An agent that marks the commands it runs reports its own model endpoint, so a generic
+    // variable set for other tools (for example OPENAI_BASE_URL pointing at a local model) is not
+    // mistaken for the endpoint the agent itself uses. The Manager then decides whether it serves it.
+    private static (string Endpoint, string? Model)? CallingAgent(Func<string, string?> env)
+    {
+        if (env("CLAUDECODE") != "1") return null;
+        string? Set(string name) => string.IsNullOrWhiteSpace(env(name)) ? null : env(name);
+        var endpoint = env("CLAUDE_CODE_USE_BEDROCK") == "1"
+            ? Set("ANTHROPIC_BEDROCK_BASE_URL") ?? "https://bedrock-runtime.amazonaws.com"
+            : env("CLAUDE_CODE_USE_VERTEX") == "1"
+            ? Set("ANTHROPIC_VERTEX_BASE_URL") ?? "https://aiplatform.googleapis.com"
+            : Set("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com";
+        return (endpoint, Set("ANTHROPIC_MODEL"));
     }
 
 }

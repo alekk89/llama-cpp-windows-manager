@@ -1,7 +1,71 @@
+using System.Net;
+using System.Net.NetworkInformation;
+
 namespace LocalLlmConsole.Services;
+
+/// <summary>How an agent's model endpoint relates to this Manager.</summary>
+public enum AgentEndpointKind
+{
+    /// <summary>A running Manager session's direct endpoint on this machine.</summary>
+    Session,
+    /// <summary>This Manager's model gateway; any running session may serve the agent.</summary>
+    Gateway,
+    /// <summary>Not served by this Manager (another host, a cloud API, or an unused local port).</summary>
+    NotManaged
+}
 
 public static class ControlSelfIdentification
 {
+    /// <summary>
+    /// Decides whether the endpoint an agent's model is served from belongs to this Manager. A
+    /// direct session or the gateway counts only when the endpoint names this machine; anything
+    /// else (for example a cloud API) cannot be a Manager model, so stopping one cannot stop the agent.
+    /// </summary>
+    public static AgentEndpointKind ClassifyEndpoint(
+        Uri endpoint,
+        IReadOnlyList<LoadedModelSessionSnapshot> runningSessions,
+        int gatewayPort,
+        Func<string, bool> isThisMachine,
+        out LoadedModelSessionSnapshot? session)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentNullException.ThrowIfNull(runningSessions);
+        ArgumentNullException.ThrowIfNull(isThisMachine);
+        session = null;
+        if (!endpoint.IsAbsoluteUri || !isThisMachine(endpoint.Host)) return AgentEndpointKind.NotManaged;
+        var matches = runningSessions.Where(candidate => candidate.LaunchSettings.Port == endpoint.Port).ToArray();
+        if (matches.Length == 1)
+        {
+            session = matches[0];
+            return AgentEndpointKind.Session;
+        }
+        return endpoint.Port == gatewayPort ? AgentEndpointKind.Gateway : AgentEndpointKind.NotManaged;
+    }
+
+    /// <summary>True for loopback and wildcard addresses, localhost names, this computer's name, and its interface addresses.</summary>
+    public static bool IsThisMachine(string host)
+    {
+        var name = (host ?? "").Trim().Trim('[', ']').TrimEnd('.');
+        if (name.Length == 0) return false;
+        if (name.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
+            || name.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith(Environment.MachineName + ".", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!IPAddress.TryParse(name, out var address)) return false;
+        if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any)) return true;
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .SelectMany(network => network.GetIPProperties().UnicastAddresses)
+                .Any(unicast => unicast.Address.Equals(address));
+        }
+        catch (NetworkInformationException)
+        {
+            return false;
+        }
+    }
+
     public static bool MatchesModelHint(
         LoadedModelSessionSnapshot session,
         IReadOnlyList<ModelRecord> models,
