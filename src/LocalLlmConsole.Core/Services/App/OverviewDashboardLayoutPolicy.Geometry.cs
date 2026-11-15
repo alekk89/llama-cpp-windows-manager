@@ -70,7 +70,8 @@ public static partial class OverviewDashboardLayoutPolicy
             CurrentVersion,
             cards,
             CardSizesLocked: resetDefaultPresentation ? false : layout.CardSizesLocked,
-            LockedSurfaceWidth: resetDefaultPresentation ? 0 : layout.LockedSurfaceWidth));
+            LockedSurfaceWidth: resetDefaultPresentation ? 0 : layout.LockedSurfaceWidth,
+            MetricThresholds: layout.MetricThresholds));
     }
 
     public static IReadOnlyList<int> DefaultGpuCardIndices(IEnumerable<HostGpuSnapshot> gpus)

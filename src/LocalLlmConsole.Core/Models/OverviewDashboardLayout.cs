@@ -257,7 +257,8 @@ public sealed record OverviewDashboardLayout(
     int Version,
     IReadOnlyList<OverviewDashboardCardLayout> Cards,
     bool CardSizesLocked = false,
-    double LockedSurfaceWidth = 0);
+    double LockedSurfaceWidth = 0,
+    IReadOnlyDictionary<string, OverviewDashboardMetricThreshold>? MetricThresholds = null);
 
 public sealed record OverviewDashboardLegacyVisibility(
     bool ModelStatus,

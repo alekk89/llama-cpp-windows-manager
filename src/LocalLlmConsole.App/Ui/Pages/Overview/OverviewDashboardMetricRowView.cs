@@ -15,7 +15,7 @@ namespace LocalLlmConsole;
 /// A self-labeling semantic metric row. Value, unit, detail, and optional chart
 /// have fixed positions and wrap instead of disappearing when space is limited.
 /// </summary>
-public sealed class OverviewDashboardMetricRowView
+public sealed partial class OverviewDashboardMetricRowView
 {
     private const double LabelFontSize = 10.25;
     private const double MeasurementValueFontSize = 14.5;
@@ -135,6 +135,10 @@ public sealed class OverviewDashboardMetricRowView
         _valueLine.Children.Add(_value);
         Grid.SetColumn(_unit, 1);
         _valueLine.Children.Add(_unit);
+        _alertGlyph = AlertGlyph();
+        _valueLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(_alertGlyph, 2);
+        _valueLine.Children.Add(_alertGlyph);
         Grid.SetColumn(_valueLine, 1);
         Root.Children.Add(_valueLine);
 
@@ -280,7 +284,8 @@ public sealed class OverviewDashboardMetricRowView
         _value.Text = presentation.Value;
         _value.FontSize = unavailable ? UnavailableValueFontSize : _valueFontSize;
         _value.FontWeight = unavailable ? FontWeights.Medium : FontWeights.SemiBold;
-        _value.SetResourceReference(TextBlock.ForegroundProperty, unavailable ? "TextMuted" : "TextMain");
+        _valueUnavailable = unavailable;
+        UpdateAlertVisual();
         _detail.FontStyle = FontStyles.Normal;
         _unit.Text = presentation.Unit;
         _unit.Visibility = string.IsNullOrWhiteSpace(presentation.Unit) ? Visibility.Collapsed : Visibility.Visible;
@@ -311,7 +316,8 @@ public sealed class OverviewDashboardMetricRowView
         _value.Text = Loc.T("Dashboard.ValueUnavailable");
         _value.FontSize = UnavailableValueFontSize;
         _value.FontWeight = FontWeights.Medium;
-        _value.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        _valueUnavailable = true;
+        UpdateAlertVisual();
         _unit.Text = "";
         _unit.Visibility = Visibility.Collapsed;
         _unitColumn.Width = new GridLength(0);
@@ -330,6 +336,8 @@ public sealed class OverviewDashboardMetricRowView
     private void UpdateItemStatus()
     {
         var status = IsUnreported ? UnreportedReason : IsStale ? _freshnessStatus : "";
+        if (EffectiveAlert is { } alert)
+            status = string.IsNullOrEmpty(status) ? alert.Status : $"{alert.Status}. {status}";
         System.Windows.Automation.AutomationProperties.SetItemStatus(Root, status);
     }
 

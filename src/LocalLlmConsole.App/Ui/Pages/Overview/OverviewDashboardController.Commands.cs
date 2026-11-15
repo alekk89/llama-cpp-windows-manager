@@ -89,6 +89,7 @@ public sealed partial class OverviewDashboardController
             menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.Reorder"),
                 () => BeginMetricReorderAsync(current.Id), current.MetricIds.Count > 1));
             menu.Items.Add(ChartMenu(menu, current));
+            menu.Items.Add(ThresholdMenu(menu, current));
             menu.Items.Add(new Separator());
             menu.Items.Add(AsyncItem(menu, Loc.T("Dashboard.RemoveCard"),
                 () => MutateAsync(layout => OverviewDashboardLayoutPolicy.RemoveCard(layout, current.Id))));

@@ -327,8 +327,9 @@ public sealed partial class OverviewDashboardController
     {
         var geometryChanged = false;
         var now = _clock.GetUtcNow();
+        var alerts = EvaluateAlerts(now);
         foreach (var view in _cardViews.Values)
-            geometryChanged |= view.Apply(_readings, pushGraphs, now);
+            geometryChanged |= view.Apply(_readings, pushGraphs, now, alerts);
         _placementDirty |= geometryChanged;
         var width = _dashboard.ActualWidth;
         if (_dragView is null && _resizeView is null

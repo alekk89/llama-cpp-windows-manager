@@ -220,13 +220,17 @@ public sealed partial class OverviewDashboardCardView
     public bool Apply(
         IReadOnlyDictionary<string, OverviewDashboardMetricReading> readings,
         bool pushGraph,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IReadOnlyDictionary<string, OverviewDashboardMetricAlert>? alerts = null)
     {
         var geometryChanged = false;
         foreach (var metricId in Layout.MetricIds.Where(_rows.ContainsKey))
         {
             readings.TryGetValue(metricId, out var reading);
             geometryChanged |= _rows[metricId].Apply(reading);
+            OverviewDashboardMetricAlert? alert = null;
+            alerts?.TryGetValue(metricId, out alert);
+            geometryChanged |= _rows[metricId].SetAlert(alert);
         }
 
         var visibleRows = Layout.MetricIds.Where(_rows.ContainsKey).Select(metricId => _rows[metricId])

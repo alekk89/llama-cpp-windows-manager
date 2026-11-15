@@ -167,7 +167,8 @@ public static partial class OverviewDashboardLayoutPolicy
             CurrentVersion,
             cards,
             cardSizesLocked,
-            cardSizesLocked ? layout.LockedSurfaceWidth : 0);
+            cardSizesLocked ? layout.LockedSurfaceWidth : 0,
+            OverviewDashboardThresholdPolicy.Normalize(layout.MetricThresholds));
     }
 
     public static OverviewDashboardLegacyVisibility LegacyVisibility(OverviewDashboardLayout? layout)
