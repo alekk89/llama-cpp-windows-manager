@@ -266,6 +266,8 @@
   "Overview.ModelStatusLabel": "Model Status",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Choose a local model or a group. A group loads every assigned launch profile after a full VRAM preflight.",
+  "Overview.SelectionFallback": "“{0}” is no longer available. Overview now shows “{1}”.",
+  "Overview.SelectionRemoved": "“{0}” is no longer available.",
   "Overview.LoadButton": "Load",
   "Overview.LoadedButton": "Loaded",
   "Overview.MissingModelLoadTooltip": "The model file is missing. Restore it or remove the catalog entry before loading.",

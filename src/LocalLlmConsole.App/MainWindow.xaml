@@ -182,6 +182,10 @@
       <Border Style="{StaticResource WorkspaceShell}">
         <ContentControl x:Name="PageHost"/>
       </Border>
+      <local:ShellNoticeBar x:Name="ShellNotice"
+                            VerticalAlignment="Bottom"
+                            HorizontalAlignment="Center"
+                            Margin="16,0,16,20"/>
       </Grid>
       </Grid>
     </Grid>

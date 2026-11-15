@@ -201,6 +201,8 @@
   "Overview.ModelStatusLabel": "Modelstatus",
   "Overview.ModelLabel": "Model",
   "Tooltip.OverviewModelCombo": "Kies een lokaal model om te laden met het opgeslagen startprofiel.",
+  "Overview.SelectionFallback": "‘{0}’ is niet meer beschikbaar. Het overzicht toont nu ‘{1}’.",
+  "Overview.SelectionRemoved": "‘{0}’ is niet meer beschikbaar.",
   "Overview.LoadButton": "Laden",
   "Overview.LoadedButton": "Geladen",
   "Overview.MissingModelLoadTooltip": "Het modelbestand ontbreekt. Herstel het of verwijder de catalogusvermelding voordat u het laadt.",

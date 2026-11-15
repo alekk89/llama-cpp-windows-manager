@@ -223,6 +223,8 @@
   "Overview.ModelStatusLabel": "Trạng thái mô hình",
   "Overview.ModelLabel": "Mô hình",
   "Tooltip.OverviewModelCombo": "Chọn một mô hình cục bộ để tải cùng với cấu hình khởi chạy đã lưu.",
+  "Overview.SelectionFallback": "“{0}” không còn khả dụng. Tổng quan hiện hiển thị “{1}”.",
+  "Overview.SelectionRemoved": "“{0}” không còn khả dụng.",
   "Overview.LoadButton": "Tải",
   "Overview.LoadedButton": "Đã tải",
   "Overview.MissingModelLoadTooltip": "Tệp mô hình bị thiếu. Hãy khôi phục tệp hoặc xóa mục danh mục trước khi tải.",

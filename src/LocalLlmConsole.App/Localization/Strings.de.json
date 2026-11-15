@@ -202,6 +202,8 @@
   "Overview.ModelStatusLabel": "Modellstatus",
   "Overview.ModelLabel": "Modell",
   "Tooltip.OverviewModelCombo": "Wählen Sie ein lokales Modell aus, das mit seinem gespeicherten Startprofil geladen werden soll.",
+  "Overview.SelectionFallback": "„{0}“ ist nicht mehr verfügbar. Die Übersicht zeigt jetzt „{1}“.",
+  "Overview.SelectionRemoved": "„{0}“ ist nicht mehr verfügbar.",
   "Overview.LoadButton": "Laden",
   "Overview.LoadedButton": "Geladen",
   "Overview.MissingModelLoadTooltip": "Die Modelldatei fehlt. Stellen Sie sie wieder her oder entfernen Sie vor dem Laden den Katalogeintrag.",

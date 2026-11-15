@@ -169,6 +169,8 @@
   "Overview.ModelStatusLabel": "モデル状態",
   "Overview.ModelLabel": "モデル",
   "Tooltip.OverviewModelCombo": "保存された起動プロファイルと共に読み込むローカルモデルを選択します。",
+  "Overview.SelectionFallback": "「{0}」は使用できなくなりました。概要には「{1}」が表示されています。",
+  "Overview.SelectionRemoved": "「{0}」は使用できなくなりました。",
   "Overview.LoadButton": "読み込み",
   "Overview.LoadedButton": "読み込み済み",
   "Overview.MissingModelLoadTooltip": "モデルファイルが見つかりません。読み込む前に復元するか、カタログ登録を削除してください。",

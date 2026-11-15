@@ -86,7 +86,13 @@ other running profiles for that model.
 The model and launch-profile selectors are searchable. Opening either dropdown
 shows a search field; type any part of a visible name to filter its choices
 immediately. Use the star beside a model or profile to add or remove it from
-favorites. Favorites remain at the top of equivalent selector lists.
+favorites. Favorites remain at the top of equivalent selector lists. A selection
+you change while the lists refresh is kept. If the selected model or group is
+removed, Overview selects the first remaining choice and shows a notice.
+
+When an action cannot start because another task is still running, a short
+notice appears at the bottom of the page area naming the running task; it closes
+by itself after a few seconds.
 
 Double-click a loaded-session or gateway row, or select its endpoint link, to
 open a read-only endpoint report. **Copy report** excludes the model API key;

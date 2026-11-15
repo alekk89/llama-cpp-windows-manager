@@ -222,6 +222,8 @@
   "Overview.ModelStatusLabel": "Статус модели",
   "Overview.ModelLabel": "Модель",
   "Tooltip.OverviewModelCombo": "Выберите локальную модель для загрузки с сохранённым профилем запуска.",
+  "Overview.SelectionFallback": "«{0}» больше недоступна. В обзоре теперь показана «{1}».",
+  "Overview.SelectionRemoved": "«{0}» больше недоступна.",
   "Overview.LoadButton": "Загрузить",
   "Overview.LoadedButton": "Загружено",
   "Overview.MissingModelLoadTooltip": "Файл модели отсутствует. Восстановите его или удалите запись из каталога перед загрузкой.",

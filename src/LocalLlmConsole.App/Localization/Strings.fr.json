@@ -179,6 +179,8 @@
   "Overview.ModelStatusLabel": "État du modèle",
   "Overview.ModelLabel": "Modèle",
   "Tooltip.OverviewModelCombo": "Choisissez un modèle local à charger avec son profil de lancement enregistré.",
+  "Overview.SelectionFallback": "« {0} » n'est plus disponible. La vue d'ensemble affiche désormais « {1} ».",
+  "Overview.SelectionRemoved": "« {0} » n'est plus disponible.",
   "Overview.LoadButton": "Charger",
   "Overview.LoadedButton": "Chargé",
   "Overview.MissingModelLoadTooltip": "Le fichier du modèle est introuvable. Restaurez-le ou supprimez son entrée du catalogue avant le chargement.",

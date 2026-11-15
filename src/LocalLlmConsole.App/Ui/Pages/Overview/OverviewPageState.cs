@@ -124,20 +124,22 @@ public sealed class OverviewPageState
             LaunchProfileCombo.SelectedIndex = 0;
     }
 
-    public void SelectModelChoice(string? selectedId, IReadOnlyList<OverviewModelChoice> modelChoices)
+    /// <summary>Selects <paramref name="selectedId"/>, falling back to the first choice, and returns the selection.</summary>
+    public OverviewModelChoice? SelectModelChoice(string? selectedId, IReadOnlyList<OverviewModelChoice> modelChoices)
     {
         ArgumentNullException.ThrowIfNull(modelChoices);
-        if (ModelCombo is null) return;
+        if (ModelCombo is null) return null;
 
         if (modelChoices.Count == 0)
         {
             ModelCombo.SelectedIndex = -1;
-            return;
+            return null;
         }
 
         var match = modelChoices.FirstOrDefault(model => string.Equals(model.Id, selectedId, StringComparison.OrdinalIgnoreCase))
             ?? modelChoices.First();
         ModelCombo.SelectedValue = match.Id;
+        return match;
     }
 
     public void SetLaunchProfileEnabled(bool enabled)

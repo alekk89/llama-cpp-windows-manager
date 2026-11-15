@@ -228,6 +228,8 @@
   "Overview.ModelStatusLabel": "Modelltillstånd",
   "Overview.ModelLabel": "Modell",
   "Tooltip.OverviewModelCombo": "Välj en lokal modell att ladda med dess sparade startprofil.",
+  "Overview.SelectionFallback": "”{0}” är inte längre tillgänglig. Översikten visar nu ”{1}”.",
+  "Overview.SelectionRemoved": "”{0}” är inte längre tillgänglig.",
   "Overview.LoadButton": "Ladda",
   "Overview.LoadedButton": "Inläst",
   "Overview.MissingModelLoadTooltip": "Modellfilen saknas. Återställ den eller ta bort katalogposten innan du laddar.",
